@@ -163,9 +163,10 @@ bool isect_line_line_strict_v3(const float v1[3], const float v2[3],
                                const float v3[3], const float v4[3],
                                float vi[3], float *r_lambda);
 
-bool isect_ray_plane_v3(const float p1[3], const float d[3],
-                        const float v0[3], const float v1[3], const float v2[3],
-                        float *r_lambda, const int clip);
+bool isect_ray_plane_v3(
+        const float p1[3], const float d[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, const bool clip);
 
 bool isect_point_planes_v3(float (*planes)[4], int totplane, const float p[3]);
 bool isect_line_plane_v3(float out[3], const float l1[3], const float l2[3],
@@ -176,22 +177,52 @@ bool isect_plane_plane_v3(float r_isect_co[3], float r_isect_no[3],
                           const float plane_b_co[3], const float plane_b_no[3]) ATTR_WARN_UNUSED_RESULT;
 
 /* line/ray triangle */
-bool isect_line_tri_v3(const float p1[3], const float p2[3],
-                       const float v0[3], const float v1[3], const float v2[3], float *r_lambda, float r_uv[2]);
-bool isect_line_tri_epsilon_v3(const float p1[3], const float p2[3],
-                       const float v0[3], const float v1[3], const float v2[3],
-                       float *r_lambda, float r_uv[2], const float epsilon);
-bool isect_ray_tri_v3(const float p1[3], const float d[3],
-                      const float v0[3], const float v1[3], const float v2[3], float *r_lambda, float r_uv[2]);
-bool isect_ray_tri_threshold_v3(const float p1[3], const float d[3],
-                                const float v0[3], const float v1[3], const float v2[3], float *r_lambda, float r_uv[2], const float threshold);
-bool isect_ray_tri_epsilon_v3(const float p1[3], const float d[3],
-                              const float v0[3], const float v1[3], const float v2[3], float *r_lambda, float r_uv[2], const float epsilon);
+bool isect_line_tri_v3(
+        const float p1[3], const float p2[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, float r_uv[2]);
+bool isect_line_tri_epsilon_v3(
+        const float p1[3], const float p2[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, float r_uv[2], const float epsilon);
+bool isect_ray_tri_v3(
+        const float p1[3], const float d[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, float r_uv[2]);
+bool isect_ray_tri_threshold_v3(
+        const float p1[3], const float d[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, float r_uv[2], const float threshold);
+bool isect_ray_tri_epsilon_v3(
+        const float p1[3], const float d[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, float r_uv[2], const float epsilon);
 bool isect_tri_tri_epsilon_v3(
         const float t_a0[3], const float t_a1[3], const float t_a2[3],
         const float t_b0[3], const float t_b1[3], const float t_b2[3],
         float r_i1[3], float r_i2[3],
         const float epsilon);
+
+/* water-tight raycast (requires pre-calculation) */
+struct IsectRayPrecalc {
+	/* Maximal dimension kz, and orthogonal dimensions. */
+	int kx, ky, kz;
+
+	/* Shear constants. */
+	float sx, sy, sz;
+};
+
+void isect_ray_tri_watertight_v3_precalc(
+        struct IsectRayPrecalc *isect_precalc, const float dir[3]);
+bool isect_ray_tri_watertight_v3(
+        const float P[3], const struct IsectRayPrecalc *isect_precalc,
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_dist, float r_uv[2]);
+/* slower version which calculates IsectRayPrecalc each time */
+bool isect_ray_tri_watertight_v3_simple(
+        const float P[3], const float dir[3],
+        const float v0[3], const float v1[3], const float v2[3],
+        float *r_lambda, float r_uv[2]);
 
 /* point in polygon */
 bool isect_point_poly_v2(const float pt[2], const float verts[][2], const unsigned int nr, const bool use_holes);
