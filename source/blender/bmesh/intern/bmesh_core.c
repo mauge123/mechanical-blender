@@ -630,6 +630,20 @@ int bmesh_elem_check(void *element, const char htype)
 				err |= (1 << 23);
 			break;
 		}
+#ifdef WITH_MECHANICAL
+		case BM_DIM:
+		{
+			BMDim *d = element;
+			if (d->v1 && d->v1->head.htype != BM_VERT) {
+				err |= (1 << 24);
+			}
+
+			if (d->v2 && d->v2->head.htype != BM_VERT) {
+				err |= (1 << 24);
+			}
+			break;
+		}
+#endif
 		default:
 			BLI_assert(0);
 			break;
@@ -2677,3 +2691,88 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 	SWAP(void *, f_a->head.data, f_b->head.data);
 	SWAP(int, f_a->head.index, f_b->head.index);
 }
+
+#ifdef WITH_MECHANICAL
+static void bm_kill_only_dim(BMesh *bm, BMDim *d)
+{
+	bm->totdim--;
+	bm->elem_index_dirty |= BM_DIM;
+	bm->elem_table_dirty |= BM_DIM;
+
+	BM_select_history_remove(bm, d);
+
+	if (d->head.data)
+		CustomData_bmesh_free_block(&bm->vdata, &d->head.data);
+
+	if (bm->dtoolflagpool) {
+		BLI_mempool_free(bm->dtoolflagpool, d->oflags);
+	}
+	BLI_mempool_free(bm->dpool, d);
+}
+
+
+
+/**
+ * \brief Main function for creating a new dimension.
+ *
+ * \note base on BM_edge_create function
+ */
+BMDim *BM_dim_create(
+        BMesh *bm, BMVert *v1, BMVert *v2,
+        const BMDim *d_example, const eBMCreateFlag create_flag)
+{
+	BMDim *d;
+
+	BLI_assert(v1 != v2);
+	BLI_assert(v1->head.htype == BM_VERT && v2->head.htype == BM_VERT);
+	BLI_assert((d_example == NULL) || (d_example->head.htype == BM_DIM));
+	BLI_assert(!(create_flag & 1));
+
+
+	d = BLI_mempool_alloc(bm->dpool);
+
+
+	/* --- assign all members --- */
+	d->head.data = NULL;
+
+#ifdef USE_DEBUG_INDEX_MEMCHECK
+	DEBUG_MEMCHECK_INDEX_INVALIDATE(d)
+#else
+	BM_elem_index_set(d, -1); /* set_ok_invalid */
+#endif
+
+	d->head.htype = BM_DIM;
+	d->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
+	d->head.api_flag = 0;
+
+	/* allocate flags */
+	d->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+
+	d->v1 = v1;
+	d->v2 = v2;
+
+
+
+	/* --- done --- */
+
+
+	/* may add to middle of the pool */
+	bm->elem_index_dirty |= BM_DIM;
+	bm->elem_table_dirty |= BM_DIM;
+
+	bm->totdim++;
+
+	if (!(create_flag & BM_CREATE_SKIP_CD)) {
+		if (d_example) {
+			BM_elem_attrs_copy(bm, bm, d_example, d);
+		}
+		else {
+			CustomData_bmesh_set_default(&bm->edata, &d->head.data);
+		}
+	}
+
+	BM_CHECK_ELEMENT(d);
+
+	return d;
+}
+#endif

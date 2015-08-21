@@ -141,6 +141,25 @@ typedef struct drawDMVerts_userData {
 	float imat[4][4];
 } drawDMVerts_userData;
 
+#ifdef WITH_MECHANICAL
+typedef struct drawDMDims_userData {
+	BMEditMesh *em;
+
+	BMDim *edm_act;
+	ARegion *ar;
+	char sel;
+
+	/* cached theme values */
+	unsigned char th_editmesh_active[4];
+	unsigned char th_vertex_select[4];
+	unsigned char th_vertex[4];
+	unsigned char th_skin_root[4];
+	float th_vertex_size;
+
+} drawDMDims_userData;
+
+#endif
+
 typedef struct drawDMEdgesSel_userData {
 	BMesh *bm;
 
@@ -2654,6 +2673,104 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 	bglEnd();
 }
 
+#ifdef WITH_MECHANICAL
+/**
+ * /Brief Draw verts with color set based on selection
+ *
+ * /param no1 normal for vertex 1
+ * /param no2 normal for vertex 2
+ */
+static void draw_dm_dims__mapFunc(void *userData, int index, const float no1[3],const float no2[3])
+{
+	drawDMDims_userData *data = userData;
+	BMEditMesh *em = data->em;
+	ARegion *ar = data->ar;
+	BMDim *edm = BM_dim_at_index(em->bm, index);
+
+	float end[3], start[3];
+	float temp[3];
+	float d[3];
+	float d1[3],d2[3];
+	float n1[3];
+	float txt_pos[3];
+	const short txt_flag = V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII;
+
+
+	//Use only one normal, as the lines should be parallel!
+	sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
+	cross_v3_v3v3(temp,d,no1);
+	cross_v3_v3v3(n1,temp,d);
+	normalize_v3(n1);
+	add_v3_v3v3(start,n1, edm->v1->co);
+	add_v3_v3v3(end, n1, edm->v2->co);
+
+	mul_v3_fl(n1,1.2f);
+	add_v3_v3v3(d1, n1, edm->v1->co);
+	add_v3_v3v3(d2, n1, edm->v2->co);
+
+	sub_v3_v3v3(txt_pos, end, start);
+	mul_v3_fl(txt_pos, 0.5);
+	add_v3_v3(txt_pos, start);
+
+
+	glBegin(GL_POINTS);
+	{
+		bglVertex3fv(start);
+		bglVertex3fv(end);
+	}
+	glEnd();
+
+	glBegin(GL_LINES);
+	{
+		bglVertex3fv(edm->v1->co);
+		bglVertex3fv(d1);
+
+		bglVertex3fv(edm->v2->co);
+		bglVertex3fv(d2);
+
+		bglVertex3fv(start);
+		bglVertex3fv(end);
+	}
+	glEnd();
+
+	{
+		char numstr[32]; /* Stores the measurement display text here */
+		size_t numstr_len;
+		unsigned char col[4] = {0, 0, 0, 255}; /* color of the text to draw */
+		bglMats mats = {{0}};
+
+		//draw dimension length
+		view3d_get_transformation(ar, ar->regiondata, em->ob, &mats);
+		//ED_view3d_clipping_calc(&bb, clip_planes, &mats, &rect);
+
+		numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(edm->v1->co, edm->v2->co));
+
+		view3d_cached_text_draw_add(txt_pos, numstr, numstr_len, 0, txt_flag, col);
+	}
+
+}
+
+
+static void draw_dm_dims(ARegion *ar, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
+                          RegionView3D* UNUSED(rv3d))
+{
+	drawDMDims_userData data;
+	data.sel = sel;
+	data.edm_act = edm_act;
+	data.em = em;
+	data.ar = ar;
+
+	/* Cache theme values */
+	UI_GetThemeColor4ubv(TH_EDITMESH_ACTIVE, data.th_editmesh_active);
+	UI_GetThemeColor4ubv(TH_VERTEX_SELECT, data.th_vertex_select);
+	UI_GetThemeColor4ubv(TH_VERTEX, data.th_vertex);
+	UI_GetThemeColor4ubv(TH_SKIN_ROOT, data.th_skin_root);
+	data.th_vertex_size = UI_GetThemeValuef(TH_VERTEX_SIZE);
+	dm->foreachMappedDim(dm, draw_dm_dims__mapFunc, &data, DM_FOREACH_NOP);
+}
+
+#endif
+
 /* Draw edges with color set based on selection */
 static DMDrawOption draw_dm_edges_sel__setDrawOptions(void *userData, int index)
 {
@@ -3299,6 +3416,64 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 	}
 }
 
+
+#ifdef WITH_MECHANICAL
+static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* UNUSED(obedit),
+                                BMEditMesh *em, DerivedMesh *cageDM, BMDim *edm_act,
+                                RegionView3D* rv3d)
+{
+	ToolSettings *ts = scene->toolsettings;
+	int sel;
+
+	if (v3d->zbuf) glDepthMask(0);  /* disable write in zbuffer, zbuf select */
+
+	for (sel = 0; sel < 2; sel++) {
+		unsigned char col[4], fcol[4];
+		int pass;
+
+		UI_GetThemeColor3ubv(sel ? TH_VERTEX_SELECT : TH_VERTEX, col);
+		UI_GetThemeColor3ubv(sel ? TH_FACE_DOT : TH_WIRE_EDIT, fcol);
+
+		for (pass = 0; pass < 2; pass++) {
+			float size = UI_GetThemeValuef(TH_VERTEX_SIZE);
+			float fsize = UI_GetThemeValuef(TH_FACEDOT_SIZE);
+
+			if (pass == 0) {
+				if (v3d->zbuf && !(v3d->flag & V3D_ZBUF_SELECT)) {
+					glDisable(GL_DEPTH_TEST);
+
+					glEnable(GL_BLEND);
+				}
+				else {
+					continue;
+				}
+
+				size = (size > 2.1f ? size / 2.0f : size);
+				fsize = (fsize > 2.1f ? fsize / 2.0f : fsize);
+				col[3] = fcol[3] = 100;
+			}
+			else {
+				col[3] = fcol[3] = 255;
+			}
+
+			if (ts->selectmode & SCE_SELECT_VERTEX) {
+				glPointSize(size);
+				glColor4ubv(col);
+				draw_dm_dims(ar, em, cageDM, sel, edm_act, rv3d);
+			}
+
+			if (pass == 0) {
+				glDisable(GL_BLEND);
+				glEnable(GL_DEPTH_TEST);
+			}
+		}
+	}
+
+	if (v3d->zbuf) glDepthMask(1);
+	glPointSize(1.0);
+}
+#endif
+
 static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMesh *em, UnitSettings *unit)
 {
 	/* Do not use ascii when using non-default unit system, some unit chars are utf8 (micro, square, etc.).
@@ -3724,6 +3899,9 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 	BMFace *efa_act = BM_mesh_active_face_get(em->bm, false, true); /* annoying but active faces is stored differently */
 	BMEdge *eed_act = NULL;
 	BMVert *eve_act = NULL;
+#ifdef WITH_MECHANICAL
+	BMDim *edm_act = NULL;
+#endif
 	bool use_occlude_wire = (v3d->flag2 & V3D_OCCLUDE_WIRE) && (dt > OB_WIRE);
 	
 	if (em->bm->selected.last) {
@@ -3743,7 +3921,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 		}
 	}
 	
-	BM_mesh_elem_table_ensure(em->bm, BM_VERT | BM_EDGE | BM_FACE);
+	BM_mesh_elem_table_ensure(em->bm, BM_VERT | BM_EDGE | BM_FACE | BM_DIM);
 
 	if (check_object_draw_editweight(me, finalDM)) {
 		if (dt > OB_WIRE) {
@@ -3948,6 +4126,10 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			draw_em_indices(em);
 		}
 	}
+
+#ifdef WITH_MECHANICAL
+	draw_em_fancy_dims(ar, scene, v3d, ob, em, cageDM, edm_act, rv3d);
+#endif
 
 	if (dt > OB_WIRE) {
 		glDepthMask(1);

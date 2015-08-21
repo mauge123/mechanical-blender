@@ -346,6 +346,25 @@ static void emDM_foreachMappedEdge(
 		}
 	}
 }
+#ifdef WITH_MECHANICAL
+static void emDM_foreachMappedDim(
+        DerivedMesh *dm,
+        void (*func)(void *userData, int index, const float v1[3], const float v2[3]),
+        void *userData,
+        DMForeachFlag flag)
+{
+	EditDerivedBMesh *bmdm = (EditDerivedBMesh *)dm;
+	BMesh *bm = bmdm->em->bm;
+	BMDim *edm;
+	BMIter iter;
+	int i;
+
+
+	BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
+		func(userData, i, edm->v1->no, edm->v2->no);
+	}
+}
+#endif
 
 static void emDM_drawMappedEdges(
         DerivedMesh *dm,
@@ -1871,6 +1890,7 @@ DerivedMesh *getEditDerivedBMesh(
 	bmdm->dm.foreachMappedLoop = emDM_foreachMappedLoop;
 	bmdm->dm.foreachMappedEdge = emDM_foreachMappedEdge;
 	bmdm->dm.foreachMappedFaceCenter = emDM_foreachMappedFaceCenter;
+	bmdm->dm.foreachMappedDim = emDM_foreachMappedDim;
 
 	bmdm->dm.drawEdges = emDM_drawEdges;
 	bmdm->dm.drawMappedEdges = emDM_drawMappedEdges;

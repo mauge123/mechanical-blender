@@ -150,6 +150,15 @@ BLI_INLINE bool BM_iter_init(BMIter *iter, BMesh *bm, const char itype, void *da
 			iter->step  = (BMIter__step_cb)bmiter__loop_of_edge_step;
 			iter->data.loop_of_edge.edata = (BMEdge *)data;
 			break;
+#ifdef WITH_MECHANICAL
+		case BM_DIMS_OF_MESH:
+			BLI_assert(bm != NULL);
+			BLI_assert(data == NULL);
+			iter->begin = (BMIter__begin_cb)bmiter__elem_of_mesh_begin;
+			iter->step  = (BMIter__step_cb)bmiter__elem_of_mesh_step;
+			iter->data.elem_of_mesh.pooliter.pool = bm->dpool;
+			break;
+#endif
 		default:
 			/* should never happen */
 			BLI_assert(0);

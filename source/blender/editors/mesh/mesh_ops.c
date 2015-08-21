@@ -82,6 +82,10 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_spin);
 	WM_operatortype_append(MESH_OT_screw);
 
+#ifdef WITH_MECHANICAL
+	WM_operatortype_append(MESH_OT_mechanical_dimension_add);
+#endif
+
 	WM_operatortype_append(MESH_OT_extrude_region);
 	WM_operatortype_append(MESH_OT_extrude_faces_indiv);
 	WM_operatortype_append(MESH_OT_extrude_edges_indiv);

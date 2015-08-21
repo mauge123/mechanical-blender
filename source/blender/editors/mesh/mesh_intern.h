@@ -86,6 +86,10 @@ void MESH_OT_primitive_monkey_add(struct wmOperatorType *ot);
 void MESH_OT_primitive_uv_sphere_add(struct wmOperatorType *ot);
 void MESH_OT_primitive_ico_sphere_add(struct wmOperatorType *ot);
 
+#ifdef WITH_MECHANICAL
+void MESH_OT_mechanical_dimension_add(struct wmOperatorType *ot);
+#endif
+
 
 /* *** editmesh_bevel.c *** */
 void MESH_OT_bevel(struct wmOperatorType *ot);

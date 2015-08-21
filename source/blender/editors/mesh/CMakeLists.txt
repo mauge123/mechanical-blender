@@ -83,6 +83,14 @@ if(WITH_FREESTYLE)
 	add_definitions(-DWITH_FREESTYLE)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL)
+
+	list(APPEND SRC
+		editmesh_dimension.c
+	)
+endif()
+
 if(WITH_BULLET)
 	add_definitions(-DWITH_BULLET)
 endif()

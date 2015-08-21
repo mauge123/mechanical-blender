@@ -108,4 +108,11 @@ BMVert *bmesh_urmv_loop_region(BMesh *bm, BMLoop *l_sep);
 
 void    bmesh_face_swap_data(BMFace *f_a, BMFace *f_b);
 
+#ifdef WITH_MECHANICAL
+BMDim *BM_dim_create(
+        BMesh *bm, BMVert *v1, BMVert *v2,
+        const BMDim *e_example, const eBMCreateFlag create_flag);
+#endif
+
+
 #endif /* __BMESH_CORE_H__ */

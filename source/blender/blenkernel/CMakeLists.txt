@@ -500,6 +500,12 @@ if(WITH_FREESTYLE)
 	add_definitions(-DWITH_FREESTYLE)
 endif()
 
+
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL)
+endif()
+
+
 if(WITH_OPENSUBDIV)
 	add_definitions(-DWITH_OPENSUBDIV)
 	list(APPEND INC_SYS

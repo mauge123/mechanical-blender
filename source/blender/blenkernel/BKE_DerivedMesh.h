@@ -488,6 +488,14 @@ struct DerivedMesh {
 	/** Release reference to the DerivedMesh. This function decides internally
 	 * if the DerivedMesh will be freed, or cached for later use. */
 	void (*release)(DerivedMesh *dm);
+
+#ifdef WITH_MECHANICAL
+	void (*foreachMappedDim)(DerivedMesh *dm,
+	                          void (*func)(void *userData, int index, const float v1[3],
+	                                       const float v2[3]),
+	                          void *userData,
+	                          DMForeachFlag flag);
+#endif
 };
 
 void DM_init_funcs(DerivedMesh *dm);

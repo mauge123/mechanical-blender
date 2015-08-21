@@ -1207,6 +1207,9 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 	bm->vtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totvert, 512, BLI_MEMPOOL_NOP);
 	bm->etoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totedge, 512, BLI_MEMPOOL_NOP);
 	bm->ftoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totface, 512, BLI_MEMPOOL_NOP);
+#ifdef WITH_MECHANICAL
+	bm->dtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totdim, 512, BLI_MEMPOOL_NOP);
+#endif
 
 #pragma omp parallel sections if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
 	{
