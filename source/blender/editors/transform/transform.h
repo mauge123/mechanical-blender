@@ -310,6 +310,7 @@ typedef struct TransData {
 	float  factor;       /* Factor of the transformation (for Proportionnal Editing)                       */
 	float *loc;          /* Location of the data to transform                                              */
 	float  iloc[3];      /* Initial location                                                               */
+	float  mloc[3];      /* Modified Inital location                                                       */
 	float *val;          /* Value pointer for special transforms */
 	float  ival;         /* Old value*/
 	float  center[3];	 /* Individual data center                                                         */
@@ -436,6 +437,7 @@ typedef struct TransInfo {
 #define TRANS_RUNNING	1
 #define TRANS_CONFIRM	2
 #define TRANS_CANCEL	3
+#define TRANS_BASE_POINT 4
 
 /* transinfo->flag */
 #define T_OBJECT		(1 << 0)
@@ -541,12 +543,16 @@ typedef struct TransInfo {
 #define TARGET_INIT		2
 #define POINT_INIT		4
 #define MULTI_POINTS	8
+#define TARGET_FIXED	16
 
 bool initTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 void saveTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op);
 int  transformEvent(TransInfo *t, const struct wmEvent *event);
 void transformApply(struct bContext *C, TransInfo *t);
 int  transformEnd(struct bContext *C, TransInfo *t);
+#ifdef WITH_MECHANICAL
+int  transformEventBasePoint(TransInfo *t, const struct wmEvent *event);
+#endif
 
 void setTransformViewMatrices(TransInfo *t);
 void setTransformViewAspect(TransInfo *t, float r_aspect[3]);
@@ -748,5 +754,10 @@ void projectVertSlideData(TransInfo *t, bool is_final);
 
 /* TODO. transform_queries.c */
 bool checkUseAxisMatrix(TransInfo *t);
+
+#ifdef WITH_MECHANICAL
+void modifyTranslationOrigin(TransData *td, float* npoint);
+void fixSnapTarget (TransInfo *t, float* target) ;
+#endif
 
 #endif

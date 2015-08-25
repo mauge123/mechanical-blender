@@ -379,12 +379,42 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 	return retval; /* return 0 on error */
 }
 
+static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	int exit_code;
+
+	TransInfo *t = op->customdata;
+
+	/* XXX insert keys are called here, and require context */
+	t->context = C;
+	exit_code = transformEventBasePoint(t, event);
+	t->context = NULL;
+
+	t->tsnap.calcSnap(t, t->values);
+	t->tsnap.targetSnap(t);
+
+	if (!exit_code) {
+		exit_code |= transformEnd(C, t);
+		if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+			transformops_exit(C, op);
+			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
+		}
+	}
+
+	return exit_code;
+
+}
+
 static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
 
 	TransInfo *t = op->customdata;
 	const enum TfmMode mode_prev = t->mode;
+
+	if (t->state == TRANS_BASE_POINT){
+		return transform_modal_base_point (C,op,event);
+	}
 
 #if 0
 	// stable 2D mouse coords map to different 3D coords while the 3D mouse is active

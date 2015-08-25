@@ -959,6 +959,51 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 	}
 }
 
+#ifdef WITH_MECHANICAL
+int transformEventBasePoint(TransInfo *t, const wmEvent *event)
+{
+	bool handled = false;
+	float tvec[3];
+	if (event->type == MOUSEMOVE) {
+		copy_v2_v2_int(t->mval, event->mval);
+		applyMouseInput(t, &t->mouse, t->mval, t->values);
+	}else if (event->type == EVT_MODAL_MAP) {
+		switch (event->val) {
+			case TFM_MODAL_CANCEL:
+				t->state = TRANS_CANCEL;
+				handled = true;
+				break;
+			case TFM_MODAL_CONFIRM:
+				modifyTranslationOrigin (t->data, t->values);
+				sub_v3_v3v3(tvec, t->tsnap.snapPoint, t->values);
+				fixSnapTarget (t, tvec);
+				t->redraw |= TREDRAW_HARD;
+				t->state = TRANS_RUNNING;
+				handled=true;
+				break;
+		}
+	} else if (event->val == KM_PRESS) {
+		switch (event->type) {
+			case RIGHTMOUSE:
+				t->state = TRANS_CANCEL;
+				handled = true;
+				break;
+			case ESCKEY:
+				t->state = TRANS_CANCEL;
+				handled = true;
+				break;
+			}
+	}
+
+	if (handled) {
+		return 0;
+	} else {
+		return OPERATOR_PASS_THROUGH;
+	}
+}
+
+#endif
+
 int transformEvent(TransInfo *t, const wmEvent *event)
 {
 	char cmode = constraintModeToChar(t);
@@ -1462,6 +1507,14 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 					handled = true;
 				}
 				break;
+#ifdef WITH_MECHANICAL
+			case BKEY:
+				restoreTransObjects(t);
+				resetTransModal(t);
+				resetTransRestrictions(t);
+				t->redraw |= TREDRAW_HARD;
+				t->state = TRANS_BASE_POINT;
+#endif
 			default:
 				break;
 		}
@@ -2388,7 +2441,11 @@ int transformEnd(bContext *C, TransInfo *t)
 
 	t->context = C;
 
+#ifdef WITH_MECHANICAL
+	if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING && t->state != TRANS_BASE_POINT) {
+#else
 	if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING) {
+#endif
 		/* handle restoring objects */
 		if (t->state == TRANS_CANCEL) {
 			/* exception, edge slide transformed UVs too */
@@ -4341,8 +4398,15 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 		
 		protectedTransBits(td->protectflag, tvec);
 		
+#ifdef WITH_MECHANICAL
+		if (td->loc) {
+			add_v3_v3v3(td->loc, td->iloc, tvec);
+			sub_v3_v3(td->loc, td->mloc);
+		}
+#else
 		if (td->loc)
 			add_v3_v3v3(td->loc, td->iloc, tvec);
+#endif
 		
 		constraintTransLim(t, td);
 	}

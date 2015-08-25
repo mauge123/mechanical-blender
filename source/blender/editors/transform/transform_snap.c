@@ -698,6 +698,14 @@ void addSnapPoint(TransInfo *t)
 	}
 }
 
+#ifdef WITH_MECHANICAL
+void fixSnapTarget (TransInfo *t, float* target)
+{
+	copy_v3_v3(t->tsnap.snapTarget,target);
+	t->tsnap.status |= TARGET_FIXED;
+}
+#endif
+
 eRedrawFlag updateSelectedSnapPoint(TransInfo *t)
 {
 	eRedrawFlag status = TREDRAW_NOTHING;
@@ -1149,7 +1157,7 @@ static void TargetSnapMedian(TransInfo *t)
 static void TargetSnapClosest(TransInfo *t)
 {
 	// Only valid if a snap point has been selected
-	if (t->tsnap.status & POINT_INIT) {
+	if ((t->tsnap.status & POINT_INIT) && !(t->tsnap.status & TARGET_FIXED)) {
 		TransData *closest = NULL, *td = NULL;
 		
 		/* Object mode */

@@ -2070,3 +2070,9 @@ void transform_data_ext_rotate(TransData *td, float mat[3][3], bool use_drot)
 	}
 }
 
+#ifdef WITH_MECHANICAL
+void modifyTranslationOrigin(TransData *td, float* npoint) {
+	copy_v3_v3(td->mloc, npoint);
+}
+#endif
+
