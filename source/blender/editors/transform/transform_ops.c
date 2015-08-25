@@ -379,16 +379,15 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 	return retval; /* return 0 on error */
 }
 
+#ifdef WITH_MECHANICAL
 static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
 
 	TransInfo *t = op->customdata;
 
-	/* XXX insert keys are called here, and require context */
-	t->context = C;
 	exit_code = transformEventBasePoint(t, event);
-	t->context = NULL;
+
 
 	t->tsnap.calcSnap(t, t->values);
 	t->tsnap.targetSnap(t);
@@ -402,19 +401,19 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 	}
 
 	return exit_code;
-
 }
+#endif
 
+#ifdef WITH_MECHANICAL
+static int transform_modal_do(bContext *C, wmOperator *op, const wmEvent *event)
+#else
 static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
+#endif
 {
 	int exit_code;
 
 	TransInfo *t = op->customdata;
 	const enum TfmMode mode_prev = t->mode;
-
-	if (t->state == TRANS_BASE_POINT){
-		return transform_modal_base_point (C,op,event);
-	}
 
 #if 0
 	// stable 2D mouse coords map to different 3D coords while the 3D mouse is active
@@ -439,7 +438,15 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 		}
 	}
 
+#ifdef WITH_MECHANICAL
+	if (t->state == TRANS_BASE_POINT){
+		restoreTransObjects(t);
+	} else {
+		transformApply(C, t);
+	}
+#else
 	transformApply(C, t);
+#endif
 
 	exit_code |= transformEnd(C, t);
 
@@ -472,6 +479,23 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	return exit_code;
 }
+
+
+#ifdef WITH_MECHANICAL
+static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	int exit_code;
+	TransInfo *t = op->customdata;
+
+	if (t->state == TRANS_BASE_POINT){
+		exit_code = transform_modal_base_point (C,op,event);
+	} else {
+		exit_code = transform_modal_do (C,op,event);
+	}
+
+	return exit_code;
+}
+#endif
 
 static void transform_cancel(bContext *C, wmOperator *op)
 {

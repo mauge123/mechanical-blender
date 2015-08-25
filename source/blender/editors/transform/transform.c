@@ -974,9 +974,9 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				handled = true;
 				break;
 			case TFM_MODAL_CONFIRM:
-				modifyTranslationOrigin (t->data, t->values);
+				setTranslationOffset(t, t->values);
 				sub_v3_v3v3(tvec, t->tsnap.snapPoint, t->values);
-				fixSnapTarget (t, tvec);
+				fixSnapTarget(t, tvec);
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;
 				handled=true;
@@ -1509,9 +1509,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				break;
 #ifdef WITH_MECHANICAL
 			case BKEY:
-				restoreTransObjects(t);
-				resetTransModal(t);
-				resetTransRestrictions(t);
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_BASE_POINT;
 #endif
@@ -4401,7 +4398,11 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 #ifdef WITH_MECHANICAL
 		if (td->loc) {
 			add_v3_v3v3(td->loc, td->iloc, tvec);
-			sub_v3_v3(td->loc, td->mloc);
+			if (t->con.mode & CON_APPLY) {
+				sub_v3_v3(td->loc, t->offset_con);
+			}else {
+				sub_v3_v3(td->loc, t->offset);
+			}
 		}
 #else
 		if (td->loc)
@@ -4427,6 +4428,10 @@ static void applyTranslation(TransInfo *t, const int UNUSED(mval[2]))
 		t->con.applyVec(t, NULL, t->values, tvec, pvec);
 		copy_v3_v3(t->values, tvec);
 		headerTranslation(t, pvec, str);
+#ifdef WITH_MECHANICAL
+		//Apply constraint to offset
+		t->con.applyVec(t, NULL, t->offset, t->offset_con, pvec);
+#endif
 	}
 	else {
 		snapGridIncrement(t, t->values);

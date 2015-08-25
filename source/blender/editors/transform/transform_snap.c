@@ -1157,7 +1157,11 @@ static void TargetSnapMedian(TransInfo *t)
 static void TargetSnapClosest(TransInfo *t)
 {
 	// Only valid if a snap point has been selected
+#ifdef WITH_MECHANICAL
 	if ((t->tsnap.status & POINT_INIT) && !(t->tsnap.status & TARGET_FIXED)) {
+#else
+	if (t->tsnap.status & POINT_INIT) {
+#endif
 		TransData *closest = NULL, *td = NULL;
 		
 		/* Object mode */

@@ -366,6 +366,10 @@ typedef struct TransInfo {
 	float       center[3];      /* center of transformation (in local-space) */
 	float       center_global[3];  /* center of transformation (in global-space) */
 	float       center2d[2];    /* center in screen coordinates         */
+#ifdef WITH_MECHANICAL
+	float		offset[3];       /* Translation offset                   */
+	float		offset_con[3];   /* Translation offset constrained       */
+#endif
 	int         imval[2];       /* initial mouse position               */
 	short		event_type;		/* event->type used to invoke transform */
 	short       idx_max;		/* maximum index on the input vector	*/
@@ -756,7 +760,7 @@ void projectVertSlideData(TransInfo *t, bool is_final);
 bool checkUseAxisMatrix(TransInfo *t);
 
 #ifdef WITH_MECHANICAL
-void modifyTranslationOrigin(TransData *td, float* npoint);
+void setTranslationOffset(TransInfo *t, float* offset);
 void fixSnapTarget (TransInfo *t, float* target) ;
 #endif
 
