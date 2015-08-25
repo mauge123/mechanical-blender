@@ -346,6 +346,9 @@ mark_as_advanced(WITH_LIBMV_WERROR)
 # Freestyle
 option(WITH_FREESTYLE     "Enable Freestyle (advanced edges rendering)" ON)
 
+# Mechanical
+option(WITH_MECHANICAL     "Enable Mechanical Tools (for mechanical desings)" ON)
+
 # Misc
 if(WIN32)
 	option(WITH_INPUT_IME "Enable Input Method Editor (IME) for complex Asian character input" ON)
@@ -2900,6 +2903,7 @@ if(FIRST_RUN)
 	info_cfg_option(WITH_INPUT_NDOF)
 	info_cfg_option(WITH_CYCLES)
 	info_cfg_option(WITH_FREESTYLE)
+	info_cfg_option(WITH_MECHANICAL)
 	info_cfg_option(WITH_OPENCOLORIO)
 
 	info_cfg_text("Compiler Options:")

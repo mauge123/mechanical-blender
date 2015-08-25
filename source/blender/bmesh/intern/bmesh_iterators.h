@@ -75,7 +75,10 @@ typedef enum BMIterType {
 	 * from the other faces in the radial cycle surrounding the
 	 * input loop's edge.*/
 	BM_LOOPS_OF_LOOP = 13,
-	BM_LOOPS_OF_EDGE = 14
+	BM_LOOPS_OF_EDGE = 14,
+#ifdef WITH_MECHANICAL
+	BM_DIMS_OF_MESH = 15,
+#endif
 } BMIterType;
 
 #define BM_ITYPE_MAX 15
@@ -127,6 +130,12 @@ struct BMIter__edge_of_vert {
 	BMVert *vdata;
 	BMEdge *e_first, *e_next;
 };
+#ifdef WITH_MECHANICAL
+struct BMIter__dim_of_mesh {
+	BMDim *ddata;
+	BMDim *d_first, *d_next;
+};
+#endif
 struct BMIter__face_of_vert {
 	BMVert *vdata;
 	BMLoop *l_first, *l_next;

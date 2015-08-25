@@ -139,6 +139,19 @@ typedef struct BMLoop {
 	struct BMLoop *next, *prev; /* next/prev verts around the face */
 } BMLoop;
 
+
+#ifdef WITH_MECHANICAL
+typedef struct BMDim {
+	BMHeader head;
+	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
+
+	struct BMVert *v1,*v2;
+	//relative position
+	float rpos[3];
+} BMDim;
+#endif
+
+
 /* can cast BMFace/BMEdge/BMVert, but NOT BMLoop, since these don't have a flag layer */
 typedef struct BMElemF {
 	BMHeader head;
@@ -243,6 +256,17 @@ typedef struct BMesh {
 	ListBase errorstack;
 
 	void *py_handle;
+
+#ifdef WITH_MECHANICAL
+	int totdim;
+	struct BLI_mempool *dpool;
+	struct BLI_mempool *dtoolflagpool;
+
+	BMDim **dtable;
+	int dtable_tot;
+
+#endif
+
 } BMesh;
 
 /* BMHeader->htype (char) */
@@ -250,11 +274,24 @@ enum {
 	BM_VERT = 1,
 	BM_EDGE = 2,
 	BM_LOOP = 4,
-	BM_FACE = 8
+	BM_FACE = 8,
+#ifdef WITH_MECHANICAL
+	BM_DIM = 16,
+#endif
 };
+
+#ifdef WITH_MECHANICAL
+
+#define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM)
+#define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE | BM_DIM)
+
+#else
 
 #define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE)
 #define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE)
+
+#endif
+
 
 /* args for _Generic */
 #define _BM_GENERIC_TYPE_ELEM_NONCONST \

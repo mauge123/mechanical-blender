@@ -2008,6 +2008,27 @@ static BMOpDefine bmo_symmetrize_def = {
 	 BMO_OPTYPE_FLAG_SELECT_VALIDATE),
 };
 
+#ifdef WITH_MECHANICAL
+/*
+ * Individual Vertex Extrude.
+ *
+ * Extrudes wire edges from vertices.
+ */
+static BMOpDefine bmo_create_dimemsion_def = {
+	"create_dimension",
+	/* slots_in */
+	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
+	 {{'\0'}},
+	},
+	/* slots_out */
+	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
+	 {{'\0'}},
+	},
+	bmo_create_dimension_exec,
+	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
+};
+#endif
+
 const BMOpDefine *bmo_opdefines[] = {
 	&bmo_automerge_def,
 	&bmo_average_vert_facedata_def,
@@ -2094,6 +2115,9 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_unsubdivide_def,
 	&bmo_weld_verts_def,
 	&bmo_wireframe_def,
+#ifdef WITH_MECHANICAL
+	&bmo_create_dimemsion_def,
+#endif
 };
 
 const int bmo_opdefines_total = ARRAY_SIZE(bmo_opdefines);
