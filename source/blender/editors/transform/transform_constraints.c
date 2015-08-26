@@ -124,13 +124,23 @@ void constraintNumInput(TransInfo *t, float vec[3])
 	}
 }
 
+#ifdef WITH_MECHANICAL
+static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3], applyConstraintFlag apply_flag)
+#else
 static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3])
+#endif
 {
 	int i = 0;
 
 	mul_m3_v3(t->con.imtx, vec);
 
+#ifdef WITH_MECHANICAL
+	if (apply_flag & CONSTRAINT_APPLY_GRID) {
+		snapGridIncrement(t, vec);
+	}
+#else
 	snapGridIncrement(t, vec);
+#endif
 
 	if (t->flag & T_NULL_ONE) {
 		if (!(t->con.mode & CON_AXIS0))
@@ -143,7 +153,11 @@ static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3])
 			vec[2] = 1.0f;
 	}
 
+#ifdef WITH_MECHANICAL
+	if ((apply_flag & CONSTRAINT_APPLY_NUM_INPUT) && (applyNumInput(&t->num, vec))) {
+#else
 	if (applyNumInput(&t->num, vec)) {
+#endif		
 		constraintNumInput(t, vec);
 		removeAspectRatio(t, vec);
 	}
@@ -303,7 +317,12 @@ static void planeProjection(TransInfo *t, const float in[3], float out[3])
  *
  */
 
+#ifdef WITH_MECHANICAL
+static void applyAxisConstraintVec(TransInfo *t, TransData *td,
+                                   const float in[3], float out[3], float pvec[3], applyConstraintFlag apply_flag)
+#else
 static void applyAxisConstraintVec(TransInfo *t, TransData *td, const float in[3], float out[3], float pvec[3])
+#endif
 {
 	copy_v3_v3(out, in);
 	if (!td && t->con.mode & CON_APPLY) {
@@ -331,7 +350,11 @@ static void applyAxisConstraintVec(TransInfo *t, TransData *td, const float in[3
 				axisProjection(t, c, in, out);
 			}
 		}
+#ifdef WITH_MECHANICAL
+		postConstraintChecks(t, out, pvec, apply_flag);
+#else
 		postConstraintChecks(t, out, pvec);
+#endif
 	}
 }
 
@@ -346,7 +369,12 @@ static void applyAxisConstraintVec(TransInfo *t, TransData *td, const float in[3
  * Further down, that vector is mapped to each data's space.
  */
 
+#ifdef WITH_MECHANICAL
+static void applyObjectConstraintVec(TransInfo *t, TransData *td,
+                                     const float in[3], float out[3], float pvec[3], applyConstraintFlag apply_flag)
+#else
 static void applyObjectConstraintVec(TransInfo *t, TransData *td, const float in[3], float out[3], float pvec[3])
+#endif
 {
 	copy_v3_v3(out, in);
 	if (t->con.mode & CON_APPLY) {
@@ -371,7 +399,11 @@ static void applyObjectConstraintVec(TransInfo *t, TransData *td, const float in
 				}
 				axisProjection(t, c, in, out);
 			}
+#ifdef WITH_MECHANICAL
+			postConstraintChecks(t, out, pvec, apply_flag);
+#else			
 			postConstraintChecks(t, out, pvec);
+#endif			
 			copy_v3_v3(out, pvec);
 		}
 		else {

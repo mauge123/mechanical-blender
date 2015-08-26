@@ -67,6 +67,17 @@ typedef enum {
 	TREDRAW_SOFT      = 2,
 } eRedrawFlag;
 
+#ifdef WITH_MECHANICAL
+// Applys to applyVec Function
+// Used to avoid apply constraint over translation offset value
+typedef enum {
+	CONSTRAINT_APPLY_NUM_INPUT    = (1 << 0),
+	CONSTRAINT_APPLY_GRID         = (1 << 1),
+	CONSTRAINT_APPLY_ALL          = (1 << 0) || (1 << 1)
+} applyConstraintFlag;
+#endif
+
+
 typedef struct TransSnapPoint {
 	struct TransSnapPoint *next, *prev;
 	float co[3];
@@ -111,7 +122,12 @@ typedef struct TransCon {
 	void  (*drawExtra)(struct TransInfo *t);
 	                     /* For constraints that needs to draw differently from the other
 	                      * uses this instead of the generic draw function                            */
+#ifdef WITH_MECHANICAL
+	void  (*applyVec)(struct TransInfo *t, struct TransData *td, const float in[3],
+						float out[3], float pvec[3], applyConstraintFlag flag);
+#else
 	void  (*applyVec)(struct TransInfo *t, struct TransData *td, const float in[3], float out[3], float pvec[3]);
+#endif
 	                     /* Apply function pointer for linear vectorial transformation                */
 	                     /* The last three parameters are pointers to the in/out/printable vectors    */
 	void  (*applySize)(struct TransInfo *t, struct TransData *td, float smat[3][3]);

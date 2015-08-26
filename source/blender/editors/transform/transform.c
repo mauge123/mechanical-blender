@@ -4384,7 +4384,11 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 		
 		if (t->con.applyVec) {
 			float pvec[3];
+#ifdef WITH_MECHANICAL
+			t->con.applyVec(t, td, vec, tvec, pvec, CONSTRAINT_APPLY_ALL);
+#else
 			t->con.applyVec(t, td, vec, tvec, pvec);
+#endif
 		}
 		else {
 			copy_v3_v3(tvec, vec);
@@ -4425,12 +4429,13 @@ static void applyTranslation(TransInfo *t, const int UNUSED(mval[2]))
 			removeAspectRatio(t, t->values);
 		}
 		applySnapping(t, t->values);
-		t->con.applyVec(t, NULL, t->values, tvec, pvec);
+		t->con.applyVec(t, NULL, t->values, tvec, pvec, CONSTRAINT_APPLY_ALL);
 		copy_v3_v3(t->values, tvec);
 		headerTranslation(t, pvec, str);
 #ifdef WITH_MECHANICAL
 		//Apply constraint to offset
-		t->con.applyVec(t, NULL, t->offset, t->offset_con, pvec);
+		t->con.applyVec(t, NULL, t->offset, t->offset_con, pvec,
+		                CONSTRAINT_APPLY_ALL & ~CONSTRAINT_APPLY_NUM_INPUT & ~CONSTRAINT_APPLY_GRID);
 #endif
 	}
 	else {
@@ -7923,7 +7928,11 @@ static void applySeqSlide(TransInfo *t, const int mval[2])
 	if (t->con.mode & CON_APPLY) {
 		float pvec[3] = {0.0f, 0.0f, 0.0f};
 		float tvec[3];
+#ifdef WITH_MECHANICAL
+		t->con.applyVec(t, NULL, t->values, tvec, pvec, CONSTRAINT_APPLY_ALL);
+#else		
 		t->con.applyVec(t, NULL, t->values, tvec, pvec);
+#endif
 		copy_v3_v3(t->values, tvec);
 	}
 	else {
