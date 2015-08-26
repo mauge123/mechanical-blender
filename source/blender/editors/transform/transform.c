@@ -4348,6 +4348,9 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 {
 	TransData *td = t->data;
 	float tvec[3];
+#ifdef WITH_MECHANICAL
+	float o_vec[3];
+#endif
 	int i;
 
 	for (i = 0; i < t->total; i++, td++) {
@@ -4399,19 +4402,16 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 		
 		protectedTransBits(td->protectflag, tvec);
 		
-#ifdef WITH_MECHANICAL
 		if (td->loc) {
 			add_v3_v3v3(td->loc, td->iloc, tvec);
-			if (t->con.mode & CON_APPLY) {
-				sub_v3_v3(td->loc, t->offset_con);
-			}else {
-				sub_v3_v3(td->loc, t->offset);
-			}
-		}
-#else
-		if (td->loc)
-			add_v3_v3v3(td->loc, td->iloc, tvec);
+#ifdef WITH_MECHANICAL
+			copy_v3_v3 (o_vec,(t->con.mode & CON_APPLY) ? t->offset_con : t->offset);
+			//Protect movements on offset
+			protectedTransBits(td->protectflag, o_vec);
+			// Apply the tranlation offset
+			sub_v3_v3(td->loc, o_vec);
 #endif
+		}
 		
 		constraintTransLim(t, td);
 	}
