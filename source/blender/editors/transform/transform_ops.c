@@ -388,6 +388,10 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 
 	exit_code = transformEventBasePoint(t, event);
 
+	if (t->state == TRANS_RUNNING) {
+		set_trans_object_base_flags(t);
+	}
+
 
 	t->tsnap.calcSnap(t, t->values);
 	t->tsnap.targetSnap(t);
@@ -441,6 +445,8 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 #ifdef WITH_MECHANICAL
 	if (t->state == TRANS_BASE_POINT){
 		restoreTransObjects(t);
+		// Remove flags to allow object snap referencer over object
+		clear_trans_object_base_flags(t);
 	} else {
 		transformApply(C, t);
 	}

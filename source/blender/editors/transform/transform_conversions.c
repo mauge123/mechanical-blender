@@ -5351,7 +5351,11 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 
 /* sets flags in Bases to define whether they take part in transform */
 /* it deselects Bases, so we have to call the clear function always after */
+#ifdef WITH_MECHANICAL
+void set_trans_object_base_flags(TransInfo *t)
+#else
 static void set_trans_object_base_flags(TransInfo *t)
+#endif
 {
 	Scene *scene = t->scene;
 	View3D *v3d = t->view;
@@ -5510,7 +5514,11 @@ static int count_proportional_objects(TransInfo *t)
 	return total;
 }
 
+#ifdef WITH_MECHANICAL
+void clear_trans_object_base_flags(TransInfo *t)
+#else
 static void clear_trans_object_base_flags(TransInfo *t)
+#endif
 {
 	Scene *sce = t->scene;
 	Base *base;

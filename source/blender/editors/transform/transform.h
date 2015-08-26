@@ -764,4 +764,10 @@ void setTranslationOffset(TransInfo *t, float* offset);
 void fixSnapTarget (TransInfo *t, float* target) ;
 #endif
 
+#ifdef WITH_MECHANICAL
+// Not static functions
+void clear_trans_object_base_flags(TransInfo *t);
+void set_trans_object_base_flags(TransInfo *t);
+#endif
+
 #endif

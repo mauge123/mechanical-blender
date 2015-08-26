@@ -542,7 +542,12 @@ static void initSnappingMode(TransInfo *t)
 		else if (t->tsnap.applySnap != NULL && // A snapping function actually exist
 		         (obedit == NULL) ) // Object Mode
 		{
+#ifdef WITH_MECHANICAL
+			// Allow snap to all objects, including base_act and selected
+			t->tsnap.modeSelect = SNAP_ALL;
+#else
 			t->tsnap.modeSelect = SNAP_NOT_SELECTED;
+#endif
 		}
 		else {
 			/* Grid if snap is not possible */
@@ -1064,7 +1069,11 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 
 static void TargetSnapOffset(TransInfo *t, TransData *td)
 {
+#ifdef WITH_MECHANICAL
+	if ((t->spacetype == SPACE_NODE && td != NULL) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
+#else
 	if (t->spacetype == SPACE_NODE && td != NULL) {
+#endif
 		bNode *node = td->extra;
 		char border = t->tsnap.snapNodeBorder;
 		float width  = BLI_rctf_size_x(&node->totr);
@@ -1095,7 +1104,11 @@ static void TargetSnapOffset(TransInfo *t, TransData *td)
 static void TargetSnapCenter(TransInfo *t)
 {
 	/* Only need to calculate once */
+#ifdef WITH_MECHANICAL
+	if (((t->tsnap.status & TARGET_INIT) == 0) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
+#else
 	if ((t->tsnap.status & TARGET_INIT) == 0) {
+#endif
 		copy_v3_v3(t->tsnap.snapTarget, t->center_global);
 		TargetSnapOffset(t, NULL);
 		
@@ -1106,7 +1119,11 @@ static void TargetSnapCenter(TransInfo *t)
 static void TargetSnapActive(TransInfo *t)
 {
 	/* Only need to calculate once */
+#ifdef WITH_MECHANICAL
+	if (((t->tsnap.status & TARGET_INIT) == 0) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
+#else
 	if ((t->tsnap.status & TARGET_INIT) == 0) {
+#endif
 		if (calculateCenterActive(t, true, t->tsnap.snapTarget)) {
 			if (t->flag & (T_EDIT | T_POSE)) {
 				Object *ob = t->obedit ? t->obedit : t->poseobj;
@@ -1129,7 +1146,11 @@ static void TargetSnapActive(TransInfo *t)
 static void TargetSnapMedian(TransInfo *t)
 {
 	// Only need to calculate once
+#ifdef WITH_MECHANICAL
+	if (((t->tsnap.status & TARGET_INIT) == 0) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
+#else
 	if ((t->tsnap.status & TARGET_INIT) == 0) {
+#endif
 		TransData *td = NULL;
 		int i;
 
@@ -1158,7 +1179,7 @@ static void TargetSnapClosest(TransInfo *t)
 {
 	// Only valid if a snap point has been selected
 #ifdef WITH_MECHANICAL
-	if ((t->tsnap.status & POINT_INIT) && !(t->tsnap.status & TARGET_FIXED)) {
+	if ((t->tsnap.status & POINT_INIT) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
 #else
 	if (t->tsnap.status & POINT_INIT) {
 #endif
@@ -1921,11 +1942,21 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 	}
 
 	for (base = FIRSTBASE; base != NULL; base = base->next) {
+#ifdef WITH_MECHANICAL
+		// Do not why mode SNAP_ALL discards base_act
+		if ((BASE_VISIBLE_BGMODE(v3d, scene, base)) &&
+		    (base->flag & (BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA)) == 0 &&
+
+		    ((mode == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL)) == 0) ||
+		     (mode == SNAP_NOT_OBEDIT && base != base_act) ||
+		     (mode == SNAP_ALL)))
+#else
 		if ((BASE_VISIBLE_BGMODE(v3d, scene, base)) &&
 		    (base->flag & (BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA)) == 0 &&
 
 		    ((mode == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL)) == 0) ||
 		     (ELEM(mode, SNAP_ALL, SNAP_NOT_OBEDIT) && base != base_act)))
+#endif
 		{
 			Object *ob = base->object;
 			Object *ob_snap = ob;
