@@ -388,6 +388,10 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 
 	exit_code = transformEventBasePoint(t, event);
 
+	if (t->state == TRANS_RUNNING) {
+		set_trans_object_base_flags(t);
+	}
+
 
 	t->tsnap.calcSnap(t, t->values);
 	t->tsnap.targetSnap(t);
@@ -441,6 +445,8 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 #ifdef WITH_MECHANICAL
 	if (t->state == TRANS_BASE_POINT){
 		restoreTransObjects(t);
+		// Remove flags to allow object snap referencer over object
+		clear_trans_object_base_flags(t);
 	} else {
 		transformApply(C, t);
 	}
@@ -641,6 +647,9 @@ static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector_xyz(ot->srna, "value", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
+#ifdef WITH_MECHANICAL
+	RNA_def_float_vector_xyz(ot->srna, "offset", 3, NULL, -FLT_MAX, FLT_MAX, "Offset", "Translation offset", -FLT_MAX, FLT_MAX);
+#endif
 
 	Transform_Properties(ot, P_CONSTRAINT | P_PROPORTIONAL | P_MIRROR | P_ALIGN_SNAP | P_OPTIONS | P_GPENCIL_EDIT);
 }
