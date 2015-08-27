@@ -1962,6 +1962,13 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 		}
 	}
 
+#ifdef WITH_MECHANICAL
+	if ((prop = RNA_struct_find_property(op->ptr, "offset"))) {
+		BLI_assert (RNA_property_array_check(prop));
+		RNA_property_float_set_array(op->ptr, prop, t->offset);
+	}
+#endif
+
 	/* convert flag to enum */
 	switch (t->flag & T_PROP_EDIT_ALL) {
 		case T_PROP_EDIT:
@@ -2362,6 +2369,14 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		copy_v4_v4(t->auto_values, values);
 		t->flag |= T_AUTOVALUES;
 	}
+
+#ifdef WITH_MECHANICAL
+	/* overwrite initial values if operator supplied a non-null vector */
+	if ((prop = RNA_struct_find_property(op->ptr, "offset")) && RNA_property_is_set(op->ptr, prop)) {
+		BLI_assert (RNA_property_array_check(prop));
+		RNA_float_get_array(op->ptr, "offset", t->offset);
+	}
+#endif
 
 	/* Transformation axis from operator */
 	if ((prop = RNA_struct_find_property(op->ptr, "axis")) && RNA_property_is_set(op->ptr, prop)) {
