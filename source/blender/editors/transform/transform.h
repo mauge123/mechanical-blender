@@ -778,7 +778,7 @@ bool checkUseAxisMatrix(TransInfo *t);
 
 #ifdef WITH_MECHANICAL
 void setTranslationOffset(TransInfo *t, float* offset);
-void fixSnapTarget (TransInfo *t, float* target) ;
+void fixSnapTarget (TransInfo *t, const float* target) ;
 #endif
 
 #ifdef WITH_MECHANICAL

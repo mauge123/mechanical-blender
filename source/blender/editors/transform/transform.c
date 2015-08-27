@@ -963,7 +963,9 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
 	bool handled = false;
+	float origin[3];
 	float tvec[3];
+	const float *cursor;
 	if (event->type == MOUSEMOVE) {
 		copy_v2_v2_int(t->mval, event->mval);
 		applyMouseInput(t, &t->mouse, t->mval, t->values);
@@ -985,14 +987,25 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 	} else if (event->val == KM_PRESS) {
 		switch (event->type) {
 			case RIGHTMOUSE:
-				t->state = TRANS_CANCEL;
-				handled = true;
-				break;
 			case ESCKEY:
 				t->state = TRANS_CANCEL;
 				handled = true;
 				break;
-			}
+			case CKEY:
+				cursor = ED_view3d_cursor3d_get(t->scene, t->view);
+				ED_view3d_win_to_3d_int(t->ar, cursor, t->imval, origin);
+				sub_v3_v3v3(tvec,cursor,origin);
+				setTranslationOffset(t, tvec);
+
+				sub_v3_v3v3(tvec, cursor, tvec);
+				fixSnapTarget(t, tvec);
+
+				t->redraw |= TREDRAW_HARD;
+				t->state = TRANS_RUNNING;
+				handled=true;
+				break;
+		}
+
 	}
 
 	if (handled) {

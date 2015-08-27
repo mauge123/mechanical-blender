@@ -704,10 +704,10 @@ void addSnapPoint(TransInfo *t)
 }
 
 #ifdef WITH_MECHANICAL
-void fixSnapTarget (TransInfo *t, float* target)
+void fixSnapTarget (TransInfo *t, const float* target)
 {
 	copy_v3_v3(t->tsnap.snapTarget,target);
-	t->tsnap.status |= TARGET_FIXED;
+	t->tsnap.status |= (TARGET_FIXED | TARGET_INIT);
 }
 #endif
 
