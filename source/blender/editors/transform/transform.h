@@ -73,7 +73,8 @@ typedef enum {
 typedef enum {
 	CONSTRAINT_APPLY_NUM_INPUT    = (1 << 0),
 	CONSTRAINT_APPLY_GRID         = (1 << 1),
-	CONSTRAINT_APPLY_ALL          = (1 << 0) || (1 << 1)
+	APPLY_T_AUTOVALUES	          = (1 << 2),
+	CONSTRAINT_APPLY_ALL          = (1 << 0) || (1 << 1) || (1<<2)
 } applyConstraintFlag;
 #endif
 

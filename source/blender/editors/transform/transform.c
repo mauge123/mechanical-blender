@@ -4450,7 +4450,7 @@ static void applyTranslation(TransInfo *t, const int UNUSED(mval[2]))
 #ifdef WITH_MECHANICAL
 		//Apply constraint to offset
 		t->con.applyVec(t, NULL, t->offset, t->offset_con, pvec,
-		                CONSTRAINT_APPLY_ALL & ~CONSTRAINT_APPLY_NUM_INPUT & ~CONSTRAINT_APPLY_GRID);
+		                CONSTRAINT_APPLY_ALL & ~CONSTRAINT_APPLY_NUM_INPUT & ~CONSTRAINT_APPLY_GRID & ~APPLY_T_AUTOVALUES);
 #endif
 	}
 	else {
