@@ -308,72 +308,25 @@ float volume_tetrahedron_signed_v3(const float v1[3], const float v2[3], const f
  * using Hesse formula, NO LINE PIECE! */
 float dist_squared_to_line_v2(const float p[2], const float l1[2], const float l2[2])
 {
-	float a[2], deler;
+	float closest[2];
 
-	a[0] = l1[1] - l2[1];
-	a[1] = l2[0] - l1[0];
+	closest_to_line_v2(closest, p, l1, l2);
 
-	deler = len_squared_v2(a);
-
-	if (deler != 0.0f) {
-		float f = ((p[0] - l1[0]) * a[0] +
-		           (p[1] - l1[1]) * a[1]);
-		return (f * f) / deler;
-	}
-	else {
-		return 0.0f;
-	}
+	return len_squared_v2v2(closest, p);
 }
 float dist_to_line_v2(const float p[2], const float l1[2], const float l2[2])
 {
-	float a[2], deler;
-
-	a[0] = l1[1] - l2[1];
-	a[1] = l2[0] - l1[0];
-
-	deler = len_squared_v2(a);
-
-	if (deler != 0.0f) {
-		float f = ((p[0] - l1[0]) * a[0] +
-		           (p[1] - l1[1]) * a[1]);
-		return fabsf(f) / sqrtf(deler);
-	}
-	else {
-		return 0.0f;
-	}
+	return sqrtf(dist_squared_to_line_v2(p, l1, l2));
 }
 
 /* distance p to line-piece v1-v2 */
 float dist_squared_to_line_segment_v2(const float p[2], const float l1[2], const float l2[2])
 {
-	float lambda, rc[2], pt[2], len;
+	float closest[2];
 
-	rc[0] = l2[0] - l1[0];
-	rc[1] = l2[1] - l1[1];
-	len = rc[0] * rc[0] + rc[1] * rc[1];
-	if (len == 0.0f) {
-		rc[0] = p[0] - l1[0];
-		rc[1] = p[1] - l1[1];
-		return (rc[0] * rc[0] + rc[1] * rc[1]);
-	}
+	closest_to_line_segment_v2(closest, p, l1, l2);
 
-	lambda = (rc[0] * (p[0] - l1[0]) + rc[1] * (p[1] - l1[1])) / len;
-	if (lambda <= 0.0f) {
-		pt[0] = l1[0];
-		pt[1] = l1[1];
-	}
-	else if (lambda >= 1.0f) {
-		pt[0] = l2[0];
-		pt[1] = l2[1];
-	}
-	else {
-		pt[0] = lambda * rc[0] + l1[0];
-		pt[1] = lambda * rc[1] + l1[1];
-	}
-
-	rc[0] = pt[0] - p[0];
-	rc[1] = pt[1] - p[1];
-	return (rc[0] * rc[0] + rc[1] * rc[1]);
+	return len_squared_v2v2(closest, p);
 }
 
 float dist_to_line_segment_v2(const float p[2], const float l1[2], const float l2[2])
@@ -501,17 +454,17 @@ float dist_to_line_segment_v3(const float p[3], const float l1[3], const float l
 	return sqrtf(dist_squared_to_line_segment_v3(p, l1, l2));
 }
 
-float dist_squared_to_line_v3(const float v1[3], const float l1[3], const float l2[3])
+float dist_squared_to_line_v3(const float p[3], const float l1[3], const float l2[3])
 {
 	float closest[3];
 
-	closest_to_line_v3(closest, v1, l1, l2);
+	closest_to_line_v3(closest, p, l1, l2);
 
-	return len_squared_v3v3(closest, v1);
+	return len_squared_v3v3(closest, p);
 }
-float dist_to_line_v3(const float v1[3], const float l1[3], const float l2[3])
+float dist_to_line_v3(const float p[3], const float l1[3], const float l2[3])
 {
-	return sqrtf(dist_squared_to_line_v3(v1, l1, l2));
+	return sqrtf(dist_squared_to_line_v3(p, l1, l2));
 }
 
 /**
@@ -573,7 +526,7 @@ float dist_signed_squared_to_corner_v3v3v3(
 	dist_a = dist_signed_squared_to_plane_v3(p, plane_a);
 	dist_b = dist_signed_squared_to_plane_v3(p, plane_b);
 #else
-	/* calculate without he planes 4th component to avoid float precision issues */
+	/* calculate without the planes 4th component to avoid float precision issues */
 	sub_v3_v3v3(s_p_v2, p, v2);
 
 	dist_a = dist_signed_squared_to_plane3_v3(s_p_v2, plane_a);
@@ -1960,7 +1913,7 @@ bool isect_axial_line_tri_v3(const int axis, const float p1[3], const float p2[3
 
 /**
  * \return The number of point of interests
- * 0 - lines are colinear
+ * 0 - lines are collinear
  * 1 - lines are coplanar, i1 is set to intersection
  * 2 - i1 and i2 are the nearest points on line 1 (v1, v2) and line 2 (v3, v4) respectively
  */
@@ -1969,27 +1922,19 @@ int isect_line_line_epsilon_v3(
         const float v3[3], const float v4[3], float i1[3], float i2[3],
         const float epsilon)
 {
-	float a[3], b[3], c[3], ab[3], cb[3], dir1[3], dir2[3];
+	float a[3], b[3], c[3], ab[3], cb[3];
 	float d, div;
 
 	sub_v3_v3v3(c, v3, v1);
 	sub_v3_v3v3(a, v2, v1);
 	sub_v3_v3v3(b, v4, v3);
 
-	normalize_v3_v3(dir1, a);
-	normalize_v3_v3(dir2, b);
-	d = dot_v3v3(dir1, dir2);
-	if (d == 1.0f || d == -1.0f) {
-		/* colinear */
-		return 0;
-	}
-
 	cross_v3_v3v3(ab, a, b);
 	d = dot_v3v3(c, ab);
 	div = dot_v3v3(ab, ab);
 
 	/* test zero length line */
-	if (UNLIKELY(div == 0.0f)) {
+	if (UNLIKELY(div <= epsilon)) {
 		return 0;
 	}
 	/* test if the two lines are coplanar */
@@ -2049,31 +1994,26 @@ bool isect_line_line_strict_v3(const float v1[3], const float v2[3],
                                float vi[3], float *r_lambda)
 {
 	const float epsilon = 0.000001f;
-	float a[3], b[3], c[3], ab[3], cb[3], ca[3], dir1[3], dir2[3];
+	float a[3], b[3], c[3], ab[3], cb[3], ca[3];
 	float d, div;
 
 	sub_v3_v3v3(c, v3, v1);
 	sub_v3_v3v3(a, v2, v1);
 	sub_v3_v3v3(b, v4, v3);
 
-	normalize_v3_v3(dir1, a);
-	normalize_v3_v3(dir2, b);
-	d = dot_v3v3(dir1, dir2);
-	if (d == 1.0f || d == -1.0f || d == 0) {
-		/* colinear or one vector is zero-length*/
-		return false;
-	}
-
 	cross_v3_v3v3(ab, a, b);
 	d = dot_v3v3(c, ab);
 	div = dot_v3v3(ab, ab);
 
 	/* test zero length line */
-	if (UNLIKELY(div == 0.0f)) {
+	if (UNLIKELY(div <= epsilon)) {
 		return false;
 	}
 	/* test if the two lines are coplanar */
-	else if (d > -epsilon && d < epsilon) {
+	else if (UNLIKELY(fabsf(d) < epsilon)) {
+		return false;
+	}
+	else {
 		float f1, f2;
 		cross_v3_v3v3(cb, c, b);
 		cross_v3_v3v3(ca, c, a);
@@ -2094,9 +2034,6 @@ bool isect_line_line_strict_v3(const float v1[3], const float v2[3],
 		else {
 			return false;
 		}
-	}
-	else {
-		return false;
 	}
 }
 
@@ -3049,7 +2986,7 @@ static float mean_value_half_tan_v3(const struct Float3_Len *d_curr, const struc
 	float cross[3], area;
 	cross_v3_v3v3(cross, d_curr->dir, d_next->dir);
 	area = len_v3(cross);
-	if (LIKELY(area != 0.0f)) {
+	if (LIKELY(fabsf(area) > FLT_EPSILON)) {
 		const float dot = dot_v3v3(d_curr->dir, d_next->dir);
 		const float len = d_curr->len * d_next->len;
 		return (len - dot) / area;
@@ -3064,7 +3001,7 @@ static float mean_value_half_tan_v2(const struct Float2_Len *d_curr, const struc
 	float area;
 	/* different from the 3d version but still correct */
 	area = cross_v2v2(d_curr->dir, d_next->dir);
-	if (LIKELY(area != 0.0f)) {
+	if (LIKELY(fabsf(area) > FLT_EPSILON)) {
 		const float dot = dot_v2v2(d_curr->dir, d_next->dir);
 		const float len = d_curr->len * d_next->len;
 		return (len - dot) / area;
@@ -3081,18 +3018,22 @@ void interp_weights_poly_v3(float *w, float v[][3], const int n, const float co[
 	const float *v_curr, *v_next;
 	float ht_prev, ht;  /* half tangents */
 	float totweight = 0.0f;
-	int i = 0;
+	int i_curr, i_next;
 	char ix_flag = 0;
 	struct Float3_Len d_curr, d_next;
 
-	v_curr = v[0];
-	v_next = v[1];
+	/* loop over 'i_next' */
+	i_curr = n - 1;
+	i_next = 0;
 
-	DIR_V3_SET(&d_curr, v[n - 1], co);
-	DIR_V3_SET(&d_next, v_curr, co);
+	v_curr = v[i_curr];
+	v_next = v[i_next];
+
+	DIR_V3_SET(&d_curr, v_curr - 3 /* v[n - 2] */, co);
+	DIR_V3_SET(&d_next, v_curr     /* v[n - 1] */, co);
 	ht_prev = mean_value_half_tan_v3(&d_curr, &d_next);
 
-	while (i < n) {
+	while (i_next < n) {
 		/* Mark Mayer et al algorithm that is used here does not operate well if vertex is close
 		 * to borders of face. In that case, do simple linear interpolation between the two edge vertices */
 
@@ -3109,22 +3050,19 @@ void interp_weights_poly_v3(float *w, float v[][3], const int n, const float co[
 		d_curr = d_next;
 		DIR_V3_SET(&d_next, v_next, co);
 		ht = mean_value_half_tan_v3(&d_curr, &d_next);
-		w[i] = (ht_prev + ht) / d_curr.len;
-		totweight += w[i];
+		w[i_curr] = (ht_prev + ht) / d_curr.len;
+		totweight += w[i_curr];
 
 		/* step */
-		i++;
+		i_curr = i_next++;
 		v_curr = v_next;
-		v_next = v[(i + 1) % n];
+		v_next = v[i_next];
 
 		ht_prev = ht;
 	}
 
 	if (ix_flag) {
-		const int i_curr = i;
-		for (i = 0; i < n; i++) {
-			w[i] = 0.0f;
-		}
+		memset(w, 0, sizeof(*w) * (size_t)n);
 
 		if (ix_flag & IS_POINT_IX) {
 			w[i_curr] = 1.0f;
@@ -3133,13 +3071,13 @@ void interp_weights_poly_v3(float *w, float v[][3], const int n, const float co[
 			float fac = line_point_factor_v3(co, v_curr, v_next);
 			CLAMP(fac, 0.0f, 1.0f);
 			w[i_curr] = 1.0f - fac;
-			w[(i_curr + 1) % n] = fac;
+			w[i_next] = fac;
 		}
 	}
 	else {
 		if (totweight != 0.0f) {
-			for (i = 0; i < n; i++) {
-				w[i] /= totweight;
+			for (i_curr = 0; i_curr < n; i_curr++) {
+				w[i_curr] /= totweight;
 			}
 		}
 	}
@@ -3153,18 +3091,22 @@ void interp_weights_poly_v2(float *w, float v[][2], const int n, const float co[
 	const float *v_curr, *v_next;
 	float ht_prev, ht;  /* half tangents */
 	float totweight = 0.0f;
-	int i = 0;
+	int i_curr, i_next;
 	char ix_flag = 0;
 	struct Float2_Len d_curr, d_next;
 
-	v_curr = v[0];
-	v_next = v[1];
+	/* loop over 'i_next' */
+	i_curr = n - 1;
+	i_next = 0;
 
-	DIR_V2_SET(&d_curr, v[n - 1], co);
-	DIR_V2_SET(&d_next, v_curr, co);
+	v_curr = v[i_curr];
+	v_next = v[i_next];
+
+	DIR_V2_SET(&d_curr, v_curr - 2 /* v[n - 2] */, co);
+	DIR_V2_SET(&d_next, v_curr     /* v[n - 1] */, co);
 	ht_prev = mean_value_half_tan_v2(&d_curr, &d_next);
 
-	while (i < n) {
+	while (i_next < n) {
 		/* Mark Mayer et al algorithm that is used here does not operate well if vertex is close
 		 * to borders of face. In that case, do simple linear interpolation between the two edge vertices */
 
@@ -3181,22 +3123,19 @@ void interp_weights_poly_v2(float *w, float v[][2], const int n, const float co[
 		d_curr = d_next;
 		DIR_V2_SET(&d_next, v_next, co);
 		ht = mean_value_half_tan_v2(&d_curr, &d_next);
-		w[i] = (ht_prev + ht) / d_curr.len;
-		totweight += w[i];
+		w[i_curr] = (ht_prev + ht) / d_curr.len;
+		totweight += w[i_curr];
 
 		/* step */
-		i++;
+		i_curr = i_next++;
 		v_curr = v_next;
-		v_next = v[(i + 1) % n];
+		v_next = v[i_next];
 
 		ht_prev = ht;
 	}
 
 	if (ix_flag) {
-		const int i_curr = i;
-		for (i = 0; i < n; i++) {
-			w[i] = 0.0f;
-		}
+		memset(w, 0, sizeof(*w) * (size_t)n);
 
 		if (ix_flag & IS_POINT_IX) {
 			w[i_curr] = 1.0f;
@@ -3205,13 +3144,13 @@ void interp_weights_poly_v2(float *w, float v[][2], const int n, const float co[
 			float fac = line_point_factor_v2(co, v_curr, v_next);
 			CLAMP(fac, 0.0f, 1.0f);
 			w[i_curr] = 1.0f - fac;
-			w[(i_curr + 1) % n] = fac;
+			w[i_next] = fac;
 		}
 	}
 	else {
 		if (totweight != 0.0f) {
-			for (i = 0; i < n; i++) {
-				w[i] /= totweight;
+			for (i_curr = 0; i_curr < n; i_curr++) {
+				w[i_curr] /= totweight;
 			}
 		}
 	}

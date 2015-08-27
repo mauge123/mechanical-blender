@@ -58,6 +58,7 @@ extern "C" {
 
 static DEG_EditorUpdateIDCb deg_editor_update_id_cb = NULL;
 static DEG_EditorUpdateSceneCb deg_editor_update_scene_cb = NULL;
+static DEG_EditorUpdateScenePreCb deg_editor_update_scene_pre_cb = NULL;
 
 Depsgraph::Depsgraph()
   : root_node(NULL),
@@ -357,9 +358,12 @@ DepsRelation *Depsgraph::add_new_relation(OperationDepsNode *from,
 #ifdef WITH_OPENSUBDIV
 	if (type == DEPSREL_TYPE_GEOMETRY_EVAL) {
 		IDDepsNode *id_to = to->owner->owner;
-		if ((id_to->eval_flags & DAG_EVAL_NEED_CPU) == 0) {
-			id_to->tag_update(this);
-			id_to->eval_flags |= DAG_EVAL_NEED_CPU;
+		IDDepsNode *id_from = to->owner->owner;
+		if (id_to != id_from) {
+			if ((id_to->eval_flags & DAG_EVAL_NEED_CPU) == 0) {
+				id_to->tag_update(this);
+				id_to->eval_flags |= DAG_EVAL_NEED_CPU;
+			}
 		}
 	}
 #endif
@@ -464,10 +468,19 @@ void DEG_graph_free(Depsgraph *graph)
 
 /* Set callbacks which are being called when depsgraph changes. */
 void DEG_editors_set_update_cb(DEG_EditorUpdateIDCb id_func,
-                               DEG_EditorUpdateSceneCb scene_func)
+                               DEG_EditorUpdateSceneCb scene_func,
+                               DEG_EditorUpdateScenePreCb scene_pre_func)
 {
 	deg_editor_update_id_cb = id_func;
 	deg_editor_update_scene_cb = scene_func;
+	deg_editor_update_scene_pre_cb = scene_pre_func;
+}
+
+void DEG_editors_update_pre(Main *bmain, Scene *scene, bool time)
+{
+	if (deg_editor_update_scene_pre_cb != NULL) {
+		deg_editor_update_scene_pre_cb(bmain, scene, time);
+	}
 }
 
 void deg_editors_id_update(Main *bmain, ID *id)

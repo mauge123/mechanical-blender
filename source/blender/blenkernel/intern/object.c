@@ -1562,6 +1562,7 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
 	}
 
 	/* Do not copy object's preview (mostly due to the fact renderers create temp copy of objects). */
+	obn->preview = NULL;
 
 	return obn;
 }
@@ -4017,9 +4018,8 @@ bool BKE_object_modifier_use_time(Object *ob, ModifierData *md)
 		AnimData *adt = ob->adt;
 		FCurve *fcu;
 
-		char pattern[MAX_NAME + 10];
-		/* TODO(sergey): Escape modifier name. */
-		BLI_snprintf(pattern, sizeof(pattern), "modifiers[%s", md->name);
+		char pattern[MAX_NAME + 16];
+		BLI_snprintf(pattern, sizeof(pattern), "modifiers[\"%s\"]", md->name);
 
 		/* action - check for F-Curves with paths containing 'modifiers[' */
 		if (adt->action) {

@@ -631,7 +631,10 @@ static bool view3d_orbit_calc_center(bContext *C, float r_dyn_ofs[3])
 	Scene *scene = CTX_data_scene(C);
 	Object *ob = OBACT;
 
-	if (ob && (ob->mode & OB_MODE_ALL_PAINT) && (BKE_object_pose_armature_get(ob) == NULL)) {
+	if (ob && (ob->mode & OB_MODE_ALL_PAINT) &&
+	    /* with weight-paint + pose-mode, fall through to using calculateTransformCenter */
+	    ((ob->mode & OB_MODE_WEIGHT_PAINT) && BKE_object_pose_armature_get(ob)) == 0)
+	{
 		/* in case of sculpting use last average stroke position as a rotation
 		 * center, in other cases it's not clear what rotation center shall be
 		 * so just rotate around object origin
@@ -3765,6 +3768,8 @@ static void axis_set_view(bContext *C, View3D *v3d, ARegion *ar,
 {
 	RegionView3D *rv3d = ar->regiondata; /* no NULL check is needed, poll checks */
 	float quat[4];
+	const short orig_persp = rv3d->persp;
+
 
 	normalize_qt_qt(quat, quat_);
 
@@ -3807,16 +3812,31 @@ static void axis_set_view(bContext *C, View3D *v3d, ARegion *ar,
 	}
 
 	if (rv3d->persp == RV3D_CAMOB && v3d->camera) {
+		/* to camera */
 		ED_view3d_smooth_view(C, v3d, ar, v3d->camera, NULL,
 		                      rv3d->ofs, quat, NULL, NULL,
 		                      smooth_viewtx);
 	}
+	else if (orig_persp == RV3D_CAMOB && v3d->camera) {
+		/* from camera */
+		float ofs[3], dist;
+
+		copy_v3_v3(ofs, rv3d->ofs);
+		dist = rv3d->dist;
+
+		/* so we animate _from_ the camera location */
+		ED_view3d_from_object(v3d->camera, rv3d->ofs, NULL, &rv3d->dist, NULL);
+
+		ED_view3d_smooth_view(C, v3d, ar, NULL, NULL,
+		                      ofs, quat, &dist, NULL,
+		                      smooth_viewtx);
+	}
 	else {
+		/* no camera involved */
 		ED_view3d_smooth_view(C, v3d, ar, NULL, NULL,
 		                      NULL, quat, NULL, NULL,
 		                      smooth_viewtx);
 	}
-
 }
 
 static int viewnumpad_exec(bContext *C, wmOperator *op)
@@ -4475,7 +4495,7 @@ void VIEW3D_OT_background_image_add(wmOperatorType *ot)
 	/* properties */
 	RNA_def_string(ot->srna, "name", "Image", MAX_ID_NAME - 2, "Name", "Image name to assign");
 	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
+	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 
