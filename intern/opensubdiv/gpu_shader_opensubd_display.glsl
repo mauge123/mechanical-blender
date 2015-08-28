@@ -52,6 +52,10 @@ void main()
 {
 	outpt.v.position = modelViewMatrix * position;
 	outpt.v.normal = normalize(normalMatrix * normal);
+	/* Some compilers expects gl_Position to be written.
+	 * It's not needed once we explicitly switch to GLSL 1.40 or above.
+	 */
+	gl_Position = outpt.v.position;
 }
 
 #endif  /* VERTEX_SHADER */
@@ -198,15 +202,17 @@ struct LightSource {
 	vec4 diffuse;
 	vec4 specular;
 	vec4 spotDirection;
+#ifdef SUPPORT_COLOR_MATERIAL
 	float constantAttenuation;
 	float linearAttenuation;
 	float quadraticAttenuation;
 	float spotCutoff;
 	float spotExponent;
 	float spotCosCutoff;
+#endif
 };
 
-uniform Lighting {
+layout(std140) uniform Lighting {
 	LightSource lightSource[MAX_LIGHTS];
 	int num_enabled_lights;
 };
