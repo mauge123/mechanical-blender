@@ -489,7 +489,7 @@ struct DerivedMesh {
 	 * if the DerivedMesh will be freed, or cached for later use. */
 	void (*release)(DerivedMesh *dm);
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	void (*foreachMappedDim)(DerivedMesh *dm,
 	                          void (*func)(void *userData, int index, const float v1[3],
 	                                       const float v2[3]),

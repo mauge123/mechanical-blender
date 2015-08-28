@@ -150,7 +150,7 @@ BLI_INLINE bool BM_iter_init(BMIter *iter, BMesh *bm, const char itype, void *da
 			iter->step  = (BMIter__step_cb)bmiter__loop_of_edge_step;
 			iter->data.loop_of_edge.edata = (BMEdge *)data;
 			break;
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case BM_DIMS_OF_MESH:
 			BLI_assert(bm != NULL);
 			BLI_assert(data == NULL);

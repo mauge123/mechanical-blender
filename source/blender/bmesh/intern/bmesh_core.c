@@ -630,7 +630,7 @@ int bmesh_elem_check(void *element, const char htype)
 				err |= (1 << 23);
 			break;
 		}
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case BM_DIM:
 		{
 			BMDim *d = element;
@@ -2692,7 +2692,7 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 	SWAP(int, f_a->head.index, f_b->head.index);
 }
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void bm_kill_only_dim(BMesh *bm, BMDim *d)
 {
 	bm->totdim--;

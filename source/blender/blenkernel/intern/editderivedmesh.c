@@ -346,7 +346,7 @@ static void emDM_foreachMappedEdge(
 		}
 	}
 }
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void emDM_foreachMappedDim(
         DerivedMesh *dm,
         void (*func)(void *userData, int index, const float v1[3], const float v2[3]),

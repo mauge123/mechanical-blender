@@ -84,7 +84,7 @@ if(WITH_FREESTYLE)
 endif()
 
 if(WITH_MECHANICAL)
-	add_definitions(-DWITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 
 	list(APPEND SRC
 		editmesh_dimension.c

@@ -1207,7 +1207,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 	bm->vtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totvert, 512, BLI_MEMPOOL_NOP);
 	bm->etoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totedge, 512, BLI_MEMPOOL_NOP);
 	bm->ftoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totface, 512, BLI_MEMPOOL_NOP);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	bm->dtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer) * bm->totflags, bm->totdim, 512, BLI_MEMPOOL_NOP);
 #endif
 

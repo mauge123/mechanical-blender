@@ -76,7 +76,7 @@ typedef enum BMIterType {
 	 * input loop's edge.*/
 	BM_LOOPS_OF_LOOP = 13,
 	BM_LOOPS_OF_EDGE = 14,
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_DIMS_OF_MESH = 15,
 #endif
 } BMIterType;
@@ -130,7 +130,7 @@ struct BMIter__edge_of_vert {
 	BMVert *vdata;
 	BMEdge *e_first, *e_next;
 };
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 struct BMIter__dim_of_mesh {
 	BMDim *ddata;
 	BMDim *d_first, *d_next;

@@ -64,7 +64,7 @@ void           BM_mesh_elem_table_free(BMesh *bm, const char htype);
 BMVert *BM_vert_at_index(BMesh *bm, const int index);
 BMEdge *BM_edge_at_index(BMesh *bm, const int index);
 BMFace *BM_face_at_index(BMesh *bm, const int index);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_at_index(BMesh *bm, const int index);
 #endif
 
@@ -86,7 +86,7 @@ void BM_mesh_remap(
         const unsigned int *edge_idx,
         const unsigned int *face_idx);
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 typedef struct BMAllocTemplate {
 	int totvert, totedge, totloop, totface, totdim;
 } BMAllocTemplate;

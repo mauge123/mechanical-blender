@@ -2008,7 +2008,7 @@ static BMOpDefine bmo_symmetrize_def = {
 	 BMO_OPTYPE_FLAG_SELECT_VALIDATE),
 };
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /*
  * Individual Vertex Extrude.
  *
@@ -2115,7 +2115,7 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_unsubdivide_def,
 	&bmo_weld_verts_def,
 	&bmo_wireframe_def,
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	&bmo_create_dimemsion_def,
 #endif
 };
