@@ -959,7 +959,7 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 	}
 }
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
 	bool handled = false;
@@ -1518,7 +1518,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 					handled = true;
 				}
 				break;
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 			case BKEY:
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_BASE_POINT;
@@ -1973,7 +1973,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 		}
 	}
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	if ((prop = RNA_struct_find_property(op->ptr, "offset"))) {
 		BLI_assert (RNA_property_array_check(prop));
 		RNA_property_float_set_array(op->ptr, prop, t->offset);
@@ -2381,7 +2381,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		t->flag |= T_AUTOVALUES;
 	}
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	/* overwrite initial values if operator supplied a non-null vector */
 	if ((prop = RNA_struct_find_property(op->ptr, "offset")) && RNA_property_is_set(op->ptr, prop)) {
 		BLI_assert (RNA_property_array_check(prop));
@@ -2464,7 +2464,7 @@ int transformEnd(bContext *C, TransInfo *t)
 
 	t->context = C;
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING && t->state != TRANS_BASE_POINT) {
 #else
 	if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING) {
@@ -4374,7 +4374,7 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 {
 	TransData *td = t->data;
 	float tvec[3];
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	float o_vec[3];
 #endif
 	int i;
@@ -4413,7 +4413,7 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 		
 		if (t->con.applyVec) {
 			float pvec[3];
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 			t->con.applyVec(t, td, vec, tvec, pvec, CONSTRAINT_APPLY_ALL);
 #else
 			t->con.applyVec(t, td, vec, tvec, pvec);
@@ -4430,7 +4430,7 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 		
 		if (td->loc) {
 			add_v3_v3v3(td->loc, td->iloc, tvec);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 			copy_v3_v3 (o_vec,(t->con.mode & CON_APPLY) ? t->offset_con : t->offset);
 			//Protect movements on offset
 			protectedTransBits(td->protectflag, o_vec);
@@ -4458,7 +4458,7 @@ static void applyTranslation(TransInfo *t, const int UNUSED(mval[2]))
 		t->con.applyVec(t, NULL, t->values, tvec, pvec, CONSTRAINT_APPLY_ALL);
 		copy_v3_v3(t->values, tvec);
 		headerTranslation(t, pvec, str);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 		//Apply constraint to offset
 		t->con.applyVec(t, NULL, t->offset, t->offset_con, pvec,
 		                CONSTRAINT_APPLY_ALL & ~CONSTRAINT_APPLY_NUM_INPUT & ~CONSTRAINT_APPLY_GRID & ~APPLY_T_AUTOVALUES);
@@ -7954,7 +7954,7 @@ static void applySeqSlide(TransInfo *t, const int mval[2])
 	if (t->con.mode & CON_APPLY) {
 		float pvec[3] = {0.0f, 0.0f, 0.0f};
 		float tvec[3];
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 		t->con.applyVec(t, NULL, t->values, tvec, pvec, CONSTRAINT_APPLY_ALL);
 #else		
 		t->con.applyVec(t, NULL, t->values, tvec, pvec);

@@ -2070,7 +2070,7 @@ void transform_data_ext_rotate(TransData *td, float mat[3][3], bool use_drot)
 	}
 }
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void setTranslationOffset(TransInfo *t, float* offset) {
 	copy_v3_v3(t->offset, offset);
 }
