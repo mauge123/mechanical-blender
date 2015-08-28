@@ -3,7 +3,7 @@ Mechanical Blender project is fork of blender BF-Project
 
 ## Purpose
 
-The purpose of Mechanical Blender is the development of tools and modify blender source to allow blender
+The purpose of Mechanical Blender is the development of tools and fork blender source to allow blender
 be a CAD software that could be used on industry. All changes will be performed in a way that
 commitment in blender official trunk could be done easily if the community and the Blender foundation consider
 it as convenient.
@@ -31,20 +31,32 @@ The mechanical branches will be also merged here periodically
 
 ### mechanical-dimensions
 
+This branchs starts from bf-blender trunk.
+
 currently on development
 
 ### mechanical-grab-w-basepoint
 
-currently on development
+This branchs starts from bf-blender trunk.
+
+The branch should be tested in other areas of Blender than 3D space editor.
 
 * see https://vimeo.com/137361362
 * see https://developer.blender.org/T45734
+
+## mechanical-rotate-w-basepoint
+
+This branchs starts from mechanical-grab-w-basepoint.
+
+currenly on development.
 
 ## Issues
 
 ### Shortcut to enable/disable snapping does not work during transform operation
 
-SHIFT+TAB does not work, but you can chose the snap type with CTRL+SHIFT+TAB
+SHIFT+TAB does not work. Chosing the snap type with CTRL+SHIFT+TAB works.
+
+In blender trunk, it works SHIFT+TAB, but not CTRL+SHIFT+TAB !
 
 ## Related
 
@@ -56,6 +68,8 @@ Related data and applications to allow blender be more CAD/CAE friendly.
 
 * http://wiki.blender.org/index.php/Extensions:2.7/Py/Scripts/Object/Enhanced_Custom_Properties
 * https://github.com/devynios/digidone
+
+#### Tutorials and videos
 
 ## Wishes
 
