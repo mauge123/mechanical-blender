@@ -161,7 +161,11 @@ EnumPropertyItem snap_element_items[] = {
 	{SCE_SNAP_MODE_EDGE, "EDGE", ICON_SNAP_EDGE, "Edge", "Snap to edges"},
 	{SCE_SNAP_MODE_FACE, "FACE", ICON_SNAP_FACE, "Face", "Snap to faces"},
 	{SCE_SNAP_MODE_VOLUME, "VOLUME", ICON_SNAP_VOLUME, "Volume", "Snap to volume"},
-	{0, NULL, 0, NULL, NULL}
+#ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
+	// Todo: Add Icon
+	{SCE_SNAP_MODE_CURSOR, "CURSOR", ICON_NONE, "Cursor", "Snap to cursor"},
+ #endif
+    {0, NULL, 0, NULL, NULL}
 };
 
 EnumPropertyItem snap_node_element_items[] = {

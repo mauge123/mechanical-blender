@@ -27,4 +27,9 @@ if(WITH_FREESTYLE)
 	add_definitions(-DWITH_FREESTYLE)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_SNAP_TO_CURSOR)
+endif()
+
+
 add_subdirectory(intern)
