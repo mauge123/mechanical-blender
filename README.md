@@ -8,7 +8,7 @@ be a CAD software that could be used on industry. All changes will be performed 
 commitment in blender official trunk could be done easily if the community and the Blender foundation consider
 it as convenient.
 
-We a wont a professional software to be used for companies and individuals that
+We wont a professional software to be used for companies and individuals that
 
 * Want to be free and no to be imposed the OS, and upgrades (soft, and hardware)
 * Don't want to be married with a company and a software.
@@ -40,6 +40,12 @@ currently on development
 * see https://vimeo.com/137361362
 * see https://developer.blender.org/T45734
 
+## Issues
+
+### Shortcut to enable/disable snapping does not work during transform operation
+
+SHIFT+TAB does not work, but you can chose the snap type with CTRL+SHIFT+TAB
+
 ## Related
 
 Related data and applications to allow blender be more CAD/CAE friendly.
@@ -61,6 +67,13 @@ See https://developer.blender.org/T43964
 
 Creation of a drawing space, to get 2D data for manufacturing or documentation.
 
+### Snap to cursor
+
+New snap mode allowing to set snap to cursor.
+
+### Snap to gemoetry
+
+New snap mode allowing to set snap to geometry, like centers, mid_points, tangents, perpendiculars and so on.
 
 ## Credits
 
