@@ -45,7 +45,7 @@
 #include "intern/bmesh_private.h"
 
 /* used as an extern, defined in bmesh.h */
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512, 512};
 const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512, 512};
 #else
@@ -63,7 +63,7 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 	                               bm_mesh_chunksize_default.totloop, BLI_MEMPOOL_NOP);
 	bm->fpool = BLI_mempool_create(sizeof(BMFace), allocsize->totface,
 	                               bm_mesh_chunksize_default.totface, BLI_MEMPOOL_ALLOW_ITER);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	bm->dpool = BLI_mempool_create(sizeof(BMDim), allocsize->totdim,
 	                               bm_mesh_chunksize_default.totdim, BLI_MEMPOOL_ALLOW_ITER);
 #endif
@@ -132,7 +132,7 @@ void BM_mesh_elem_toolflags_clear(BMesh *bm)
 		BLI_mempool_destroy(bm->ftoolflagpool);
 		bm->ftoolflagpool = NULL;
 	}
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (bm->dtoolflagpool) {
 		BLI_mempool_destroy(bm->dtoolflagpool);
 		bm->ftoolflagpool = NULL;
@@ -230,14 +230,14 @@ void BM_mesh_data_free(BMesh *bm)
 	BLI_mempool_destroy(bm->epool);
 	BLI_mempool_destroy(bm->lpool);
 	BLI_mempool_destroy(bm->fpool);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BLI_mempool_destroy(bm->dpool);
 #endif
 
 	if (bm->vtable) MEM_freeN(bm->vtable);
 	if (bm->etable) MEM_freeN(bm->etable);
 	if (bm->ftable) MEM_freeN(bm->ftable);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (bm->dtable) MEM_freeN(bm->dtable);
 #endif
 
@@ -1309,7 +1309,7 @@ void BM_mesh_elem_table_ensure(BMesh *bm, const char htype)
 			bm->ftable_tot = bm->totface;
 		}
 	}
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (htype_needed & BM_DIM) {
 		if (bm->dtable && bm->totdim <= bm->dtable_tot && bm->totdim * 2 >= bm->dtable_tot) {
 			/* pass (re-use the array) */
@@ -1345,7 +1345,7 @@ void BM_mesh_elem_table_ensure(BMesh *bm, const char htype)
 				BM_iter_as_array(bm, BM_FACES_OF_MESH, NULL, (void **)bm->ftable, bm->totface);
 			}
 		}
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 #pragma omp section
 		{
 			if (htype_needed & BM_DIM) {
@@ -1395,7 +1395,7 @@ BMVert *BM_vert_at_index(BMesh *bm, const int index)
 	return bm->vtable[index];
 }
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_at_index(BMesh *bm, const int index)
 {
 	BLI_assert((index >= 0) && (index < bm->totdim));

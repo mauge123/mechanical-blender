@@ -140,7 +140,7 @@ typedef struct BMLoop {
 } BMLoop;
 
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 typedef struct BMDim {
 	BMHeader head;
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
@@ -257,7 +257,7 @@ typedef struct BMesh {
 
 	void *py_handle;
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	int totdim;
 	struct BLI_mempool *dpool;
 	struct BLI_mempool *dtoolflagpool;
@@ -275,12 +275,12 @@ enum {
 	BM_EDGE = 2,
 	BM_LOOP = 4,
 	BM_FACE = 8,
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_DIM = 16,
 #endif
 };
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 
 #define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM)
 #define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE | BM_DIM)

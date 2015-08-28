@@ -113,7 +113,7 @@ typedef enum eBMOpSlotType {
 #define BMO_OP_SLOT_TOTAL_TYPES 11
 
 /* don't overlap values to avoid confusion */
-#ifndef WITH_MECHANICAL
+#ifndef WITH_MECHANICAL_MESH_DIMENSIONS
 typedef enum eBMOpSlotSubType_Elem {
 	/* use as flags */
 	BMO_OP_SLOT_SUBTYPE_ELEM_VERT = BM_VERT,

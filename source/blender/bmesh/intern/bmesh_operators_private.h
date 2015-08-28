@@ -114,7 +114,7 @@ void bmo_unsubdivide_exec(BMesh *bm, BMOperator *op);
 void bmo_weld_verts_exec(BMesh *bm, BMOperator *op);
 void bmo_wireframe_exec(BMesh *bm, BMOperator *op);
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void bmo_create_dimension_exec(BMesh *bm, BMOperator *op);
 #endif
 

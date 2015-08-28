@@ -141,7 +141,7 @@ typedef struct drawDMVerts_userData {
 	float imat[4][4];
 } drawDMVerts_userData;
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 typedef struct drawDMDims_userData {
 	BMEditMesh *em;
 
@@ -2673,7 +2673,7 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 	bglEnd();
 }
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /**
  * /Brief Draw verts with color set based on selection
  *
@@ -3417,7 +3417,7 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 }
 
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* UNUSED(obedit),
                                 BMEditMesh *em, DerivedMesh *cageDM, BMDim *edm_act,
                                 RegionView3D* rv3d)
@@ -3899,7 +3899,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 	BMFace *efa_act = BM_mesh_active_face_get(em->bm, false, true); /* annoying but active faces is stored differently */
 	BMEdge *eed_act = NULL;
 	BMVert *eve_act = NULL;
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm_act = NULL;
 #endif
 	bool use_occlude_wire = (v3d->flag2 & V3D_OCCLUDE_WIRE) && (dt > OB_WIRE);
@@ -4127,7 +4127,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 		}
 	}
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	draw_em_fancy_dims(ar, scene, v3d, ob, em, cageDM, edm_act, rv3d);
 #endif
 

@@ -91,7 +91,7 @@ if(WITH_FREESTYLE)
 endif()
 
 if(WITH_MECHANICAL)
-	add_definitions(-DWITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 endif()
 
 blender_add_lib(bf_editor_space_view3d "${SRC}" "${INC}" "${INC_SYS}")
