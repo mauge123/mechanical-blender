@@ -61,7 +61,7 @@ if(WITH_LEGACY_DEPSGRAPH)
 endif()
 
 if(WITH_MECHANICAL)
-	add_definitions(-DWITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_GRAB_W_BASE_POINT)
 endif()
 
 

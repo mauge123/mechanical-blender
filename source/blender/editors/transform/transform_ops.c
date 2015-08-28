@@ -379,7 +379,7 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 	return retval; /* return 0 on error */
 }
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
@@ -408,7 +408,7 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 }
 #endif
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 static int transform_modal_do(bContext *C, wmOperator *op, const wmEvent *event)
 #else
 static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
@@ -442,7 +442,7 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 		}
 	}
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	if (t->state == TRANS_BASE_POINT){
 		restoreTransObjects(t);
 		// Remove flags to allow object snap referencer over object
@@ -487,7 +487,7 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 }
 
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
@@ -647,7 +647,7 @@ static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector_xyz(ot->srna, "value", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	RNA_def_float_vector_xyz(ot->srna, "offset", 3, NULL, -FLT_MAX, FLT_MAX, "Offset", "Translation offset", -FLT_MAX, FLT_MAX);
 #endif
 

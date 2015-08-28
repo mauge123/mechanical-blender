@@ -67,7 +67,7 @@ typedef enum {
 	TREDRAW_SOFT      = 2,
 } eRedrawFlag;
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 // Applys to applyVec Function
 // Used to avoid apply constraint over translation offset value
 typedef enum {
@@ -123,7 +123,7 @@ typedef struct TransCon {
 	void  (*drawExtra)(struct TransInfo *t);
 	                     /* For constraints that needs to draw differently from the other
 	                      * uses this instead of the generic draw function                            */
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	void  (*applyVec)(struct TransInfo *t, struct TransData *td, const float in[3],
 						float out[3], float pvec[3], applyConstraintFlag flag);
 #else
@@ -383,7 +383,7 @@ typedef struct TransInfo {
 	float       center[3];      /* center of transformation (in local-space) */
 	float       center_global[3];  /* center of transformation (in global-space) */
 	float       center2d[2];    /* center in screen coordinates         */
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	float		offset[3];       /* Translation offset                   */
 	float		offset_con[3];   /* Translation offset constrained       */
 #endif
@@ -571,7 +571,7 @@ void saveTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *o
 int  transformEvent(TransInfo *t, const struct wmEvent *event);
 void transformApply(struct bContext *C, TransInfo *t);
 int  transformEnd(struct bContext *C, TransInfo *t);
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 int  transformEventBasePoint(TransInfo *t, const struct wmEvent *event);
 #endif
 
@@ -776,12 +776,12 @@ void projectVertSlideData(TransInfo *t, bool is_final);
 /* TODO. transform_queries.c */
 bool checkUseAxisMatrix(TransInfo *t);
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void setTranslationOffset(TransInfo *t, float* offset);
-void fixSnapTarget (TransInfo *t, float* target) ;
+void fixSnapTarget (TransInfo *t, const float* target) ;
 #endif
 
-#ifdef WITH_MECHANICAL
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 // Not static functions
 void clear_trans_object_base_flags(TransInfo *t);
 void set_trans_object_base_flags(TransInfo *t);
