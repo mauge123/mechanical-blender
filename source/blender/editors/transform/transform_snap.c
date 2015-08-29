@@ -428,6 +428,11 @@ void applyGridAbsolute(TransInfo *t)
 
 void applySnapping(TransInfo *t, float *vec)
 {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	// Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always
+	t->tsnap.mode = t->settings->snap_mode;
+#endif
+
 	/* project is not applied this way */
 	if (t->tsnap.project)
 		return;
@@ -921,7 +926,7 @@ static void UNUSED_FUNCTION(CalcSnapGrid) (TransInfo *t, float *UNUSED(vec))
 }
 
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
-static int snap_3d_point (TransInfo *t, float *mval, float *point, float dist_px){
+static int snap_3d_point (TransInfo *t, const float *mval, const float *point, float dist_px){
 	float pos [2] = {};
 	RegionView3D *rv3d = t->ar->regiondata;
 

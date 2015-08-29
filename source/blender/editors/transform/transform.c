@@ -801,6 +801,11 @@ enum {
 	TFM_MODAL_PROPSIZE       = 26,
 /* node editor insert offset (aka auto-offset) direction toggle */
 	TFM_MODAL_INSERTOFS_TOGGLE_DIR         = 27,
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	TFM_MODAL_SELECT_BASE_POINT = 28,
+	TFM_MODAL_SNAP_ELEMENT_SELECT = 29,
+#endif
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -834,6 +839,10 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 		{TFM_MODAL_EDGESLIDE_DOWN, "EDGESLIDE_PREV_NEXT", 0, "Select previous Edge Slide Edge", ""},
 		{TFM_MODAL_PROPSIZE, "PROPORTIONAL_SIZE", 0, "Adjust Proportional Influence", ""},
 		{TFM_MODAL_INSERTOFS_TOGGLE_DIR, "INSERTOFS_TOGGLE_DIR", 0, "Toggle Direction for Node Auto-offset", ""},
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+		{TFM_MODAL_SELECT_BASE_POINT, "TFM_MODAL_SELECT_BASE_POINT", 0, "Snap Element Menu", ""},
+		{TFM_MODAL_SNAP_ELEMENT_SELECT, "TFM_MODAL_SNAP_ELEMENT_SELECT", 0, "Snap Element Menu", ""},
+#endif
 		{0, NULL, 0, NULL, NULL}
 	};
 	
@@ -885,6 +894,12 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 
 	/* node editor only */
 	WM_modalkeymap_add_item(keymap, TKEY, KM_PRESS, 0, 0, TFM_MODAL_INSERTOFS_TOGGLE_DIR);
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	WM_modalkeymap_add_item(keymap, BKEY, KM_PRESS, 0, 0, TFM_MODAL_SELECT_BASE_POINT);
+	WM_modalkeymap_add_item(keymap, TABKEY, KM_PRESS, KM_SHIFT | KM_CTRL, 0, TFM_MODAL_SNAP_ELEMENT_SELECT);
+#endif
+
 
 	return keymap;
 }
@@ -983,6 +998,21 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				t->state = TRANS_RUNNING;
 				handled=true;
 				break;
+			case TFM_MODAL_SNAP_INV_ON:
+				t->modifiers |= MOD_SNAP_INVERT;
+				t->redraw |= TREDRAW_HARD;
+				handled = true;
+				break;
+			case TFM_MODAL_SNAP_INV_OFF:
+				t->modifiers &= ~MOD_SNAP_INVERT;
+				t->redraw |= TREDRAW_HARD;
+				handled = true;
+				break;
+			case TFM_MODAL_SNAP_TOGGLE:
+				t->modifiers ^= MOD_SNAP;
+				t->redraw |= TREDRAW_HARD;
+				handled = true;
+				break;
 		}
 	} else if (event->val == KM_PRESS) {
 		switch (event->type) {
@@ -1054,6 +1084,30 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 	/* handle modal keymap first */
 	else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+			case TFM_MODAL_SNAP_ELEMENT_SELECT:
+			{
+				wmOperatorType *ot = WM_operatortype_find("WM_OT_context_menu_enum", true);
+				PointerRNA ptr;
+				WM_operator_properties_create_ptr(&ptr, ot);
+				RNA_string_set(&ptr, "data_path", "tool_settings.snap_element");
+				WM_operator_name_call_ptr(t->context,ot,WM_OP_EXEC_DEFAULT,&ptr);
+
+				// Reset precision and snap invert as they get released
+				t->modifiers &= (~MOD_PRECISION | ~MOD_SNAP_INVERT);
+				//Activate Snap always
+				t->modifiers &= MOD_SNAP;
+				t->mouse.precision = 0;
+				handled = true;
+				break;
+			}
+			case TFM_MODAL_SELECT_BASE_POINT:
+			{
+				t->redraw |= TREDRAW_HARD;
+				t->state = TRANS_BASE_POINT;
+				break;
+			}
+#endif
 			case TFM_MODAL_CANCEL:
 				t->state = TRANS_CANCEL;
 				handled = true;
@@ -1518,11 +1572,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 					handled = true;
 				}
 				break;
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-			case BKEY:
-				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_BASE_POINT;
-#endif
 			default:
 				break;
 		}
