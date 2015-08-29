@@ -428,6 +428,11 @@ void applyGridAbsolute(TransInfo *t)
 
 void applySnapping(TransInfo *t, float *vec)
 {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	// Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always
+	t->tsnap.mode = t->settings->snap_mode;
+#endif
+
 	/* project is not applied this way */
 	if (t->tsnap.project)
 		return;
@@ -920,6 +925,19 @@ static void UNUSED_FUNCTION(CalcSnapGrid) (TransInfo *t, float *UNUSED(vec))
 	snapGridIncrementAction(t, t->tsnap.snapPoint, BIG_GEARS);
 }
 
+#ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
+static int snap_3d_point (TransInfo *t, const float *mval, const float *point, float dist_px){
+	float pos [2] = {};
+	RegionView3D *rv3d = t->ar->regiondata;
+
+	//Get 2D cordinates of target
+	ED_view3d_project_float_v2_m4(t->ar, point, pos, rv3d->persmat);
+
+	return (len_v2v2(pos,mval) < dist_px);
+}
+#endif
+
+
 static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 {
 	if (t->spacetype == SPACE_VIEW3D) {
@@ -1014,6 +1032,15 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 			
 			BLI_freelistN(&depth_peels);
 		}
+#ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
+		else if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
+			const float *cursor =  ED_view3d_cursor3d_get(t->scene, t->view);
+			if (snap_3d_point(t, mval, cursor, dist_px)){
+				found = true;
+				copy_v3_v3 (loc,cursor);
+			}
+		}
+#endif
 		else {
 			found = snapObjectsTransform(t, mval, &dist_px, loc, no, t->tsnap.modeSelect);
 		}

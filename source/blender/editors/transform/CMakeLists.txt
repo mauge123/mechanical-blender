@@ -62,6 +62,7 @@ endif()
 
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_GRAB_W_BASE_POINT)
+	add_definitions(-DWITH_MECHANICAL_SNAP_TO_CURSOR)
 endif()
 
 
