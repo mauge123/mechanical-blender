@@ -17,6 +17,12 @@ We wont a professional software to be used for companies and individuals that
 
 ## Builds
 
+### Changes and improvements from BF-Blender
+
+* User is capable to select base points for transformations, using B key
+* 3D cursor is set as snap element, so transformations can refer to it.
+* User is capable to change snap element list during transformation using the shortcut CTRL+SHIFT+TAB
+
 ## Compile
 
 To be compiled you must enable WITH_MECHANICAL flag. Once enable compile as usual done for bf-blender
@@ -42,6 +48,7 @@ This branchs starts from bf-blender trunk.
 The branch should be tested in other areas of Blender than 3D space editor.
 
 * see https://vimeo.com/137361362
+* see https://vimeo.com/137503811
 * see https://developer.blender.org/T45734
 
 ## mechanical-rotate-w-basepoint
@@ -51,12 +58,6 @@ This branchs starts from mechanical-grab-w-basepoint.
 currenly on development.
 
 ## Issues
-
-### Shortcut to enable/disable snapping does not work during transform operation
-
-SHIFT+TAB does not work. Chosing the snap type with CTRL+SHIFT+TAB works.
-
-In blender trunk, it works SHIFT+TAB, but not CTRL+SHIFT+TAB !
 
 ## Related
 
@@ -80,10 +81,6 @@ See https://developer.blender.org/T43964
 ### Drawing Space
 
 Creation of a drawing space, to get 2D data for manufacturing or documentation.
-
-### Snap to cursor
-
-New snap mode allowing to set snap to cursor.
 
 ### Snap to gemoetry
 
