@@ -2076,3 +2076,14 @@ void setTranslationOffset(TransInfo *t, float* offset) {
 }
 #endif
 
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+void setRotationOffset(TransInfo *t, float* offset) {
+	copy_v3_v3(t->offset, offset);
+}
+
+void rotate_using_result(TransInfo *t) {
+	t->con.mode |= (CON_APPLY | CON_ROTATE_USE_RESULT);
+	t->con.applyRot = applyRotateUsingResult;
+}
+#endif
+

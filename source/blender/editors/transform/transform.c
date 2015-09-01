@@ -806,6 +806,11 @@ enum {
 	TFM_MODAL_SELECT_BASE_POINT = 28,
 	TFM_MODAL_SNAP_ELEMENT_SELECT = 29,
 #endif
+
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+	TFM_MODAL_ROTATE_USE_RESULT_AXIS = 30,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -842,6 +847,7 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 		{TFM_MODAL_SELECT_BASE_POINT, "TFM_MODAL_SELECT_BASE_POINT", 0, "Snap Element Menu", ""},
 		{TFM_MODAL_SNAP_ELEMENT_SELECT, "TFM_MODAL_SNAP_ELEMENT_SELECT", 0, "Snap Element Menu", ""},
+		{TFM_MODAL_ROTATE_USE_RESULT_AXIS, "TFM_MODAL_ROTATE_USE_RESULT_AXIS", 0, "Use result axis on rotation", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -898,6 +904,11 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	WM_modalkeymap_add_item(keymap, BKEY, KM_PRESS, 0, 0, TFM_MODAL_SELECT_BASE_POINT);
 	WM_modalkeymap_add_item(keymap, TABKEY, KM_PRESS, KM_SHIFT | KM_CTRL, 0, TFM_MODAL_SNAP_ELEMENT_SELECT);
+#endif
+
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+	/* Use the axis resulting on base point and target */
+	WM_modalkeymap_add_item(keymap, WKEY, KM_PRESS, 0, 0, TFM_MODAL_ROTATE_USE_RESULT_AXIS);
 #endif
 
 
@@ -991,9 +1002,21 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				handled = true;
 				break;
 			case TFM_MODAL_CONFIRM:
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION));
+				if (t->mode == TFM_TRANSLATION) {
+					setTranslationOffset(t, t->values);
+					sub_v3_v3v3(tvec, t->tsnap.snapPoint, t->values);
+					fixSnapTarget(t, tvec);
+				}else if (t->mode == TFM_ROTATION) {
+					setRotationOffset (t, t->values);
+					fixSnapTarget(t, t->tsnap.snapPoint);
+				}
+#else
 				setTranslationOffset(t, t->values);
 				sub_v3_v3v3(tvec, t->tsnap.snapPoint, t->values);
 				fixSnapTarget(t, tvec);
+#endif
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;
 				handled=true;
@@ -1102,11 +1125,20 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				break;
 			}
 			case TFM_MODAL_SELECT_BASE_POINT:
-			{
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_BASE_POINT;
 				break;
-			}
+#endif
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+			case TFM_MODAL_ROTATE_USE_RESULT_AXIS:
+				if (t->tsnap.status & TARGET_FIXED) {
+					rotate_using_result (t);
+					t->redraw |= TREDRAW_HARD;
+				} else {
+					// Nothing
+				}
+				handled = true;
+				break;
 #endif
 			case TFM_MODAL_CANCEL:
 				t->state = TRANS_CANCEL;
@@ -4065,12 +4097,58 @@ static void applyRotationValue(TransInfo *t, float angle, float axis[3])
 	}
 }
 
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+static float computeRotationAngle (TransInfo *t, float *values, applyConstraintFlag apply_flag) {
+	float final;
+	float v1[3],v2[3];
+
+	final = values[0];
+
+	if (apply_flag & CONSTRAINT_APPLY_GRID) {
+		snapGridIncrement(t, &final);
+	}
+
+
+	if (apply_flag & CONSTRAINT_APPLY_ALL){
+
+		applySnapping(t, &final);
+
+		if ((t->con.mode & CON_APPLY) && t->con.applyRot) {
+			if (!t->con.applyRot(t, NULL, t->axis, NULL)) {
+				copy_v3_v3(t->axis, t->axis_orig);
+			}
+		} else {
+			/* reset axis if constraint is not set */
+			copy_v3_v3(t->axis, t->axis_orig);
+		}
+	}
+
+	if ((apply_flag & CONSTRAINT_APPLY_NUM_INPUT) && (applyNumInput(&t->num, &final))) {
+		/* Clamp between -PI and PI */
+		final = angle_wrap_rad(final);
+	}
+
+	values[0] = final;
+
+	return final;
+}
+#endif
+
 static void applyRotation(TransInfo *t, const int UNUSED(mval[2]))
 {
 	char str[MAX_INFO_LEN];
 	size_t ofs = 0;
 
 	float final;
+	float offset_angle = 0;
+
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+	final = computeRotationAngle (t, t->values, CONSTRAINT_APPLY_ALL);
+	if  (!validSnap(t)) {
+		offset_angle = computeRotationAngle (t, t->offset, CONSTRAINT_APPLY_NONE);
+		final -=offset_angle;
+	}
+#else
 
 	final = t->values[0];
 
@@ -4092,6 +4170,8 @@ static void applyRotation(TransInfo *t, const int UNUSED(mval[2]))
 	}
 
 	t->values[0] = final;
+
+#endif
 
 	if (hasNumInput(&t->num)) {
 		char c[NUM_STR_REP_LEN];

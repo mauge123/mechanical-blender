@@ -134,7 +134,11 @@ typedef struct TransCon {
 	                     /* The last three parameters are pointers to the in/out/printable vectors    */
 	void  (*applySize)(struct TransInfo *t, struct TransData *td, float smat[3][3]);
 	                     /* Apply function pointer for size transformation */
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+	int  (*applyRot)(struct TransInfo *t, struct TransData *td, float vec[3], float *angle);
+#else
 	void  (*applyRot)(struct TransInfo *t, struct TransData *td, float vec[3], float *angle);
+#endif
 	                     /* Apply function pointer for rotation transformation */
 } TransCon;
 
@@ -539,6 +543,10 @@ typedef struct TransInfo {
 #define CON_SELECT		16
 #define CON_NOFLIP		32	/* does not reorient vector to face viewport when on */
 #define CON_USER		64
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+#define CON_ROTATE_USE_RESULT 128
+#endif
+
 
 /* transdata->flag */
 #define TD_SELECTED			1
@@ -651,6 +659,10 @@ void selectConstraint(TransInfo *t);
 void postSelectConstraint(TransInfo *t);
 
 void setNearestAxis(TransInfo *t);
+
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+int applyRotateUsingResult(TransInfo *t, TransData *td, float vec[3], float *angle);
+#endif
 
 /*********************** Snapping ********************************/
 
@@ -780,6 +792,10 @@ bool checkUseAxisMatrix(TransInfo *t);
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void setTranslationOffset(TransInfo *t, float* offset);
 void fixSnapTarget (TransInfo *t, const float* target) ;
+#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
+void setRotationOffset(TransInfo *t, float* offset);
+void rotate_using_result(TransInfo *t);
+#endif
 #endif
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
