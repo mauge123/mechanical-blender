@@ -1287,6 +1287,9 @@ static void TargetSnapClosest(TransInfo *t)
 		TargetSnapOffset(t, closest);
 		
 		t->tsnap.status |= TARGET_INIT;
+
+	} else if (t->tsnap.status & TARGET_FIXED) {
+		t->tsnap.dist = t->tsnap.distance(t, t->tsnap.snapTarget, t->tsnap.snapPoint);
 	}
 }
 
