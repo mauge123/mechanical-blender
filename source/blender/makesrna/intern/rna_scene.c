@@ -163,7 +163,7 @@ EnumPropertyItem snap_element_items[] = {
 	{SCE_SNAP_MODE_VOLUME, "VOLUME", ICON_SNAP_VOLUME, "Volume", "Snap to volume"},
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
 	// Todo: Add Icon
-	{SCE_SNAP_MODE_CURSOR, "CURSOR", ICON_NONE, "Cursor", "Snap to cursor"},
+	{SCE_SNAP_MODE_CURSOR, "CURSOR", ICON_CURSOR, "Cursor", "Snap to cursor"},
  #endif
     {0, NULL, 0, NULL, NULL}
 };

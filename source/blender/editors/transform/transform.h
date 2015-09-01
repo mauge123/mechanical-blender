@@ -71,6 +71,7 @@ typedef enum {
 // Applys to applyVec Function
 // Used to avoid apply constraint over translation offset value
 typedef enum {
+	CONSTRAINT_APPLY_NONE		  = 0,
 	CONSTRAINT_APPLY_NUM_INPUT    = (1 << 0),
 	CONSTRAINT_APPLY_GRID         = (1 << 1),
 	APPLY_T_AUTOVALUES	          = (1 << 2),
