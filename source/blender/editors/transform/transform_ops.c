@@ -394,7 +394,9 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 
 
 	t->tsnap.calcSnap(t, t->values);
-	t->tsnap.targetSnap(t);
+	if (t->tsnap.targetSnap) {
+		t->tsnap.targetSnap(t);
+	}
 
 	if (!exit_code) {
 		exit_code |= transformEnd(C, t);
@@ -402,6 +404,8 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 			transformops_exit(C, op);
 			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 		}
+	} else {
+				   ED_area_headerprint(t->sa, "Select Base Point");
 	}
 
 	return exit_code;

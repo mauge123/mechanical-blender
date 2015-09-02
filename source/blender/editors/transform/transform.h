@@ -796,6 +796,7 @@ void fixSnapTarget (TransInfo *t, const float* target) ;
 void setRotationOffset(TransInfo *t, float* offset);
 void rotate_using_result(TransInfo *t);
 #endif
+void setTargetSnapFunc (TransInfo *t, int target_element);
 #endif
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
