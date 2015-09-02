@@ -780,6 +780,7 @@ bool checkUseAxisMatrix(TransInfo *t);
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void setTranslationOffset(TransInfo *t, float* offset);
 void fixSnapTarget (TransInfo *t, const float* target) ;
+void setTargetSnapFunc (TransInfo *t, int target_element);
 #endif
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT

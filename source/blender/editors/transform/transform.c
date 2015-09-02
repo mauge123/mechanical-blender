@@ -1104,7 +1104,8 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_SELECT_BASE_POINT:
 			{
 				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_BASE_POINT;
+				//set the snapTarget function
+				setTargetSnapFunc(t,SCE_SNAP_TARGET_MANUAL);
 				break;
 			}
 #endif

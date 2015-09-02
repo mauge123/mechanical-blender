@@ -6388,7 +6388,13 @@ static void createTransObject(bContext *C, TransInfo *t)
 	TransDataExtension *tx;
 	const bool is_prop_edit = (t->flag & T_PROP_EDIT) != 0;
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	if (t->settings->snap_target != SCE_SNAP_TARGET_MANUAL){
+		set_trans_object_base_flags(t);
+	}
+#else
 	set_trans_object_base_flags(t);
+#endif
 
 	/* count */
 	t->total = CTX_DATA_COUNT(C, selected_objects);
