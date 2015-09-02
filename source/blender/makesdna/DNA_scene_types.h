@@ -1707,6 +1707,9 @@ extern const char *RE_engine_id_CYCLES;
 #define SCE_SNAP_TARGET_CENTER	1
 #define SCE_SNAP_TARGET_MEDIAN	2
 #define SCE_SNAP_TARGET_ACTIVE	3
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+#define SCE_SNAP_TARGET_MANUAL  4
+#endif
 /* toolsettings->snap_mode */
 #define SCE_SNAP_MODE_INCREMENT	0
 #define SCE_SNAP_MODE_VERTEX	1

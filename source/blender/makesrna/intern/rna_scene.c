@@ -110,6 +110,9 @@ EnumPropertyItem snap_target_items[] = {
 	{SCE_SNAP_TARGET_CENTER, "CENTER", 0, "Center", "Snap center onto target"},
 	{SCE_SNAP_TARGET_MEDIAN, "MEDIAN", 0, "Median", "Snap median onto target"},
 	{SCE_SNAP_TARGET_ACTIVE, "ACTIVE", 0, "Active", "Snap active onto target"},
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	{SCE_SNAP_TARGET_MANUAL, "MANUAL", 0, "Manual", "Snap selected reference onto target"},
+#endif
 	{0, NULL, 0, NULL, NULL}
 };
 	

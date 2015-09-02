@@ -102,6 +102,7 @@ static void TargetSnapMedian(TransInfo *t);
 static void TargetSnapCenter(TransInfo *t);
 static void TargetSnapClosest(TransInfo *t);
 static void TargetSnapActive(TransInfo *t);
+static void TargetSnapManual(TransInfo *t);
 
 static float RotationBetween(TransInfo *t, const float p1[3], const float p2[3]);
 static float TranslationBetween(TransInfo *t, const float p1[3], const float p2[3]);
@@ -438,7 +439,13 @@ void applySnapping(TransInfo *t, float *vec)
 		return;
 	
 	if (t->tsnap.status & SNAP_FORCED) {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+		if (t->tsnap.targetSnap) {
+			t->tsnap.targetSnap(t);
+		}
+#else
 		t->tsnap.targetSnap(t);
+#endif
 	
 		t->tsnap.applySnap(t, vec);
 	}
@@ -449,7 +456,13 @@ void applySnapping(TransInfo *t, float *vec)
 		/* !TODO! add exception for object mode, no need to slow it down then */
 		if (current - t->tsnap.last >= 0.01) {
 			t->tsnap.calcSnap(t, vec);
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+			if (t->tsnap.targetSnap) {
+				t->tsnap.targetSnap(t);
+			}
+#else
 			t->tsnap.targetSnap(t);
+#endif
 	
 			t->tsnap.last = current;
 		}
@@ -645,6 +658,9 @@ static void setSnappingCallback(TransInfo *t)
 {
 	t->tsnap.calcSnap = CalcSnapGeometry;
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	setTargetSnapFunc (t, t->tsnap.target);
+#else
 	switch (t->tsnap.target) {
 		case SCE_SNAP_TARGET_CLOSEST:
 			t->tsnap.targetSnap = TargetSnapClosest;
@@ -660,6 +676,7 @@ static void setSnappingCallback(TransInfo *t)
 			break;
 
 	}
+#endif
 
 	switch (t->mode) {
 		case TFM_TRANSLATION:
@@ -713,6 +730,27 @@ void fixSnapTarget (TransInfo *t, const float* target)
 {
 	copy_v3_v3(t->tsnap.snapTarget,target);
 	t->tsnap.status |= (TARGET_FIXED | TARGET_INIT);
+}
+
+void setTargetSnapFunc (TransInfo *t, int target_element){
+	switch (target_element) {
+		case SCE_SNAP_TARGET_CLOSEST:
+			t->tsnap.targetSnap = TargetSnapClosest;
+			break;
+		case SCE_SNAP_TARGET_CENTER:
+			t->tsnap.targetSnap = TargetSnapCenter;
+			break;
+		case SCE_SNAP_TARGET_MEDIAN:
+			t->tsnap.targetSnap = TargetSnapMedian;
+			break;
+		case SCE_SNAP_TARGET_ACTIVE:
+			t->tsnap.targetSnap = TargetSnapActive;
+			break;
+		case SCE_SNAP_TARGET_MANUAL:
+			t->state = TRANS_BASE_POINT;
+			t->tsnap.targetSnap = TargetSnapManual;
+			break;
+	}
 }
 #endif
 
@@ -1137,11 +1175,7 @@ static void TargetSnapOffset(TransInfo *t, TransData *td)
 static void TargetSnapCenter(TransInfo *t)
 {
 	/* Only need to calculate once */
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (((t->tsnap.status & TARGET_INIT) == 0) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-#else
 	if ((t->tsnap.status & TARGET_INIT) == 0) {
-#endif
 		copy_v3_v3(t->tsnap.snapTarget, t->center_global);
 		TargetSnapOffset(t, NULL);
 		
@@ -1152,11 +1186,7 @@ static void TargetSnapCenter(TransInfo *t)
 static void TargetSnapActive(TransInfo *t)
 {
 	/* Only need to calculate once */
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (((t->tsnap.status & TARGET_INIT) == 0) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-#else
 	if ((t->tsnap.status & TARGET_INIT) == 0) {
-#endif
 		if (calculateCenterActive(t, true, t->tsnap.snapTarget)) {
 			if (t->flag & (T_EDIT | T_POSE)) {
 				Object *ob = t->obedit ? t->obedit : t->poseobj;
@@ -1179,11 +1209,7 @@ static void TargetSnapActive(TransInfo *t)
 static void TargetSnapMedian(TransInfo *t)
 {
 	// Only need to calculate once
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (((t->tsnap.status & TARGET_INIT) == 0) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-#else
 	if ((t->tsnap.status & TARGET_INIT) == 0) {
-#endif
 		TransData *td = NULL;
 		int i;
 
@@ -1211,11 +1237,7 @@ static void TargetSnapMedian(TransInfo *t)
 static void TargetSnapClosest(TransInfo *t)
 {
 	// Only valid if a snap point has been selected
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if ((t->tsnap.status & POINT_INIT) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-#else
 	if (t->tsnap.status & POINT_INIT) {
-#endif
 		TransData *closest = NULL, *td = NULL;
 		
 		/* Object mode */
@@ -1288,10 +1310,18 @@ static void TargetSnapClosest(TransInfo *t)
 		
 		t->tsnap.status |= TARGET_INIT;
 
+	}
+}
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+static void TargetSnapManual (TransInfo *t) {
+	if ((t->tsnap.status & POINT_INIT) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
+		TargetSnapClosest(t);
 	} else if (t->tsnap.status & TARGET_FIXED) {
 		t->tsnap.dist = t->tsnap.distance(t, t->tsnap.snapTarget, t->tsnap.snapPoint);
 	}
 }
+#endif
 
 static bool snapEdge(ARegion *ar, const float v1co[3], const short v1no[3], const float v2co[3], const short v2no[3], float obmat[4][4], float timat[3][3],
                      const float ray_start[3], const float ray_start_local[3], const float ray_normal_local[3], const float mval_fl[2],
