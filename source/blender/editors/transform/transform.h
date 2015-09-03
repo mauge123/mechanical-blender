@@ -763,10 +763,8 @@ void projectVertSlideData(TransInfo *t, bool is_final);
 bool checkUseAxisMatrix(TransInfo *t);
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-void setTranslationOffset(TransInfo *t, float* offset);
 void fixSnapTarget (TransInfo *t, const float* target) ;
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
-void setRotationOffset(TransInfo *t, float* offset);
 void rotate_using_result(TransInfo *t);
 #endif
 void setTargetSnapFunc (TransInfo *t, int target_element);

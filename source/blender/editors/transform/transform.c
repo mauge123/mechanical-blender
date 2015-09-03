@@ -989,9 +989,10 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
 	bool handled = false;
-	float origin[3];
-	float tvec[3];
+	float pos[2];
 	const float *cursor;
+	RegionView3D *rv3d = t->ar->regiondata;
+
 	if (event->type == MOUSEMOVE) {
 		copy_v2_v2_int(t->mval, event->mval);
 		applyMouseInput(t, &t->mouse, t->mval, t->values);
@@ -1016,7 +1017,6 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 						initResize(t);
 						break;
 				}
-
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;
 				handled=true;
@@ -1046,13 +1046,22 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				break;
 			case CKEY:
 				cursor = ED_view3d_cursor3d_get(t->scene, t->view);
-				ED_view3d_win_to_3d_int(t->ar, cursor, t->imval, origin);
-				sub_v3_v3v3(tvec,cursor,origin);
-				setTranslationOffset(t, tvec);
-
-				sub_v3_v3v3(tvec, cursor, tvec);
-				fixSnapTarget(t, tvec);
-
+				//ED_view3d_win_to_3d_int(t->ar, cursor, t->imval, origin);
+				fixSnapTarget(t, cursor);
+				ED_view3d_project_float_v2_m4(t->ar, cursor, pos, rv3d->persmat);
+				t->imval[0] = (int) pos[0];
+				t->imval[1] = (int) pos[1];
+				switch (t->mode) {
+					case TFM_TRANSLATION:
+						initTranslation(t);
+						break;
+					case TFM_ROTATION:
+						initRotation(t);
+						break;
+					case TFM_RESIZE:
+						initResize(t);
+						break;
+				}
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;
 				handled=true;
