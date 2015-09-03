@@ -37,13 +37,13 @@ The mechanical branches will be also merged here periodically
 
 ### mechanical-dimensions
 
-This branchs starts from bf-blender trunk.
+This branch starts from bf-blender trunk.
 
 currently on development
 
 ### mechanical-grab-w-basepoint
 
-This branchs starts from bf-blender trunk.
+This branch starts from bf-blender trunk.
 
 The branch should be tested in other areas of Blender than 3D space editor.
 
@@ -51,11 +51,16 @@ The branch should be tested in other areas of Blender than 3D space editor.
 * see https://vimeo.com/137503811
 * see https://developer.blender.org/T45734
 
-## mechanical-rotate-w-basepoint
+### mechanical-grab-w-basepoint-bf
+
+This branchs starts from mechanical-grab-w-basepoint and is intended to get a diff to be applied directly to Bf Blender
+
+see https://developer.blender.org/D1501
+
+### mechanical-rotate-w-basepoint
 
 This branchs starts from mechanical-grab-w-basepoint.
-
-currenly on development.
+This branch is merged down to mechanical-grab-w-basepoint.
 
 ## Issues
 
