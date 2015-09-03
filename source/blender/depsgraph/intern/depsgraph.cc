@@ -63,7 +63,7 @@ static DEG_EditorUpdateScenePreCb deg_editor_update_scene_pre_cb = NULL;
 Depsgraph::Depsgraph()
   : root_node(NULL),
     need_update(false),
-    layers((1 << 20) - 1)
+    layers(0)
 {
 	BLI_spin_init(&lock);
 }
@@ -356,13 +356,15 @@ DepsRelation *Depsgraph::add_new_relation(OperationDepsNode *from,
 	DepsRelation *rel = OBJECT_GUARDED_NEW(DepsRelation, from, to, type, description);
 	/* TODO(sergey): Find a better place for this. */
 #ifdef WITH_OPENSUBDIV
-	if (type == DEPSREL_TYPE_GEOMETRY_EVAL) {
+	ComponentDepsNode *comp_node = from->owner;
+	if (comp_node->type == DEPSNODE_TYPE_GEOMETRY) {
 		IDDepsNode *id_to = to->owner->owner;
-		IDDepsNode *id_from = to->owner->owner;
-		if (id_to != id_from) {
-			if ((id_to->eval_flags & DAG_EVAL_NEED_CPU) == 0) {
-				id_to->tag_update(this);
-				id_to->eval_flags |= DAG_EVAL_NEED_CPU;
+		IDDepsNode *id_from = from->owner->owner;
+		Object *object_to = (Object *)id_to->id;
+		if (id_to != id_from && (object_to->recalc & OB_RECALC_ALL)) {
+			if ((id_from->eval_flags & DAG_EVAL_NEED_CPU) == 0) {
+				id_from->tag_update(this);
+				id_from->eval_flags |= DAG_EVAL_NEED_CPU;
 			}
 		}
 	}
