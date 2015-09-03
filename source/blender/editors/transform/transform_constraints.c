@@ -124,23 +124,13 @@ void constraintNumInput(TransInfo *t, float vec[3])
 	}
 }
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3], applyConstraintFlag apply_flag)
-#else
 static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3])
-#endif
 {
 	int i = 0;
 
 	mul_m3_v3(t->con.imtx, vec);
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (apply_flag & CONSTRAINT_APPLY_GRID) {
-		snapGridIncrement(t, vec);
-	}
-#else
 	snapGridIncrement(t, vec);
-#endif
 
 	if (t->flag & T_NULL_ONE) {
 		if (!(t->con.mode & CON_AXIS0))
@@ -153,21 +143,13 @@ static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3])
 			vec[2] = 1.0f;
 	}
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if ((apply_flag & CONSTRAINT_APPLY_NUM_INPUT) && (applyNumInput(&t->num, vec))) {
-#else
 	if (applyNumInput(&t->num, vec)) {
-#endif		
 		constraintNumInput(t, vec);
 		removeAspectRatio(t, vec);
 	}
 
 	/* autovalues is operator param, use that directly but not if snapping is forced */
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if ((apply_flag & APPLY_T_AUTOVALUES) && (t->flag & T_AUTOVALUES) && (t->tsnap.status & SNAP_FORCED) == 0) {
-#else
 	if (t->flag & T_AUTOVALUES && (t->tsnap.status & SNAP_FORCED) == 0) {
-#endif
 		mul_v3_m3v3(vec, t->con.imtx, t->auto_values);
 		constraintAutoValues(t, vec);
 		/* inverse transformation at the end */
@@ -321,12 +303,7 @@ static void planeProjection(TransInfo *t, const float in[3], float out[3])
  *
  */
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static void applyAxisConstraintVec(TransInfo *t, TransData *td,
-                                   const float in[3], float out[3], float pvec[3], applyConstraintFlag apply_flag)
-#else
 static void applyAxisConstraintVec(TransInfo *t, TransData *td, const float in[3], float out[3], float pvec[3])
-#endif
 {
 	copy_v3_v3(out, in);
 	if (!td && t->con.mode & CON_APPLY) {
@@ -354,11 +331,7 @@ static void applyAxisConstraintVec(TransInfo *t, TransData *td, const float in[3
 				axisProjection(t, c, in, out);
 			}
 		}
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-		postConstraintChecks(t, out, pvec, apply_flag);
-#else
 		postConstraintChecks(t, out, pvec);
-#endif
 	}
 }
 
@@ -373,12 +346,7 @@ static void applyAxisConstraintVec(TransInfo *t, TransData *td, const float in[3
  * Further down, that vector is mapped to each data's space.
  */
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static void applyObjectConstraintVec(TransInfo *t, TransData *td,
-                                     const float in[3], float out[3], float pvec[3], applyConstraintFlag apply_flag)
-#else
 static void applyObjectConstraintVec(TransInfo *t, TransData *td, const float in[3], float out[3], float pvec[3])
-#endif
 {
 	copy_v3_v3(out, in);
 	if (t->con.mode & CON_APPLY) {
@@ -403,11 +371,7 @@ static void applyObjectConstraintVec(TransInfo *t, TransData *td, const float in
 				}
 				axisProjection(t, c, in, out);
 			}
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-			postConstraintChecks(t, out, pvec, apply_flag);
-#else			
 			postConstraintChecks(t, out, pvec);
-#endif			
 			copy_v3_v3(out, pvec);
 		}
 		else {
