@@ -1309,7 +1309,6 @@ static void TargetSnapClosest(TransInfo *t)
 		TargetSnapOffset(t, closest);
 		
 		t->tsnap.status |= TARGET_INIT;
-
 	}
 }
 

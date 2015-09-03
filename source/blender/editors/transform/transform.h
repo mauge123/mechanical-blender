@@ -67,19 +67,6 @@ typedef enum {
 	TREDRAW_SOFT      = 2,
 } eRedrawFlag;
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-// Applys to applyVec Function
-// Used to avoid apply constraint over translation offset value
-typedef enum {
-	CONSTRAINT_APPLY_NONE		  = 0,
-	CONSTRAINT_APPLY_NUM_INPUT    = (1 << 0),
-	CONSTRAINT_APPLY_GRID         = (1 << 1),
-	APPLY_T_AUTOVALUES	          = (1 << 2),
-	CONSTRAINT_APPLY_ALL          = (1 << 0) || (1 << 1) || (1<<2)
-} applyConstraintFlag;
-#endif
-
-
 typedef struct TransSnapPoint {
 	struct TransSnapPoint *next, *prev;
 	float co[3];
@@ -124,21 +111,12 @@ typedef struct TransCon {
 	void  (*drawExtra)(struct TransInfo *t);
 	                     /* For constraints that needs to draw differently from the other
 	                      * uses this instead of the generic draw function                            */
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	void  (*applyVec)(struct TransInfo *t, struct TransData *td, const float in[3],
-						float out[3], float pvec[3], applyConstraintFlag flag);
-#else
 	void  (*applyVec)(struct TransInfo *t, struct TransData *td, const float in[3], float out[3], float pvec[3]);
-#endif
 	                     /* Apply function pointer for linear vectorial transformation                */
 	                     /* The last three parameters are pointers to the in/out/printable vectors    */
 	void  (*applySize)(struct TransInfo *t, struct TransData *td, float smat[3][3]);
 	                     /* Apply function pointer for size transformation */
-#ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
-	int  (*applyRot)(struct TransInfo *t, struct TransData *td, float vec[3], float *angle);
-#else
 	void  (*applyRot)(struct TransInfo *t, struct TransData *td, float vec[3], float *angle);
-#endif
 	                     /* Apply function pointer for rotation transformation */
 } TransCon;
 
@@ -332,7 +310,6 @@ typedef struct TransData {
 	float  factor;       /* Factor of the transformation (for Proportionnal Editing)                       */
 	float *loc;          /* Location of the data to transform                                              */
 	float  iloc[3];      /* Initial location                                                               */
-	float  mloc[3];      /* Modified Inital location                                                       */
 	float *val;          /* Value pointer for special transforms */
 	float  ival;         /* Old value*/
 	float  center[3];	 /* Individual data center                                                         */
@@ -388,10 +365,6 @@ typedef struct TransInfo {
 	float       center[3];      /* center of transformation (in local-space) */
 	float       center_global[3];  /* center of transformation (in global-space) */
 	float       center2d[2];    /* center in screen coordinates         */
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	float		offset[3];       /* Translation offset                   */
-	float		offset_con[3];   /* Translation offset constrained       */
-#endif
 	int         imval[2];       /* initial mouse position               */
 	short		event_type;		/* event->type used to invoke transform */
 	short       idx_max;		/* maximum index on the input vector	*/
