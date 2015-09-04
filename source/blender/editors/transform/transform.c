@@ -811,6 +811,10 @@ enum {
 	TFM_MODAL_ROTATE_USE_RESULT_AXIS = 30,
 #endif
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	TFM_MODAL_MULTIPLE_TRANSFORM = 31,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -848,6 +852,9 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 		{TFM_MODAL_SELECT_BASE_POINT, "TFM_MODAL_SELECT_BASE_POINT", 0, "Snap Element Menu", ""},
 		{TFM_MODAL_SNAP_ELEMENT_SELECT, "TFM_MODAL_SNAP_ELEMENT_SELECT", 0, "Snap Element Menu", ""},
 		{TFM_MODAL_ROTATE_USE_RESULT_AXIS, "TFM_MODAL_ROTATE_USE_RESULT_AXIS", 0, "Use result axis on rotation", ""},
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	    {TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -911,6 +918,10 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_add_item(keymap, WKEY, KM_PRESS, 0, 0, TFM_MODAL_ROTATE_USE_RESULT_AXIS);
 #endif
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	/* Use the axis resulting on base point and target */
+	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
+#endif
 
 	return keymap;
 }
@@ -1147,6 +1158,13 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				} else {
 					// Nothing
 				}
+				handled = true;
+				break;
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+			case TFM_MODAL_MULTIPLE_TRANSFORM:
+				// Multiple instancies
+				t->flag |= T_TRANSFORM_MULTIPLE;
 				handled = true;
 				break;
 #endif
@@ -2562,6 +2580,11 @@ int transformEnd(bContext *C, TransInfo *t)
 			exit_code = OPERATOR_FINISHED;
 		}
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		if (t->state == TRANS_CONFIRM && t->flag & T_TRANSFORM_MULTIPLE) {
+			exit_code |= OPERATOR_REPEAT;
+		}
+#endif
 		/* aftertrans does insert keyframes, and clears base flags; doesn't read transdata */
 		special_aftertrans_update(C, t);
 
