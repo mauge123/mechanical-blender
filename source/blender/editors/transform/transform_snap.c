@@ -1261,7 +1261,13 @@ static void TargetSnapClosest(TransInfo *t)
 						dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 						
 						if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+							if ((t->tsnap.status & TARGET_FIXED) == 0) {
+								copy_v3_v3(t->tsnap.snapTarget, loc);
+							}
+#else
 							copy_v3_v3(t->tsnap.snapTarget, loc);
+#endif
 							closest = td;
 							t->tsnap.dist = dist; 
 						}
@@ -1277,7 +1283,13 @@ static void TargetSnapClosest(TransInfo *t)
 					dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 					
 					if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+						if ((t->tsnap.status & TARGET_FIXED) == 0) {
+							copy_v3_v3(t->tsnap.snapTarget, loc);
+						}
+#else
 						copy_v3_v3(t->tsnap.snapTarget, loc);
+#endif
 						closest = td;
 						t->tsnap.dist = dist; 
 					}
@@ -1300,7 +1312,13 @@ static void TargetSnapClosest(TransInfo *t)
 				dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 				
 				if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+					if ((t->tsnap.status & TARGET_FIXED) == 0) {
+						copy_v3_v3(t->tsnap.snapTarget, loc);
+					}
+#else
 					copy_v3_v3(t->tsnap.snapTarget, loc);
+#endif
 					closest = td;
 					t->tsnap.dist = dist; 
 				}

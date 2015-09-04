@@ -2208,7 +2208,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 }
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent *event, int mode) {
+void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent* UNUSED(event), int mode) {
 	switch (mode) {
 		case TFM_TRANSLATION:
 			initTranslation(t);
