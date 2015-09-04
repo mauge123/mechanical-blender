@@ -801,6 +801,11 @@ enum {
 	TFM_MODAL_PROPSIZE       = 26,
 /* node editor insert offset (aka auto-offset) direction toggle */
 	TFM_MODAL_INSERTOFS_TOGGLE_DIR         = 27,
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	TFM_MODAL_MULTIPLE_TRANSFORM = 28,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -834,6 +839,10 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 		{TFM_MODAL_EDGESLIDE_DOWN, "EDGESLIDE_PREV_NEXT", 0, "Select previous Edge Slide Edge", ""},
 		{TFM_MODAL_PROPSIZE, "PROPORTIONAL_SIZE", 0, "Adjust Proportional Influence", ""},
 		{TFM_MODAL_INSERTOFS_TOGGLE_DIR, "INSERTOFS_TOGGLE_DIR", 0, "Toggle Direction for Node Auto-offset", ""},
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	    {TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
+#endif
 		{0, NULL, 0, NULL, NULL}
 	};
 	
@@ -885,6 +894,11 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 
 	/* node editor only */
 	WM_modalkeymap_add_item(keymap, TKEY, KM_PRESS, 0, 0, TFM_MODAL_INSERTOFS_TOGGLE_DIR);
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	/* Use the axis resulting on base point and target */
+	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
+#endif
 
 	return keymap;
 }
@@ -996,6 +1010,13 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 	/* handle modal keymap first */
 	else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+			case TFM_MODAL_MULTIPLE_TRANSFORM:
+				// Multiple instancies
+				t->flag |= T_TRANSFORM_MULTIPLE;
+				handled = true;
+				break;
+#endif
 			case TFM_MODAL_CANCEL:
 				t->state = TRANS_CANCEL;
 				handled = true;
@@ -2404,6 +2425,11 @@ int transformEnd(bContext *C, TransInfo *t)
 			exit_code = OPERATOR_FINISHED;
 		}
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		if (t->state == TRANS_CONFIRM && t->flag & T_TRANSFORM_MULTIPLE) {
+			exit_code |= OPERATOR_REPEAT;
+		}
+#endif
 		/* aftertrans does insert keyframes, and clears base flags; doesn't read transdata */
 		special_aftertrans_update(C, t);
 
