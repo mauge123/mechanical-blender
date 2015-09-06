@@ -2053,9 +2053,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	}
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-	if ((prop = RNA_struct_find_property(op->ptr, "transform_multiple"))) {
-		RNA_property_boolean_set(op->ptr, prop, (t->flag & T_TRANSFORM_MULTIPLE) != 0);
-	}
+	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
 #endif
 }
 

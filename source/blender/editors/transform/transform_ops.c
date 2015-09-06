@@ -486,12 +486,9 @@ static int transform_exec(bContext *C, wmOperator *op)
  */
 static void transform_copy(bContext* UNUSED(C), const wmOperator *op_new, const wmOperator *op)
 {
-	PropertyRNA *prop;
 	TransInfo *t = (TransInfo*) op_new->customdata;
 
-	if ((prop = RNA_struct_find_property(op->ptr, "transform_multiple")) &&
-	     RNA_property_boolean_get(op->ptr, prop)) {
-
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
 		t->flag |= T_TRANSFORM_MULTIPLE;
 	}
 }
