@@ -2205,6 +2205,11 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 			RNA_property_boolean_set(op->ptr, prop, (t->flag & T_ALT_TRANSFORM) != 0);
 		}
 	}
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	RNA_float_set_array(op->ptr, "snap_point_value", t->tsnap.snapPoint);
+	RNA_float_set_array(op->ptr, "snap_target_value", t->tsnap.snapTarget);
+#endif
 }
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
