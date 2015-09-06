@@ -493,8 +493,7 @@ static void applyAxisConstraintRot(TransInfo *t, TransData *td, float vec[3], fl
 }
 
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
-int applyRotateUsingResult(TransInfo *t, TransData *td, float axis[3], float *UNUSED(angle)) {
-	int ret = 0;
+void applyRotateUsingResult(TransInfo *t, TransData *td, float axis[3], float *UNUSED(angle)) {
 	float v1[3]={}, v2[3]={};
 	if (!td && t->con.mode & CON_APPLY) {
 		if ((t->con.mode & CON_ROTATE_USE_RESULT) && validSnap(t)) {
@@ -502,10 +501,8 @@ int applyRotateUsingResult(TransInfo *t, TransData *td, float axis[3], float *UN
 			sub_v3_v3v3(v2,t->center_global, t->tsnap.snapPoint);
 			cross_v3_v3v3(axis,v1,v2);
 			normalize_v3(axis);
-			ret = 1;
 		}
 	}
-	return ret;
 }
 #endif
 

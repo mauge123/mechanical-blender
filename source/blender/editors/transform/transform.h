@@ -554,6 +554,7 @@ int  transformEvent(TransInfo *t, const struct wmEvent *event);
 void transformApply(struct bContext *C, TransInfo *t);
 int  transformEnd(struct bContext *C, TransInfo *t);
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+void initTransformMode(TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 int  transformEventBasePoint(TransInfo *t, const struct wmEvent *event);
 #endif
 
@@ -634,7 +635,7 @@ void postSelectConstraint(TransInfo *t);
 void setNearestAxis(TransInfo *t);
 
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
-int applyRotateUsingResult(TransInfo *t, TransData *td, float vec[3], float *angle);
+void applyRotateUsingResult(TransInfo *t, TransData *td, float vec[3], float *angle);
 #endif
 
 /*********************** Snapping ********************************/
