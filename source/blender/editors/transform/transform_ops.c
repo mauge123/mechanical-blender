@@ -612,6 +612,15 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 				RNA_def_property_flag(prop, PROP_HIDDEN);
 			}
 		}
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+		prop = RNA_def_float_vector(ot->srna, "snap_point_value", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "", -FLT_MAX, FLT_MAX);
+		RNA_def_property_flag(prop, PROP_HIDDEN);
+		prop = RNA_def_float_vector(ot->srna, "snap_target_value", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "", -FLT_MAX, FLT_MAX);
+		RNA_def_property_flag(prop, PROP_HIDDEN);
+#endif
+
+
 	}
 	
 	if (flags & P_GPENCIL_EDIT) {
