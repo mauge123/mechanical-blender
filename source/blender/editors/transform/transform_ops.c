@@ -461,6 +461,13 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	exit_code |= transformEnd(C, t);
 
 	if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		if ((exit_code & OPERATOR_REPEAT)) {
+			op->storeddata = MEM_callocN(sizeof(TransInfo), "TransInfo stored data2");
+			memcpy (op->storeddata, op->customdata,sizeof(TransInfo));
+		}
+#endif
 		transformops_exit(C, op);
 		exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 	}
@@ -538,6 +545,30 @@ static int transform_exec(bContext *C, wmOperator *op)
 	WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, NULL);
 
 	return OPERATOR_FINISHED;
+}
+
+/**
+ * @brief copies data from previous transform when repeted
+ * @param UNUSED(C)
+ * @param op1
+ * @param op2
+ */
+static void transform_copy(bContext* UNUSED(C), const wmOperator *op1, const wmOperator *op2)
+{
+	TransInfo *t = (TransInfo*) op1->customdata;
+	TransInfo *t2 = (TransInfo*) op2->storeddata;
+	if (t2) {
+		/* Maintan flags */
+		t->flag = t2->flag;
+
+		/* Maintain snap target if set */
+		if (t2->tsnap.status & TARGET_FIXED) {
+			fixSnapTarget (t, t2->tsnap.snapPoint);
+		}
+
+		/* Not used anymore */
+		MEM_freeN(t2);
+	}
 }
 
 static int transform_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -658,6 +689,7 @@ static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 	ot->modal  = transform_modal;
 	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
+	ot->copy = transform_copy;
 
 	RNA_def_float_vector_xyz(ot->srna, "value", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
 
