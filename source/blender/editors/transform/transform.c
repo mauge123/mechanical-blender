@@ -2228,6 +2228,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	RNA_float_set_array(op->ptr, "snap_point_value", t->tsnap.snapPoint);
 	RNA_float_set_array(op->ptr, "snap_target_value", t->tsnap.snapTarget);
 #endif
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
+#endif
 }
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT

@@ -462,12 +462,6 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
 
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-		if ((exit_code & OPERATOR_REPEAT)) {
-			op->storeddata = MEM_callocN(sizeof(TransInfo), "TransInfo stored data2");
-			memcpy (op->storeddata, op->customdata,sizeof(TransInfo));
-		}
-#endif
 		transformops_exit(C, op);
 		exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 	}
@@ -547,29 +541,27 @@ static int transform_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 /**
  * @brief copies data from previous transform when repeted
  * @param UNUSED(C)
  * @param op1
  * @param op2
  */
-static void transform_copy(bContext* UNUSED(C), const wmOperator *op1, const wmOperator *op2)
+static void transform_copy(bContext* UNUSED(C), const wmOperator *op_new, const wmOperator *op)
 {
-	TransInfo *t = (TransInfo*) op1->customdata;
-	TransInfo *t2 = (TransInfo*) op2->storeddata;
-	if (t2) {
-		/* Maintan flags */
-		t->flag = t2->flag;
+	TransInfo *t = (TransInfo*) op_new->customdata;
+	float snap_point[3];
 
-		/* Maintain snap target if set */
-		if (t2->tsnap.status & TARGET_FIXED) {
-			fixSnapTarget (t, t2->tsnap.snapPoint);
-		}
-
-		/* Not used anymore */
-		MEM_freeN(t2);
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
 	}
+
+	RNA_float_get_array(op->ptr, "snap_point_value", snap_point);
+	fixSnapTarget(t,snap_point);
+
 }
+#endif
 
 static int transform_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
@@ -672,6 +664,10 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		// Add confirm method all the time. At the end because it's not really that important and should be hidden only in log, not in keymap edit
 		/*prop =*/ RNA_def_boolean(ot->srna, "release_confirm", 0, "Confirm on Release", "Always confirm operation when releasing button");
 		//RNA_def_property_flag(prop, PROP_HIDDEN);
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
+#endif
 	}
 }
 

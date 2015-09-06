@@ -351,7 +351,6 @@ typedef struct wmOperator {
 	/* runtime */
 	struct wmOperatorType *type;  /* operator type definition from idname */
 	void *customdata;             /* custom storage, only while operator runs */
-	void *storeddata;	      /* not automatically freed data */
 	void *py_instance;            /* python stores the class instance here */
 
 	struct PointerRNA *ptr;       /* rna pointer to access properties */
@@ -380,7 +379,7 @@ enum {
 	OPERATOR_REPEAT      = (1 << 6),
 #endif
 };
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+#ifdef WITH_MECHANICAL
 #define OPERATOR_FLAGS_ALL ( \
 	OPERATOR_RUNNING_MODAL | \
 	OPERATOR_CANCELLED | \
