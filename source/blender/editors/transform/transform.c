@@ -815,6 +815,10 @@ enum {
 	TFM_MODAL_MULTIPLE_TRANSFORM = 31,
 #endif
 
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	TFM_MODAL_SELECT_CENTER = 32,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -855,6 +859,9 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 #endif
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	    {TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
+#endif
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	    {TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -922,6 +929,11 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 	/* Use the axis resulting on base point and target */
 	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
 #endif
+
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	WM_modalkeymap_add_item(keymap, CKEY, KM_PRESS, 0, 0, TFM_MODAL_SELECT_CENTER);
+#endif
+
 
 	return keymap;
 }
@@ -1075,23 +1087,46 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				ED_view3d_project_float_v2_m4(t->ar, cursor, pos, rv3d->persmat);
 				t->imval[0] = (int) pos[0];
 				t->imval[1] = (int) pos[1];
-				switch (t->mode) {
-					case TFM_TRANSLATION:
-						initTranslation(t);
-						break;
-					case TFM_ROTATION:
-						initRotation(t);
-						break;
-					case TFM_RESIZE:
-						initResize(t);
-						break;
-				}
+				initTransformMode(t,NULL,NULL,t->mode);
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;
 				handled=true;
 				break;
 		}
 
+	}
+
+	if (handled) {
+		return 0;
+	} else {
+		return OPERATOR_PASS_THROUGH;
+	}
+}
+#endif
+
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
+{
+	bool handled = transformEventCommon(t, event);
+
+	if (event->type == MOUSEMOVE) {
+		copy_v2_v2_int(t->mval, event->mval);
+		applyMouseInput(t, &t->mouse, t->mval, t->values);
+	}else if (event->type == EVT_MODAL_MAP) {
+		switch (event->val) {
+			case TFM_MODAL_CONFIRM:
+				BLI_assert(ELEM(t->mode, TFM_RESIZE, TFM_ROTATION));
+				copy_v3_v3(t->center, t->selected_point);
+				calculateCenter2D(t);
+				calculateCenterGlobal(t);
+				copy_v2_v2_int(t->imval,t->mval);
+				copy_v2_v2 (t->mouse.center, t->center2d);
+				initTransformMode(t,NULL,NULL,t->mode);
+				t->redraw |= TREDRAW_HARD;
+				t->state = TRANS_RUNNING;
+				handled=true;
+				break;
+		}
 	}
 
 	if (handled) {
@@ -1178,6 +1213,12 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_MULTIPLE_TRANSFORM:
 				// Multiple instancies
 				t->flag |= T_TRANSFORM_MULTIPLE;
+				handled = true;
+				break;
+#endif
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+			case TFM_MODAL_SELECT_CENTER:
+				t->state = TRANS_SELECT_CENTER;
 				handled = true;
 				break;
 #endif
@@ -2016,6 +2057,9 @@ static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), voi
 	drawConstraint(t);
 	drawPropCircle(C, t);
 	drawSnapping(C, t);
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	drawSelectedPoint(C,t);
+#endif
 
 	/* edge slide, vert slide */
 	drawEdgeSlide(t);
@@ -2595,7 +2639,7 @@ int transformEnd(bContext *C, TransInfo *t)
 	t->context = C;
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING && t->state != TRANS_BASE_POINT) {
+	if (!ELEM(t->state, TRANS_STARTING, TRANS_RUNNING, TRANS_BASE_POINT, TRANS_SELECT_CENTER)) {
 #else
 	if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING) {
 #endif

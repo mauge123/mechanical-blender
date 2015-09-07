@@ -140,6 +140,35 @@ bool activeSnap(TransInfo *t)
 	       ((t->modifiers & (MOD_SNAP | MOD_SNAP_INVERT)) == MOD_SNAP_INVERT);
 }
 
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+void drawSelectedPoint(const struct bContext *C, TransInfo *t)
+{
+	if ((t->spacetype == SPACE_VIEW3D)  && (t->flag & T_USE_SELECTED_POINT)){
+		View3D *v3d = CTX_wm_view3d(C);
+		RegionView3D *rv3d = CTX_wm_region_view3d(C);
+		unsigned char activeCol[4];
+		float size;
+		float imat[4][4];
+
+		UI_GetThemeColor3ubv(TH_ACTIVE, activeCol);
+		activeCol[3] = 192;
+
+		glDisable(GL_DEPTH_TEST);
+
+		size = 2.5f * UI_GetThemeValuef(TH_VERTEX_SIZE);
+
+		invert_m4_m4(imat, rv3d->viewmat);
+
+		glColor4ubv(activeCol);
+		drawcircball(GL_LINE_LOOP, t->selected_point, ED_view3d_pixel_size(rv3d, t->selected_point) * size, imat);
+
+		if (v3d->zbuf)
+			glEnable(GL_DEPTH_TEST);
+	}
+
+}
+#endif
+
 void drawSnapping(const struct bContext *C, TransInfo *t)
 {
 	unsigned char col[4], selectedCol[4], activeCol[4];
@@ -186,6 +215,7 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 				
 				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, ED_view3d_pixel_size(rv3d, t->tsnap.snapPoint) * size, imat);
 			}
+
 			
 			/* draw normal if needed */
 			if (usingSnappingNormal(t) && validSnappingNormal(t)) {

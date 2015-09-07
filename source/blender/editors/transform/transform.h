@@ -426,6 +426,9 @@ typedef struct TransInfo {
 	void		*draw_handle_view;
 	void		*draw_handle_pixel;
 	void		*draw_handle_cursor;
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	float		selected_point[3];
+#endif
 } TransInfo;
 
 
@@ -436,7 +439,10 @@ typedef struct TransInfo {
 #define TRANS_RUNNING	1
 #define TRANS_CONFIRM	2
 #define TRANS_CANCEL	3
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 #define TRANS_BASE_POINT 4
+#define TRANS_SELECT_CENTER 5
+#endif
 
 /* transinfo->flag */
 #define T_OBJECT		(1 << 0)
@@ -485,7 +491,15 @@ typedef struct TransInfo {
 	/* alternative transformation. used to add offset to tracking markers */
 #define T_ALT_TRANSFORM		(1 << 24)
 
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 #define T_TRANSFORM_MULTIPLE (1 << 25)
+#endif
+
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+#define T_USE_SELECTED_POINT	(1 << 26)
+#endif
+
 
 /* TransInfo->modifiers */
 #define	MOD_CONSTRAINT_SELECT	0x01
@@ -558,6 +572,9 @@ int  transformEnd(struct bContext *C, TransInfo *t);
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void initTransformMode(TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 int  transformEventBasePoint(TransInfo *t, const struct wmEvent *event);
+#endif
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+int  transformEventSelectCenter(TransInfo *t, const struct wmEvent *event);
 #endif
 
 void setTransformViewMatrices(TransInfo *t);
@@ -663,6 +680,9 @@ void applySnapping(TransInfo *t, float *vec);
 void resetSnapping(TransInfo *t);
 eRedrawFlag handleSnapping(TransInfo *t, const struct wmEvent *event);
 void drawSnapping(const struct bContext *C, TransInfo *t);
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+void drawSelectedPoint(const struct bContext *C, TransInfo *t);
+#endif
 bool usingSnappingNormal(TransInfo *t);
 bool validSnappingNormal(TransInfo *t);
 

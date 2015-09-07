@@ -100,6 +100,10 @@ static void TRANSFORM_OT_edge_crease(struct wmOperatorType *ot);
 static void TRANSFORM_OT_edge_bevelweight(struct wmOperatorType *ot);
 static void TRANSFORM_OT_seq_slide(struct wmOperatorType *ot);
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t);
+#endif
+
 static TransformModeItem transform_modes[] =
 {
 	{OP_TRANSLATION, TFM_TRANSLATION, TRANSFORM_OT_translate},
@@ -390,6 +394,7 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 
 	if (t->state == TRANS_RUNNING) {
 		set_trans_object_base_flags(t);
+		select_transform_modal_func(op->type,t);
 	}
 
 
@@ -412,11 +417,52 @@ static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent
 }
 #endif
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static int transform_modal_do(bContext *C, wmOperator *op, const wmEvent *event)
-#else
-static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+static int transform_modal_select_center(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	int exit_code;
+	float loc[3], no[3];
+	float mval[2];
+	float dist_px = SNAP_MIN_DISTANCE; // Use a user defined value here
+
+
+
+	TransInfo *t = op->customdata;
+
+	exit_code = transformEventSelectCenter(t, event);
+
+	if (t->state == TRANS_RUNNING) {
+		set_trans_object_base_flags(t);
+		select_transform_modal_func(op->type,t);
+	}
+
+	mval[0] = (float) t->mval[0];
+	mval[1] = (float) t->mval[1];
+
+	if (snapObjectsTransform(t, mval, &dist_px, loc, no, t->tsnap.modeSelect)) {
+		t->flag |= T_USE_SELECTED_POINT;
+	}else {
+		t->flag &= ~T_USE_SELECTED_POINT;
+	}
+
+	copy_v3_v3(t->selected_point, loc);
+
+
+	if (!exit_code) {
+		exit_code |= transformEnd(C, t);
+		if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+			transformops_exit(C, op);
+			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
+		}
+	} else {
+			ED_area_headerprint(t->sa, "Select Center of transform");
+	}
+
+	return exit_code;
+}
 #endif
+
+static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
 
@@ -447,10 +493,11 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	}
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (t->state == TRANS_BASE_POINT){
+	if (ELEM (t->state,TRANS_BASE_POINT, TRANS_SELECT_CENTER)){
 		restoreTransObjects(t);
 		// Remove flags to allow object snap referencer over object
 		clear_trans_object_base_flags(t);
+		select_transform_modal_func (op->type,t);
 	} else {
 		transformApply(C, t);
 	}
@@ -491,20 +538,19 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	return exit_code;
 }
 
-
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
-{
-	int exit_code;
-	TransInfo *t = op->customdata;
-
-	if (t->state == TRANS_BASE_POINT){
-		exit_code = transform_modal_base_point (C,op,event);
-	} else {
-		exit_code = transform_modal_do (C,op,event);
+static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t){
+	switch (t->state) {
+		case TRANS_BASE_POINT:
+			ot->modal = transform_modal_base_point;
+			break;
+		case TRANS_SELECT_CENTER:
+			t->helpline = HLP_NONE;
+			ot->modal = transform_modal_select_center;
+			break;
+		default:
+			ot->modal = transform_modal;
 	}
-
-	return exit_code;
 }
 #endif
 
