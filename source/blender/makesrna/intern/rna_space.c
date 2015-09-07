@@ -132,7 +132,11 @@ static EnumPropertyItem pivot_items_full[] = {
 	{V3D_CENTROID, "MEDIAN_POINT", ICON_ROTATECENTER, "Median Point",
 	               "Pivot around the median point of selected objects"},
 	{V3D_ACTIVE, "ACTIVE_ELEMENT", ICON_ROTACTIVE, "Active Element", "Pivot around active object"},
-	{0, NULL, 0, NULL, NULL}
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	{V3D_MANUAL, "MANUAL_POINT", ICON_ROTATECENTER, "Manual Point",
+				   "Pivot around manually selected point"},
+#endif
+    {0, NULL, 0, NULL, NULL}
 };
 
 static EnumPropertyItem draw_channels_items[] = {
@@ -4451,7 +4455,7 @@ static void rna_def_space_clip(BlenderRNA *brna)
 		            "Individual Origins", "Pivot around each object's own origin"},
 		{V3D_CENTROID, "MEDIAN_POINT", ICON_ROTATECENTER, "Median Point",
 		               "Pivot around the median point of selected objects"},
-		{0, NULL, 0, NULL, NULL}
+	    {0, NULL, 0, NULL, NULL}
 	};
 
 	srna = RNA_def_struct(brna, "SpaceClipEditor", "Space");

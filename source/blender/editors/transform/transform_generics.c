@@ -1787,6 +1787,12 @@ void calculateCenter(TransInfo *t)
 			}
 			break;
 		}
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+		case V3D_MANUAL:
+			// Manually selected
+			t->state = TRANS_SELECT_CENTER;
+			break;
+#endif
 	}
 
 	calculateCenter2D(t);

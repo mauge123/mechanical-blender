@@ -321,6 +321,9 @@ typedef struct View3D {
 #define V3D_CURSOR		 1
 #define V3D_LOCAL		 2
 #define V3D_ACTIVE		 4
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+#define V3D_MANUAL		 5
+#endif
 
 /*View3D types (only used in tools, not actually saved)*/
 #define V3D_VIEW_STEPLEFT		 1
