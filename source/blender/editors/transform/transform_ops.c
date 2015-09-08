@@ -414,7 +414,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	mval[0] = (float) t->mval[0];
 	mval[1] = (float) t->mval[1];
 
-	if (snapObjectsTransform(t, mval, &dist_px, loc, no, t->tsnap.modeSelect)) {
+	if (snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL_INCLUDING_SEL)) {
 		t->flag |= T_USE_SELECTED_POINT;
 	}else {
 		t->flag &= ~T_USE_SELECTED_POINT;
