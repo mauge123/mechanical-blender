@@ -1061,7 +1061,7 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_CONFIRM:
 				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION));
 				copy_v2_v2_int(t->imval,t->mval);
-				fixSnapTarget(t, t->tsnap.snapPoint);
+				fixSnapTarget(t, t->selected_point);
 				initTransformMode(t,NULL,NULL,t->mode);
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;

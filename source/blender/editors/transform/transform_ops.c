@@ -383,42 +383,9 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 	return retval; /* return 0 on error */
 }
 
+
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent *event)
-{
-	int exit_code;
-
-	TransInfo *t = op->customdata;
-
-	exit_code = transformEventBasePoint(t, event);
-
-	if (t->state == TRANS_RUNNING) {
-		set_trans_object_base_flags(t);
-		select_transform_modal_func(op->type,t);
-	}
-
-
-	t->tsnap.calcSnap(t, t->values);
-	if (t->tsnap.targetSnap) {
-		t->tsnap.targetSnap(t);
-	}
-
-	if (!exit_code) {
-		exit_code |= transformEnd(C, t);
-		if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
-			transformops_exit(C, op);
-			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
-		}
-	} else {
-				   ED_area_headerprint(t->sa, "Select Base Point");
-	}
-
-	return exit_code;
-}
-#endif
-
-#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-static int transform_modal_select_center(bContext *C, wmOperator *op, const wmEvent *event)
+static int transform_modal_select_one_point(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
 	float loc[3], no[3];
@@ -429,7 +396,15 @@ static int transform_modal_select_center(bContext *C, wmOperator *op, const wmEv
 
 	TransInfo *t = op->customdata;
 
-	exit_code = transformEventSelectCenter(t, event);
+	switch (t->state) {
+		case TRANS_BASE_POINT:
+			exit_code = transformEventBasePoint(t, event);
+			break;
+		case TRANS_SELECT_CENTER:
+			exit_code = transformEventSelectCenter(t, event);
+			break;
+
+	}
 
 	if (t->state == TRANS_RUNNING) {
 		set_trans_object_base_flags(t);
@@ -541,11 +516,11 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t){
 	switch (t->state) {
 		case TRANS_BASE_POINT:
-			ot->modal = transform_modal_base_point;
+			ot->modal = transform_modal_select_one_point;
 			break;
 		case TRANS_SELECT_CENTER:
 			t->helpline = HLP_NONE;
-			ot->modal = transform_modal_select_center;
+			ot->modal = transform_modal_select_one_point;
 			break;
 		default:
 			ot->modal = transform_modal;
