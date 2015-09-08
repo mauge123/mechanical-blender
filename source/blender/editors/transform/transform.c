@@ -1200,7 +1200,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 #endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
 			case TFM_MODAL_SELECT_CENTER:
-				t->state = TRANS_SELECT_CENTER;
+				change_transform_step (t, TRANS_SELECT_CENTER);
 				handled = true;
 				break;
 #endif

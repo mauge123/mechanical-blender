@@ -777,7 +777,7 @@ void setTargetSnapFunc (TransInfo *t, int target_element){
 			t->tsnap.targetSnap = TargetSnapActive;
 			break;
 		case SCE_SNAP_TARGET_MANUAL:
-			t->state = TRANS_BASE_POINT;
+			change_transform_step (t, TRANS_BASE_POINT);
 			t->tsnap.targetSnap = TargetSnapManual;
 			break;
 	}

@@ -1776,6 +1776,11 @@ int BIF_do_manipulator(bContext *C, const struct wmEvent *event, wmOperator *op)
 	/* Force orientation */
 	RNA_enum_set(op->ptr, "constraint_orientation", v3d->twmode);
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	/* T_USES_TRANSFORM flag seems to be used anywhere ? so set a flag is set on ptr to initialize it */
+	RNA_boolean_set(op->ptr, "uses_manipulator", true);
+#endif
+
 	// find the hotspots first test narrow hotspot
 	val = manipulator_selectbuf(sa, ar, event->mval, 0.5f * (float)U.tw_hotspot);
 	if (val) {

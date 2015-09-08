@@ -782,6 +782,7 @@ bool checkUseAxisMatrix(TransInfo *t);
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void fixSnapTarget (TransInfo *t, const float* target) ;
+void change_transform_step (TransInfo *t, int state);
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
 void rotate_using_result(TransInfo *t);
 #endif
