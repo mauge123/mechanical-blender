@@ -39,6 +39,10 @@
 
 #include "DNA_listBase.h"
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+#define MAX_INFO_LEN 256
+#endif
+
 /* ************************** Types ***************************** */
 
 struct TransInfo;

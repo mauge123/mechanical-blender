@@ -339,11 +339,18 @@ static void transformops_loopsel_hack(bContext *C, wmOperator *op)
 
 static void transformops_exit(bContext *C, wmOperator *op)
 {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	TransInfo *t = op->customdata;
+#endif
 #ifdef USE_LOOPSLIDE_HACK
 	transformops_loopsel_hack(C, op);
 #endif
 
 	saveTransform(C, op->customdata, op);
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	/*We need to reset the modal func, as belongs to opeator_type*/
+	select_transform_modal_func(op->type,t);
+#endif
 	MEM_freeN(op->customdata);
 	op->customdata = NULL;
 	G.moving = 0;
@@ -391,7 +398,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	float loc[3], no[3];
 	float mval[2];
 	float dist_px = SNAP_MIN_DISTANCE; // Use a user defined value here
-
+	char str[MAX_INFO_LEN];
 
 
 	TransInfo *t = op->customdata;
@@ -399,11 +406,14 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	switch (t->state) {
 		case TRANS_BASE_POINT:
 			exit_code = transformEventBasePoint(t, event);
+			sprintf(str,"%s","Select Snap Target point");
 			break;
 		case TRANS_SELECT_CENTER:
 			exit_code = transformEventSelectCenter(t, event);
+			sprintf(str,"%s","Select Pivot point");
 			break;
-
+		default:
+			BLI_assert(false);
 	}
 
 	if (t->state == TRANS_RUNNING) {
@@ -430,7 +440,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 		}
 	} else {
-			ED_area_headerprint(t->sa, "Select Center of transform");
+			ED_area_headerprint(t->sa, str);
 	}
 
 	return exit_code;
