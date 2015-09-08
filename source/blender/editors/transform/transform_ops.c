@@ -339,11 +339,18 @@ static void transformops_loopsel_hack(bContext *C, wmOperator *op)
 
 static void transformops_exit(bContext *C, wmOperator *op)
 {
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	TransInfo *t = op->customdata;
+#endif
 #ifdef USE_LOOPSLIDE_HACK
 	transformops_loopsel_hack(C, op);
 #endif
 
 	saveTransform(C, op->customdata, op);
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	/*We need to reset the modal func, as belongs to opeator_type*/
+	select_transform_modal_func(op->type,t);
+#endif
 	MEM_freeN(op->customdata);
 	op->customdata = NULL;
 	G.moving = 0;
@@ -383,53 +390,31 @@ static int transformops_data(bContext *C, wmOperator *op, const wmEvent *event)
 	return retval; /* return 0 on error */
 }
 
+
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static int transform_modal_base_point(bContext *C, wmOperator *op, const wmEvent *event)
-{
-	int exit_code;
-
-	TransInfo *t = op->customdata;
-
-	exit_code = transformEventBasePoint(t, event);
-
-	if (t->state == TRANS_RUNNING) {
-		set_trans_object_base_flags(t);
-		select_transform_modal_func(op->type,t);
-	}
-
-
-	t->tsnap.calcSnap(t, t->values);
-	if (t->tsnap.targetSnap) {
-		t->tsnap.targetSnap(t);
-	}
-
-	if (!exit_code) {
-		exit_code |= transformEnd(C, t);
-		if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
-			transformops_exit(C, op);
-			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
-		}
-	} else {
-				   ED_area_headerprint(t->sa, "Select Base Point");
-	}
-
-	return exit_code;
-}
-#endif
-
-#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-static int transform_modal_select_center(bContext *C, wmOperator *op, const wmEvent *event)
+static int transform_modal_select_one_point(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int exit_code;
 	float loc[3], no[3];
 	float mval[2];
 	float dist_px = SNAP_MIN_DISTANCE; // Use a user defined value here
-
+	char str[MAX_INFO_LEN];
 
 
 	TransInfo *t = op->customdata;
 
-	exit_code = transformEventSelectCenter(t, event);
+	switch (t->state) {
+		case TRANS_BASE_POINT:
+			exit_code = transformEventBasePoint(t, event);
+			sprintf(str,"%s","Select Snap Target point");
+			break;
+		case TRANS_SELECT_CENTER:
+			exit_code = transformEventSelectCenter(t, event);
+			sprintf(str,"%s","Select Pivot point");
+			break;
+		default:
+			BLI_assert(false);
+	}
 
 	if (t->state == TRANS_RUNNING) {
 		set_trans_object_base_flags(t);
@@ -439,7 +424,7 @@ static int transform_modal_select_center(bContext *C, wmOperator *op, const wmEv
 	mval[0] = (float) t->mval[0];
 	mval[1] = (float) t->mval[1];
 
-	if (snapObjectsTransform(t, mval, &dist_px, loc, no, t->tsnap.modeSelect)) {
+	if (snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL_INCLUDING_SEL)) {
 		t->flag |= T_USE_SELECTED_POINT;
 	}else {
 		t->flag &= ~T_USE_SELECTED_POINT;
@@ -455,7 +440,7 @@ static int transform_modal_select_center(bContext *C, wmOperator *op, const wmEv
 			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 		}
 	} else {
-			ED_area_headerprint(t->sa, "Select Center of transform");
+			ED_area_headerprint(t->sa, str);
 	}
 
 	return exit_code;
@@ -542,11 +527,11 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t){
 	switch (t->state) {
 		case TRANS_BASE_POINT:
-			ot->modal = transform_modal_base_point;
+			ot->modal = transform_modal_select_one_point;
 			break;
 		case TRANS_SELECT_CENTER:
 			t->helpline = HLP_NONE;
-			ot->modal = transform_modal_select_center;
+			ot->modal = transform_modal_select_one_point;
 			break;
 		default:
 			ot->modal = transform_modal;
@@ -715,6 +700,13 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
 #endif
 	}
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	/* T_USES_MANIPULATOR FLAG */
+	prop = RNA_def_boolean(ot->srna,"uses_manipulator",false,NULL,NULL);
+	RNA_def_property_flag(prop, PROP_HIDDEN);
+#endif
+
 }
 
 static void TRANSFORM_OT_translate(struct wmOperatorType *ot)

@@ -1408,6 +1408,12 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	}
 #endif
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	if (RNA_boolean_get(op->ptr,"uses_manipulator")) {
+		t->flag |= T_USES_MANIPULATOR;
+	}
+#endif
+
 	setTransformViewMatrices(t);
 	setTransformViewAspect(t, t->aspect);
 	initNumInput(&t->num);
@@ -1754,6 +1760,25 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
 	return ok;
 }
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+void change_transform_step (TransInfo *t, int state)
+{
+	bool ok = false;
+	if ((t->flag & T_USES_MANIPULATOR) == 0) {
+		switch (state) {
+			case TRANS_BASE_POINT:
+				ok = (ELEM (t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE));
+				break;
+			case TRANS_SELECT_CENTER:
+				ok = (ELEM (t->mode, TFM_ROTATION, TFM_RESIZE));
+		}
+	}
+	if (ok) {
+		t->state = state;
+	}
+}
+#endif
+
 
 void calculateCenter(TransInfo *t)
 {
@@ -1787,6 +1812,12 @@ void calculateCenter(TransInfo *t)
 			}
 			break;
 		}
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+		case V3D_MANUAL:
+			// Manually selected
+			change_transform_step(t, TRANS_SELECT_CENTER);
+			break;
+#endif
 	}
 
 	calculateCenter2D(t);

@@ -777,7 +777,7 @@ void setTargetSnapFunc (TransInfo *t, int target_element){
 			t->tsnap.targetSnap = TargetSnapActive;
 			break;
 		case SCE_SNAP_TARGET_MANUAL:
-			t->state = TRANS_BASE_POINT;
+			change_transform_step (t, TRANS_BASE_POINT);
 			t->tsnap.targetSnap = TargetSnapManual;
 			break;
 	}
@@ -1639,9 +1639,15 @@ static bool snapCurve(short snap_mode, ARegion *ar, Object *ob, Curve *cu, float
 	return retval;
 }
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMesh *dm, BMEditMesh *em, float obmat[4][4],
+                            const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
+                            const float mval[2], float r_loc[3], float r_no[3], float *r_dist_px, float *r_depth, bool do_bb, SnapMode mode)
+#else
 static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMesh *dm, BMEditMesh *em, float obmat[4][4],
                             const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
                             const float mval[2], float r_loc[3], float r_no[3], float *r_dist_px, float *r_depth, bool do_bb)
+#endif
 {
 	bool retval = false;
 	const bool do_ray_start_correction = (snap_mode == SCE_SNAP_MODE_FACE && ar &&
@@ -1784,8 +1790,14 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 						else {
 							eve = BM_vert_at_index(em->bm, index);
 							
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+							/* Allow select the selected vertex */
+							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
+								(BM_elem_flag_test(eve, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)))
+#else
 							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
 							    BM_elem_flag_test(eve, BM_ELEM_SELECT))
+#endif
 							{
 								test = false;
 							}
@@ -1832,9 +1844,15 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 						else {
 							BMEdge *eed = BM_edge_at_index(em->bm, index);
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+							if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
+							    (BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)) ||
+							    (BM_elem_flag_test(eed->v2, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)))
+#else
 							if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
 							    BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) ||
 							    BM_elem_flag_test(eed->v2, BM_ELEM_SELECT))
+#endif
 							{
 								test = false;
 							}
@@ -1976,10 +1994,17 @@ static bool snapCamera(short snap_mode, ARegion *ar, Scene *scene, Object *objec
 	return retval;
 }
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+static bool snapObject(Scene *scene, short snap_mode, ARegion *ar, Object *ob, float obmat[4][4], bool use_obedit,
+                       Object **r_ob, float r_obmat[4][4],
+                       const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
+                       const float mval[2], float r_loc[3], float r_no[3], float *r_dist_px, float *r_depth, SnapMode mode)
+#else
 static bool snapObject(Scene *scene, short snap_mode, ARegion *ar, Object *ob, float obmat[4][4], bool use_obedit,
                        Object **r_ob, float r_obmat[4][4],
                        const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
                        const float mval[2], float r_loc[3], float r_no[3], float *r_dist_px, float *r_depth)
+#endif
 {
 	bool retval = false;
 	
@@ -2006,7 +2031,11 @@ static bool snapObject(Scene *scene, short snap_mode, ARegion *ar, Object *ob, f
 			em = NULL;
 		}
 		
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+		retval = snapDerivedMesh(snap_mode, ar, ob, dm, em, obmat, ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_depth, do_bb, mode);
+#else
 		retval = snapDerivedMesh(snap_mode, ar, ob, dm, em, obmat, ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_depth, do_bb);
+#endif
 
 		dm->release(dm);
 	}
@@ -2042,12 +2071,22 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 	Base *base;
 	bool retval = false;
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	if (ELEM(mode,SNAP_ALL, SNAP_ALL_INCLUDING_SEL) && obedit) {
+#else
 	if (mode == SNAP_ALL && obedit) {
+#endif
 		Object *ob = obedit;
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+		retval |= snapObject(scene, snap_mode, ar, ob, ob->obmat, true,
+		                     r_ob, r_obmat,
+		                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist, mode);
+#else
 		retval |= snapObject(scene, snap_mode, ar, ob, ob->obmat, true,
 		                     r_ob, r_obmat,
 		                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist);
+#endif
 	}
 
 	/* Need an exception for particle edit because the base is flagged with BA_HAS_RECALC_DATA
@@ -2058,9 +2097,15 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 	base = base_act;
 	if (base && base->object && base->object->mode & OB_MODE_PARTICLE_EDIT) {
 		Object *ob = base->object;
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT		
+		retval |= snapObject(scene, snap_mode, ar, ob, ob->obmat, false,
+		                     r_ob, r_obmat,
+		                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist, mode);
+#else
 		retval |= snapObject(scene, snap_mode, ar, ob, ob->obmat, false,
 		                     r_ob, r_obmat,
 		                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist);
+#endif
 	}
 
 	for (base = FIRSTBASE; base != NULL; base = base->next) {
@@ -2071,7 +2116,7 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 
 		    ((mode == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL)) == 0) ||
 		     (mode == SNAP_NOT_OBEDIT && base != base_act) ||
-		     (mode == SNAP_ALL)))
+		     (ELEM(mode, SNAP_ALL, SNAP_ALL_INCLUDING_SEL))))
 #else
 		if ((BASE_VISIBLE_BGMODE(v3d, scene, base)) &&
 		    (base->flag & (BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA)) == 0 &&
@@ -2098,17 +2143,29 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 					bool use_obedit_dupli = (obedit && dupli_ob->ob->data == obedit->data);
 					Object *dupli_snap = (use_obedit_dupli) ? obedit : dupli_ob->ob;
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+					retval |= snapObject(scene, snap_mode, ar, dupli_snap, dupli_ob->mat, use_obedit_dupli,
+					                     r_ob, r_obmat,
+					                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist, mode);
+#else
 					retval |= snapObject(scene, snap_mode, ar, dupli_snap, dupli_ob->mat, use_obedit_dupli,
 					                     r_ob, r_obmat,
 					                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist);
+#endif
 				}
 				
 				free_object_duplilist(lb);
 			}
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+			retval |= snapObject(scene, snap_mode, ar, ob_snap, ob->obmat, use_obedit,
+			                     r_ob, r_obmat,
+			                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist,mode);
+#else
 			retval |= snapObject(scene, snap_mode, ar, ob_snap, ob->obmat, use_obedit,
 			                     r_ob, r_obmat,
 			                     ray_start, ray_normal, ray_origin, mval, r_loc, r_no, r_dist_px, r_ray_dist);
+#endif
 		}
 	}
 	
