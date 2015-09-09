@@ -399,9 +399,15 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	float mval[2];
 	float dist_px = SNAP_MIN_DISTANCE; // Use a user defined value here
 	char str[MAX_INFO_LEN];
+	bool found = false;
 
 
 	TransInfo *t = op->customdata;
+
+
+	/* Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always */
+	t->tsnap.mode = t->settings->snap_mode;
+
 
 	t->context = C;
 	switch (t->state) {
@@ -426,7 +432,13 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	mval[0] = (float) t->mval[0];
 	mval[1] = (float) t->mval[1];
 
-	if (snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL)) {
+	if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
+		found = snapCursor(t,mval,&dist_px,loc);
+	} else {
+		found = snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL);
+	}
+
+	if (found) {
 		t->flag |= T_USE_SELECTED_POINT;
 	}else {
 		t->flag &= ~T_USE_SELECTED_POINT;
@@ -455,6 +467,10 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	TransInfo *t = op->customdata;
 	const enum TfmMode mode_prev = t->mode;
+
+	/* Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always */
+	t->tsnap.mode = t->settings->snap_mode;
+
 
 #if 0
 	// stable 2D mouse coords map to different 3D coords while the 3D mouse is active

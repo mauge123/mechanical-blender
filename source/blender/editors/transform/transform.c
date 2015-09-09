@@ -1070,9 +1070,6 @@ void modal_snap_element_select(TransInfo  *t) {
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
 	bool handled = transformEventCommon(t, event);
-	float pos[2];
-	const float *cursor;
-	RegionView3D *rv3d = t->ar->regiondata;
 
 	if (event->type == MOUSEMOVE) {
 		copy_v2_v2_int(t->mval, event->mval);
@@ -1093,21 +1090,6 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				handled = true;
 				break;
 		}
-	} else if (event->val == KM_PRESS) {
-		switch (event->type) {
-			case CKEY:
-				cursor = ED_view3d_cursor3d_get(t->scene, t->view);
-				fixSnapTarget(t, cursor);
-				ED_view3d_project_float_v2_m4(t->ar, cursor, pos, rv3d->persmat);
-				t->imval[0] = (int) pos[0];
-				t->imval[1] = (int) pos[1];
-				initTransformMode(t,NULL,NULL,t->mode);
-				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_RUNNING;
-				handled=true;
-				break;
-		}
-
 	}
 
 	if (handled) {

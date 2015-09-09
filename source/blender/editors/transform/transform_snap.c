@@ -458,11 +458,6 @@ void applyGridAbsolute(TransInfo *t)
 
 void applySnapping(TransInfo *t, float *vec)
 {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	// Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always
-	t->tsnap.mode = t->settings->snap_mode;
-#endif
-
 	/* project is not applied this way */
 	if (t->tsnap.project)
 		return;
@@ -1098,11 +1093,8 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 		}
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
 		else if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
-			const float *cursor =  ED_view3d_cursor3d_get(t->scene, t->view);
-			if (snap_3d_point(t, mval, cursor, dist_px)){
-				found = true;
-				copy_v3_v3 (loc,cursor);
-			}
+			zero_v3(no);
+			found = snapCursor(t,mval,&dist_px,loc);
 		}
 #endif
 		else {
@@ -2172,6 +2164,18 @@ static bool snapObjects(Scene *scene, short snap_mode, Base *base_act, View3D *v
 	                      ray_start, ray_normal, ray_orgigin, r_ray_dist,
 	                      mval, r_dist_px, r_loc, r_no, mode);
 }
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+bool snapCursor(TransInfo *t,  const float mval[2], float *r_dist_p, float r_loc[3]){
+	const float *cursor =  ED_view3d_cursor3d_get(t->scene, t->view);
+	bool found = false;
+	if (snap_3d_point(t, mval, cursor, *r_dist_p)) {
+		found = true;
+		copy_v3_v3 (r_loc,cursor);
+	}
+	return found;
+}
+#endif
 
 bool snapObjectsTransform(TransInfo *t, const float mval[2], float *r_dist_px, float r_loc[3], float r_no[3], SnapMode mode)
 {
