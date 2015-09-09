@@ -1143,6 +1143,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 	bool handled = transformEventCommon(t, event);
 	const int modifiers_prev = t->modifiers;
 
+
 	t->redraw |= handleMouseInput(t, &t->mouse, event);
 
 	/* Handle modal numinput events first, if already activated. */

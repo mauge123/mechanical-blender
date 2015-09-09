@@ -559,7 +559,7 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 
 
 static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
-{
+{	
 	int co[2];
 
 	/* we don't want the clipping for cursor */
