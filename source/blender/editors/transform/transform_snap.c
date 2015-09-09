@@ -577,7 +577,9 @@ static void initSnappingMode(TransInfo *t)
 				t->tsnap.modeSelect = SNAP_NOT_OBEDIT;
 			}
 			else {
-				t->tsnap.modeSelect = t->tsnap.snap_self ? SNAP_ALL : SNAP_NOT_OBEDIT;
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+				t->tsnap.modeSelect = t->tsnap.snap_self ? SNAP_NOT_SELECTED : SNAP_NOT_OBEDIT;
+#endif
 			}
 		}
 		/* Particles edit mode*/
@@ -590,12 +592,7 @@ static void initSnappingMode(TransInfo *t)
 		else if (t->tsnap.applySnap != NULL && // A snapping function actually exist
 		         (obedit == NULL) ) // Object Mode
 		{
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-			// Allow snap to all objects, including base_act and selected
-			t->tsnap.modeSelect = SNAP_ALL;
-#else
 			t->tsnap.modeSelect = SNAP_NOT_SELECTED;
-#endif
 		}
 		else {
 			/* Grid if snap is not possible */
@@ -1793,7 +1790,7 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 							/* Allow select the selected vertex */
 							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
-								(BM_elem_flag_test(eve, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)))
+								(BM_elem_flag_test(eve, BM_ELEM_SELECT) && (mode != SNAP_ALL)))
 #else
 							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
 							    BM_elem_flag_test(eve, BM_ELEM_SELECT))
@@ -1846,8 +1843,8 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 							if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
-							    (BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)) ||
-							    (BM_elem_flag_test(eed->v2, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)))
+							    (BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) && (mode != SNAP_ALL)) ||
+							    (BM_elem_flag_test(eed->v2, BM_ELEM_SELECT) && (mode != SNAP_ALL)))
 #else
 							if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
 							    BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) ||
@@ -2072,7 +2069,7 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 	bool retval = false;
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (ELEM(mode,SNAP_ALL, SNAP_ALL_INCLUDING_SEL) && obedit) {
+	if (ELEM(mode,SNAP_ALL, SNAP_NOT_SELECTED) && obedit) {
 #else
 	if (mode == SNAP_ALL && obedit) {
 #endif
@@ -2116,7 +2113,7 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 
 		    ((mode == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL)) == 0) ||
 		     (mode == SNAP_NOT_OBEDIT && base != base_act) ||
-		     (ELEM(mode, SNAP_ALL, SNAP_ALL_INCLUDING_SEL))))
+		     (ELEM(mode, SNAP_ALL, SNAP_NOT_SELECTED))))
 #else
 		if ((BASE_VISIBLE_BGMODE(v3d, scene, base)) &&
 		    (base->flag & (BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA)) == 0 &&
