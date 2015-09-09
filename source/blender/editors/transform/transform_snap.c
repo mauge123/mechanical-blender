@@ -1352,9 +1352,7 @@ static void TargetSnapClosest(TransInfo *t)
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 static void TargetSnapManual (TransInfo *t) {
-	if ((t->tsnap.status & POINT_INIT) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-		TargetSnapClosest(t);
-	} else if (t->tsnap.status & TARGET_FIXED) {
+	if (t->tsnap.status & TARGET_FIXED) {
 		t->tsnap.dist = t->tsnap.distance(t, t->tsnap.snapTarget, t->tsnap.snapPoint);
 	}
 }
