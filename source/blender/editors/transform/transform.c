@@ -2043,6 +2043,26 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glLineWidth(1.0);
 				break;
 			}
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+			case HLP_ADD_POINT:
+			{
+				short size = 5;
+				short offset = 5;
+
+				UI_ThemeColor(TH_VIEW_OVERLAY);
+				glTranslatef(mval[0], mval[1], 0);
+				glLineWidth(3.0);
+				glBegin(GL_LINES);
+				glVertex2s(offset, offset-size);
+				glVertex2s(offset, offset+size);
+				glVertex2s(offset-size, offset);
+				glVertex2s(offset+size, offset);
+				glEnd();
+
+				glLineWidth(1.0);
+
+			}
+#endif
 		}
 
 		glPopMatrix();

@@ -528,10 +528,11 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t){
 	switch (t->state) {
 		case TRANS_BASE_POINT:
+			t->helpline = HLP_ADD_POINT;
 			ot->modal = transform_modal_select_one_point;
 			break;
 		case TRANS_SELECT_CENTER:
-			t->helpline = HLP_NONE;
+			t->helpline = HLP_ADD_POINT;
 			ot->modal = transform_modal_select_one_point;
 			break;
 		default:
