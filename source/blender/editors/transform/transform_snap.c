@@ -102,7 +102,6 @@ static void TargetSnapMedian(TransInfo *t);
 static void TargetSnapCenter(TransInfo *t);
 static void TargetSnapClosest(TransInfo *t);
 static void TargetSnapActive(TransInfo *t);
-static void TargetSnapManual(TransInfo *t);
 
 static float RotationBetween(TransInfo *t, const float p1[3], const float p2[3]);
 static float TranslationBetween(TransInfo *t, const float p1[3], const float p2[3]);
@@ -775,7 +774,7 @@ void setTargetSnapFunc (TransInfo *t, int target_element){
 			break;
 		case SCE_SNAP_TARGET_MANUAL:
 			change_transform_step (t, TRANS_BASE_POINT);
-			t->tsnap.targetSnap = TargetSnapManual;
+			t->tsnap.targetSnap = NULL;
 			break;
 	}
 }
@@ -1357,16 +1356,6 @@ static void TargetSnapClosest(TransInfo *t)
 		t->tsnap.status |= TARGET_INIT;
 	}
 }
-
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static void TargetSnapManual (TransInfo *t) {
-	if ((t->tsnap.status & POINT_INIT) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-		TargetSnapClosest(t);
-	} else if (t->tsnap.status & TARGET_FIXED) {
-		t->tsnap.dist = t->tsnap.distance(t, t->tsnap.snapTarget, t->tsnap.snapPoint);
-	}
-}
-#endif
 
 static bool snapEdge(ARegion *ar, const float v1co[3], const short v1no[3], const float v2co[3], const short v2no[3], float obmat[4][4], float timat[3][3],
                      const float ray_start[3], const float ray_start_local[3], const float ray_normal_local[3], const float mval_fl[2],
