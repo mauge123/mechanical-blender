@@ -403,6 +403,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 
 	TransInfo *t = op->customdata;
 
+	t->context = C;
 	switch (t->state) {
 		case TRANS_BASE_POINT:
 			exit_code = transformEventBasePoint(t, event);
@@ -415,6 +416,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 		default:
 			BLI_assert(false);
 	}
+	t->context = NULL;
 
 	if (t->state == TRANS_RUNNING) {
 		set_trans_object_base_flags(t);

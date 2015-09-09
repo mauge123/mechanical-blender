@@ -571,6 +571,8 @@ int  transformEnd(struct bContext *C, TransInfo *t);
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void initTransformMode(TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 int  transformEventBasePoint(TransInfo *t, const struct wmEvent *event);
+int transformEventSubModal(TransInfo* t, const struct wmEvent *event);
+void modal_snap_element_select(TransInfo  *t);
 #endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
 int  transformEventSelectCenter(TransInfo *t, const struct wmEvent *event);

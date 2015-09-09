@@ -1045,6 +1045,27 @@ static int transformEventCommon(TransInfo *t, const wmEvent *event){
 	return handled;
 }
 
+int transformEventSubModal(TransInfo* UNUSED(t), const wmEvent *event) {
+	if (event->type == KM_PRESS) {
+		return 0;
+	}
+	return OPERATOR_PASS_THROUGH;
+}
+
+void modal_snap_element_select(TransInfo  *t) {
+	wmOperatorType *ot = WM_operatortype_find("WM_OT_context_menu_enum", true);
+	PointerRNA ptr;
+	WM_operator_properties_create_ptr(&ptr, ot);
+	RNA_string_set(&ptr, "data_path", "tool_settings.snap_element");
+	WM_operator_name_call_ptr(t->context,ot,WM_OP_EXEC_DEFAULT,&ptr);
+
+	// Reset precision and snap invert as they get released
+	t->modifiers &= (~MOD_PRECISION | ~MOD_SNAP_INVERT);
+	//Activate Snap always
+	t->modifiers &= MOD_SNAP;
+	t->mouse.precision = 0;
+}
+
 
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
@@ -1067,6 +1088,10 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				t->state = TRANS_RUNNING;
 				handled=true;
 				break;
+			case TFM_MODAL_SNAP_ELEMENT_SELECT:
+				modal_snap_element_select(t);
+				handled = true;
+				break;
 		}
 	} else if (event->val == KM_PRESS) {
 		switch (event->type) {
@@ -1088,7 +1113,7 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 	if (handled) {
 		return 0;
 	} else {
-		return OPERATOR_PASS_THROUGH;
+		return transformEventSubModal(t,event);
 	}
 }
 #endif
@@ -1103,6 +1128,10 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 		applyMouseInput(t, &t->mouse, t->mval, t->values);
 	}else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
+			case TFM_MODAL_SNAP_ELEMENT_SELECT:
+				modal_snap_element_select(t);
+				handled = true;
+				break;
 			case TFM_MODAL_CONFIRM:
 				BLI_assert(ELEM(t->mode, TFM_RESIZE, TFM_ROTATION));
 				copy_v3_v3(t->center, t->selected_point);
@@ -1121,7 +1150,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 	if (handled) {
 		return 0;
 	} else {
-		return OPERATOR_PASS_THROUGH;
+		return transformEventSubModal(t,event);
 	}
 }
 #endif
@@ -1166,21 +1195,9 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 		switch (event->val) {
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 			case TFM_MODAL_SNAP_ELEMENT_SELECT:
-			{
-				wmOperatorType *ot = WM_operatortype_find("WM_OT_context_menu_enum", true);
-				PointerRNA ptr;
-				WM_operator_properties_create_ptr(&ptr, ot);
-				RNA_string_set(&ptr, "data_path", "tool_settings.snap_element");
-				WM_operator_name_call_ptr(t->context,ot,WM_OP_EXEC_DEFAULT,&ptr);
-
-				// Reset precision and snap invert as they get released
-				t->modifiers &= (~MOD_PRECISION | ~MOD_SNAP_INVERT);
-				//Activate Snap always
-				t->modifiers &= MOD_SNAP;
-				t->mouse.precision = 0;
+				modal_snap_element_select(t);
 				handled = true;
 				break;
-			}
 			case TFM_MODAL_SELECT_BASE_POINT:
 				t->redraw |= TREDRAW_HARD;
 				//set the snapTarget function
