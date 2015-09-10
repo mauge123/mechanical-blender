@@ -1061,8 +1061,6 @@ void modal_snap_element_select(TransInfo  *t) {
 
 	// Reset precision and snap invert as they get released
 	t->modifiers &= (~MOD_PRECISION | ~MOD_SNAP_INVERT);
-	//Activate Snap always
-	t->modifiers &= MOD_SNAP;
 	t->mouse.precision = 0;
 }
 
