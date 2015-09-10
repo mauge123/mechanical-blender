@@ -524,6 +524,7 @@ typedef struct TransInfo {
 #define HLP_TRACKBALL	5
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 #define HLP_ADD_POINT	6
+#define HLP_ADD_POINT_PIVOT_REF 7
 #endif
 
 /* transinfo->con->mode */

@@ -400,6 +400,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	float dist_px = SNAP_MIN_DISTANCE; // Use a user defined value here
 	char str[MAX_INFO_LEN];
 	bool found = false;
+	short prv_state; /* previous state */
 
 
 	TransInfo *t = op->customdata;
@@ -410,6 +411,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 
 
 	t->context = C;
+	prv_state = t->state;
 	switch (t->state) {
 		case TRANS_BASE_POINT:
 			exit_code = transformEventBasePoint(t, event);
@@ -424,9 +426,13 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	}
 	t->context = NULL;
 
+	if (t->state != prv_state) {
+		/* State has changed */
+		select_transform_modal_func(op->type,t);
+	}
+
 	if (t->state == TRANS_RUNNING) {
 		set_trans_object_base_flags(t);
-		select_transform_modal_func(op->type,t);
 	}
 
 	mval[0] = (float) t->mval[0];
@@ -544,7 +550,11 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t){
 	switch (t->state) {
 		case TRANS_BASE_POINT:
-			t->helpline = HLP_ADD_POINT;
+			if(ELEM(t->mode,TFM_ROTATION, TFM_RESIZE)) {
+				t->helpline = HLP_ADD_POINT_PIVOT_REF;
+			} else {
+				t->helpline = HLP_ADD_POINT;
+			}
 			ot->modal = transform_modal_select_one_point;
 			break;
 		case TRANS_SELECT_CENTER:

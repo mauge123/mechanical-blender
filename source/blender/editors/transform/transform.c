@@ -1070,6 +1070,10 @@ void modal_snap_element_select(TransInfo  *t) {
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
 	bool handled = transformEventCommon(t, event);
+	ARegion *ar = t->ar;
+	RegionView3D *rv3d = ar->regiondata;
+	float pos[2];
+
 
 	if (event->type == MOUSEMOVE) {
 		copy_v2_v2_int(t->mval, event->mval);
@@ -1077,8 +1081,17 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 	}else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
 			case TFM_MODAL_CONFIRM:
-				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION));
+				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE));
+
 				copy_v2_v2_int(t->imval,t->mval);
+
+				if (ELEM(t->mode, TFM_ROTATION,TFM_RESIZE)) {
+					//Get 2D cordinates of selected Point
+					ED_view3d_project_float_v2_m4(ar, t->selected_point, pos, rv3d->persmat);
+					t->mouse.imval[0] = t->mval[0] = (int) pos[0];
+					t->mouse.imval[1] = t->mval[1] = (int) pos[1];
+				}
+
 				fixSnapTarget(t, t->selected_point);
 				initTransformMode(t,NULL,NULL,t->mode);
 				t->redraw |= TREDRAW_HARD;
@@ -1122,8 +1135,17 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				copy_v2_v2_int(t->imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
 				initTransformMode(t,NULL,NULL,t->mode);
+
+				if ((t->settings->snap_target == SCE_SNAP_TARGET_MANUAL) &&
+				    ((t->tsnap.status & TARGET_FIXED) == 0)) {
+					/* Change to Manual Snap */
+					t->state = TRANS_BASE_POINT;
+				} else {
+					t->state = TRANS_RUNNING;
+				}
+
 				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_RUNNING;
+
 				handled=true;
 				break;
 		}
@@ -2026,6 +2048,17 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				break;
 			}
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+			case HLP_ADD_POINT_PIVOT_REF:
+			{
+				UI_ThemeColor(TH_VIEW_OVERLAY);
+				setlinestyle(3);
+				glBegin(GL_LINE_STRIP);
+				glVertex2iv(t->mval);
+				glVertex2fv(cent);
+				glEnd();
+				setlinestyle(0);
+				/* No break */
+			}
 			case HLP_ADD_POINT:
 			{
 				short size = 5;
@@ -2043,7 +2076,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 				glLineWidth(1.0);
 
-			}
+			}			
 #endif
 		}
 
