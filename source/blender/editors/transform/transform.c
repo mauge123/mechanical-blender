@@ -1142,7 +1142,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				if ((t->settings->snap_target == SCE_SNAP_TARGET_MANUAL) &&
 				    ((t->tsnap.status & TARGET_FIXED) == 0)) {
 					/* Change to Manual Snap */
-					t->state = TRANS_BASE_POINT;
+					change_transform_step(t,TRANS_BASE_POINT);
 				} else {
 					t->state = TRANS_RUNNING;
 				}
