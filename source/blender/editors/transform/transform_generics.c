@@ -1771,6 +1771,7 @@ void change_transform_step (TransInfo *t, int state)
 				break;
 			case TRANS_SELECT_CENTER:
 				ok = (ELEM (t->mode, TFM_ROTATION, TFM_RESIZE));
+				break;
 		}
 	}
 	if (ok) {
@@ -1782,6 +1783,10 @@ void change_transform_step (TransInfo *t, int state)
 
 void calculateCenter(TransInfo *t)
 {
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	if (ELEM(t->state, TRANS_STARTING, TRANS_RUNNING, TRANS_BASE_POINT)) {
+		/* Allow overwrite TRANS_BASE_POINT, when multiple submodals are set */
+#endif
 	switch (t->around) {
 		case V3D_CENTER:
 			calculateCenterBound(t, t->center);
@@ -1819,6 +1824,9 @@ void calculateCenter(TransInfo *t)
 			break;
 #endif
 	}
+#ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+	}
+#endif
 
 	calculateCenter2D(t);
 	calculateCenterGlobal(t);

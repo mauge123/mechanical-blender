@@ -459,11 +459,6 @@ void applyGridAbsolute(TransInfo *t)
 
 void applySnapping(TransInfo *t, float *vec)
 {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	// Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always
-	t->tsnap.mode = t->settings->snap_mode;
-#endif
-
 	/* project is not applied this way */
 	if (t->tsnap.project)
 		return;
@@ -577,7 +572,9 @@ static void initSnappingMode(TransInfo *t)
 				t->tsnap.modeSelect = SNAP_NOT_OBEDIT;
 			}
 			else {
-				t->tsnap.modeSelect = t->tsnap.snap_self ? SNAP_ALL : SNAP_NOT_OBEDIT;
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+				t->tsnap.modeSelect = t->tsnap.snap_self ? SNAP_NOT_SELECTED : SNAP_NOT_OBEDIT;
+#endif
 			}
 		}
 		/* Particles edit mode*/
@@ -590,12 +587,7 @@ static void initSnappingMode(TransInfo *t)
 		else if (t->tsnap.applySnap != NULL && // A snapping function actually exist
 		         (obedit == NULL) ) // Object Mode
 		{
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-			// Allow snap to all objects, including base_act and selected
-			t->tsnap.modeSelect = SNAP_ALL;
-#else
 			t->tsnap.modeSelect = SNAP_NOT_SELECTED;
-#endif
 		}
 		else {
 			/* Grid if snap is not possible */
@@ -897,7 +889,12 @@ static void ApplySnapRotation(TransInfo *t, float *value)
 static void ApplySnapResize(TransInfo *t, float vec[3])
 {
 	float dist;
-
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	/* Use generic function always */
+	float point[3];
+	getSnapPoint(t, point);
+	dist = ResizeBetween(t, t->tsnap.snapTarget, point);
+#else
 	if (t->tsnap.target == SCE_SNAP_TARGET_CLOSEST) {
 		dist = t->tsnap.dist;
 	}
@@ -906,6 +903,7 @@ static void ApplySnapResize(TransInfo *t, float vec[3])
 		getSnapPoint(t, point);
 		dist = ResizeBetween(t, t->tsnap.snapTarget, point);
 	}
+#endif
 
 	copy_v3_fl(vec, dist);
 }
@@ -1102,11 +1100,8 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 		}
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
 		else if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
-			const float *cursor =  ED_view3d_cursor3d_get(t->scene, t->view);
-			if (snap_3d_point(t, mval, cursor, dist_px)){
-				found = true;
-				copy_v3_v3 (loc,cursor);
-			}
+			zero_v3(no);
+			found = snapCursor(t,mval,&dist_px,loc);
 		}
 #endif
 		else {
@@ -1171,11 +1166,7 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 
 static void TargetSnapOffset(TransInfo *t, TransData *td)
 {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if ((t->spacetype == SPACE_NODE && td != NULL) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-#else
 	if (t->spacetype == SPACE_NODE && td != NULL) {
-#endif
 		bNode *node = td->extra;
 		char border = t->tsnap.snapNodeBorder;
 		float width  = BLI_rctf_size_x(&node->totr);
@@ -1291,13 +1282,7 @@ static void TargetSnapClosest(TransInfo *t)
 						dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 						
 						if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-							if ((t->tsnap.status & TARGET_FIXED) == 0) {
-								copy_v3_v3(t->tsnap.snapTarget, loc);
-							}
-#else
 							copy_v3_v3(t->tsnap.snapTarget, loc);
-#endif
 							closest = td;
 							t->tsnap.dist = dist; 
 						}
@@ -1313,13 +1298,7 @@ static void TargetSnapClosest(TransInfo *t)
 					dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 					
 					if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-						if ((t->tsnap.status & TARGET_FIXED) == 0) {
-							copy_v3_v3(t->tsnap.snapTarget, loc);
-						}
-#else
 						copy_v3_v3(t->tsnap.snapTarget, loc);
-#endif
 						closest = td;
 						t->tsnap.dist = dist; 
 					}
@@ -1342,13 +1321,7 @@ static void TargetSnapClosest(TransInfo *t)
 				dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 				
 				if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-					if ((t->tsnap.status & TARGET_FIXED) == 0) {
-						copy_v3_v3(t->tsnap.snapTarget, loc);
-					}
-#else
 					copy_v3_v3(t->tsnap.snapTarget, loc);
-#endif
 					closest = td;
 					t->tsnap.dist = dist; 
 				}
@@ -1363,9 +1336,7 @@ static void TargetSnapClosest(TransInfo *t)
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 static void TargetSnapManual (TransInfo *t) {
-	if ((t->tsnap.status & POINT_INIT) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-		TargetSnapClosest(t);
-	} else if (t->tsnap.status & TARGET_FIXED) {
+	if (t->tsnap.status & TARGET_FIXED) {
 		t->tsnap.dist = t->tsnap.distance(t, t->tsnap.snapTarget, t->tsnap.snapPoint);
 	}
 }
@@ -1793,7 +1764,7 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 							/* Allow select the selected vertex */
 							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
-								(BM_elem_flag_test(eve, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)))
+								(BM_elem_flag_test(eve, BM_ELEM_SELECT) && (mode != SNAP_ALL)))
 #else
 							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
 							    BM_elem_flag_test(eve, BM_ELEM_SELECT))
@@ -1846,8 +1817,8 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 							if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
-							    (BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)) ||
-							    (BM_elem_flag_test(eed->v2, BM_ELEM_SELECT) && (mode != SNAP_ALL_INCLUDING_SEL)))
+							    (BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) && (mode != SNAP_ALL)) ||
+							    (BM_elem_flag_test(eed->v2, BM_ELEM_SELECT) && (mode != SNAP_ALL)))
 #else
 							if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
 							    BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) ||
@@ -2072,7 +2043,7 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 	bool retval = false;
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (ELEM(mode,SNAP_ALL, SNAP_ALL_INCLUDING_SEL) && obedit) {
+	if (ELEM(mode,SNAP_ALL, SNAP_NOT_SELECTED) && obedit) {
 #else
 	if (mode == SNAP_ALL && obedit) {
 #endif
@@ -2116,7 +2087,7 @@ static bool snapObjectsRay(Scene *scene, short snap_mode, Base *base_act, View3D
 
 		    ((mode == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL)) == 0) ||
 		     (mode == SNAP_NOT_OBEDIT && base != base_act) ||
-		     (ELEM(mode, SNAP_ALL, SNAP_ALL_INCLUDING_SEL))))
+		     (ELEM(mode, SNAP_ALL, SNAP_NOT_SELECTED))))
 #else
 		if ((BASE_VISIBLE_BGMODE(v3d, scene, base)) &&
 		    (base->flag & (BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA)) == 0 &&
@@ -2186,6 +2157,18 @@ static bool snapObjects(Scene *scene, short snap_mode, Base *base_act, View3D *v
 	                      ray_start, ray_normal, ray_orgigin, r_ray_dist,
 	                      mval, r_dist_px, r_loc, r_no, mode);
 }
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+bool snapCursor(TransInfo *t,  const float mval[2], float *r_dist_p, float r_loc[3]){
+	const float *cursor =  ED_view3d_cursor3d_get(t->scene, t->view);
+	bool found = false;
+	if (snap_3d_point(t, mval, cursor, *r_dist_p)) {
+		found = true;
+		copy_v3_v3 (r_loc,cursor);
+	}
+	return found;
+}
+#endif
 
 bool snapObjectsTransform(TransInfo *t, const float mval[2], float *r_dist_px, float r_loc[3], float r_no[3], SnapMode mode)
 {

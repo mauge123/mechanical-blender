@@ -527,6 +527,10 @@ typedef struct TransInfo {
 #define HLP_HARROW		3
 #define HLP_VARROW		4
 #define HLP_TRACKBALL	5
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+#define HLP_ADD_POINT	6
+#define HLP_ADD_POINT_PIVOT_REF 7
+#endif
 
 /* transinfo->con->mode */
 #define CON_APPLY		1
@@ -576,6 +580,8 @@ int  transformEnd(struct bContext *C, TransInfo *t);
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 void initTransformMode(TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 int  transformEventBasePoint(TransInfo *t, const struct wmEvent *event);
+int transformEventSubModal(TransInfo* t, const struct wmEvent *event);
+void modal_snap_element_select(TransInfo  *t);
 #endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
 int  transformEventSelectCenter(TransInfo *t, const struct wmEvent *event);

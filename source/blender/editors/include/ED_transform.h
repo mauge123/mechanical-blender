@@ -173,9 +173,6 @@ typedef enum SnapMode {
 	SNAP_ALL = 0,
 	SNAP_NOT_SELECTED = 1,
 	SNAP_NOT_OBEDIT = 2,
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	SNAP_ALL_INCLUDING_SEL = 3
-#endif
 } SnapMode;
 
 #define SNAP_MIN_DISTANCE 30
@@ -196,6 +193,11 @@ bool snapObjectsRayEx(struct Scene *scene, struct Base *base_act, struct View3D 
 
 bool snapNodesTransform(struct TransInfo *t, const int mval[2], float *r_dist_px, float r_loc[2], char *r_node_border, SnapMode mode);
 bool snapNodesContext(struct bContext *C, const int mval[2], float *r_dist_px, float r_loc[2], char *r_node_border, SnapMode mode);
+
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+bool snapCursor(struct TransInfo *t,  const float mval[2], float *r_dist_p, float r_loc[3]);
+#endif
 
 #endif
 

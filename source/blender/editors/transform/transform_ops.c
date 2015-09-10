@@ -399,10 +399,19 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	float mval[2];
 	float dist_px = SNAP_MIN_DISTANCE; // Use a user defined value here
 	char str[MAX_INFO_LEN];
+	bool found = false;
+	short prv_state; /* previous state */
 
 
 	TransInfo *t = op->customdata;
 
+
+	/* Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always */
+	t->tsnap.mode = t->settings->snap_mode;
+
+
+	t->context = C;
+	prv_state = t->state;
 	switch (t->state) {
 		case TRANS_BASE_POINT:
 			exit_code = transformEventBasePoint(t, event);
@@ -415,16 +424,27 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 		default:
 			BLI_assert(false);
 	}
+	t->context = NULL;
+
+	if (t->state != prv_state) {
+		/* State has changed */
+		select_transform_modal_func(op->type,t);
+	}
 
 	if (t->state == TRANS_RUNNING) {
 		set_trans_object_base_flags(t);
-		select_transform_modal_func(op->type,t);
 	}
 
 	mval[0] = (float) t->mval[0];
 	mval[1] = (float) t->mval[1];
 
-	if (snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL_INCLUDING_SEL)) {
+	if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
+		found = snapCursor(t,mval,&dist_px,loc);
+	} else {
+		found = snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL);
+	}
+
+	if (found) {
 		t->flag |= T_USE_SELECTED_POINT;
 	}else {
 		t->flag &= ~T_USE_SELECTED_POINT;
@@ -453,6 +473,10 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	TransInfo *t = op->customdata;
 	const enum TfmMode mode_prev = t->mode;
+
+	/* Snap_mode can be change using TFM_MODAL_SNAP_ELEMENT_SELECT, so keep in sync always */
+	t->tsnap.mode = t->settings->snap_mode;
+
 
 #if 0
 	// stable 2D mouse coords map to different 3D coords while the 3D mouse is active
@@ -527,10 +551,15 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t){
 	switch (t->state) {
 		case TRANS_BASE_POINT:
+			if(ELEM(t->mode,TFM_ROTATION, TFM_RESIZE)) {
+				t->helpline = HLP_ADD_POINT_PIVOT_REF;
+			} else {
+				t->helpline = HLP_ADD_POINT;
+			}
 			ot->modal = transform_modal_select_one_point;
 			break;
 		case TRANS_SELECT_CENTER:
-			t->helpline = HLP_NONE;
+			t->helpline = HLP_ADD_POINT;
 			ot->modal = transform_modal_select_one_point;
 			break;
 		default:

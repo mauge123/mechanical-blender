@@ -1056,13 +1056,33 @@ static int transformEventCommon(TransInfo *t, const wmEvent *event){
 	return handled;
 }
 
+int transformEventSubModal(TransInfo* UNUSED(t), const wmEvent *event) {
+	if (event->type == KM_PRESS) {
+		return 0;
+	}
+	return OPERATOR_PASS_THROUGH;
+}
+
+void modal_snap_element_select(TransInfo  *t) {
+	wmOperatorType *ot = WM_operatortype_find("WM_OT_context_menu_enum", true);
+	PointerRNA ptr;
+	WM_operator_properties_create_ptr(&ptr, ot);
+	RNA_string_set(&ptr, "data_path", "tool_settings.snap_element");
+	WM_operator_name_call_ptr(t->context,ot,WM_OP_EXEC_DEFAULT,&ptr);
+
+	// Reset precision and snap invert as they get released
+	t->modifiers &= (~MOD_PRECISION | ~MOD_SNAP_INVERT);
+	t->mouse.precision = 0;
+}
+
 
 int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 {
 	bool handled = transformEventCommon(t, event);
+	ARegion *ar = t->ar;
+	RegionView3D *rv3d = ar->regiondata;
 	float pos[2];
-	const float *cursor;
-	RegionView3D *rv3d = t->ar->regiondata;
+
 
 	if (event->type == MOUSEMOVE) {
 		copy_v2_v2_int(t->mval, event->mval);
@@ -1070,36 +1090,34 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 	}else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
 			case TFM_MODAL_CONFIRM:
-				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION));
+				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE));
+
 				copy_v2_v2_int(t->imval,t->mval);
+
+				if (ELEM(t->mode, TFM_ROTATION,TFM_RESIZE)) {
+					//Get 2D cordinates of selected Point
+					ED_view3d_project_float_v2_m4(ar, t->selected_point, pos, rv3d->persmat);
+					t->mouse.imval[0] = t->mval[0] = (int) pos[0];
+					t->mouse.imval[1] = t->mval[1] = (int) pos[1];
+				}
+
 				fixSnapTarget(t, t->selected_point);
 				initTransformMode(t,NULL,NULL,t->mode);
 				t->redraw |= TREDRAW_HARD;
 				t->state = TRANS_RUNNING;
 				handled=true;
 				break;
-		}
-	} else if (event->val == KM_PRESS) {
-		switch (event->type) {
-			case CKEY:
-				cursor = ED_view3d_cursor3d_get(t->scene, t->view);
-				fixSnapTarget(t, cursor);
-				ED_view3d_project_float_v2_m4(t->ar, cursor, pos, rv3d->persmat);
-				t->imval[0] = (int) pos[0];
-				t->imval[1] = (int) pos[1];
-				initTransformMode(t,NULL,NULL,t->mode);
-				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_RUNNING;
-				handled=true;
+			case TFM_MODAL_SNAP_ELEMENT_SELECT:
+				modal_snap_element_select(t);
+				handled = true;
 				break;
 		}
-
 	}
 
 	if (handled) {
 		return 0;
 	} else {
-		return OPERATOR_PASS_THROUGH;
+		return transformEventSubModal(t,event);
 	}
 }
 #endif
@@ -1114,16 +1132,34 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 		applyMouseInput(t, &t->mouse, t->mval, t->values);
 	}else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
+			case TFM_MODAL_SNAP_ELEMENT_SELECT:
+				modal_snap_element_select(t);
+				handled = true;
+				break;
 			case TFM_MODAL_CONFIRM:
 				BLI_assert(ELEM(t->mode, TFM_RESIZE, TFM_ROTATION));
-				copy_v3_v3(t->center, t->selected_point);
-				calculateCenter2D(t);
-				calculateCenterGlobal(t);
+				if (t->flag & (T_EDIT | T_POSE)) {
+					/* Center is relative to obect */
+					Object *ob = t->obedit ? t->obedit : t->poseobj;
+					mul_v3_m4v3(t->center,ob->imat, t->selected_point);
+				} else {
+					copy_v3_v3(t->center, t->selected_point);
+				}
+				calculateCenter(t);
 				copy_v2_v2_int(t->imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
 				initTransformMode(t,NULL,NULL,t->mode);
+
+				if ((t->settings->snap_target == SCE_SNAP_TARGET_MANUAL) &&
+				    ((t->tsnap.status & TARGET_FIXED) == 0)) {
+					/* Change to Manual Snap */
+					change_transform_step(t,TRANS_BASE_POINT);
+				} else {
+					t->state = TRANS_RUNNING;
+				}
+
 				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_RUNNING;
+
 				handled=true;
 				break;
 		}
@@ -1132,7 +1168,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 	if (handled) {
 		return 0;
 	} else {
-		return OPERATOR_PASS_THROUGH;
+		return transformEventSubModal(t,event);
 	}
 }
 #endif
@@ -1177,21 +1213,9 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 		switch (event->val) {
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 			case TFM_MODAL_SNAP_ELEMENT_SELECT:
-			{
-				wmOperatorType *ot = WM_operatortype_find("WM_OT_context_menu_enum", true);
-				PointerRNA ptr;
-				WM_operator_properties_create_ptr(&ptr, ot);
-				RNA_string_set(&ptr, "data_path", "tool_settings.snap_element");
-				WM_operator_name_call_ptr(t->context,ot,WM_OP_EXEC_DEFAULT,&ptr);
-
-				// Reset precision and snap invert as they get released
-				t->modifiers &= (~MOD_PRECISION | ~MOD_SNAP_INVERT);
-				//Activate Snap always
-				t->modifiers &= MOD_SNAP;
-				t->mouse.precision = 0;
+				modal_snap_element_select(t);
 				handled = true;
 				break;
-			}
 			case TFM_MODAL_SELECT_BASE_POINT:
 				t->redraw |= TREDRAW_HARD;
 				//set the snapTarget function
@@ -2044,6 +2068,37 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				glLineWidth(1.0);
 				break;
 			}
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+			case HLP_ADD_POINT_PIVOT_REF:
+			{
+				UI_ThemeColor(TH_VIEW_OVERLAY);
+				setlinestyle(3);
+				glBegin(GL_LINE_STRIP);
+				glVertex2iv(t->mval);
+				glVertex2fv(cent);
+				glEnd();
+				setlinestyle(0);
+				/* No break */
+			}
+			case HLP_ADD_POINT:
+			{
+				short size = 5;
+				short offset = 5;
+
+				UI_ThemeColor(TH_VIEW_OVERLAY);
+				glTranslatef(mval[0], mval[1], 0);
+				glLineWidth(3.0);
+				glBegin(GL_LINES);
+				glVertex2s(offset, offset-size);
+				glVertex2s(offset, offset+size);
+				glVertex2s(offset-size, offset);
+				glVertex2s(offset+size, offset);
+				glEnd();
+
+				glLineWidth(1.0);
+
+			}			
+#endif
 		}
 
 		glPopMatrix();
