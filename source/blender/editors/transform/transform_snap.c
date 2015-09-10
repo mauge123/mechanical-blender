@@ -1160,11 +1160,7 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 
 static void TargetSnapOffset(TransInfo *t, TransData *td)
 {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if ((t->spacetype == SPACE_NODE && td != NULL) && ((t->tsnap.status & TARGET_FIXED) == 0)) {
-#else
 	if (t->spacetype == SPACE_NODE && td != NULL) {
-#endif
 		bNode *node = td->extra;
 		char border = t->tsnap.snapNodeBorder;
 		float width  = BLI_rctf_size_x(&node->totr);
@@ -1280,13 +1276,7 @@ static void TargetSnapClosest(TransInfo *t)
 						dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 						
 						if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-							if ((t->tsnap.status & TARGET_FIXED) == 0) {
-								copy_v3_v3(t->tsnap.snapTarget, loc);
-							}
-#else
 							copy_v3_v3(t->tsnap.snapTarget, loc);
-#endif
 							closest = td;
 							t->tsnap.dist = dist; 
 						}
@@ -1302,13 +1292,7 @@ static void TargetSnapClosest(TransInfo *t)
 					dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 					
 					if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-						if ((t->tsnap.status & TARGET_FIXED) == 0) {
-							copy_v3_v3(t->tsnap.snapTarget, loc);
-						}
-#else
 						copy_v3_v3(t->tsnap.snapTarget, loc);
-#endif
 						closest = td;
 						t->tsnap.dist = dist; 
 					}
@@ -1331,13 +1315,7 @@ static void TargetSnapClosest(TransInfo *t)
 				dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 				
 				if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-					if ((t->tsnap.status & TARGET_FIXED) == 0) {
-						copy_v3_v3(t->tsnap.snapTarget, loc);
-					}
-#else
 					copy_v3_v3(t->tsnap.snapTarget, loc);
-#endif
 					closest = td;
 					t->tsnap.dist = dist; 
 				}
