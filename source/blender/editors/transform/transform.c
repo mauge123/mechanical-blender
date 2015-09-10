@@ -1127,7 +1127,13 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				break;
 			case TFM_MODAL_CONFIRM:
 				BLI_assert(ELEM(t->mode, TFM_RESIZE, TFM_ROTATION));
-				copy_v3_v3(t->center, t->selected_point);
+				if (t->flag & (T_EDIT | T_POSE)) {
+					/* Center is relative to obect */
+					Object *ob = t->obedit ? t->obedit : t->poseobj;
+					mul_v3_m4v3(t->center,ob->imat, t->selected_point);
+				} else {
+					copy_v3_v3(t->center, t->selected_point);
+				}
 				calculateCenter(t);
 				copy_v2_v2_int(t->imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
