@@ -1130,8 +1130,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_CONFIRM:
 				BLI_assert(ELEM(t->mode, TFM_RESIZE, TFM_ROTATION));
 				copy_v3_v3(t->center, t->selected_point);
-				calculateCenter2D(t);
-				calculateCenterGlobal(t);
+				calculateCenter(t);
 				copy_v2_v2_int(t->imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
 				initTransformMode(t,NULL,NULL,t->mode);

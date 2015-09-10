@@ -889,7 +889,12 @@ static void ApplySnapRotation(TransInfo *t, float *value)
 static void ApplySnapResize(TransInfo *t, float vec[3])
 {
 	float dist;
-
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	/* Use generic function always */
+	float point[3];
+	getSnapPoint(t, point);
+	dist = ResizeBetween(t, t->tsnap.snapTarget, point);
+#else
 	if (t->tsnap.target == SCE_SNAP_TARGET_CLOSEST) {
 		dist = t->tsnap.dist;
 	}
@@ -898,6 +903,7 @@ static void ApplySnapResize(TransInfo *t, float vec[3])
 		getSnapPoint(t, point);
 		dist = ResizeBetween(t, t->tsnap.snapTarget, point);
 	}
+#endif
 
 	copy_v3_fl(vec, dist);
 }
