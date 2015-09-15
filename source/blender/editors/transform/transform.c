@@ -2081,6 +2081,15 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		}
 	}
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		/*Remove value as is set execs the transform according to it*/
+		if ((prop = RNA_struct_find_property(op->ptr, "value")) && RNA_property_is_set(op->ptr, prop)) {
+			RNA_property_unset(op->ptr,prop);
+		}
+	}
+#endif
+
 	t->options = options;
 
 	t->mode = mode;
@@ -2367,6 +2376,12 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	}
 
 	t->context = NULL;
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
+#endif
 
 	return 1;
 }

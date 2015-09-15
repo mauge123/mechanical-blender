@@ -573,9 +573,6 @@ typedef struct wmOperatorType {
 	/* Flag last for padding */
 	short flag;
 
-	/* For copy data from last operator when repeting it usuing OPERATOR_REPEAT */
-	void (*copy)(struct bContext *, const struct wmOperator *, const struct wmOperator *);
-
 } wmOperatorType;
 
 #ifdef WITH_INPUT_IME

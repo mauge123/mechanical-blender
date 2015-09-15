@@ -477,23 +477,6 @@ static int transform_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-/**
- * @brief copies data from previous transform when repeted
- * @param UNUSED(C)
- * @param op1
- * @param op2
- */
-static void transform_copy(bContext* UNUSED(C), const wmOperator *op_new, const wmOperator *op)
-{
-	TransInfo *t = (TransInfo*) op_new->customdata;
-
-	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
-		t->flag |= T_TRANSFORM_MULTIPLE;
-	}
-}
-#endif
-
 static int transform_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	if (!transformops_data(C, op, event)) {
@@ -586,11 +569,12 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		// Add confirm method all the time. At the end because it's not really that important and should be hidden only in log, not in keymap edit
 		/*prop =*/ RNA_def_boolean(ot->srna, "release_confirm", 0, "Confirm on Release", "Always confirm operation when releasing button");
 		//RNA_def_property_flag(prop, PROP_HIDDEN);
+	}
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-		RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
+	RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
 #endif
-	}
+
 }
 
 static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
@@ -607,7 +591,6 @@ static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 	ot->modal  = transform_modal;
 	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
-	ot->copy = transform_copy;
 
 	RNA_def_float_vector_xyz(ot->srna, "value", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
 

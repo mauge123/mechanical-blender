@@ -484,7 +484,9 @@ typedef struct TransInfo {
 	/* alternative transformation. used to add offset to tracking markers */
 #define T_ALT_TRANSFORM		(1 << 24)
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 #define T_TRANSFORM_MULTIPLE (1 << 25)
+#endif
 
 /* TransInfo->modifiers */
 #define	MOD_CONSTRAINT_SELECT	0x01

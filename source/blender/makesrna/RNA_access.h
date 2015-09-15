@@ -928,6 +928,10 @@ bool RNA_property_collection_move(PointerRNA *ptr, PropertyRNA *prop, int key, i
 bool RNA_property_copy(PointerRNA *ptr, PointerRNA *fromptr, PropertyRNA *prop, int index);
 bool RNA_property_reset(PointerRNA *ptr, PropertyRNA *prop, int index);
 
+#ifdef WITH_MECHANICAL
+void RNA_copy_properties(PointerRNA *ptr, PointerRNA *fromptr);
+#endif
+
 /* Path
  *
  * Experimental method to refer to structs and properties with a string,
