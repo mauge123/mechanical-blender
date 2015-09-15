@@ -323,6 +323,7 @@ typedef struct View3D {
 #define V3D_ACTIVE		 4
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
 #define V3D_MANUAL		 5
+#define V3D_FIXED		 6
 #endif
 
 /*View3D types (only used in tools, not actually saved)*/

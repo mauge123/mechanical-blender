@@ -816,7 +816,11 @@ enum {
 #endif
 
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-	TFM_MODAL_SELECT_CENTER = 32,
+	TFM_MODAL_SELECT_CENTER = 31,
+#endif
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	TFM_MODAL_MULTIPLE_TRANSFORM = 32,
 #endif
 
 };
@@ -861,7 +865,14 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 	    {TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
 #endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
+<<<<<<< HEAD
 	    {TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
+=======
+		{TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		{TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
+>>>>>>> mechanical-grab-w-basepoint
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -934,6 +945,10 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_add_item(keymap, CKEY, KM_PRESS, 0, 0, TFM_MODAL_SELECT_CENTER);
 #endif
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	/* Use the axis resulting on base point and target */
+	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
+#endif
 
 	return keymap;
 }
@@ -1145,6 +1160,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				} else {
 					copy_v3_v3(t->center, t->selected_point);
 				}
+				t->around = V3D_FIXED;
 				calculateCenter(t);
 				copy_v2_v2_int(t->imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
@@ -1220,6 +1236,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				t->redraw |= TREDRAW_HARD;
 				//set the snapTarget function
 				setTargetSnapFunc(t,SCE_SNAP_TARGET_MANUAL);
+				handled = true;
 				break;
 #endif
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
@@ -2324,8 +2341,15 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	}
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	RNA_boolean_set(op->ptr, "snap_target_fixed",(t->tsnap.status & TARGET_FIXED) != 0);
 	RNA_float_set_array(op->ptr, "snap_point_value", t->tsnap.snapPoint);
 	RNA_float_set_array(op->ptr, "snap_target_value", t->tsnap.snapTarget);
+	RNA_float_set_array(op->ptr, "transform_center_value", t->center);
+	RNA_int_set(op->ptr, "transform_mode", t->mode);
+#endif
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
 #endif
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
@@ -2485,6 +2509,21 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		}
 	}
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	if ((prop = RNA_struct_find_property(op->ptr, "transform_mode")) && RNA_property_is_set(op->ptr, prop)) {
+		/*if a mode is set, override and delete to avoid changes*/
+		mode = RNA_property_int_get(op->ptr, prop);
+		RNA_property_unset(op->ptr,prop);
+	}
+
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		/*Remove value as is set execs the transform according to it*/
+		if ((prop = RNA_struct_find_property(op->ptr, "value")) && RNA_property_is_set(op->ptr, prop)) {
+			RNA_property_unset(op->ptr,prop);
+		}
+	}
+#endif
+
 	t->options = options;
 
 	t->mode = mode;
@@ -2590,6 +2629,13 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	/* EVIL3: extend mode for animation editors also switches modes... but is best way to avoid duplicate code */
 	mode = t->mode;
 
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	if ((prop = RNA_struct_find_property(op->ptr, "transform_center_value")) && RNA_property_is_set(op->ptr, prop)) {
+		RNA_property_float_get_array(op->ptr,prop, t->center);
+		t->around = V3D_FIXED;
+	}
+#endif
+
 	calculatePropRatio(t);
 	calculateCenter(t);
 
@@ -2649,6 +2695,19 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	}
 
 	t->context = NULL;
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
+
+	if (RNA_boolean_get(op->ptr, "snap_target_fixed")) {
+		float snap_point[3];
+		RNA_float_get_array(op->ptr, "snap_point_value", snap_point);
+		fixSnapTarget(t,snap_point);
+		setTargetSnapFunc(t,SCE_SNAP_TARGET_MANUAL);
+	}
+#endif
 
 	return 1;
 }
