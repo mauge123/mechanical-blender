@@ -500,6 +500,10 @@ typedef struct TransInfo {
 #endif
 
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+#define T_TRANSFORM_MULTIPLE (1 << 26)
+#endif
+
 /* TransInfo->modifiers */
 #define	MOD_CONSTRAINT_SELECT	0x01
 #define	MOD_PRECISION			0x02

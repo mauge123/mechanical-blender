@@ -815,6 +815,10 @@ enum {
 	TFM_MODAL_SELECT_CENTER = 31,
 #endif
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	TFM_MODAL_MULTIPLE_TRANSFORM = 32,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -854,7 +858,10 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 		{TFM_MODAL_ROTATE_USE_RESULT_AXIS, "TFM_MODAL_ROTATE_USE_RESULT_AXIS", 0, "Use result axis on rotation", ""},
 #endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-	    {TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
+		{TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		{TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -922,7 +929,10 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_add_item(keymap, CKEY, KM_PRESS, 0, 0, TFM_MODAL_SELECT_CENTER);
 #endif
 
-
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	/* Use the axis resulting on base point and target */
+	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
+#endif
 
 	return keymap;
 }
@@ -1221,6 +1231,13 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				} else {
 					// Nothing
 				}
+				handled = true;
+				break;
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+			case TFM_MODAL_MULTIPLE_TRANSFORM:
+				// Multiple instancies
+				t->flag |= T_TRANSFORM_MULTIPLE;
 				handled = true;
 				break;
 #endif
@@ -2314,6 +2331,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	RNA_float_set_array(op->ptr, "transform_center_value", t->center);
 	RNA_int_set(op->ptr, "transform_mode", t->mode);
 #endif
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
+#endif
 }
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
@@ -2467,6 +2488,21 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			options |= CTX_GPENCIL_STROKES;
 		}
 	}
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	if ((prop = RNA_struct_find_property(op->ptr, "transform_mode")) && RNA_property_is_set(op->ptr, prop)) {
+		/*if a mode is set, override and delete to avoid changes*/
+		mode = RNA_property_int_get(op->ptr, prop);
+		RNA_property_unset(op->ptr,prop);
+	}
+
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		/*Remove value as is set execs the transform according to it*/
+		if ((prop = RNA_struct_find_property(op->ptr, "value")) && RNA_property_is_set(op->ptr, prop)) {
+			RNA_property_unset(op->ptr,prop);
+		}
+	}
+#endif
 
 	t->options = options;
 
@@ -2640,6 +2676,19 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
 	t->context = NULL;
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
+
+	if (RNA_boolean_get(op->ptr, "snap_target_fixed")) {
+		float snap_point[3];
+		RNA_float_get_array(op->ptr, "snap_point_value", snap_point);
+		fixSnapTarget(t,snap_point);
+		setTargetSnapFunc(t,SCE_SNAP_TARGET_MANUAL);
+	}
+#endif
+
 	return 1;
 }
 
@@ -2705,6 +2754,11 @@ int transformEnd(bContext *C, TransInfo *t)
 			exit_code = OPERATOR_FINISHED;
 		}
 
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		if (t->state == TRANS_CONFIRM && t->flag & T_TRANSFORM_MULTIPLE) {
+			exit_code |= OPERATOR_REPEAT;
+		}
+#endif
 		/* aftertrans does insert keyframes, and clears base flags; doesn't read transdata */
 		special_aftertrans_update(C, t);
 

@@ -517,6 +517,7 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	exit_code |= transformEnd(C, t);
 
 	if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+
 		transformops_exit(C, op);
 		exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 	}
@@ -713,6 +714,9 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 	/* T_USES_MANIPULATOR FLAG */
 	prop = RNA_def_boolean(ot->srna,"uses_manipulator",false,NULL,NULL);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
 #endif
 
 }

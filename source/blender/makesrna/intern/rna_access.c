@@ -3232,6 +3232,23 @@ int RNA_property_collection_lookup_int(PointerRNA *ptr, PropertyRNA *prop, int k
 	}
 }
 
+#ifdef WITH_MECHANICAL
+void RNA_copy_properties(PointerRNA *ptr, PointerRNA *ptrfrom) {
+
+	CollectionPropertyIterator iter;
+	PropertyRNA *prop = RNA_struct_iterator_property(ptr->type);
+
+	RNA_property_collection_begin(ptrfrom, prop, &iter);
+	for (; iter.valid; RNA_property_collection_next(&iter)) {
+		if (iter.ptr.data && iter.ptr.type->nameproperty) {
+			RNA_property_copy(ptr, ptrfrom, iter.ptr.data, -1);
+		}
+	}
+	RNA_property_collection_end(&iter);
+}
+#endif
+
+
 int RNA_property_collection_lookup_string(PointerRNA *ptr, PropertyRNA *prop, const char *key, PointerRNA *r_ptr)
 {
 	CollectionPropertyRNA *cprop = (CollectionPropertyRNA *)rna_ensure_property(prop);

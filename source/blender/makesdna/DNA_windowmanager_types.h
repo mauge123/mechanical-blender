@@ -375,7 +375,21 @@ enum {
 	/* used for operators that act indirectly (eg. popup menu)
 	 * note: this isn't great design (using operators to trigger UI) avoid where possible. */
 	OPERATOR_INTERFACE      = (1 << 5),
+#ifdef WITH_MECHANICAL
+	OPERATOR_REPEAT      = (1 << 6),
+#endif
 };
+#ifdef WITH_MECHANICAL
+#define OPERATOR_FLAGS_ALL ( \
+	OPERATOR_RUNNING_MODAL | \
+	OPERATOR_CANCELLED | \
+	OPERATOR_FINISHED | \
+	OPERATOR_PASS_THROUGH | \
+	OPERATOR_HANDLED | \
+	OPERATOR_INTERFACE | \
+	OPERATOR_REPEAT | \
+	0)
+#else
 #define OPERATOR_FLAGS_ALL ( \
 	OPERATOR_RUNNING_MODAL | \
 	OPERATOR_CANCELLED | \
@@ -384,7 +398,7 @@ enum {
 	OPERATOR_HANDLED | \
 	OPERATOR_INTERFACE | \
 	0)
-
+#endif
 /* sanity checks for debug mode only */
 #define OPERATOR_RETVAL_CHECK(ret) (void)ret, BLI_assert(ret != 0 && (ret & OPERATOR_FLAGS_ALL) == ret)
 

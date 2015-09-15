@@ -1057,9 +1057,15 @@ bool WM_operator_last_properties_store(wmOperator *UNUSED(op))
 
 #endif
 
+#ifdef WITH_MECHANICAL
+static int wm_operator_invoke(
+        bContext *C, wmOperatorType *ot, wmEvent *event,
+        PointerRNA *properties, ReportList *reports, const bool poll_only, wmOperator *op_prev)
+#else
 static int wm_operator_invoke(
         bContext *C, wmOperatorType *ot, wmEvent *event,
         PointerRNA *properties, ReportList *reports, const bool poll_only)
+#endif
 {
 	int retval = OPERATOR_PASS_THROUGH;
 
@@ -1069,9 +1075,23 @@ static int wm_operator_invoke(
 
 	if (WM_operator_poll(C, ot)) {
 		wmWindowManager *wm = CTX_wm_manager(C);
-		wmOperator *op = wm_operator_create(wm, ot, properties, reports); /* if reports == NULL, they'll be initialized */
 		const bool is_nested_call = (wm->op_undo_depth != 0);
-		
+		wmOperator *op = wm_operator_create(wm, ot, properties, reports); /* if reports == NULL, they'll be initialized */
+#ifdef WITH_MECHANICAL
+		wmOperator *opm, *opm_prev;
+
+
+		if (op_prev) {
+			/* Copy RNA from previous*/
+			RNA_copy_properties(op->ptr, op_prev->ptr);
+			/* exectue copy on macros */
+			for (opm = op->macro.first, opm_prev = op_prev->macro.first;
+			     opm;
+			     opm = opm->next, opm_prev = opm_prev->next) {
+					RNA_copy_properties(opm->ptr,opm_prev->ptr);
+			}
+		}
+#endif
 		op->flag |= OP_IS_INVOKE;
 
 		/* initialize setting from previous run */
@@ -1197,6 +1217,30 @@ static int wm_operator_invoke(
 	return retval;
 }
 
+
+#ifdef WITH_MECHANICAL
+/**
+ * @brief wm_operator_restart
+ * @param C
+ * @param op
+ * @param ot
+ * @param event
+ * @param properties
+ * @param reports
+ * @param poll_only
+ * @return
+ */
+static int wm_operator_restart(
+        bContext *C, wmOperatorType *ot, wmEvent *event,
+        PointerRNA *properties, ReportList *reports, const bool poll_only)
+{
+	wmWindowManager *wm = CTX_wm_manager(C);
+	wmOperator *op_prev = wm->operators.last;
+
+	return wm_operator_invoke(C,ot,event,properties,reports, poll_only, op_prev);
+}
+#endif
+
 /**
  * #WM_operator_name_call is the main accessor function
  * this is for python to access since its done the operator lookup
@@ -1285,7 +1329,11 @@ static int wm_operator_call_internal(
 						CTX_wm_region_set(C, ar1);
 				}
 				
+#ifdef WITH_MECHANICAL
+				retval = wm_operator_invoke(C, ot, event, properties, reports, poll_only,NULL);
+#else
 				retval = wm_operator_invoke(C, ot, event, properties, reports, poll_only);
+#endif
 				
 				/* set region back */
 				CTX_wm_region_set(C, ar);
@@ -1299,7 +1347,12 @@ static int wm_operator_call_internal(
 				ARegion *ar = CTX_wm_region(C);
 
 				CTX_wm_region_set(C, NULL);
+#ifdef WITH_MECHANICAL
+				retval = wm_operator_invoke(C, ot, event, properties, reports, poll_only,NULL);
+#else
 				retval = wm_operator_invoke(C, ot, event, properties, reports, poll_only);
+
+#endif
 				CTX_wm_region_set(C, ar);
 
 				return retval;
@@ -1313,7 +1366,11 @@ static int wm_operator_call_internal(
 
 				CTX_wm_region_set(C, NULL);
 				CTX_wm_area_set(C, NULL);
+#ifdef WITH_MECHANICAL
+				retval = wm_operator_invoke(C, ot, event, properties, reports, poll_only,NULL);
+#else
 				retval = wm_operator_invoke(C, ot, event, properties, reports, poll_only);
+#endif
 				CTX_wm_area_set(C, area);
 				CTX_wm_region_set(C, ar);
 
@@ -1321,7 +1378,11 @@ static int wm_operator_call_internal(
 			}
 			case WM_OP_EXEC_DEFAULT:
 			case WM_OP_INVOKE_DEFAULT:
+#ifdef WITH_MECHANICAL
+				return wm_operator_invoke(C, ot, event, properties, reports, poll_only,NULL);
+#else
 				return wm_operator_invoke(C, ot, event, properties, reports, poll_only);
+#endif
 		}
 	}
 	
@@ -1691,6 +1752,11 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 					CTX_wm_area_set(C, area);
 					CTX_wm_region_set(C, region);
 				}
+#ifdef WITH_MECHANICAL
+				else if (retval & OPERATOR_REPEAT) {
+					wm_operator_restart(C, ot, event, properties, NULL, false);
+				}
+#endif
 				else {
 					/* this special cases is for areas and regions that get removed */
 					CTX_wm_area_set(C, NULL);
@@ -1719,7 +1785,11 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 
 		if (ot) {
 			if (wm_operator_check_locked_interface(C, ot)) {
-				retval = wm_operator_invoke(C, ot, event, properties, NULL, false);
+#ifdef WITH_MECHANICAL
+				retval = wm_operator_invoke(C, ot, event, properties, NULL, false, NULL);
+#else
+				retval = wm_operator_invoke(C, ot, event, properties, NULL, false, &op);
+#endif
 			}
 		}
 	}
