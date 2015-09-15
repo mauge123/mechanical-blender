@@ -1134,6 +1134,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				} else {
 					copy_v3_v3(t->center, t->selected_point);
 				}
+				t->around = V3D_FIXED;
 				calculateCenter(t);
 				copy_v2_v2_int(t->imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
@@ -1209,6 +1210,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				t->redraw |= TREDRAW_HARD;
 				//set the snapTarget function
 				setTargetSnapFunc(t,SCE_SNAP_TARGET_MANUAL);
+				handled = true;
 				break;
 #endif
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
@@ -2306,8 +2308,11 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	}
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	RNA_boolean_set(op->ptr, "snap_target_fixed",(t->tsnap.status & TARGET_FIXED) != 0);
 	RNA_float_set_array(op->ptr, "snap_point_value", t->tsnap.snapPoint);
 	RNA_float_set_array(op->ptr, "snap_target_value", t->tsnap.snapTarget);
+	RNA_float_set_array(op->ptr, "transform_center_value", t->center);
+	RNA_int_set(op->ptr, "transform_mode", t->mode);
 #endif
 }
 
@@ -2567,6 +2572,13 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	/* EVIL2: we gave as argument also texture space context bit... was cleared */
 	/* EVIL3: extend mode for animation editors also switches modes... but is best way to avoid duplicate code */
 	mode = t->mode;
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+	if ((prop = RNA_struct_find_property(op->ptr, "transform_center_value")) && RNA_property_is_set(op->ptr, prop)) {
+		RNA_property_float_get_array(op->ptr,prop, t->center);
+		t->around = V3D_FIXED;
+	}
+#endif
 
 	calculatePropRatio(t);
 	calculateCenter(t);
