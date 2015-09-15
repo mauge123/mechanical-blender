@@ -816,11 +816,7 @@ enum {
 #endif
 
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-	TFM_MODAL_SELECT_CENTER = 31,
-#endif
-
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-	TFM_MODAL_MULTIPLE_TRANSFORM = 32,
+	TFM_MODAL_SELECT_CENTER = 32,
 #endif
 
 };
@@ -865,14 +861,7 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 	    {TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
 #endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-<<<<<<< HEAD
-	    {TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
-=======
 		{TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
-#endif
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-		{TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
->>>>>>> mechanical-grab-w-basepoint
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
