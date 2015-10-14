@@ -2690,6 +2690,10 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		t->flag |= T_TRANSFORM_MULTIPLE;
 	}
 
+	if (t->settings->transform_multiple) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
+
 	if (RNA_boolean_get(op->ptr, "snap_target_fixed")) {
 		float snap_point[3];
 		RNA_float_get_array(op->ptr, "snap_point_value", snap_point);
