@@ -1220,7 +1220,10 @@ typedef struct ToolSettings {
 	char gpencil_flags;		/* flags/options for how the tool works */
 	char gpencil_src;		/* for main 3D view Grease Pencil, where data comes from */
 
-	char pad[4];
+	/* Duplicate multiple flag WITH_MECHANICAL_TRANSFORM_MULTIPLE*/
+	char transform_multiple;
+
+	char pad[3];
 
 	/* Image Paint (8 byttse aligned please!) */
 	struct ImagePaintSettings imapaint;
@@ -1792,6 +1795,10 @@ typedef enum eVGroupSelect {
 #define F_START			0
 #define F_SCENE			1
 #define F_DUPLI			3
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+#define SCE_DUPLICATE_MULTIPLE  1
+#endif
 
 /* audio->flag */
 #define AUDIO_MUTE                (1<<0)

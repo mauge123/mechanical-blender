@@ -307,6 +307,7 @@ endif()
 
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_TRANSFORM_MULTIPLE)
 endif()
 
 

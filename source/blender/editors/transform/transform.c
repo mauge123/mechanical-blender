@@ -2381,6 +2381,10 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
 		t->flag |= T_TRANSFORM_MULTIPLE;
 	}
+
+	if (t->settings->transform_multiple) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
 #endif
 
 	return 1;
