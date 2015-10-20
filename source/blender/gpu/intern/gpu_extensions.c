@@ -1455,7 +1455,10 @@ GPUOffScreen *GPU_offscreen_create(int width, int height, int samples, char err_
 		    /* Only needed for GPU_offscreen_read_pixels.
 		     * We could add an arg if we intend to use multi-samle
 		     * offscreen buffers w/o reading their pixels */
-		    !GLEW_EXT_framebuffer_blit)
+		    !GLEW_EXT_framebuffer_blit ||
+		    /* This is required when blitting from a multi-sampled buffers,
+		     * even though we're not scaling. */
+		    !GLEW_EXT_framebuffer_multisample_blit_scaled)
 		{
 			samples = 0;
 		}
@@ -1611,6 +1614,11 @@ int GPU_offscreen_width(const GPUOffScreen *ofs)
 int GPU_offscreen_height(const GPUOffScreen *ofs)
 {
 	return ofs->color->h_orig;
+}
+
+int GPU_offscreen_color_texture(const GPUOffScreen *ofs)
+{
+	return ofs->color->bindcode;
 }
 
 /* GPUShader */
