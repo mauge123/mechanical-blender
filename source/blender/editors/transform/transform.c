@@ -2689,6 +2689,10 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		fixSnapTarget(t,snap_point);
 		setTargetSnapFunc(t,SCE_SNAP_TARGET_MANUAL);
 	}
+
+	if (t->settings->transform_multiple) {
+		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
 #endif
 
 	return 1;
