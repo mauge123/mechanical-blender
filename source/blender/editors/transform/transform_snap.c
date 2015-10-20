@@ -85,6 +85,8 @@
 
 #define TRANSFORM_DIST_MAX_PX 1000.0f
 #define TRANSFORM_SNAP_MAX_PX 100.0f
+#define TRANSFORM_DIST_INVALID NAN_FLT
+
 /* use half of flt-max so we can scale up without an exception */
 
 /********************* PROTOTYPES ***********************/
@@ -220,7 +222,7 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 			h = (((float)hi) / IMG_SIZE_FALLBACK) * G.sima->zoom * yuser_asp;
 			
 			cpack(0xFFFFFF);
-			glTranslatef(t->tsnap.snapPoint[0], t->tsnap.snapPoint[1], 0.0f);
+			glTranslate2fv(t->tsnap.snapPoint);
 			
 			//glRectf(0, 0, 1, 1);
 			
@@ -897,7 +899,10 @@ static float ResizeBetween(TransInfo *t, const float p1[3], const float p2[3])
 	
 	len_d1 = len_v3(d1);
 
-	return len_d1 != 0.0f ? len_v3(d2) / len_d1 : 1;
+	/* Use 'invalid' dist when `center == p1` (after projecting),
+	 * in this case scale will _never_ move the point in relation to the center,
+	 * so it makes no sense to take it into account when scaling. see: T46503 */
+	return len_d1 != 0.0f ? len_v3(d2) / len_d1 : TRANSFORM_DIST_INVALID;
 }
 
 /********************** CALC **************************/
@@ -981,7 +986,7 @@ static void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 						break;
 					}
 					
-					new_dist = len_v3v3(last_p, vec);
+					new_dist = len_squared_v3v3(last_p, vec);
 					
 					if (new_dist < max_dist) {
 						copy_v3_v3(p, vec);
@@ -1177,8 +1182,10 @@ static void TargetSnapClosest(TransInfo *t)
 						mul_m4_v3(td->ext->obmat, loc);
 						
 						dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
-						
-						if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
+
+						if ((dist != TRANSFORM_DIST_INVALID) &&
+						    (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)))
+						{
 							copy_v3_v3(t->tsnap.snapTarget, loc);
 							closest = td;
 							t->tsnap.dist = dist; 
@@ -1193,8 +1200,10 @@ static void TargetSnapClosest(TransInfo *t)
 					copy_v3_v3(loc, td->center);
 					
 					dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
-					
-					if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
+
+					if ((dist != TRANSFORM_DIST_INVALID) &&
+					    (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)))
+					{
 						copy_v3_v3(t->tsnap.snapTarget, loc);
 						closest = td;
 						t->tsnap.dist = dist; 
@@ -1217,7 +1226,9 @@ static void TargetSnapClosest(TransInfo *t)
 				
 				dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 				
-				if (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)) {
+				if ((dist != TRANSFORM_DIST_INVALID) &&
+				    (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)))
+				{
 					copy_v3_v3(t->tsnap.snapTarget, loc);
 					closest = td;
 					t->tsnap.dist = dist; 
@@ -1527,8 +1538,17 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 
 		if (do_bb) {
 			BoundBox *bb = BKE_object_boundbox_get(ob);
-			if (!BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, &len_diff)) {
-				return retval;
+
+			if (bb) {
+				BoundBox bb_temp;
+
+				/* We cannot aford a bbox with some null dimension, which may happen in some cases...
+				 * Threshold is rather high, but seems to be needed to get good behavior, see T46099. */
+				bb = BKE_boundbox_ensure_minimum_dimensions(bb, &bb_temp, 1e-1f);
+
+				if (!BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, &len_diff)) {
+					return retval;
+				}
 			}
 		}
 		else if (do_ray_start_correction) {
@@ -1540,6 +1560,7 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 			len_diff = 0.0f;  /* In case BVHTree would fail for some reason... */
 
 			treeData.em_evil = em;
+			treeData.em_evil_all = false;
 			bvhtree_from_mesh_looptri(&treeData, dm, 0.0f, 2, 6);
 			if (treeData.tree != NULL) {
 				nearest.index = -1;
@@ -1582,6 +1603,7 @@ static bool snapDerivedMesh(short snap_mode, ARegion *ar, Object *ob, DerivedMes
 				}
 
 				treeData.em_evil = em;
+				treeData.em_evil_all = false;
 				bvhtree_from_mesh_looptri(&treeData, dm, 0.0f, 4, 6);
 
 				hit.index = -1;
@@ -1854,7 +1876,7 @@ static bool snapObject(Scene *scene, short snap_mode, ARegion *ar, Object *ob, f
 			do_bb = false;
 		}
 		else {
-			/* in this case we wan't the mesh from the editmesh, avoids stale data. see: T45978.
+			/* in this case we want the mesh from the editmesh, avoids stale data. see: T45978.
 			 * still set the 'em' to NULL, since we only want the 'dm'. */
 			em = BKE_editmesh_from_object(ob);
 			if (em) {
@@ -2151,20 +2173,30 @@ static bool peelDerivedMesh(
 		 * test against boundbox first
 		 * */
 		if (looptri_num > 16) {
-			struct BoundBox *bb = BKE_object_boundbox_get(ob);
-			test = BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, NULL);
+			BoundBox *bb = BKE_object_boundbox_get(ob);
+
+			if (bb) {
+				BoundBox bb_temp;
+
+				/* We cannot aford a bbox with some null dimension, which may happen in some cases...
+				 * Threshold is rather high, but seems to be needed to get good behavior, see T46099. */
+				bb = BKE_boundbox_ensure_minimum_dimensions(bb, &bb_temp, 1e-1f);
+
+				test = BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, NULL);
+			}
 		}
 		
 		if (test == true) {
 			struct PeelRayCast_Data data;
 
 			data.bvhdata.em_evil = em;
+			data.bvhdata.em_evil_all = false;
 			bvhtree_from_mesh_looptri(&data.bvhdata, dm, 0.0f, 4, 6);
 
 			if (data.bvhdata.tree != NULL) {
 				data.ob = ob;
-				data.obmat = obmat;
-				data.timat = timat;
+				data.obmat = (const float (*)[4])obmat;
+				data.timat = (const float (*)[3])timat;
 				data.ray_start = ray_start;
 				data.looptri = looptri;
 				data.polynors = dm->getPolyDataArray(dm, CD_NORMAL);  /* can be NULL */

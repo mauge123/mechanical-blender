@@ -464,15 +464,15 @@ void BKE_scene_free(Scene *sce)
 	BKE_previewimg_free(&sce->preview);
 }
 
-Scene *BKE_scene_add(Main *bmain, const char *name)
+void BKE_scene_init(Scene *sce)
 {
-	Scene *sce;
 	ParticleEditSettings *pset;
 	int a;
 	const char *colorspace_name;
 	SceneRenderView *srv;
 
-	sce = BKE_libblock_alloc(bmain, ID_SCE, name);
+	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(sce, id));
+
 	sce->lay = sce->layact = 1;
 	
 	sce->r.mode = R_GAMMA | R_OSA | R_SHADOW | R_SSS | R_ENVMAP | R_RAYTRACE;
@@ -743,6 +743,15 @@ Scene *BKE_scene_add(Main *bmain, const char *name)
 	copy_v2_fl2(sce->safe_areas.action_center, 15.0f / 100.0f, 5.0f / 100.0f);
 
 	sce->preview = NULL;
+}
+
+Scene *BKE_scene_add(Main *bmain, const char *name)
+{
+	Scene *sce;
+
+	sce = BKE_libblock_alloc(bmain, ID_SCE, name);
+
+	BKE_scene_init(sce);
 
 	return sce;
 }
@@ -1360,7 +1369,7 @@ static void scene_do_rb_simulation_recursive(Scene *scene, float ctime)
  *
  * Ideally Mballs shouldn't do such an iteration and use DAG
  * queries instead. For the time being we've got new DAG
- * let's keep it simple and update mballs in a ingle thread.
+ * let's keep it simple and update mballs in a single thread.
  */
 #define MBALL_SINGLETHREAD_HACK
 
@@ -2174,8 +2183,8 @@ bool BKE_scene_use_new_shading_nodes(const Scene *scene)
 
 bool BKE_scene_use_shading_nodes_custom(Scene *scene)
 {
-	   RenderEngineType *type = RE_engines_find(scene->r.engine);
-	   return (type && type->flag & RE_USE_SHADING_NODES_CUSTOM);
+	RenderEngineType *type = RE_engines_find(scene->r.engine);
+	return (type && type->flag & RE_USE_SHADING_NODES_CUSTOM);
 }
 
 bool BKE_scene_uses_blender_internal(const  Scene *scene)

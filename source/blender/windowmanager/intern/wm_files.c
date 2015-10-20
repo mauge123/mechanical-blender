@@ -81,6 +81,7 @@
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+#include "BKE_scene.h"
 #include "BKE_screen.h"
 
 #include "BLO_readfile.h"
@@ -105,6 +106,9 @@
 #include "UI_view2d.h"
 
 #include "GPU_draw.h"
+
+/* only to report a missing engine */
+#include "RE_engine.h"
 
 #ifdef WITH_PYTHON
 #include "BPY_extern.h"
@@ -335,11 +339,13 @@ static void wm_init_userdef(bContext *C, const bool from_memory)
 #define BKE_READ_EXOTIC_FAIL_FORMAT     -2 /* file format is not supported */
 #define BKE_READ_EXOTIC_FAIL_OPEN       -1 /* Can't open the file */
 #define BKE_READ_EXOTIC_OK_BLEND         0 /* .blend file */
+#if 0
 #define BKE_READ_EXOTIC_OK_OTHER         1 /* other supported formats */
+#endif
 
 
 /* intended to check for non-blender formats but for now it only reads blends */
-static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
+static int wm_read_exotic(const char *name)
 {
 	int len;
 	gzFile gzfile;
@@ -401,6 +407,104 @@ void WM_file_autoexec_init(const char *filepath)
 	}
 }
 
+void wm_file_read_report(bContext *C)
+{
+	ReportList *reports = NULL;
+	Scene *sce;
+
+	for (sce = G.main->scene.first; sce; sce = sce->id.next) {
+		if (sce->r.engine[0] &&
+		    BLI_findstring(&R_engines, sce->r.engine, offsetof(RenderEngineType, idname)) == NULL)
+		{
+			if (reports == NULL) {
+				reports = CTX_wm_reports(C);
+			}
+
+			BKE_reportf(reports, RPT_ERROR,
+			            "Engine '%s' not available for scene '%s' "
+			            "(an addon may need to be installed or enabled)",
+			            sce->r.engine, sce->id.name + 2);
+		}
+	}
+
+	if (reports) {
+		if (!G.background) {
+			WM_report_banner_show(C);
+		}
+	}
+}
+
+/**
+ * Logic shared between #WM_file_read & #wm_homefile_read,
+ * updates to make after reading a file.
+ */
+static void wm_file_read_post(bContext *C, bool is_startup_file)
+{
+	bool addons_loaded = false;
+	wmWindowManager *wm = CTX_wm_manager(C);
+
+	if (!G.background) {
+		/* remove windows which failed to be added via WM_check */
+		wm_window_ghostwindows_remove_invalid(C, wm);
+	}
+
+	CTX_wm_window_set(C, wm->windows.first);
+
+	ED_editors_init(C);
+	DAG_on_visible_update(CTX_data_main(C), true);
+
+#ifdef WITH_PYTHON
+	if (is_startup_file) {
+		/* possible python hasn't been initialized */
+		if (CTX_py_init_get(C)) {
+			/* sync addons, these may have changed from the defaults */
+			BPY_string_exec(C, "__import__('addon_utils').reset_all()");
+
+			BPY_python_reset(C);
+			addons_loaded = true;
+		}
+	}
+	else {
+		/* run any texts that were loaded in and flagged as modules */
+		BPY_python_reset(C);
+		addons_loaded = true;
+	}
+#endif  /* WITH_PYTHON */
+
+	WM_operatortype_last_properties_clear_all();
+
+	/* important to do before NULL'ing the context */
+	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_VERSION_UPDATE);
+	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
+
+	/* would otherwise be handled by event loop */
+	if (G.background) {
+		Main *bmain = CTX_data_main(C);
+		BKE_scene_update_tagged(bmain->eval_ctx, bmain, CTX_data_scene(C));
+	}
+
+	WM_event_add_notifier(C, NC_WM | ND_FILEREAD, NULL);
+
+	/* report any errors.
+	 * currently disabled if addons aren't yet loaded */
+	if (addons_loaded) {
+		wm_file_read_report(C);
+	}
+
+	if (!G.background) {
+		/* in background mode this makes it hard to load
+		 * a blend file and do anything since the screen
+		 * won't be set to a valid value again */
+		CTX_wm_window_set(C, NULL); /* exits queues */
+	}
+
+	if (!G.background) {
+//		undo_editmode_clear();
+		BKE_undo_reset();
+		BKE_undo_write(C, "original");  /* save current state */
+	}
+}
+
 bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 {
 	/* assume automated tasks with background, don't write recent file list */
@@ -420,7 +524,7 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 	/* first try to append data from exotic file formats... */
 	/* it throws error box when file doesn't exist and returns -1 */
 	/* note; it should set some error message somewhere... (ton) */
-	retval = wm_read_exotic(CTX_data_scene(C), filepath);
+	retval = wm_read_exotic(filepath);
 	
 	/* we didn't succeed, now try to read Blender file */
 	if (retval == BKE_READ_EXOTIC_OK_BLEND) {
@@ -465,58 +569,14 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 			}
 		}
 
-
-		WM_event_add_notifier(C, NC_WM | ND_FILEREAD, NULL);
-//		refresh_interface_font();
-
-		CTX_wm_window_set(C, CTX_wm_manager(C)->windows.first);
-
-		ED_editors_init(C);
-		DAG_on_visible_update(CTX_data_main(C), true);
-
-#ifdef WITH_PYTHON
-		/* run any texts that were loaded in and flagged as modules */
-		BPY_python_reset(C);
-#endif
-
-		WM_operatortype_last_properties_clear_all();
-
-		/* important to do before NULL'ing the context */
-		BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_VERSION_UPDATE);
-		BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
-
-		if (!G.background) {
-			/* in background mode this makes it hard to load
-			 * a blend file and do anything since the screen
-			 * won't be set to a valid value again */
-			CTX_wm_window_set(C, NULL); /* exits queues */
-		}
-
-#if 0
-		/* gives popups on windows but not linux, bug in report API
-		 * but disable for now to stop users getting annoyed  */
-		/* TODO, make this show in header info window */
-		{
-			Scene *sce;
-			for (sce = G.main->scene.first; sce; sce = sce->id.next) {
-				if (sce->r.engine[0] &&
-				    BLI_findstring(&R_engines, sce->r.engine, offsetof(RenderEngineType, idname)) == NULL)
-				{
-					BKE_reportf(reports, RPT_ERROR, "Engine '%s' not available for scene '%s' "
-					            "(an addon may need to be installed or enabled)",
-					            sce->r.engine, sce->id.name + 2);
-				}
-			}
-		}
-#endif
-
-		BKE_undo_reset();
-		BKE_undo_write(C, "original");  /* save current state */
+		wm_file_read_post(C, false);
 
 		success = true;
 	}
+#if 0
 	else if (retval == BKE_READ_EXOTIC_OK_OTHER)
 		BKE_undo_write(C, "Import file");
+#endif
 	else if (retval == BKE_READ_EXOTIC_FAIL_OPEN) {
 		BKE_reportf(reports, RPT_ERROR, "Cannot read file '%s': %s", filepath,
 		            errno ? strerror(errno) : TIP_("unable to open the file"));
@@ -673,36 +733,7 @@ int wm_homefile_read(bContext *C, ReportList *reports, bool from_memory, const c
 	G.save_over = 0;    // start with save preference untitled.blend
 	G.fileflags &= ~G_FILE_AUTOPLAY;    /*  disable autoplay in startup.blend... */
 
-//	refresh_interface_font();
-	
-//	undo_editmode_clear();
-	BKE_undo_reset();
-	BKE_undo_write(C, "original");  /* save current state */
-
-	ED_editors_init(C);
-	DAG_on_visible_update(CTX_data_main(C), true);
-
-#ifdef WITH_PYTHON
-	if (CTX_py_init_get(C)) {
-		/* sync addons, these may have changed from the defaults */
-		BPY_string_exec(C, "__import__('addon_utils').reset_all()");
-
-		BPY_python_reset(C);
-	}
-#endif
-
-	WM_operatortype_last_properties_clear_all();
-
-	/* important to do before NULL'ing the context */
-	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_VERSION_UPDATE);
-	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
-
-	WM_event_add_notifier(C, NC_WM | ND_FILEREAD, NULL);
-
-	/* in background mode the scene will stay NULL */
-	if (!G.background) {
-		CTX_wm_window_set(C, NULL); /* exits queues */
-	}
+	wm_file_read_post(C, true);
 
 	return true;
 }
@@ -901,13 +932,18 @@ static ImBuf *blend_file_thumb(Scene *scene, bScreen *screen, BlendThumbnail **t
 
 	/* gets scaled to BLEN_THUMB_SIZE */
 	if (scene->camera) {
-		ibuf = ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
-		                                             BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-		                                             IB_rect, OB_SOLID, false, false, false, R_ALPHAPREMUL, NULL, err_out);
+		ibuf = ED_view3d_draw_offscreen_imbuf_simple(
+		        scene, scene->camera,
+		        BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
+		        IB_rect, OB_SOLID, false, false, false, R_ALPHAPREMUL, 0, NULL,
+		        NULL, err_out);
 	}
 	else {
-		ibuf = ED_view3d_draw_offscreen_imbuf(scene, v3d, ar, BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-		                                      IB_rect, false, R_ALPHAPREMUL, NULL, err_out);
+		ibuf = ED_view3d_draw_offscreen_imbuf(
+		        scene, v3d, ar,
+		        BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
+		        IB_rect, false, R_ALPHAPREMUL, 0, NULL,
+		        NULL, err_out);
 	}
 
 	if (ibuf) {

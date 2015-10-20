@@ -291,11 +291,10 @@ static void ww_handle_init(eWriteWrapType ww_type, WriteWrap *r_ww)
 typedef struct {
 	struct SDNA *sdna;
 
-	int file;
 	unsigned char *buf;
 	MemFile *compare, *current;
 	
-	int tot, count, error, memsize;
+	int tot, count, error;
 
 	/* Wrap writing, so we can use zlib or
 	 * other compression types later, see: G_FILE_COMPRESS
@@ -2079,7 +2078,7 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 
 				/* now fill in polys to mfaces */
 				/* XXX This breaks writing desing, by using temp allocated memory, which will likely generate
-				 *     doublons in stored 'old' addresses.
+				 *     duplicates in stored 'old' addresses.
 				 *     This is very bad, but do not see easy way to avoid this, aside from generating those data
 				 *     outside of save process itself.
 				 *     Maybe we can live with this, though?

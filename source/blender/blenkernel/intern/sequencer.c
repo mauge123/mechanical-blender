@@ -563,6 +563,8 @@ void BKE_sequencer_new_render_data(
 	r_context->skip_cache = false;
 	r_context->is_proxy_render = false;
 	r_context->view_id = 0;
+	r_context->gpu_offscreen = NULL;
+	r_context->gpu_samples = (scene->r.mode & R_OSA) ? scene->r.osa : 0;
 }
 
 /* ************************* iterator ************************** */
@@ -1011,6 +1013,15 @@ void BKE_sequencer_sort(Scene *scene)
 
 	BLI_movelisttolist(&seqbase, &effbase);
 	*(ed->seqbasep) = seqbase;
+}
+
+/** Comparision function suitable to be used with BLI_listbase_sort()... */
+int BKE_sequencer_cmp_time_startdisp(const void *a, const void *b)
+{
+	const Sequence *seq_a = a;
+	const Sequence *seq_b = b;
+
+	return (seq_a->startdisp > seq_b->startdisp);
 }
 
 static int clear_scene_in_allseqs_cb(Sequence *seq, void *arg_pt)
@@ -3009,12 +3020,17 @@ static ImBuf *seq_render_mask(const SeqRenderData *context, Mask *mask, float nr
 		return NULL;
 	}
 	else {
+		AnimData *adt;
 		Mask *mask_temp;
 		MaskRasterHandle *mr_handle;
 
 		mask_temp = BKE_mask_copy_nolib(mask);
 
 		BKE_mask_evaluate(mask_temp, mask->sfra + nr, true);
+
+		/* anim-data */
+		adt = BKE_animdata_from_id(&mask->id);
+		BKE_animsys_evaluate_animdata(context->scene, &mask_temp->id, adt, nr, ADT_RECALC_ANIM);
 
 		maskbuf = MEM_mallocN(sizeof(float) * context->rectx * context->recty, __func__);
 
@@ -3198,10 +3214,14 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 
 		/* opengl offscreen render */
 		BKE_scene_update_for_newframe(context->eval_ctx, context->bmain, scene, scene->lay);
-		ibuf = sequencer_view3d_cb(scene, camera, width, height, IB_rect,
-		                           context->scene->r.seq_prev_type,
-		                           (context->scene->r.seq_flag & R_SEQ_SOLID_TEX) != 0,
-		                           use_gpencil, true, scene->r.alphamode, viewname, err_out);
+		ibuf = sequencer_view3d_cb(
+		        /* set for OpenGL render (NULL when scrubbing) */
+		        scene, camera, width, height, IB_rect,
+		        context->scene->r.seq_prev_type,
+		        (context->scene->r.seq_flag & R_SEQ_SOLID_TEX) != 0,
+		        use_gpencil, true, scene->r.alphamode,
+		        context->gpu_samples, viewname,
+		        context->gpu_offscreen, err_out);
 		if (ibuf == NULL) {
 			fprintf(stderr, "seq_render_scene_strip failed to get opengl buffer: %s\n", err_out);
 		}
@@ -3408,7 +3428,7 @@ static ImBuf *do_render_strip_uncached(const SeqRenderData *context, Sequence *s
 
 		case SEQ_TYPE_MASK:
 		{
-			/* ibuf is alwats new */
+			/* ibuf is always new */
 			ibuf = seq_render_mask_strip(context, seq, nr);
 
 			copy_to_ibuf_still(context, seq, nr, ibuf);
@@ -3430,7 +3450,7 @@ static ImBuf *seq_render_strip(const SeqRenderData *context, Sequence *seq, floa
 	float nr = give_stripelem_index(seq, cfra);
 	/* all effects are handled similarly with the exception of speed effect */
 	int type = (seq->type & SEQ_TYPE_EFFECT && seq->type != SEQ_TYPE_SPEED) ? SEQ_TYPE_EFFECT : seq->type;
-	bool is_preprocessed = !ELEM(type, SEQ_TYPE_IMAGE, SEQ_TYPE_MOVIE, SEQ_TYPE_SCENE);
+	bool is_preprocessed = !ELEM(type, SEQ_TYPE_IMAGE, SEQ_TYPE_MOVIE, SEQ_TYPE_SCENE, SEQ_TYPE_MOVIECLIP);
 
 	ibuf = BKE_sequencer_cache_get(context, seq, cfra, SEQ_STRIPELEM_IBUF);
 

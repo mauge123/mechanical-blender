@@ -44,6 +44,7 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_armature.h"
 #include "BKE_camera.h"
 #include "BKE_context.h"
 #include "BKE_font.h"
@@ -557,7 +558,7 @@ typedef struct ViewOpsData {
 
 } ViewOpsData;
 
-#define TRACKBALLSIZE  (1.1)
+#define TRACKBALLSIZE  (1.1f)
 
 static void calctrackballvec(const rcti *rect, int mx, int my, float vec[3])
 {
@@ -1027,31 +1028,25 @@ static void viewrotate_apply(ViewOpsData *vod, int x, int y)
 	rv3d->view = RV3D_VIEW_USER; /* need to reset every time because of view snapping */
 
 	if (U.flag & USER_TRACKBALL) {
-		float phi, si, q1[4], dvec[3], newvec[3];
+		float axis[3], q1[4], dvec[3], newvec[3];
+		float angle;
 
 		calctrackballvec(&vod->ar->winrct, x, y, newvec);
 
 		sub_v3_v3v3(dvec, newvec, vod->trackvec);
 
-		si = len_v3(dvec);
-		si /= (float)(2.0 * TRACKBALLSIZE);
-
-		cross_v3_v3v3(q1 + 1, vod->trackvec, newvec);
-		normalize_v3(q1 + 1);
+		angle = (len_v3(dvec) / (2.0f * TRACKBALLSIZE)) * (float)M_PI;
 
 		/* Allow for rotation beyond the interval [-pi, pi] */
-		while (si > 1.0f)
-			si -= 2.0f;
+		angle = angle_wrap_rad(angle);
 
-		/* This relation is used instead of
-		 * - phi = asin(si) so that the angle
-		 * - of rotation is linearly proportional
-		 * - to the distance that the mouse is
-		 * - dragged. */
-		phi = si * (float)M_PI_2;
+		/* This relation is used instead of the actual angle between vectors
+		 * so that the angle of rotation is linearly proportional to
+		 * the distance that the mouse is dragged. */
 
-		q1[0] = cosf(phi);
-		mul_v3_fl(q1 + 1, sinf(phi));
+		cross_v3_v3v3(axis, vod->trackvec, newvec);
+		axis_angle_to_quat(q1, axis, angle);
+
 		mul_qt_qtqt(vod->viewquat, q1, vod->oldquat);
 
 		viewrotate_apply_dyn_ofs(vod, vod->viewquat);
@@ -1475,8 +1470,7 @@ static void view3d_ndof_orbit(const struct wmNDOFMotionData *ndof, ScrArea *sa, 
 
 		/* Perform the up/down rotation */
 		angle = ndof->dt * rot[0];
-		quat[0] = cosf(angle);
-		mul_v3_v3fl(quat + 1, xvec, sinf(angle));
+		axis_angle_to_quat(quat, xvec, angle * 2);
 		mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, quat);
 
 		/* Perform the orbital rotation */
@@ -3042,24 +3036,7 @@ static int viewselected_exec(bContext *C, wmOperator *op)
 		ok = ED_view3d_minmax_verts(obedit, min, max);    /* only selected */
 	}
 	else if (ob && (ob->mode & OB_MODE_POSE)) {
-		if (ob->pose) {
-			bArmature *arm = ob->data;
-			bPoseChannel *pchan;
-			float vec[3];
-
-			for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
-				if (pchan->bone->flag & BONE_SELECTED) {
-					if (pchan->bone->layer & arm->layer) {
-						bPoseChannel *pchan_tx = pchan->custom_tx ? pchan->custom_tx : pchan;
-						ok = 1;
-						mul_v3_m4v3(vec, ob->obmat, pchan_tx->pose_head);
-						minmax_v3v3_v3(min, max, vec);
-						mul_v3_m4v3(vec, ob->obmat, pchan_tx->pose_tail);
-						minmax_v3v3_v3(min, max, vec);
-					}
-				}
-			}
-		}
+		ok = BKE_pose_minmax(ob, min, max, true, true);
 	}
 	else if (BKE_paint_select_face_test(ob)) {
 		ok = paintface_minmax(ob, min, max);
@@ -3785,7 +3762,7 @@ static void axis_set_view(bContext *C, View3D *v3d, ARegion *ar,
 			float twmat[3][3];
 
 			/* same as transform manipulator when normal is set */
-			ED_getTransformOrientationMatrix(C, twmat, true);
+			ED_getTransformOrientationMatrix(C, twmat, V3D_ACTIVE);
 
 			mat3_to_quat(obact_quat, twmat);
 			invert_qt(obact_quat);

@@ -42,6 +42,7 @@
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
+#include "BKE_image.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
@@ -1562,8 +1563,8 @@ bool ED_screen_set(bContext *C, bScreen *sc)
 		}
 
 		/* Always do visible update since it's possible new screen will
-		 * have different layers visible in 3D viewpots. This is possible
-		 * because of view3d.lock_camera_and_layers option.
+		 * have different layers visible in 3D view-ports.
+		 * This is possible because of view3d.lock_camera_and_layers option.
 		 */
 		DAG_on_visible_update(bmain, false);
 	}
@@ -1791,6 +1792,8 @@ ScrArea *ED_screen_full_newspace(bContext *C, ScrArea *sa, int type)
  */
 void ED_screen_full_prevspace(bContext *C, ScrArea *sa, const bool was_prev_temp)
 {
+	BLI_assert(sa->full);
+
 	if (sa->flag & AREA_FLAG_STACKED_FULLSCREEN) {
 		/* stacked fullscreen -> only go back to previous screen and don't toggle out of fullscreen */
 		ED_area_prevspace(C, sa);
@@ -2193,7 +2196,7 @@ bool ED_screen_stereo3d_required(bScreen *screen)
 				/* images should always show in stereo, even if
 				 * the file doesn't have views enabled */
 				sima = sa->spacedata.first;
-				if (sima->image && (sima->image->flag & IMA_IS_STEREO) &&
+				if (sima->image && BKE_image_is_stereo(sima->image) &&
 				    (sima->iuser.flag & IMA_SHOW_STEREO))
 				{
 					return true;
