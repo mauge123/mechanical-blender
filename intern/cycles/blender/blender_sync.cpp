@@ -161,7 +161,12 @@ void BlenderSync::sync_data(BL::RenderSettings b_render,
 
 	mesh_synced.clear(); /* use for objects and motion sync */
 
-	sync_objects(b_v3d);
+	if(scene->need_motion() == Scene::MOTION_PASS ||
+	   scene->need_motion() == Scene::MOTION_NONE ||
+	   scene->camera->motion_position == Camera::MOTION_POSITION_CENTER)
+	{
+		sync_objects(b_v3d);
+	}
 	sync_motion(b_render,
 	            b_v3d,
 	            b_override,
@@ -427,7 +432,6 @@ SceneParams BlenderSync::get_scene_params(BL::Scene b_scene, bool background, bo
 		params.bvh_type = (SceneParams::BVHType)RNA_enum_get(&cscene, "debug_bvh_type");
 
 	params.use_bvh_spatial_split = RNA_boolean_get(&cscene, "debug_use_spatial_splits");
-	params.use_bvh_cache = (background)? RNA_boolean_get(&cscene, "use_cache"): false;
 
 	if(background && params.shadingsystem != SHADINGSYSTEM_OSL)
 		params.persistent_data = r.use_persistent_data();

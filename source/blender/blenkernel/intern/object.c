@@ -467,7 +467,7 @@ void BKE_object_free(Object *ob)
 	BKE_object_free_ex(ob, true);
 }
 
-static void unlink_object__unlinkModifierLinks(void *userData, Object *ob, Object **obpoin)
+static void unlink_object__unlinkModifierLinks(void *userData, Object *ob, Object **obpoin, int UNUSED(cd_flag))
 {
 	Object *unlinkOb = userData;
 
@@ -1041,6 +1041,7 @@ Object *BKE_object_add_only_object(Main *bmain, int type, const char *name)
 	ob->step_height = 0.15f;
 	ob->jump_speed = 10.0f;
 	ob->fall_speed = 55.0f;
+	ob->max_jumps = 1;
 	ob->col_group = 0x01;
 	ob->col_mask = 0xffff;
 	ob->preview = NULL;
@@ -1574,8 +1575,7 @@ Object *BKE_object_copy(Object *ob)
 }
 
 static void extern_local_object__modifiersForeachIDLink(
-        void *UNUSED(userData), Object *UNUSED(ob),
-        ID **idpoin)
+        void *UNUSED(userData), Object *UNUSED(ob), ID **idpoin, int UNUSED(cd_flag))
 {
 	if (*idpoin) {
 		/* intentionally omit ID_OB */
@@ -1950,9 +1950,15 @@ void BKE_object_mat3_to_rot(Object *ob, float mat[3][3], bool use_compat)
 		}
 		case ROT_MODE_AXISANGLE:
 		{
-			mat3_to_axis_angle(ob->rotAxis, &ob->rotAngle, mat);
-			sub_v3_v3(ob->rotAxis, ob->drotAxis);
-			ob->rotAngle -= ob->drotAngle;
+			float quat[4];
+			float dquat[4];
+
+			/* without drot we could apply 'mat' directly */
+			mat3_to_quat(quat, mat);
+			axis_angle_to_quat(dquat, ob->drotAxis, ob->drotAngle);
+			invert_qt(dquat);
+			mul_qt_qtqt(quat, dquat, quat);
+			quat_to_axis_angle(ob->rotAxis, &ob->rotAngle, quat);
 			break;
 		}
 		default: /* euler */
@@ -2655,6 +2661,76 @@ void BKE_boundbox_calc_size_aabb(const BoundBox *bb, float r_size[3])
 	r_size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
 }
 
+void BKE_boundbox_minmax(const BoundBox *bb, float obmat[4][4], float r_min[3], float r_max[3])
+{
+	int i;
+	for (i = 0; i < 8; i++) {
+		float vec[3];
+		mul_v3_m4v3(vec, obmat, bb->vec[i]);
+		minmax_v3v3_v3(r_min, r_max, vec);
+	}
+}
+
+/**
+ * Returns a BBox which each dimensions are at least epsilon.
+ * \note In case a given dimension needs to be enlarged, its final value will be in [epsilon, 3 * epsilon] range.
+ *
+ * \param bb the input bbox to check.
+ * \param bb_temp the temp bbox to modify (\a bb content is never changed).
+ * \param epsilon the minimum dimension to ensure.
+ * \return either bb (if nothing needed to be changed) or bb_temp.
+ */
+BoundBox *BKE_boundbox_ensure_minimum_dimensions(BoundBox *bb, BoundBox *bb_temp, const float epsilon)
+{
+	if (fabsf(bb->vec[0][0] - bb->vec[4][0]) < epsilon) {
+		/* Flat along X axis... */
+		*bb_temp = *bb;
+		bb = bb_temp;
+		bb->vec[0][0] -= epsilon;
+		bb->vec[1][0] -= epsilon;
+		bb->vec[2][0] -= epsilon;
+		bb->vec[3][0] -= epsilon;
+		bb->vec[4][0] += epsilon;
+		bb->vec[5][0] += epsilon;
+		bb->vec[6][0] += epsilon;
+		bb->vec[7][0] += epsilon;
+	}
+
+	if (fabsf(bb->vec[0][1] - bb->vec[3][1]) < epsilon) {
+		/* Flat along Y axis... */
+		if (bb != bb_temp) {
+			*bb_temp = *bb;
+			bb = bb_temp;
+		}
+		bb->vec[0][1] -= epsilon;
+		bb->vec[1][1] -= epsilon;
+		bb->vec[4][1] -= epsilon;
+		bb->vec[5][1] -= epsilon;
+		bb->vec[2][1] += epsilon;
+		bb->vec[3][1] += epsilon;
+		bb->vec[6][1] += epsilon;
+		bb->vec[7][1] += epsilon;
+	}
+
+	if (fabsf(bb->vec[0][2] - bb->vec[1][2]) < epsilon) {
+		/* Flat along Z axis... */
+		if (bb != bb_temp) {
+			*bb_temp = *bb;
+			bb = bb_temp;
+		}
+		bb->vec[0][2] -= epsilon;
+		bb->vec[3][2] -= epsilon;
+		bb->vec[4][2] -= epsilon;
+		bb->vec[7][2] -= epsilon;
+		bb->vec[1][2] += epsilon;
+		bb->vec[2][2] += epsilon;
+		bb->vec[5][2] += epsilon;
+		bb->vec[6][2] += epsilon;
+	}
+
+	return bb;
+}
+
 BoundBox *BKE_object_boundbox_get(Object *ob)
 {
 	BoundBox *bb = NULL;
@@ -2730,7 +2806,6 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
 {
 	BoundBox bb;
 	float vec[3];
-	int a;
 	bool changed = false;
 	
 	switch (ob->type) {
@@ -2739,11 +2814,7 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
 		case OB_SURF:
 		{
 			bb = *BKE_curve_boundbox_get(ob);
-
-			for (a = 0; a < 8; a++) {
-				mul_m4_v3(ob->obmat, bb.vec[a]);
-				minmax_v3v3_v3(min_r, max_r, bb.vec[a]);
-			}
+			BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
 			changed = true;
 			break;
 		}
@@ -2766,23 +2837,7 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
 		}
 		case OB_ARMATURE:
 		{
-			if (ob->pose) {
-				bArmature *arm = ob->data;
-				bPoseChannel *pchan;
-
-				for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
-					/* XXX pchan->bone may be NULL for duplicated bones, see duplicateEditBoneObjects() comment
-					 *     (editarmature.c:2592)... Skip in this case too! */
-					if (pchan->bone && !((use_hidden == false) && (PBONE_VISIBLE(arm, pchan->bone) == false))) {
-						mul_v3_m4v3(vec, ob->obmat, pchan->pose_head);
-						minmax_v3v3_v3(min_r, max_r, vec);
-						mul_v3_m4v3(vec, ob->obmat, pchan->pose_tail);
-						minmax_v3v3_v3(min_r, max_r, vec);
-
-						changed = true;
-					}
-				}
-			}
+			changed = BKE_pose_minmax(ob, min_r, max_r, use_hidden, false);
 			break;
 		}
 		case OB_MESH:
@@ -2791,11 +2846,7 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
 
 			if (me) {
 				bb = *BKE_mesh_boundbox_get(ob);
-
-				for (a = 0; a < 8; a++) {
-					mul_m4_v3(ob->obmat, bb.vec[a]);
-					minmax_v3v3_v3(min_r, max_r, bb.vec[a]);
-				}
+				BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
 				changed = true;
 			}
 			break;
@@ -3669,38 +3720,6 @@ bool BKE_object_is_animated(Scene *scene, Object *ob)
 			return true;
 		}
 	return false;
-}
-
-static void copy_object__forwardModifierLinks(void *UNUSED(userData), Object *UNUSED(ob), ID **idpoin)
-{
-	/* this is copied from ID_NEW; it might be better to have a macro */
-	if (*idpoin && (*idpoin)->newid) *idpoin = (*idpoin)->newid;
-}
-
-void BKE_object_relink(Object *ob)
-{
-	if (ob->id.lib)
-		return;
-
-	BKE_constraints_relink(&ob->constraints);
-	if (ob->pose) {
-		bPoseChannel *chan;
-		for (chan = ob->pose->chanbase.first; chan; chan = chan->next) {
-			BKE_constraints_relink(&chan->constraints);
-		}
-	}
-	modifiers_foreachIDLink(ob, copy_object__forwardModifierLinks, NULL);
-
-	if (ob->adt)
-		BKE_animdata_relink(ob->adt);
-	
-	if (ob->rigidbody_constraint)
-		BKE_rigidbody_relink_constraint(ob->rigidbody_constraint);
-
-	ID_NEW(ob->parent);
-
-	ID_NEW(ob->proxy);
-	ID_NEW(ob->proxy_group);
 }
 
 MovieClip *BKE_object_movieclip_get(Scene *scene, Object *ob, bool use_default)

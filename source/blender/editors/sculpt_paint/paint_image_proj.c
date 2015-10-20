@@ -298,6 +298,7 @@ typedef struct ProjPaintState {
 	float cloneOffset[2];
 
 	float projectMat[4][4];     /* Projection matrix, use for getting screen coords */
+	float projectMatInv[4][4];  /* inverse of projectMat */
 	float viewDir[3];           /* View vector, use for do_backfacecull and for ray casting with an ortho viewport  */
 	float viewPos[3];           /* View location in object relative 3D space, so can compare to verts  */
 	float clipsta, clipend;
@@ -1244,6 +1245,55 @@ static void screen_px_from_persp(
 
 	/* do interpolation based on projected weight */
 	interp_v3_v3v3v3(pixelScreenCo, v1co, v2co, v3co, w_int);
+}
+
+
+/**
+ * Set a direction vector based on a screen location.
+ * (use for perspective view, else we can simply use `ps->viewDir`)
+ *
+ * Similar functionality to #ED_view3d_win_to_vector
+ *
+ * \param r_dir: Resulting direction (length is undefined).
+ */
+static void screen_px_to_vector_persp(
+        int winx, int winy, const float projmat_inv[4][4], const float view_pos[3],
+        const float co_px[2],
+        float r_dir[3])
+{
+	r_dir[0] = 2.0f * (co_px[0] / winx) - 1.0f;
+	r_dir[1] = 2.0f * (co_px[1] / winy) - 1.0f;
+	r_dir[2] = -0.5f;
+	mul_project_m4_v3((float(*)[4])projmat_inv, r_dir);
+	sub_v3_v3(r_dir, view_pos);
+}
+
+/**
+ * Special function to return the factor to a point along a line in pixel space.
+ *
+ * This is needed since we can't use #line_point_factor_v2 for perspective screen-space coords.
+ *
+ * \param p: 2D screen-space location.
+ * \param v1, v2: 3D object-space locations.
+ */
+static float screen_px_line_point_factor_v2_persp(
+        const ProjPaintState *ps,
+        const float p[2],
+        const float v1[3], const float v2[3])
+{
+	const float zero[3] = {0};
+	float v1_proj[3], v2_proj[3];
+	float dir[3];
+
+	screen_px_to_vector_persp(ps->winx, ps->winy, ps->projectMatInv, ps->viewPos, p, dir);
+
+	sub_v3_v3v3(v1_proj, v1, ps->viewPos);
+	sub_v3_v3v3(v2_proj, v2, ps->viewPos);
+
+	project_plane_v3_v3v3(v1_proj, v1_proj, dir);
+	project_plane_v3_v3v3(v2_proj, v2_proj, dir);
+
+	return line_point_factor_v2(zero, v1_proj, v2_proj);
 }
 
 
@@ -2680,8 +2730,15 @@ static void project_paint_face_init(
 				    line_clip_rect2f(clip_rect, bucket_bounds, vCoSS[fidx1], vCoSS[fidx2], bucket_clip_edges[0], bucket_clip_edges[1]))
 				{
 					if (len_squared_v2v2(vCoSS[fidx1], vCoSS[fidx2]) > FLT_EPSILON) { /* avoid div by zero */
-						fac1 = line_point_factor_v2(bucket_clip_edges[0], vCoSS[fidx1], vCoSS[fidx2]);
-						fac2 = line_point_factor_v2(bucket_clip_edges[1], vCoSS[fidx1], vCoSS[fidx2]);
+
+						if (is_ortho) {
+							fac1 = line_point_factor_v2(bucket_clip_edges[0], vCoSS[fidx1], vCoSS[fidx2]);
+							fac2 = line_point_factor_v2(bucket_clip_edges[1], vCoSS[fidx1], vCoSS[fidx2]);
+						}
+						else {
+							fac1 = screen_px_line_point_factor_v2_persp(ps, bucket_clip_edges[0], vCo[fidx1], vCo[fidx2]);
+							fac2 = screen_px_line_point_factor_v2_persp(ps, bucket_clip_edges[1], vCo[fidx1], vCo[fidx2]);
+						}
 
 						interp_v2_v2v2(seam_subsection[0], lt_uv_pxoffset[fidx1], lt_uv_pxoffset[fidx2], fac1);
 						interp_v2_v2v2(seam_subsection[1], lt_uv_pxoffset[fidx1], lt_uv_pxoffset[fidx2], fac2);
@@ -2695,7 +2752,7 @@ static void project_paint_face_init(
 						interp_v3_v3v3(edge_verts_inset_clip[1], insetCos[fidx1], insetCos[fidx2], fac2);
 
 
-						if (pixel_bounds_uv(seam_subsection, &bounds_px, ibuf->x, ibuf->y)) {
+						if (pixel_bounds_uv((const float (*)[2])seam_subsection, &bounds_px, ibuf->x, ibuf->y)) {
 							/* bounds between the seam rect and the uvspace bucket pixels */
 
 							has_isect = 0;
@@ -3104,6 +3161,7 @@ static void proj_paint_state_viewport_init(
 		mul_m4_m4m4(ps->projectMat, winmat, vmat);
 	}
 
+	invert_m4_m4(ps->projectMatInv, ps->projectMat);
 
 	/* viewDir - object relative */
 	copy_m3_m4(mat, viewinv);
@@ -4266,7 +4324,7 @@ static void do_projectpaint_soften(ProjPaintState *ps, ProjPixel *projPixel, flo
 		}
 		else {
 			premul_float_to_straight_uchar(rgba_ub, rgba);
-			blend_color_interpolate_byte(rgba_ub, rgba_ub, projPixel->pixel.ch_pt, mask);
+			blend_color_interpolate_byte(rgba_ub, projPixel->pixel.ch_pt, rgba_ub, mask);
 		}
 		BLI_linklist_prepend_arena(softenPixels, (void *)projPixel, softenArena);
 	}
@@ -4474,6 +4532,7 @@ static void *do_projectpaint_thread(void *ph_v)
 								break;
 							}
 							case BRUSH_GRADIENT_RADIAL:
+							default:
 							{
 								f = len_v2(p) / line_len;
 								break;
@@ -5340,7 +5399,10 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	if (w > maxsize) w = maxsize;
 	if (h > maxsize) h = maxsize;
 
-	ibuf = ED_view3d_draw_offscreen_imbuf(scene, CTX_wm_view3d(C), CTX_wm_region(C), w, h, IB_rect, false, R_ALPHAPREMUL, NULL, err_out);
+	ibuf = ED_view3d_draw_offscreen_imbuf(
+	        scene, CTX_wm_view3d(C), CTX_wm_region(C),
+	        w, h, IB_rect, false, R_ALPHAPREMUL, 0, NULL,
+	        NULL, err_out);
 	if (!ibuf) {
 		/* Mostly happens when OpenGL offscreen buffer was failed to create, */
 		/* but could be other reasons. Should be handled in the future. nazgul */
@@ -5354,7 +5416,7 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	IMB_freeImBuf(ibuf);
 
 	if (image) {
-		/* now for the trickyness. store the view projection here!
+		/* now for the trickiness. store the view projection here!
 		 * re-projection will reuse this */
 		View3D *v3d = CTX_wm_view3d(C);
 		RegionView3D *rv3d = CTX_wm_region_view3d(C);

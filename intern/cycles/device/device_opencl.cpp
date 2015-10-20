@@ -313,7 +313,7 @@ void opencl_get_usable_devices(vector<OpenCLPlatformDevice> *usable_devices)
 				continue;
 			}
 			if(!opencl_device_version_check(device_id)) {
-				FIRST_VLOG(2) << "Ignoting device " << device_name
+				FIRST_VLOG(2) << "Ignoring device " << device_name
 				              << " due to old compiler version.";
 				continue;
 			}
@@ -327,8 +327,8 @@ void opencl_get_usable_devices(vector<OpenCLPlatformDevice> *usable_devices)
 				                   &device_type,
 				                   NULL) != CL_SUCCESS)
 				{
-					FIRST_VLOG(2) << "Ignoting device " << device_name
-					              << ", faield to fetch device type.";
+					FIRST_VLOG(2) << "Ignoring device " << device_name
+					              << ", failed to fetch device type.";
 					continue;
 				}
 				FIRST_VLOG(2) << "Adding new device " << device_name << ".";
@@ -339,7 +339,7 @@ void opencl_get_usable_devices(vector<OpenCLPlatformDevice> *usable_devices)
 				                                               device_name));
 			}
 			else {
-				FIRST_VLOG(2) << "Ignoting device " << device_name
+				FIRST_VLOG(2) << "Ignoring device " << device_name
 				              << ", not officially supported yet.";
 			}
 		}
@@ -581,7 +581,7 @@ public:
 	                          ProgramName program_name,
 	                          thread_scoped_lock& slot_locker)
 	{
-		switch (program_name) {
+		switch(program_name) {
 			case OCL_DEV_BASE_PROGRAM:
 				store_something<cl_program>(platform,
 				                            device,
@@ -3690,7 +3690,7 @@ string device_opencl_capabilities(void)
 	APPEND_STRING_INFO(clGetDeviceInfo, id, "\t\t\tDevice " name, what)
 
 	vector<cl_device_id> device_ids;
-	for (cl_uint platform = 0; platform < num_platforms; ++platform) {
+	for(cl_uint platform = 0; platform < num_platforms; ++platform) {
 		cl_platform_id platform_id = platform_ids[platform];
 
 		result += string_printf("Platform #%u\n", platform);
@@ -3715,7 +3715,7 @@ string device_opencl_capabilities(void)
 		                             num_devices,
 		                             &device_ids[0],
 		                             NULL));
-		for (cl_uint device = 0; device < num_devices; ++device) {
+		for(cl_uint device = 0; device < num_devices; ++device) {
 			cl_device_id device_id = device_ids[device];
 
 			result += string_printf("\t\tDevice: #%u\n", device);

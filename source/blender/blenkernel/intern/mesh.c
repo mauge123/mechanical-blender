@@ -2199,8 +2199,9 @@ void BKE_mesh_calc_normals_split(Mesh *mesh)
 	}
 	else {
 		polynors = MEM_mallocN(sizeof(float[3]) * mesh->totpoly, __func__);
-		BKE_mesh_calc_normals_poly(mesh->mvert, mesh->totvert, mesh->mloop, mesh->mpoly, mesh->totloop, mesh->totpoly,
-		                           polynors, false);
+		BKE_mesh_calc_normals_poly(
+		            mesh->mvert, NULL, mesh->totvert,
+		            mesh->mloop, mesh->mpoly, mesh->totloop, mesh->totpoly, polynors, false);
 		free_polynors = true;
 	}
 
@@ -2339,6 +2340,19 @@ Mesh *BKE_mesh_new_from_object(
 			tmpobj = BKE_object_copy_ex(bmain, ob, true);
 			tmpcu = (Curve *)tmpobj->data;
 			tmpcu->id.us--;
+
+			/* Copy cached display list, it might be needed by the stack evaluation.
+			 * Ideally stack should be able to use render-time display list, but doing
+			 * so is quite tricky and not safe so close to the release.
+			 *
+			 * TODO(sergey): Look into more proper solution.
+			 */
+			if (ob->curve_cache != NULL) {
+				if (tmpobj->curve_cache == NULL) {
+					tmpobj->curve_cache = MEM_callocN(sizeof(CurveCache), "CurveCache for curve types");
+				}
+				BKE_displist_copy(&tmpobj->curve_cache->disp, &ob->curve_cache->disp);
+			}
 
 			/* if getting the original caged mesh, delete object modifiers */
 			if (cage)
