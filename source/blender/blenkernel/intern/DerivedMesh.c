@@ -328,21 +328,17 @@ void DM_init(
  * Utility function to initialize a DerivedMesh for the desired number
  * of vertices, edges and faces, with a layer setup copied from source
  */
-void DM_from_template(
+void DM_from_template_ex(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
-        int numLoops, int numPolys)
+        int numLoops, int numPolys,
+        CustomDataMask mask)
 {
-	CustomData_copy(&source->vertData, &dm->vertData, CD_MASK_DERIVEDMESH,
-	                CD_CALLOC, numVerts);
-	CustomData_copy(&source->edgeData, &dm->edgeData, CD_MASK_DERIVEDMESH,
-	                CD_CALLOC, numEdges);
-	CustomData_copy(&source->faceData, &dm->faceData, CD_MASK_DERIVEDMESH,
-	                CD_CALLOC, numTessFaces);
-	CustomData_copy(&source->loopData, &dm->loopData, CD_MASK_DERIVEDMESH,
-	                CD_CALLOC, numLoops);
-	CustomData_copy(&source->polyData, &dm->polyData, CD_MASK_DERIVEDMESH,
-	                CD_CALLOC, numPolys);
+	CustomData_copy(&source->vertData, &dm->vertData, mask, CD_CALLOC, numVerts);
+	CustomData_copy(&source->edgeData, &dm->edgeData, mask, CD_CALLOC, numEdges);
+	CustomData_copy(&source->faceData, &dm->faceData, mask, CD_CALLOC, numTessFaces);
+	CustomData_copy(&source->loopData, &dm->loopData, mask, CD_CALLOC, numLoops);
+	CustomData_copy(&source->polyData, &dm->polyData, mask, CD_CALLOC, numPolys);
 
 	dm->cd_flag = source->cd_flag;
 
@@ -357,6 +353,17 @@ void DM_from_template(
 
 	dm->needsFree = 1;
 	dm->dirty = 0;
+}
+void DM_from_template(
+        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
+        int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys)
+{
+	DM_from_template_ex(
+	        dm, source, type,
+	        numVerts, numEdges, numTessFaces,
+	        numLoops, numPolys,
+	        CD_MASK_DERIVEDMESH);
 }
 
 int DM_release(DerivedMesh *dm)
@@ -593,8 +600,6 @@ void DM_generate_tangent_tessface_data(DerivedMesh *dm, bool generate)
 	if (!polyindex)
 		return;
 
-	CustomData_from_bmeshpoly(fdata, pdata, ldata, totface);
-
 	if (generate) {
 		for (i = 0; i < ldata->totlayer; i++) {
 			if (ldata->layers[i].type == CD_TANGENT)
@@ -602,6 +607,8 @@ void DM_generate_tangent_tessface_data(DerivedMesh *dm, bool generate)
 		}
 		CustomData_bmesh_update_active_layers(fdata, pdata, ldata);
 	}
+
+	BLI_assert(CustomData_from_bmeshpoly_test(fdata, pdata, ldata, true));
 
 	loopindex = MEM_mallocN(sizeof(*loopindex) * totface, __func__);
 
@@ -1554,8 +1561,8 @@ void DM_update_weight_mcol(
 			ml = mloop + mp->loopstart;
 
 			for (j = 0; j < mp->totloop; j++, ml++, l_index++) {
-				copy_v4_v4_char((char *)&wtcol_l[l_index],
-				                (char *)&wtcol_v[ml->v]);
+				copy_v4_v4_uchar(&wtcol_l[l_index][0],
+				                 &wtcol_v[ml->v][0]);
 			}
 		}
 		MEM_freeN(wtcol_v);
@@ -2536,7 +2543,7 @@ static void editbmesh_calc_modifiers(
 #ifdef WITH_OPENSUBDIV
 /* The idea is to skip CPU-side ORCO calculation when
  * we'll be using GPU backend of OpenSubdiv. This is so
- * playback performance is kept as high as posssible.
+ * playback performance is kept as high as possible.
  */
 static bool calc_modifiers_skip_orco(const Object *ob)
 {
@@ -2619,13 +2626,13 @@ static CustomDataMask object_get_datamask(const Scene *scene, Object *ob, bool *
 {
 	Object *actob = scene->basact ? scene->basact->object : NULL;
 	CustomDataMask mask = ob->customdata_mask;
-	bool editing = BKE_paint_select_face_test(ob);
 
 	if (r_need_mapping) {
 		*r_need_mapping = false;
 	}
 
 	if (ob == actob) {
+		bool editing = BKE_paint_select_face_test(ob);
 
 		/* weight paint and face select need original indices because of selection buffer drawing */
 		if (r_need_mapping) {
@@ -3052,7 +3059,7 @@ static void GetNormal(const SMikkTSpaceContext *pContext, float r_no[3], const i
 		}
 	}
 	else {
-		const short *no = pMesh->mvert[pMesh->mloop[lt->tri[0]].v].no;
+		const short *no = pMesh->mvert[pMesh->mloop[lt->tri[vert_index]].v].no;
 		normal_short_to_float_v3(r_no, no);
 	}
 }
@@ -3446,7 +3453,7 @@ void DM_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert,
 
 		if (attribs->mcol[b].array) {
 			const MLoopCol *cp = &attribs->mcol[b].array[loop];
-			copy_v4_v4_char((char *)col, &cp->r);
+			copy_v4_v4_uchar(col, &cp->r);
 		}
 		else {
 			col[0] = 0; col[1] = 0; col[2] = 0; col[3] = 0;

@@ -368,9 +368,11 @@ static void ui_block_bounds_calc_popup(
         wmWindow *window, uiBlock *block,
         eBlockBoundsCalc bounds_calc, const int xy[2])
 {
-	int startx, starty, endx, endy, width, height, oldwidth, oldheight;
+	int width, height, oldwidth, oldheight;
 	int oldbounds, xmax, ymax;
 	const int margin = UI_SCREEN_MARGIN;
+	rcti rect, rect_bounds;
+	int ofs_dummy[2];
 
 	oldbounds = block->bounds;
 
@@ -405,27 +407,18 @@ static void ui_block_bounds_calc_popup(
 
 	/* offset block based on mouse position, user offset is scaled
 	 * along in case we resized the block in ui_block_bounds_calc_text */
-	startx = xy[0] + block->rect.xmin + (block->mx * width) / oldwidth;
-	starty = xy[1] + block->rect.ymin + (block->my * height) / oldheight;
+	rect.xmin = xy[0] + block->rect.xmin + (block->mx * width) / oldwidth;
+	rect.ymin = xy[1] + block->rect.ymin + (block->my * height) / oldheight;
+	rect.xmax = rect.xmin + width;
+	rect.ymax = rect.ymin + height;
 
-	if (startx < margin)
-		startx = margin;
-	if (starty < margin)
-		starty = margin;
+	rect_bounds.xmin = margin;
+	rect_bounds.ymin = margin;
+	rect_bounds.xmax = xmax - margin;
+	rect_bounds.ymax = ymax - UI_POPUP_MENU_TOP;
 
-	endx = startx + width;
-	endy = starty + height;
-
-	if (endx > xmax) {
-		endx = xmax - margin;
-		startx = endx - width;
-	}
-	if (endy > ymax - margin) {
-		endy = ymax - margin;
-		starty = endy - height;
-	}
-
-	ui_block_translate(block, startx - block->rect.xmin, starty - block->rect.ymin);
+	BLI_rcti_clamp(&rect, &rect_bounds, ofs_dummy);
+	ui_block_translate(block, rect.xmin - block->rect.xmin, rect.ymin - block->rect.ymin);
 
 	/* now recompute bounds and safety */
 	ui_block_bounds_calc(block);
@@ -1805,6 +1798,16 @@ bool ui_but_is_rna_valid(uiBut *but)
 	}
 }
 
+/**
+ * Checks if the button supports ctrl+mousewheel cycling
+ */
+bool ui_but_supports_cycling(const uiBut *but)
+{
+	return ((ELEM(but->type, UI_BTYPE_ROW, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER, UI_BTYPE_LISTBOX)) ||
+	        (but->type == UI_BTYPE_MENU && ui_but_menu_step_poll(but)) ||
+	        (but->type == UI_BTYPE_COLOR && but->a1 != -1));
+}
+
 double ui_but_value_get(uiBut *but)
 {
 	PropertyRNA *prop;
@@ -2077,14 +2080,32 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 static float ui_get_but_step_unit(uiBut *but, float step_default)
 {
 	int unit_type = RNA_SUBTYPE_UNIT_VALUE(UI_but_unit_type_get(but));
-	double step;
-
-	step = bUnit_ClosestScalar(ui_get_but_scale_unit(but, step_default), but->block->unit->system, unit_type);
+	const double step_orig = step_default * UI_PRECISION_FLOAT_SCALE;
+	/* Scaling up 'step_origg ' here is a bit arbitrary, its just giving better scales from user POV */
+	const double scale_step = ui_get_but_scale_unit(but, step_orig * 10);
+	const double step = bUnit_ClosestScalar(scale_step, but->block->unit->system, unit_type);
 
 	/* -1 is an error value */
 	if (step != -1.0) {
+		const double scale_unit = ui_get_but_scale_unit(but, 1.0);
+		const double step_unit = bUnit_ClosestScalar(scale_unit, but->block->unit->system, unit_type);
+		double step_final;
+
 		BLI_assert(step > 0.0);
-		return (float)(step / ui_get_but_scale_unit(but, 1.0));
+
+		step_final = (step / scale_unit) / (double)UI_PRECISION_FLOAT_SCALE;
+
+		if (step == step_unit) {
+			/* Logic here is to scale by the original 'step_orig'
+			 * only when the unit step matches the scaled step.
+			 *
+			 * This is needed for units that don't have a wide range of scales (degrees for eg.).
+			 * Without this we can't select between a single degree, or a 10th of a degree.
+			 */
+			step_final *= step_orig;
+		}
+
+		return (float)step_final;
 	}
 	else {
 		return step_default;
@@ -2128,8 +2149,14 @@ void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int 
 			str[0] = '\0';
 		}
 		else if (buf && buf != str) {
+			BLI_assert(maxlen <= buf_len + 1);
 			/* string was too long, we have to truncate */
-			memcpy(str, buf, MIN2(maxlen, (size_t)(buf_len + 1)));
+			if (ui_but_is_utf8(but)) {
+				BLI_strncpy_utf8(str, buf, maxlen);
+			}
+			else {
+				BLI_strncpy(str, buf, maxlen);
+			}
 			MEM_freeN((void *)buf);
 		}
 	}
@@ -3111,6 +3138,20 @@ void ui_block_cm_to_scene_linear_v3(uiBlock *block, float pixel[3])
 	struct ColorManagedDisplay *display = ui_block_cm_display_get(block);
 
 	IMB_colormanagement_display_to_scene_linear_v3(pixel, display);
+}
+
+void ui_block_cm_to_display_space_range(uiBlock *block, float *min, float *max)
+{
+	struct ColorManagedDisplay *display = ui_block_cm_display_get(block);
+	float pixel[3];
+
+	copy_v3_fl(pixel, *min);
+	IMB_colormanagement_scene_linear_to_display_v3(pixel, display);
+	*min = min_fff(UNPACK3(pixel));
+
+	copy_v3_fl(pixel, *max);
+	IMB_colormanagement_scene_linear_to_display_v3(pixel, display);
+	*max = max_fff(UNPACK3(pixel));
 }
 
 /**

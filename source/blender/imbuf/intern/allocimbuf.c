@@ -62,6 +62,30 @@ void imb_refcounter_lock_exit(void)
 	BLI_spin_end(&refcounter_spin);
 }
 
+#ifdef WIN32
+static SpinLock mmap_spin;
+
+void imb_mmap_lock_init(void)
+{
+	BLI_spin_init(&mmap_spin);
+}
+
+void imb_mmap_lock_exit(void)
+{
+	BLI_spin_end(&mmap_spin);
+}
+
+void imb_mmap_lock(void)
+{
+	BLI_spin_lock(&mmap_spin);
+}
+
+void imb_mmap_unlock(void)
+{
+	BLI_spin_unlock(&mmap_spin);
+}
+#endif
+
 void imb_freemipmapImBuf(ImBuf *ibuf)
 {
 	int a;
@@ -128,6 +152,13 @@ void imb_freetilesImBuf(ImBuf *ibuf)
 	ibuf->mall &= ~IB_tiles;
 }
 
+static void imb_free_bitmap_font(ImBuf *ibuf)
+{
+	if (ibuf->userdata && (ibuf->userflags & IB_BITMAPFONT)) {
+		MEM_freeN(ibuf->userdata);
+	}
+}
+
 static void freeencodedbufferImBuf(ImBuf *ibuf)
 {
 	if (ibuf == NULL) return;
@@ -181,6 +212,7 @@ void IMB_freeImBuf(ImBuf *ibuf)
 			imb_freerectImBuf(ibuf);
 			imb_freerectfloatImBuf(ibuf);
 			imb_freetilesImBuf(ibuf);
+			imb_free_bitmap_font(ibuf);
 			IMB_freezbufImBuf(ibuf);
 			IMB_freezbuffloatImBuf(ibuf);
 			freeencodedbufferImBuf(ibuf);

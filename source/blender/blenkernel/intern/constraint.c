@@ -447,7 +447,7 @@ static void contarget_get_mesh_mat(Object *ob, const char *substring, float mat[
 			copy_v3_v3(plane, tmat[1]);
 			
 			cross_v3_v3v3(mat[0], normal, plane);
-			if (len_v3(mat[0]) < 1e-3f) {
+			if (len_squared_v3(mat[0]) < SQUARE(1e-3f)) {
 				copy_v3_v3(plane, tmat[0]);
 				cross_v3_v3v3(mat[0], normal, plane);
 			}
@@ -4882,11 +4882,12 @@ void BKE_constraints_solve(ListBase *conlist, bConstraintOb *cob, float ctime)
 		 *    since some constraints may not convert the solution back to the input space before blending
 		 *    but all are guaranteed to end up in good "worldspace" result
 		 */
-		/* Note: all kind of stuff here before (caused trouble), much easier to just interpolate, or did I miss something? -jahka (r.32105) */
+		/* Note: all kind of stuff here before (caused trouble), much easier to just interpolate,
+		 * or did I miss something? -jahka (r.32105) */
 		if (enf < 1.0f) {
 			float solution[4][4];
 			copy_m4_m4(solution, cob->matrix);
-			blend_m4_m4m4(cob->matrix, oldmat, solution, enf);
+			interp_m4_m4m4(cob->matrix, oldmat, solution, enf);
 		}
 	}
 }

@@ -494,7 +494,7 @@ static void applyAxisConstraintRot(TransInfo *t, TransData *td, float vec[3], fl
 
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
 void applyRotateUsingResult(TransInfo *t, TransData *td, float axis[3], float *UNUSED(angle)) {
-	float v1[3]={}, v2[3]={};
+	float v1[3]={0}, v2[3]={0};
 	if (!td && t->con.mode & CON_APPLY) {
 		if ((t->con.mode & CON_ROTATE_USE_RESULT) && validSnap(t)) {
 			sub_v3_v3v3(v1,t->center_global, t->tsnap.snapTarget);
@@ -869,21 +869,15 @@ void getConstraintMatrix(TransInfo *t)
 	unit_m3(t->con.pmtx);
 
 	if (!(t->con.mode & CON_AXIS0)) {
-		t->con.pmtx[0][0]       =
-		    t->con.pmtx[0][1]   =
-		    t->con.pmtx[0][2]   = 0.0f;
+		zero_v3(t->con.pmtx[0]);
 	}
 
 	if (!(t->con.mode & CON_AXIS1)) {
-		t->con.pmtx[1][0]       =
-		    t->con.pmtx[1][1]   =
-		    t->con.pmtx[1][2]   = 0.0f;
+		zero_v3(t->con.pmtx[1]);
 	}
 
 	if (!(t->con.mode & CON_AXIS2)) {
-		t->con.pmtx[2][0]       =
-		    t->con.pmtx[2][1]   =
-		    t->con.pmtx[2][2]   = 0.0f;
+		zero_v3(t->con.pmtx[2]);
 	}
 
 	mul_m3_m3m3(mat, t->con.pmtx, t->con.imtx);

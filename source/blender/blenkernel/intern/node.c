@@ -818,6 +818,10 @@ void nodeChainIter(
 	bNodeLink *link;
 
 	for (link = ntree->links.first; link; link = link->next) {
+		if ((link->flag & NODE_LINK_VALID) == 0) {
+			/* Skip links marked as cyclic. */
+			continue;
+		}
 		if (link->tonode && link->fromnode) {
 			/* is the link part of the chain meaning node_start == fromnode (or tonode for reversed case)? */
 			if ((reversed && (link->tonode == node_start)) ||
@@ -1145,6 +1149,11 @@ void nodeDetachNode(struct bNode *node)
 		node->locy = locy;
 		node->parent = NULL;
 	}
+}
+
+void ntreeInitDefault(bNodeTree *ntree)
+{
+	ntree_set_typeinfo(ntree, NULL);
 }
 
 bNodeTree *ntreeAddTree(Main *bmain, const char *name, const char *idname)
