@@ -172,7 +172,7 @@ struct ListBase;
 typedef enum SnapMode {
 	SNAP_ALL = 0,
 	SNAP_NOT_SELECTED = 1,
-	SNAP_NOT_OBEDIT = 2,
+	SNAP_NOT_OBEDIT = 2
 } SnapMode;
 
 #define SNAP_MIN_DISTANCE 30
