@@ -2336,6 +2336,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
+	RNA_boolean_set(op->ptr, "snap",(t->modifiers & MOD_SNAP) != 0);
 #endif
 }
 
@@ -2505,7 +2506,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	}
 
 	if (RNA_boolean_get(op->ptr, "transform_multiple")) {
-		/*Remove value as is set execs the transform according to it*/
+		/* Remove value as is set execs the transform according to it*/
 		if ((prop = RNA_struct_find_property(op->ptr, "value")) && RNA_property_is_set(op->ptr, prop)) {
 			RNA_property_unset(op->ptr,prop);
 		}
@@ -2761,7 +2762,7 @@ int transformEnd(bContext *C, TransInfo *t)
 		}
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-		if (t->state == TRANS_CONFIRM && t->flag & T_TRANSFORM_MULTIPLE) {
+		if (t->state == TRANS_CONFIRM && (t->flag & T_TRANSFORM_MULTIPLE)) {
 			exit_code |= OPERATOR_REPEAT;
 		}
 #endif

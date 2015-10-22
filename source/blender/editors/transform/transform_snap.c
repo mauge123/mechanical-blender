@@ -633,10 +633,21 @@ void initSnapping(TransInfo *t, wmOperator *op)
 				snap_target = RNA_enum_get(op->ptr, "snap_target");
 			}
 			
-			if (RNA_struct_property_is_set(op->ptr, "snap_point")) {
-				RNA_float_get_array(op->ptr, "snap_point", t->tsnap.snapPoint);
-				t->tsnap.status |= SNAP_FORCED | POINT_INIT;
-			}
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+			if (!RNA_boolean_get(op->ptr, "transform_multiple")) {
+				/* Do not set the snap point as it will be set by user */
+				if (RNA_struct_property_is_set(op->ptr, "snap_point")) {
+					RNA_float_get_array(op->ptr, "snap_point", t->tsnap.snapPoint);
+					t->tsnap.status |= SNAP_FORCED | POINT_INIT;
+				}
+		}
+#else
+		if (RNA_struct_property_is_set(op->ptr, "snap_point")) {
+			RNA_float_get_array(op->ptr, "snap_point", t->tsnap.snapPoint);
+			t->tsnap.status |= SNAP_FORCED | POINT_INIT;
+		}
+#endif
+
 			
 			/* snap align only defined in specific cases */
 			if (RNA_struct_find_property(op->ptr, "snap_align")) {
