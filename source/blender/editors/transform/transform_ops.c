@@ -455,7 +455,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 
 	if (!exit_code) {
 		exit_code |= transformEnd(C, t);
-		if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+		if ((exit_code & (OPERATOR_CANCELLED | OPERATOR_FINISHED))) {
 			transformops_exit(C, op);
 			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 		}
