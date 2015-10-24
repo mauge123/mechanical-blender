@@ -820,6 +820,10 @@ enum {
 	TFM_MODAL_SELECT_CENTER = 32,
 #endif
 
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	TFM_MODAL_NO_MODAL_TRANSFORM = 33,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -858,11 +862,14 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 		{TFM_MODAL_SNAP_ELEMENT_SELECT, "TFM_MODAL_SNAP_ELEMENT_SELECT", 0, "Snap Element Menu", ""},
 		{TFM_MODAL_ROTATE_USE_RESULT_AXIS, "TFM_MODAL_ROTATE_USE_RESULT_AXIS", 0, "Use result axis on rotation", ""},
 #endif
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-	    {TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
-#endif
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
 		{TFM_MODAL_SELECT_CENTER, "TFM_MODAL_SELECT_CENTER",0, "Select transform center"},
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+		{TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
+#endif
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+		{TFM_MODAL_NO_MODAL_TRANSFORM, "TFM_MODAL_NO_MODAL_TRANSFORM", 0, "Exit from modal, allow movements around the scene", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -936,8 +943,12 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 #endif
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-	/* Use the axis resulting on base point and target */
+	/* M is set to multiple */
 	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
+#endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	WM_modalkeymap_add_item(keymap, NKEY, KM_PRESS, 0, 0, TFM_MODAL_NO_MODAL_TRANSFORM);
 #endif
 
 	return keymap;
@@ -1263,6 +1274,12 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				handled = true;
 				break;
 #endif
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+			case TFM_MODAL_NO_MODAL_TRANSFORM:
+				t->flag ^= T_TRANSFORM_NO_MODAL;
+				handled = true;
+				break;
+#endif
 			case TFM_MODAL_TRANSLATE:
 				/* only switch when... */
 				if (ELEM(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
@@ -1556,6 +1573,11 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 #endif
 
 			case MIDDLEMOUSE:
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+				if ((t->flag & T_TRANSFORM_NO_MODAL)) {
+					break;
+				}
+#endif
 				if ((t->flag & T_NO_CONSTRAINT) == 0) {
 					/* exception for switching to dolly, or trackball, in camera view */
 					if (t->flag & T_CAMERA) {
@@ -2347,141 +2369,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
 #endif
-}
-
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent* UNUSED(event), int mode) {
-	switch (mode) {
-		case TFM_TRANSLATION:
-			initTranslation(t);
-			break;
-		case TFM_ROTATION:
-			initRotation(t);
-			break;
-		case TFM_RESIZE:
-			initResize(t);
-			break;
-		case TFM_SKIN_RESIZE:
-			initSkinResize(t);
-			break;
-		case TFM_TOSPHERE:
-			initToSphere(t);
-			break;
-		case TFM_SHEAR:
-			initShear(t);
-			break;
-		case TFM_BEND:
-			initBend(t);
-			break;
-		case TFM_SHRINKFATTEN:
-			initShrinkFatten(t);
-			break;
-		case TFM_TILT:
-			initTilt(t);
-			break;
-		case TFM_CURVE_SHRINKFATTEN:
-			initCurveShrinkFatten(t);
-			break;
-		case TFM_MASK_SHRINKFATTEN:
-			initMaskShrinkFatten(t);
-			break;
-		case TFM_GPENCIL_SHRINKFATTEN:
-			initGPShrinkFatten(t);
-			break;
-		case TFM_TRACKBALL:
-			initTrackball(t);
-			break;
-		case TFM_PUSHPULL:
-			initPushPull(t);
-			break;
-		case TFM_CREASE:
-			initCrease(t);
-			break;
-		case TFM_BONESIZE:
-		{   /* used for both B-Bone width (bonesize) as for deform-dist (envelope) */
-			bArmature *arm = t->poseobj->data;
-			if (arm->drawtype == ARM_ENVELOPE) {
-				initBoneEnvelope(t);
-				t->mode = TFM_BONE_ENVELOPE_DIST;
-			}
-			else {
-				initBoneSize(t);
-			}
-			break;
-		}
-		case TFM_BONE_ENVELOPE:
-			initBoneEnvelope(t);
-			break;
-		case TFM_BONE_ENVELOPE_DIST:
-			initBoneEnvelope(t);
-			t->mode = TFM_BONE_ENVELOPE_DIST;
-			break;
-		case TFM_EDGE_SLIDE:
-		case TFM_VERT_SLIDE:
-		{
-			const bool use_even = (op ? RNA_boolean_get(op->ptr, "use_even") : false);
-			const bool flipped = (op ? RNA_boolean_get(op->ptr, "flipped") : false);
-			const bool use_clamp = (op ? RNA_boolean_get(op->ptr, "use_clamp") : true);
-			if (mode == TFM_EDGE_SLIDE) {
-				const bool use_double_side = (op ? !RNA_boolean_get(op->ptr, "single_side") : true);
-				initEdgeSlide_ex(t, use_double_side, use_even, flipped, use_clamp);
-			}
-			else {
-				initVertSlide_ex(t, use_even, flipped, use_clamp);
-			}
-			break;
-		}
-		case TFM_BONE_ROLL:
-			initBoneRoll(t);
-			break;
-		case TFM_TIME_TRANSLATE:
-			initTimeTranslate(t);
-			break;
-		case TFM_TIME_SLIDE:
-			initTimeSlide(t);
-			break;
-		case TFM_TIME_SCALE:
-			initTimeScale(t);
-			break;
-		case TFM_TIME_DUPLICATE:
-			/* same as TFM_TIME_EXTEND, but we need the mode info for later
-			 * so that duplicate-culling will work properly
-			 */
-			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
-				initTranslation(t);
-			else
-				initTimeTranslate(t);
-			t->mode = mode;
-			break;
-		case TFM_TIME_EXTEND:
-			/* now that transdata has been made, do like for TFM_TIME_TRANSLATE (for most Animation
-			 * Editors because they have only 1D transforms for time values) or TFM_TRANSLATION
-			 * (for Graph/NLA Editors only since they uses 'standard' transforms to get 2D movement)
-			 * depending on which editor this was called from
-			 */
-			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
-				initTranslation(t);
-			else
-				initTimeTranslate(t);
-			break;
-		case TFM_BAKE_TIME:
-			initBakeTime(t);
-			break;
-		case TFM_MIRROR:
-			initMirror(t);
-			break;
-		case TFM_BWEIGHT:
-			initBevelWeight(t);
-			break;
-		case TFM_ALIGN:
-			initAlign(t);
-			break;
-		case TFM_SEQ_SLIDE:
-			initSeqSlide(t);
-			break;
-	}
-}
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	RNA_boolean_set(op->ptr, "transform_no_modal", (t->flag & T_TRANSFORM_NO_MODAL) != 0);
 #endif
+}
 
 /* note: caller needs to free 't' on a 0 return */
 bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *event, int mode)
@@ -2705,8 +2596,148 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	}
 #endif
 
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (RNA_boolean_get(op->ptr, "transform_no_modal")) {
+		t->flag |= T_TRANSFORM_NO_MODAL;
+	}
+#endif
+
 	return 1;
 }
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent* UNUSED(event), int mode) {
+	switch (mode) {
+		case TFM_TRANSLATION:
+			initTranslation(t);
+			break;
+		case TFM_ROTATION:
+			initRotation(t);
+			break;
+		case TFM_RESIZE:
+			initResize(t);
+			break;
+		case TFM_SKIN_RESIZE:
+			initSkinResize(t);
+			break;
+		case TFM_TOSPHERE:
+			initToSphere(t);
+			break;
+		case TFM_SHEAR:
+			initShear(t);
+			break;
+		case TFM_BEND:
+			initBend(t);
+			break;
+		case TFM_SHRINKFATTEN:
+			initShrinkFatten(t);
+			break;
+		case TFM_TILT:
+			initTilt(t);
+			break;
+		case TFM_CURVE_SHRINKFATTEN:
+			initCurveShrinkFatten(t);
+			break;
+		case TFM_MASK_SHRINKFATTEN:
+			initMaskShrinkFatten(t);
+			break;
+		case TFM_GPENCIL_SHRINKFATTEN:
+			initGPShrinkFatten(t);
+			break;
+		case TFM_TRACKBALL:
+			initTrackball(t);
+			break;
+		case TFM_PUSHPULL:
+			initPushPull(t);
+			break;
+		case TFM_CREASE:
+			initCrease(t);
+			break;
+		case TFM_BONESIZE:
+		{   /* used for both B-Bone width (bonesize) as for deform-dist (envelope) */
+			bArmature *arm = t->poseobj->data;
+			if (arm->drawtype == ARM_ENVELOPE) {
+				initBoneEnvelope(t);
+				t->mode = TFM_BONE_ENVELOPE_DIST;
+			}
+			else {
+				initBoneSize(t);
+			}
+			break;
+		}
+		case TFM_BONE_ENVELOPE:
+			initBoneEnvelope(t);
+			break;
+		case TFM_BONE_ENVELOPE_DIST:
+			initBoneEnvelope(t);
+			t->mode = TFM_BONE_ENVELOPE_DIST;
+			break;
+		case TFM_EDGE_SLIDE:
+		case TFM_VERT_SLIDE:
+		{
+			const bool use_even = (op ? RNA_boolean_get(op->ptr, "use_even") : false);
+			const bool flipped = (op ? RNA_boolean_get(op->ptr, "flipped") : false);
+			const bool use_clamp = (op ? RNA_boolean_get(op->ptr, "use_clamp") : true);
+			if (mode == TFM_EDGE_SLIDE) {
+				const bool use_double_side = (op ? !RNA_boolean_get(op->ptr, "single_side") : true);
+				initEdgeSlide_ex(t, use_double_side, use_even, flipped, use_clamp);
+			}
+			else {
+				initVertSlide_ex(t, use_even, flipped, use_clamp);
+			}
+			break;
+		}
+		case TFM_BONE_ROLL:
+			initBoneRoll(t);
+			break;
+		case TFM_TIME_TRANSLATE:
+			initTimeTranslate(t);
+			break;
+		case TFM_TIME_SLIDE:
+			initTimeSlide(t);
+			break;
+		case TFM_TIME_SCALE:
+			initTimeScale(t);
+			break;
+		case TFM_TIME_DUPLICATE:
+			/* same as TFM_TIME_EXTEND, but we need the mode info for later
+			 * so that duplicate-culling will work properly
+			 */
+			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
+				initTranslation(t);
+			else
+				initTimeTranslate(t);
+			t->mode = mode;
+			break;
+		case TFM_TIME_EXTEND:
+			/* now that transdata has been made, do like for TFM_TIME_TRANSLATE (for most Animation
+			 * Editors because they have only 1D transforms for time values) or TFM_TRANSLATION
+			 * (for Graph/NLA Editors only since they uses 'standard' transforms to get 2D movement)
+			 * depending on which editor this was called from
+			 */
+			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
+				initTranslation(t);
+			else
+				initTimeTranslate(t);
+			break;
+		case TFM_BAKE_TIME:
+			initBakeTime(t);
+			break;
+		case TFM_MIRROR:
+			initMirror(t);
+			break;
+		case TFM_BWEIGHT:
+			initBevelWeight(t);
+			break;
+		case TFM_ALIGN:
+			initAlign(t);
+			break;
+		case TFM_SEQ_SLIDE:
+			initSeqSlide(t);
+			break;
+	}
+}
+#endif
 
 void transformApply(bContext *C, TransInfo *t)
 {
@@ -2744,8 +2775,11 @@ static void drawTransformApply(const bContext *C, ARegion *UNUSED(ar), void *arg
 
 int transformEnd(bContext *C, TransInfo *t)
 {
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	int exit_code =  (t->flag & T_TRANSFORM_NO_MODAL)  ? 0 : OPERATOR_RUNNING_MODAL;
+#else
 	int exit_code = OPERATOR_RUNNING_MODAL;
-
+#endif
 	t->context = C;
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT

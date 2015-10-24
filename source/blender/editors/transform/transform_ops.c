@@ -455,7 +455,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 
 	if (!exit_code) {
 		exit_code |= transformEnd(C, t);
-		if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
+		if ((exit_code & (OPERATOR_CANCELLED | OPERATOR_FINISHED))) {
 			transformops_exit(C, op);
 			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 		}
@@ -516,8 +516,11 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	exit_code |= transformEnd(C, t);
 
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL 
+	if ((exit_code & (OPERATOR_CANCELLED | OPERATOR_FINISHED))) {
+#else
 	if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
-
+#endif
 		transformops_exit(C, op);
 		exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 	}
@@ -715,9 +718,15 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 	prop = RNA_def_boolean(ot->srna,"uses_manipulator",false,NULL,NULL);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
+
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
 #endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	RNA_def_boolean(ot->srna, "transform_no_modal", 0, "No Modal", "No Modal Transform");
+#endif
+
 
 }
 
