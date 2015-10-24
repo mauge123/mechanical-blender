@@ -820,6 +820,10 @@ enum {
 	TFM_MODAL_MULTIPLE_TRANSFORM = 32,
 #endif
 
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	TFM_MODAL_NO_MODAL_TRANSFORM = 33,
+#endif
+
 };
 
 /* called in transform_ops.c, on each regeneration of keymaps */
@@ -863,6 +867,9 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 #endif
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 		{TFM_MODAL_MULTIPLE_TRANSFORM, "TFM_MODAL_MULTIPLE_TRANSFORM", 0, "Repeat transform multiple times", ""},
+#endif
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+		{TFM_MODAL_NO_MODAL_TRANSFORM, "TFM_MODAL_NO_MODAL_TRANSFORM", 0, "Exit from modal, allow movements around the scene", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -931,8 +938,12 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 #endif
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-	/* Use the axis resulting on base point and target */
+	/* M is set to multiple */
 	WM_modalkeymap_add_item(keymap, MKEY, KM_PRESS, 0, 0, TFM_MODAL_MULTIPLE_TRANSFORM);
+#endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	WM_modalkeymap_add_item(keymap, NKEY, KM_PRESS, 0, 0, TFM_MODAL_NO_MODAL_TRANSFORM);
 #endif
 
 	return keymap;
@@ -1258,6 +1269,12 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				handled = true;
 				break;
 #endif
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+			case TFM_MODAL_NO_MODAL_TRANSFORM:
+				t->flag ^= T_TRANSFORM_NO_MODAL;
+				handled = true;
+				break;
+#endif
 			case TFM_MODAL_TRANSLATE:
 				/* only switch when... */
 				if (ELEM(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_EDGE_SLIDE, TFM_VERT_SLIDE)) {
@@ -1551,6 +1568,11 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 #endif
 
 			case MIDDLEMOUSE:
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+				if ((t->flag & T_TRANSFORM_NO_MODAL)) {
+					break;
+				}
+#endif
 				if ((t->flag & T_NO_CONSTRAINT) == 0) {
 					/* exception for switching to dolly, or trackball, in camera view */
 					if (t->flag & T_CAMERA) {
@@ -2735,8 +2757,11 @@ static void drawTransformApply(const bContext *C, ARegion *UNUSED(ar), void *arg
 
 int transformEnd(bContext *C, TransInfo *t)
 {
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	int exit_code =  (t->flag & T_TRANSFORM_NO_MODAL)  ? 0 : OPERATOR_RUNNING_MODAL;
+#else
 	int exit_code = OPERATOR_RUNNING_MODAL;
-
+#endif
 	t->context = C;
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
