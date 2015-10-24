@@ -2366,139 +2366,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 #endif
 }
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent* UNUSED(event), int mode) {
-	switch (mode) {
-		case TFM_TRANSLATION:
-			initTranslation(t);
-			break;
-		case TFM_ROTATION:
-			initRotation(t);
-			break;
-		case TFM_RESIZE:
-			initResize(t);
-			break;
-		case TFM_SKIN_RESIZE:
-			initSkinResize(t);
-			break;
-		case TFM_TOSPHERE:
-			initToSphere(t);
-			break;
-		case TFM_SHEAR:
-			initShear(t);
-			break;
-		case TFM_BEND:
-			initBend(t);
-			break;
-		case TFM_SHRINKFATTEN:
-			initShrinkFatten(t);
-			break;
-		case TFM_TILT:
-			initTilt(t);
-			break;
-		case TFM_CURVE_SHRINKFATTEN:
-			initCurveShrinkFatten(t);
-			break;
-		case TFM_MASK_SHRINKFATTEN:
-			initMaskShrinkFatten(t);
-			break;
-		case TFM_GPENCIL_SHRINKFATTEN:
-			initGPShrinkFatten(t);
-			break;
-		case TFM_TRACKBALL:
-			initTrackball(t);
-			break;
-		case TFM_PUSHPULL:
-			initPushPull(t);
-			break;
-		case TFM_CREASE:
-			initCrease(t);
-			break;
-		case TFM_BONESIZE:
-		{   /* used for both B-Bone width (bonesize) as for deform-dist (envelope) */
-			bArmature *arm = t->poseobj->data;
-			if (arm->drawtype == ARM_ENVELOPE) {
-				initBoneEnvelope(t);
-				t->mode = TFM_BONE_ENVELOPE_DIST;
-			}
-			else {
-				initBoneSize(t);
-			}
-			break;
-		}
-		case TFM_BONE_ENVELOPE:
-			initBoneEnvelope(t);
-			break;
-		case TFM_BONE_ENVELOPE_DIST:
-			initBoneEnvelope(t);
-			t->mode = TFM_BONE_ENVELOPE_DIST;
-			break;
-		case TFM_EDGE_SLIDE:
-		case TFM_VERT_SLIDE:
-		{
-			const bool use_even = (op ? RNA_boolean_get(op->ptr, "use_even") : false);
-			const bool flipped = (op ? RNA_boolean_get(op->ptr, "flipped") : false);
-			const bool use_clamp = (op ? RNA_boolean_get(op->ptr, "use_clamp") : true);
-			if (mode == TFM_EDGE_SLIDE) {
-				const bool use_double_side = (op ? !RNA_boolean_get(op->ptr, "single_side") : true);
-				initEdgeSlide_ex(t, use_double_side, use_even, flipped, use_clamp);
-			}
-			else {
-				initVertSlide_ex(t, use_even, flipped, use_clamp);
-			}
-			break;
-		}
-		case TFM_BONE_ROLL:
-			initBoneRoll(t);
-			break;
-		case TFM_TIME_TRANSLATE:
-			initTimeTranslate(t);
-			break;
-		case TFM_TIME_SLIDE:
-			initTimeSlide(t);
-			break;
-		case TFM_TIME_SCALE:
-			initTimeScale(t);
-			break;
-		case TFM_TIME_DUPLICATE:
-			/* same as TFM_TIME_EXTEND, but we need the mode info for later
-			 * so that duplicate-culling will work properly
-			 */
-			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
-				initTranslation(t);
-			else
-				initTimeTranslate(t);
-			t->mode = mode;
-			break;
-		case TFM_TIME_EXTEND:
-			/* now that transdata has been made, do like for TFM_TIME_TRANSLATE (for most Animation
-			 * Editors because they have only 1D transforms for time values) or TFM_TRANSLATION
-			 * (for Graph/NLA Editors only since they uses 'standard' transforms to get 2D movement)
-			 * depending on which editor this was called from
-			 */
-			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
-				initTranslation(t);
-			else
-				initTimeTranslate(t);
-			break;
-		case TFM_BAKE_TIME:
-			initBakeTime(t);
-			break;
-		case TFM_MIRROR:
-			initMirror(t);
-			break;
-		case TFM_BWEIGHT:
-			initBevelWeight(t);
-			break;
-		case TFM_ALIGN:
-			initAlign(t);
-			break;
-		case TFM_SEQ_SLIDE:
-			initSeqSlide(t);
-			break;
-	}
-}
-#endif
+
 
 /* note: caller needs to free 't' on a 0 return */
 bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *event, int mode)
@@ -2730,6 +2598,140 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
 	return 1;
 }
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent* UNUSED(event), int mode) {
+	switch (mode) {
+		case TFM_TRANSLATION:
+			initTranslation(t);
+			break;
+		case TFM_ROTATION:
+			initRotation(t);
+			break;
+		case TFM_RESIZE:
+			initResize(t);
+			break;
+		case TFM_SKIN_RESIZE:
+			initSkinResize(t);
+			break;
+		case TFM_TOSPHERE:
+			initToSphere(t);
+			break;
+		case TFM_SHEAR:
+			initShear(t);
+			break;
+		case TFM_BEND:
+			initBend(t);
+			break;
+		case TFM_SHRINKFATTEN:
+			initShrinkFatten(t);
+			break;
+		case TFM_TILT:
+			initTilt(t);
+			break;
+		case TFM_CURVE_SHRINKFATTEN:
+			initCurveShrinkFatten(t);
+			break;
+		case TFM_MASK_SHRINKFATTEN:
+			initMaskShrinkFatten(t);
+			break;
+		case TFM_GPENCIL_SHRINKFATTEN:
+			initGPShrinkFatten(t);
+			break;
+		case TFM_TRACKBALL:
+			initTrackball(t);
+			break;
+		case TFM_PUSHPULL:
+			initPushPull(t);
+			break;
+		case TFM_CREASE:
+			initCrease(t);
+			break;
+		case TFM_BONESIZE:
+		{   /* used for both B-Bone width (bonesize) as for deform-dist (envelope) */
+			bArmature *arm = t->poseobj->data;
+			if (arm->drawtype == ARM_ENVELOPE) {
+				initBoneEnvelope(t);
+				t->mode = TFM_BONE_ENVELOPE_DIST;
+			}
+			else {
+				initBoneSize(t);
+			}
+			break;
+		}
+		case TFM_BONE_ENVELOPE:
+			initBoneEnvelope(t);
+			break;
+		case TFM_BONE_ENVELOPE_DIST:
+			initBoneEnvelope(t);
+			t->mode = TFM_BONE_ENVELOPE_DIST;
+			break;
+		case TFM_EDGE_SLIDE:
+		case TFM_VERT_SLIDE:
+		{
+			const bool use_even = (op ? RNA_boolean_get(op->ptr, "use_even") : false);
+			const bool flipped = (op ? RNA_boolean_get(op->ptr, "flipped") : false);
+			const bool use_clamp = (op ? RNA_boolean_get(op->ptr, "use_clamp") : true);
+			if (mode == TFM_EDGE_SLIDE) {
+				const bool use_double_side = (op ? !RNA_boolean_get(op->ptr, "single_side") : true);
+				initEdgeSlide_ex(t, use_double_side, use_even, flipped, use_clamp);
+			}
+			else {
+				initVertSlide_ex(t, use_even, flipped, use_clamp);
+			}
+			break;
+		}
+		case TFM_BONE_ROLL:
+			initBoneRoll(t);
+			break;
+		case TFM_TIME_TRANSLATE:
+			initTimeTranslate(t);
+			break;
+		case TFM_TIME_SLIDE:
+			initTimeSlide(t);
+			break;
+		case TFM_TIME_SCALE:
+			initTimeScale(t);
+			break;
+		case TFM_TIME_DUPLICATE:
+			/* same as TFM_TIME_EXTEND, but we need the mode info for later
+			 * so that duplicate-culling will work properly
+			 */
+			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
+				initTranslation(t);
+			else
+				initTimeTranslate(t);
+			t->mode = mode;
+			break;
+		case TFM_TIME_EXTEND:
+			/* now that transdata has been made, do like for TFM_TIME_TRANSLATE (for most Animation
+			 * Editors because they have only 1D transforms for time values) or TFM_TRANSLATION
+			 * (for Graph/NLA Editors only since they uses 'standard' transforms to get 2D movement)
+			 * depending on which editor this was called from
+			 */
+			if (ELEM(t->spacetype, SPACE_IPO, SPACE_NLA))
+				initTranslation(t);
+			else
+				initTimeTranslate(t);
+			break;
+		case TFM_BAKE_TIME:
+			initBakeTime(t);
+			break;
+		case TFM_MIRROR:
+			initMirror(t);
+			break;
+		case TFM_BWEIGHT:
+			initBevelWeight(t);
+			break;
+		case TFM_ALIGN:
+			initAlign(t);
+			break;
+		case TFM_SEQ_SLIDE:
+			initSeqSlide(t);
+			break;
+	}
+}
+#endif
 
 void transformApply(bContext *C, TransInfo *t)
 {
