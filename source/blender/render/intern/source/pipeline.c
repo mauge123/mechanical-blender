@@ -135,7 +135,7 @@ Render R;
 
 /* ********* alloc and free ******** */
 
-static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovieHandle *mh, const size_t totvideos, const char *name_override);
+static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovieHandle *mh, const int totvideos, const char *name_override);
 
 static volatile int g_break = 0;
 static int thread_break(void *UNUSED(arg))
@@ -430,7 +430,7 @@ void RE_ReleaseResultImage(Render *re)
 void RE_ResultGet32(Render *re, unsigned int *rect)
 {
 	RenderResult rres;
-	const size_t view_id = BKE_scene_multiview_view_id_get(&re->r, re->viewname);
+	const int view_id = BKE_scene_multiview_view_id_get(&re->r, re->viewname);
 
 	RE_AcquireResultImageViews(re, &rres);
 	render_result_rect_get_pixels(&rres, rect, re->rectx, re->recty, &re->scene->view_settings, &re->scene->display_settings, view_id);
@@ -2589,7 +2589,7 @@ static void do_render_seq(Render *re)
 	RenderResult *rr; /* don't assign re->result here as it might change during give_ibuf_seq */
 	int cfra = re->r.cfra;
 	SeqRenderData context;
-	size_t view_id, tot_views;
+	int view_id, tot_views;
 	struct ImBuf **ibuf_arr;
 	int re_x, re_y;
 
@@ -3205,7 +3205,7 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 	else if (is_mono || (rd->im_format.views_format == R_IMF_VIEWS_INDIVIDUAL))
 	{
 		RenderView *rv;
-		size_t view_id;
+		int view_id;
 		char filepath[FILE_MAX];
 
 		BLI_strncpy(filepath, name, sizeof(filepath));
@@ -3331,8 +3331,9 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 	return ok;
 }
 
-bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scene, RenderData *rd, bMovieHandle *mh,
-                              const size_t width, const size_t height, void **movie_ctx_arr, const size_t totvideos, bool preview)
+bool RE_WriteRenderViewsMovie(
+        ReportList *reports, RenderResult *rr, Scene *scene, RenderData *rd, bMovieHandle *mh,
+        const size_t width, const size_t height, void **movie_ctx_arr, const int totvideos, bool preview)
 {
 	bool is_mono;
 	bool ok = true;
@@ -3343,7 +3344,7 @@ bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scen
 	is_mono = BLI_listbase_count_ex(&rr->views, 2) < 2;
 
 	if (is_mono || (scene->r.im_format.views_format == R_IMF_VIEWS_INDIVIDUAL)) {
-		size_t view_id;
+		int view_id;
 		for (view_id = 0; view_id < totvideos; view_id++) {
 			bool do_free = false;
 			const char *suffix = BKE_scene_multiview_view_id_suffix_get(&scene->r, view_id);
@@ -3378,7 +3379,7 @@ bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scen
 		const char *names[2] = {STEREO_LEFT_NAME, STEREO_RIGHT_NAME};
 		ImBuf *ibuf_arr[3] = {NULL};
 		bool do_free[2] = {false, false};
-		size_t i;
+		int i;
 
 		BLI_assert((totvideos == 1) && (scene->r.im_format.views_format == R_IMF_VIEWS_STEREO_3D));
 
@@ -3418,7 +3419,7 @@ bool RE_WriteRenderViewsMovie(ReportList *reports, RenderResult *rr, Scene *scen
 	return ok;
 }
 
-static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovieHandle *mh, const size_t totvideos, const char *name_override)
+static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovieHandle *mh, const int totvideos, const char *name_override)
 {
 	char name[FILE_MAX];
 	RenderResult rres;
@@ -3465,7 +3466,9 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 	return ok;
 }
 
-static void get_videos_dimensions(Render *re, RenderData *rd, size_t *r_width, size_t *r_height)
+static void get_videos_dimensions(
+        Render *re, RenderData *rd,
+        size_t *r_width, size_t *r_height)
 {
 	size_t width, height;
 	if (re->r.mode & R_BORDER) {
@@ -3486,6 +3489,18 @@ static void get_videos_dimensions(Render *re, RenderData *rd, size_t *r_width, s
 	BKE_scene_multiview_videos_dimensions_get(rd, width, height, r_width, r_height);
 }
 
+static void re_movie_free_all(Render *re, bMovieHandle *mh, int totvideos)
+{
+	int i;
+
+	for (i = 0; i < totvideos; i++) {
+		mh->end_movie(re->movie_ctx_arr[i]);
+		mh->context_free(re->movie_ctx_arr[i]);
+	}
+
+	MEM_SAFE_FREE(re->movie_ctx_arr);
+}
+
 /* saves images to disk */
 void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_override,
                     unsigned int lay_override, int sfra, int efra, int tfra)
@@ -3494,7 +3509,7 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 	bMovieHandle *mh = NULL;
 	int cfrao = scene->r.cfra;
 	int nfra, totrendered = 0, totskipped = 0;
-	const size_t totvideos = BKE_scene_multiview_num_videos_get(&rd);
+	const int totvideos = BKE_scene_multiview_num_videos_get(&rd);
 	const bool is_movie = BKE_imtype_is_movie(scene->r.im_format.imtype);
 	const bool is_multiview_name = ((scene->r.scemode & R_MULTIVIEW) != 0 &&
 	                                (scene->r.im_format.views_format == R_IMF_VIEWS_INDIVIDUAL));
@@ -3510,15 +3525,11 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 		BKE_report(re->reports, RPT_ERROR, "Frame Server only support stereo output for multiview rendering");
 		return;
 	}
-	
-	/* ugly global still... is to prevent renderwin events and signal subsurfs etc to make full resol */
-	/* is also set by caller renderwin.c */
-	G.is_rendering = true;
-
-	re->flag |= R_ANIMATION;
 
 	if (is_movie) {
-		size_t i, width, height;
+		size_t width, height;
+		int i;
+		bool is_error = false;
 
 		get_videos_dimensions(re, &rd, &width, &height);
 
@@ -3535,10 +3546,24 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 
 			re->movie_ctx_arr[i] = mh->context_create();
 
-			if (!mh->start_movie(re->movie_ctx_arr[i], scene, &re->r, width, height, re->reports, false, suffix))
-				G.is_break = true;
+			if (!mh->start_movie(re->movie_ctx_arr[i], scene, &re->r, width, height, re->reports, false, suffix)) {
+				is_error = true;
+				break;
+			}
+		}
+
+		if (is_error) {
+			/* report is handled above */
+			re_movie_free_all(re, mh, i + 1);
+			return;
 		}
 	}
+
+	/* ugly global still... is to prevent renderwin events and signal subsurfs etc to make full resol */
+	/* is also set by caller renderwin.c */
+	G.is_rendering = true;
+
+	re->flag |= R_ANIMATION;
 
 	if (mh && mh->get_next_frame) {
 		/* MULTIVIEW_TODO:
@@ -3723,15 +3748,7 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 	
 	/* end movie */
 	if (is_movie) {
-		size_t i;
-		for (i = 0; i < totvideos; i++) {
-			mh->end_movie(re->movie_ctx_arr[i]);
-			mh->context_free(re->movie_ctx_arr[i]);
-		}
-
-		if (re->movie_ctx_arr) {
-			MEM_freeN(re->movie_ctx_arr);
-		}
+		re_movie_free_all(re, mh, totvideos);
 	}
 	
 	if (totskipped && totrendered == 0)
