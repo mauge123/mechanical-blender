@@ -718,9 +718,15 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 	prop = RNA_def_boolean(ot->srna,"uses_manipulator",false,NULL,NULL);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
+
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
 #endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	RNA_def_boolean(ot->srna, "transform_no_modal", 0, "No Modal", "No Modal Transform");
+#endif
+
 
 }
 

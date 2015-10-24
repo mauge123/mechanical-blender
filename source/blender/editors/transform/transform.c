@@ -2360,6 +2360,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
 	RNA_boolean_set(op->ptr, "snap",(t->modifiers & MOD_SNAP) != 0);
 #endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	RNA_boolean_set(op->ptr, "transform_no_modal", (t->flag & T_TRANSFORM_NO_MODAL) != 0);
+#endif
 }
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
@@ -2715,6 +2719,12 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
 	if (t->settings->transform_multiple) {
 		t->flag |= T_TRANSFORM_MULTIPLE;
+	}
+#endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (RNA_boolean_get(op->ptr, "transform_no_modal")) {
+		t->flag |= T_TRANSFORM_NO_MODAL;
 	}
 #endif
 
