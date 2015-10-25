@@ -686,11 +686,11 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 		prop = RNA_def_float_vector(ot->srna, "transform_center_value", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "", -FLT_MAX, FLT_MAX);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 		prop = RNA_def_int(ot->srna, "transform_mode", TFM_TRANSLATION, 0, 0,NULL,NULL,0,0);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
-
-
 	}
 	
 	if (flags & P_GPENCIL_EDIT) {

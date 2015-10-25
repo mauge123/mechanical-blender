@@ -2353,10 +2353,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	RNA_float_set_array(op->ptr, "snap_point_value", t->tsnap.snapPoint);
 	RNA_float_set_array(op->ptr, "snap_target_value", t->tsnap.snapTarget);
 	RNA_float_set_array(op->ptr, "transform_center_value", t->center);
-	RNA_int_set(op->ptr, "transform_mode", t->mode);
 #endif
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
+	RNA_int_set(op->ptr, "transform_mode", t->mode);
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
 	RNA_boolean_set(op->ptr, "snap",(t->modifiers & MOD_SNAP) != 0);
 #endif
