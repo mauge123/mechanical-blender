@@ -516,11 +516,8 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	exit_code |= transformEnd(C, t);
 
-#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL 
-	if ((exit_code & (OPERATOR_CANCELLED | OPERATOR_FINISHED))) {
-#else
 	if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
-#endif
+
 		transformops_exit(C, op);
 		exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 	}
