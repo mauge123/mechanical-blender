@@ -1231,6 +1231,8 @@ kmi = km.keymap_items.new_modal('AUTOIK_CHAIN_LEN_DOWN', 'PAGE_DOWN', 'PRESS', s
 kmi = km.keymap_items.new_modal('AUTOIK_CHAIN_LEN_UP', 'WHEELDOWNMOUSE', 'PRESS', shift=True)
 kmi = km.keymap_items.new_modal('AUTOIK_CHAIN_LEN_DOWN', 'WHEELUPMOUSE', 'PRESS', shift=True)
 kmi = km.keymap_items.new_modal('CONFIRM', 'MIDDLEMOUSE', 'RELEASE')
+kmi = km.keymap_items.new_modal('NO_MODAL_TRANSFORM', 'N', 'PRESS') 
+
 
 # Map View3D Gesture Circle
 km = kc.keymaps.new('View3D Gesture Circle', space_type='EMPTY', region_type='WINDOW', modal=True)

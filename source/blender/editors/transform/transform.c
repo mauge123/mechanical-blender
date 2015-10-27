@@ -841,7 +841,7 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
 		{TFM_MODAL_PROPSIZE, "PROPORTIONAL_SIZE", 0, "Adjust Proportional Influence", ""},
 		{TFM_MODAL_INSERTOFS_TOGGLE_DIR, "INSERTOFS_TOGGLE_DIR", 0, "Toggle Direction for Node Auto-offset", ""},
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
-		{TFM_MODAL_NO_MODAL_TRANSFORM, "TFM_MODAL_NO_MODAL_TRANSFORM", 0, "Exit from modal, allow movements around the scene", ""},
+		{TFM_MODAL_NO_MODAL_TRANSFORM, "NO_MODAL_TRANSFORM", 0, "allow movements around the scene", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -976,6 +976,14 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 	bool handled = false;
 	const int modifiers_prev = t->modifiers;
 
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (t->flag & T_TRANSFORM_NO_MODAL) {
+		if (!handled && ELEM(event->val, KM_PRESS, KM_RELEASE) &&  ELEM(event->type,LEFTMOUSE, RIGHTMOUSE, MIDDLEMOUSE)) {
+			return OPERATOR_PASS_THROUGH;
+		}
+	}
+#endif
+
 	t->redraw |= handleMouseInput(t, &t->mouse, event);
 
 	/* Handle modal numinput events first, if already activated. */
@@ -1017,9 +1025,21 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				break;
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 			case TFM_MODAL_NO_MODAL_TRANSFORM:
+
 				t->flag ^= T_TRANSFORM_NO_MODAL;
 				handled = true;
-				break;
+				{
+					wmKeyMapItem *kmi;
+					for (kmi = t->keymap->items.first; kmi; kmi = kmi->next) {
+						if (ELEM(kmi->type,LEFTMOUSE,RIGHTMOUSE,MIDDLEMOUSE)) {
+							if (t->flag & T_TRANSFORM_NO_MODAL) {
+								kmi->flag |= KMI_INACTIVE;
+							} else {
+								kmi->flag &= ~KMI_INACTIVE;
+							}
+						}
+					}
+				}
 #endif
 			case TFM_MODAL_TRANSLATE:
 				/* only switch when... */
@@ -1310,11 +1330,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				break;
 
 			case MIDDLEMOUSE:
-#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
-				if ((t->flag & T_TRANSFORM_NO_MODAL)) {
-					break;
-				}
-#endif
 				if ((t->flag & T_NO_CONSTRAINT) == 0) {
 					/* exception for switching to dolly, or trackball, in camera view */
 					if (t->flag & T_CAMERA) {
