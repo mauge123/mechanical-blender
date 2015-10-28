@@ -330,6 +330,7 @@ typedef struct MouseInput {
 	void	(*post)(struct TransInfo *t, float values[3]);
 
 	int     imval[2];       	/* initial mouse position                */
+	int     smval[2];       	/* stored mouse position                */
 	bool	precision;
 	int     precision_mval[2];	/* mouse position when precision key was pressed */
 	float	center[2];

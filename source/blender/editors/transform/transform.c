@@ -970,6 +970,36 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 	}
 }
 
+static void switchTransformNoModal(TransInfo *t, const wmEvent *event) {
+	t->flag ^= T_TRANSFORM_NO_MODAL;
+
+	{
+		// Enable/Disable modal events allowing to be processed as non-modal events
+		wmKeyMapItem *kmi;
+		for (kmi = t->keymap->items.first; kmi; kmi = kmi->next) {
+			if (ELEM(kmi->type,LEFTMOUSE,RIGHTMOUSE,MIDDLEMOUSE,WHEELDOWNMOUSE,WHEELUPMOUSE)) {
+				if ((t->flag & T_TRANSFORM_NO_MODAL)==0) {
+					kmi->flag &= ~KMI_INACTIVE;
+				} else {
+					kmi->flag |= KMI_INACTIVE;
+				}
+			}
+		}
+	}
+	if ((t->flag & T_TRANSFORM_NO_MODAL) == 0) {
+		// Transform Restart
+		TransData *td = t->data;
+		int i;
+		for (i = 0; i < t->total; i++, td++) {
+			copy_v3_v3(td->iloc,td->loc);
+		}
+		copy_v2_v2_int(t->imval, event->mval);
+		calculateCenter(t);
+		initMouseInput(t, &t->mouse, t->center2d, t->imval);
+	}
+}
+
+
 int transformEvent(TransInfo *t, const wmEvent *event)
 {
 	char cmode = constraintModeToChar(t);
@@ -978,9 +1008,37 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 	if (t->flag & T_TRANSFORM_NO_MODAL) {
-		if (!handled && ELEM(event->val, KM_PRESS, KM_RELEASE) &&  ELEM(event->type,LEFTMOUSE, RIGHTMOUSE, MIDDLEMOUSE)) {
+		if (ELEM(event->val, KM_PRESS, KM_RELEASE) &&  ELEM(event->type,LEFTMOUSE, RIGHTMOUSE, MIDDLEMOUSE)) {
 			return OPERATOR_PASS_THROUGH;
+		} else if (ELEM(event->type,
+		                BUTTON4MOUSE,
+		                BUTTON5MOUSE,
+		                BUTTON6MOUSE,
+		                BUTTON7MOUSE,
+		                MOUSEPAN,
+						MOUSEZOOM,
+						MOUSEROTATE,
+		                WHEELINMOUSE,
+		                WHEELOUTMOUSE,
+		                WHEELUPMOUSE,
+		                WHEELDOWNMOUSE)) {
+			return OPERATOR_PASS_THROUGH;
+		} else if (event->type == EVT_MODAL_MAP) {
+			switch (event->val) {
+				case TFM_MODAL_CANCEL:
+					t->state = TRANS_CANCEL;
+					break;
+				case TFM_MODAL_CONFIRM:
+					t->state = TRANS_CONFIRM;
+					break;
+				case TFM_MODAL_NO_MODAL_TRANSFORM:
+					t->redraw |= TREDRAW_HARD;  // Redraw the Header
+					switchTransformNoModal(t,event);
+					break;
+
+			}
 		}
+		return 0;
 	}
 #endif
 
@@ -1025,21 +1083,9 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				break;
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 			case TFM_MODAL_NO_MODAL_TRANSFORM:
-
-				t->flag ^= T_TRANSFORM_NO_MODAL;
-				handled = true;
-				{
-					wmKeyMapItem *kmi;
-					for (kmi = t->keymap->items.first; kmi; kmi = kmi->next) {
-						if (ELEM(kmi->type,LEFTMOUSE,RIGHTMOUSE,MIDDLEMOUSE)) {
-							if (t->flag & T_TRANSFORM_NO_MODAL) {
-								kmi->flag |= KMI_INACTIVE;
-							} else {
-								kmi->flag &= ~KMI_INACTIVE;
-							}
-						}
-					}
-				}
+				switchTransformNoModal(t,event);
+				t->redraw |= TREDRAW_HARD;  // Redraw the Header
+				break;
 #endif
 			case TFM_MODAL_TRANSLATE:
 				/* only switch when... */
@@ -4340,6 +4386,12 @@ static void headerTranslation(TransInfo *t, const float vec[3], char str[MAX_INF
 			MEM_freeN((void *)str_old);
 		}
 	}
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (t->flag & T_TRANSFORM_NO_MODAL) {
+		BLI_snprintf(str, MAX_INFO_LEN, "Moving Around the scene");
+	}
+#endif
 }
 
 static void applyTranslationValue(TransInfo *t, const float vec[3])
