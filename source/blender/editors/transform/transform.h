@@ -334,6 +334,7 @@ typedef struct MouseInput {
 	void	(*post)(struct TransInfo *t, float values[3]);
 
 	int     imval[2];       	/* initial mouse position                */
+	int     smval[2];       	/* stored mouse position                */
 	bool	precision;
 	int     precision_mval[2];	/* mouse position when precision key was pressed */
 	float	center[2];
@@ -503,6 +504,11 @@ typedef struct TransInfo {
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 #define T_TRANSFORM_MULTIPLE (1 << 26)
 #endif
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+#define T_TRANSFORM_NO_MODAL (1 << 27)
+#endif
+
 
 /* TransInfo->modifiers */
 #define	MOD_CONSTRAINT_SELECT	0x01
