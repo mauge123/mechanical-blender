@@ -516,11 +516,8 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
 	exit_code |= transformEnd(C, t);
 
-#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL 
-	if ((exit_code & (OPERATOR_CANCELLED | OPERATOR_FINISHED))) {
-#else
 	if ((exit_code & OPERATOR_RUNNING_MODAL) == 0) {
-#endif
+
 		transformops_exit(C, op);
 		exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 	}
@@ -686,11 +683,11 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 		prop = RNA_def_float_vector(ot->srna, "transform_center_value", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "", -FLT_MAX, FLT_MAX);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
+#endif
+#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 		prop = RNA_def_int(ot->srna, "transform_mode", TFM_TRANSLATION, 0, 0,NULL,NULL,0,0);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
-
-
 	}
 	
 	if (flags & P_GPENCIL_EDIT) {
