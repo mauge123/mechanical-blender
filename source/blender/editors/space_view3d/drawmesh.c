@@ -410,7 +410,10 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 		solidtex = false;
 		Gtexdraw.is_lit = 0;
 	}
-	else if (v3d->drawtype == OB_SOLID || ((ob->mode & OB_MODE_EDIT) && v3d->drawtype != OB_TEXTURE)) {
+	else if ((v3d->drawtype == OB_SOLID) ||
+	         ((ob->mode & OB_MODE_EDIT) && (v3d->drawtype != OB_TEXTURE)) ||
+	         ((ob->mode & OB_MODE_TEXTURE_PAINT) && BKE_scene_use_new_shading_nodes(scene)))
+	{
 		/* draw with default lights in solid draw mode and edit mode */
 		solidtex = true;
 		Gtexdraw.is_lit = -1;
@@ -1114,7 +1117,8 @@ void draw_mesh_textured(Scene *scene, View3D *v3d, RegionView3D *rv3d,
 	/* if not cycles, or preview-modifiers, or drawing matcaps */
 	if ((draw_flags & DRAW_MODIFIERS_PREVIEW) ||
 	    (v3d->flag2 & V3D_SHOW_SOLID_MATCAP) ||
-	    (BKE_scene_use_new_shading_nodes(scene) == false))
+	    (BKE_scene_use_new_shading_nodes(scene) == false) ||
+	    ((ob->mode & OB_MODE_TEXTURE_PAINT) && ELEM(v3d->drawtype, OB_TEXTURE, OB_SOLID)))
 	{
 		draw_mesh_textured_old(scene, v3d, rv3d, ob, dm, draw_flags);
 		return;

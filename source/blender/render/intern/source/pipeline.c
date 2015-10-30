@@ -59,6 +59,7 @@
 
 #include "BKE_animsys.h"  /* <------ should this be here?, needed for sequencer update */
 #include "BKE_camera.h"
+#include "BKE_colortools.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
@@ -505,6 +506,8 @@ void RE_FreeRender(Render *re)
 	BLI_freelistN(&re->r.layers);
 	BLI_freelistN(&re->r.views);
 
+	curvemapping_free_data(&re->r.mblur_shutter_curve);
+
 	/* main dbase can already be invalid now, some database-free code checks it */
 	re->main = NULL;
 	re->scene = NULL;
@@ -666,6 +669,7 @@ void RE_InitState(Render *re, Render *source, RenderData *rd,
 	re->r = *rd;
 	BLI_duplicatelist(&re->r.layers, &rd->layers);
 	BLI_duplicatelist(&re->r.views, &rd->views);
+	curvemapping_copy_data(&re->r.mblur_shutter_curve, &rd->mblur_shutter_curve);
 
 	if (source) {
 		/* reuse border flags from source renderer */
@@ -2108,9 +2112,10 @@ static void ntree_render_scenes(Render *re)
 /* bad call... need to think over proper method still */
 static void render_composit_stats(void *UNUSED(arg), const char *str)
 {
-	R.i.infostr = str;
-	R.stats_draw(R.sdh, &R.i);
-	R.i.infostr = NULL;
+	RenderStats i;
+	memcpy(&i, &R.i, sizeof(i));
+	i.infostr = str;
+	R.stats_draw(R.sdh, &i);
 }
 
 #ifdef WITH_FREESTYLE
