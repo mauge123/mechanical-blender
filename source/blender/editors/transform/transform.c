@@ -988,14 +988,7 @@ static void switchTransformNoModal(TransInfo *t, const wmEvent *event) {
 	}
 	if ((t->flag & T_TRANSFORM_NO_MODAL) == 0) {
 		// Transform Restart
-		TransData *td = t->data;
-		int i;
-		for (i = 0; i < t->total; i++, td++) {
-			copy_v3_v3(td->iloc,td->loc);
-		}
-		copy_v2_v2_int(t->imval, event->mval);
-		calculateCenter(t);
-		initMouseInput(t, &t->mouse, t->center2d, t->imval);
+
 	}
 }
 
