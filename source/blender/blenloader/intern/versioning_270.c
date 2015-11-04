@@ -53,6 +53,7 @@
 
 #include "DNA_genfile.h"
 
+#include "BKE_colortools.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
 #include "BKE_node.h"
@@ -908,5 +909,31 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 #undef LA_YF_PHOTON
 		}
 
+		{
+			Object *ob;
+			for (ob = main->object.first; ob; ob = ob->id.next) {
+				if (ob->body_type == OB_BODY_TYPE_CHARACTER && (ob->gameflag & OB_BOUNDS) && ob->collision_boundtype == OB_BOUND_TRIANGLE_MESH) {
+					ob->boundtype = ob->collision_boundtype = OB_BOUND_BOX;
+				}
+			}
+		}
+
 	}
+
+	{
+		if (!DNA_struct_elem_find(fd->filesdna, "RenderData", "CurveMapping", "mblur_shutter_curve")) {
+			Scene *scene;
+			for (scene = main->scene.first; scene != NULL; scene = scene->id.next) {
+				CurveMapping *curve_mapping = &scene->r.mblur_shutter_curve;
+				curvemapping_set_defaults(curve_mapping, 1, 0.0f, 0.0f, 1.0f, 1.0f);
+				curvemapping_initialize(curve_mapping);
+				curvemap_reset(curve_mapping->cm,
+				               &curve_mapping->clipr,
+				               CURVE_PRESET_MAX,
+				               CURVEMAP_SLOPE_POS_NEG);
+			}
+		}
+	}
+
+
 }

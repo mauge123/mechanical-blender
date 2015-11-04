@@ -1269,8 +1269,6 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 	BLI_mempool_destroy(foldpool);
 
 	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE);
-
-
 }
 
 static void bmo_flag_layer_free(BMesh *bm)
