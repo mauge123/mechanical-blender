@@ -1108,7 +1108,7 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 			case TFM_MODAL_CONFIRM:
 				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE));
 
-				copy_v2_v2_int(t->imval,t->mval);
+				copy_v2_v2_int(t->mouse.imval,t->mval);
 
 				if (ELEM(t->mode, TFM_ROTATION,TFM_RESIZE)) {
 					//Get 2D cordinates of selected Point
@@ -1163,7 +1163,7 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				}
 				t->around = V3D_FIXED;
 				calculateCenter(t);
-				copy_v2_v2_int(t->imval,t->mval);
+				copy_v2_v2_int(t->mouse.imval,t->mval);
 				copy_v2_v2 (t->mouse.center, t->center2d);
 				initTransformMode(t,NULL,NULL,t->mode);
 
@@ -1208,14 +1208,7 @@ static void switchTransformNoModal(TransInfo *t, const wmEvent *event) {
 	}
 	if ((t->flag & T_TRANSFORM_NO_MODAL) == 0) {
 		// Transform Restart
-		TransData *td = t->data;
-		int i;
-		for (i = 0; i < t->total; i++, td++) {
-			copy_v3_v3(td->iloc,td->loc);
-		}
-		copy_v2_v2_int(t->imval, event->mval);
-		calculateCenter(t);
-		initMouseInput(t, &t->mouse, t->center2d, t->imval);
+
 	}
 }
 
@@ -2583,6 +2576,13 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	calculateCenter(t);
 
 	initMouseInput(t, &t->mouse, t->center2d, event->mval);
+
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (t->spacetype == SPACE_VIEW3D) {
+		float p[3] = {0,0,0};
+		ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+	}
+#endif
 
 	initTransformMode (t, op, event, mode);
 
