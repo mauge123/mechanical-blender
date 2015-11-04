@@ -29,6 +29,7 @@
 #include <math.h>
 
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -58,6 +59,13 @@ static void InputVector(TransInfo *t, MouseInput *mi, const int mval[2], float o
 	}
 	else {
 		convertViewVec(t, output, (mval[0] - t->mouse.imval[0]), (mval[1] - t->mouse.imval[1]));
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+		if (t->spacetype == SPACE_VIEW3D){
+			float p[3] = {0,0,0};
+			ED_view3d_win_to_3d_int(t->ar, p, mval, vec);
+			sub_v3_v3v3(output,vec,t->iloc);
+		}
+#endif
 	}
 
 }

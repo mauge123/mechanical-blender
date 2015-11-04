@@ -371,6 +371,9 @@ typedef struct TransInfo {
 	float		snap[3];		/* Snapping Gears						*/
 	float		snap_spatial[3]; /* Spatial snapping gears(even when rotating, scaling... etc) */
 	char		frame_side;		/* Mouse side of the cfra, 'L', 'R' or 'B' */
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	float		iloc[3];			/* Initial location */
+#endif
 
 	float		viewmat[4][4];	/* copy from G.vd, prevents feedback,   */
 	float		viewinv[4][4];  /* and to make sure we don't have to    */
