@@ -272,7 +272,6 @@ typedef struct ccdf_minmax {
 } ccdf_minmax;
 
 
-
 typedef struct ccd_Mesh {
 	int mvert_num, tri_num;
 	const MVert *mvert;
@@ -284,8 +283,6 @@ typedef struct ccd_Mesh {
 	float bbmin[3];
 	float bbmax[3];
 } ccd_Mesh;
-
-
 
 
 static ccd_Mesh *ccd_mesh_make(Object *ob)
@@ -559,8 +556,6 @@ static void ccd_update_deflector_hash(Scene *scene, Object *vertexowner, GHash *
 		base = base->next;
 	} /* while (base) */
 }
-
-
 
 
 /*--- collider caching and dicing ---*/
@@ -1993,7 +1988,7 @@ static int _softbody_calc_forces_slice_in_a_thread(Scene *scene, Object *ob, flo
 				compare = (obp->colball + bp->colball);
 				sub_v3_v3v3(def, bp->pos, obp->pos);
 				/* rather check the AABBoxes before ever calulating the real distance */
-				/* mathematically it is completly nuts, but performance is pretty much (3) times faster */
+				/* mathematically it is completely nuts, but performance is pretty much (3) times faster */
 				if ((ABS(def[0]) > compare) || (ABS(def[1]) > compare) || (ABS(def[2]) > compare)) continue;
 				distance = normalize_v3(def);
 				if (distance < compare ) {
@@ -2254,8 +2249,6 @@ static void softbody_calc_forcesEx(Scene *scene, Object *ob, float forcetime, fl
 }
 
 
-
-
 static void softbody_calc_forces(Scene *scene, Object *ob, float forcetime, float timenow, int nl_flags)
 {
 	/* redirection to the new threaded Version */
@@ -2361,7 +2354,7 @@ static void softbody_calc_forces(Scene *scene, Object *ob, float forcetime, floa
 					sub_v3_v3v3(def, bp->pos, obp->pos);
 
 					/* rather check the AABBoxes before ever calulating the real distance */
-					/* mathematically it is completly nuts, but performance is pretty much (3) times faster */
+					/* mathematically it is completely nuts, but performance is pretty much (3) times faster */
 					if ((ABS(def[0]) > compare) || (ABS(def[1]) > compare) || (ABS(def[2]) > compare)) continue;
 
 					distance = normalize_v3(def);

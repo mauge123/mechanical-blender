@@ -261,6 +261,7 @@ else:
         "bpy.utils.previews",
         "bpy_extras",
         "gpu",
+        "gpu.offscreen",
         "mathutils",
         "mathutils.geometry",
         "mathutils.bvhtree",
@@ -470,6 +471,18 @@ if _BPY_PROP_COLLECTION_FAKE:
     _BPY_PROP_COLLECTION_ID = ":class:`%s`" % _BPY_PROP_COLLECTION_FAKE
 else:
     _BPY_PROP_COLLECTION_ID = "collection"
+
+
+def escape_rst(text):
+    """ Escape plain text which may contain characters used by RST.
+    """
+    return text.translate(escape_rst.trans)
+escape_rst.trans = str.maketrans({
+    "`": "\\`",
+    "|": "\\|",
+    "*": "\\*",
+    "\\": "\\\\",
+    })
 
 
 def is_struct_seq(value):
@@ -1139,7 +1152,7 @@ def pycontext2sphinx(basepath):
 
 
 def pyrna_enum2sphinx(prop, use_empty_descriptions=False):
-    """ write a bullet point list of enum + descrptons
+    """ write a bullet point list of enum + descriptions
     """
 
     if use_empty_descriptions:
@@ -1154,7 +1167,7 @@ def pyrna_enum2sphinx(prop, use_empty_descriptions=False):
     if ok:
         return "".join(["* ``%s`` %s.\n" %
                         (identifier,
-                         ", ".join(val for val in (name, description) if val),
+                         ", ".join(escape_rst(val) for val in (name, description) if val),
                          )
                         for identifier, name, description in prop.enum_items
                         ])
@@ -1600,7 +1613,7 @@ def write_rst_contents(basepath):
     fw("\n")
 
     # fw("`A PDF version of this document is also available <%s>`_\n" % BLENDER_PDF_FILENAME)
-    fw("This site can be downloaded for offline use `Download the full Documentation (zipped HTML files)<%s>`_\n" % BLENDER_ZIP_FILENAME)
+    fw("This site can be downloaded for offline use `Download the full Documentation (zipped HTML files) <%s>`_\n" % BLENDER_ZIP_FILENAME)
 
     fw("\n")
 
@@ -1647,7 +1660,9 @@ def write_rst_contents(basepath):
         # mathutils
         "mathutils", "mathutils.geometry", "mathutils.bvhtree", "mathutils.kdtree", "mathutils.noise",
         # misc
-        "freestyle", "bgl", "blf", "gpu", "aud", "bpy_extras",
+        "freestyle", "bgl", "blf",
+        "gpu", "gpu.offscreen",
+        "aud", "bpy_extras",
         # bmesh, submodules are in own page
         "bmesh",
         )
@@ -1787,6 +1802,7 @@ def write_rst_importable_modules(basepath):
         # C_modules
         "aud"                  : "Audio System",
         "blf"                  : "Font Drawing",
+        "gpu.offscreen"        : "GPU Off-Screen Buffer",
         "bmesh"                : "BMesh Module",
         "bmesh.types"          : "BMesh Types",
         "bmesh.utils"          : "BMesh Utilities",

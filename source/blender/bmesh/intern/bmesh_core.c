@@ -910,7 +910,7 @@ static bool bm_loop_reverse_loop(BMesh *bm, BMFace *f
 #endif
 
 	const int len = f->len;
-	const bool do_disps = CustomData_has_layer(&bm->ldata, CD_MDISPS);
+	const int cd_loop_mdisp_offset = CustomData_get_offset(&bm->ldata, CD_MDISPS);
 	BMLoop *l_iter, *oldprev, *oldnext;
 	BMEdge **edar = BLI_array_alloca(edar, len);
 	int i, j, edok;
@@ -927,12 +927,12 @@ static bool bm_loop_reverse_loop(BMesh *bm, BMFace *f
 		l_iter->prev = oldnext;
 		l_iter = oldnext;
 		
-		if (do_disps) {
+		if (cd_loop_mdisp_offset != -1) {
 			float (*co)[3];
 			int x, y, sides;
 			MDisps *md;
 			
-			md = CustomData_bmesh_get(&bm->ldata, l_iter->head.data, CD_MDISPS);
+			md = BM_ELEM_CD_GET_VOID_P(l_iter, cd_loop_mdisp_offset);
 			if (!md->totdisp || !md->disps)
 				continue;
 
@@ -940,12 +940,25 @@ static bool bm_loop_reverse_loop(BMesh *bm, BMFace *f
 			co = md->disps;
 			
 			for (x = 0; x < sides; x++) {
+				float *co_a, *co_b;
+
 				for (y = 0; y < x; y++) {
-					swap_v3_v3(co[y * sides + x], co[sides * x + y]);
-					SWAP(float, co[y * sides + x][0], co[y * sides + x][1]);
-					SWAP(float, co[x * sides + y][0], co[x * sides + y][1]);
+					co_a = co[y * sides + x];
+					co_b = co[x * sides + y];
+
+					swap_v3_v3(co_a, co_b);
+					SWAP(float, co_a[0], co_a[1]);
+					SWAP(float, co_b[0], co_b[1]);
+
+					co_a[2] *= -1.0f;
+					co_b[2] *= -1.0f;
 				}
-				SWAP(float, co[x * sides + x][0], co[x * sides + x][1]);
+
+				co_a = co[x * sides + x];
+
+				SWAP(float, co_a[0], co_a[1]);
+
+				co_a[2] *= -1.0f;
 			}
 		}
 	}
@@ -971,6 +984,7 @@ static bool bm_loop_reverse_loop(BMesh *bm, BMFace *f
 	for (i = 0, l_iter = l_first; i < len; i++, l_iter = l_iter->next)
 		bmesh_radial_append(l_iter->e, l_iter);
 
+#ifndef NDEBUG
 	/* validate radial */
 	for (i = 0, l_iter = l_first; i < len; i++, l_iter = l_iter->next) {
 		BM_CHECK_ELEMENT(l_iter);
@@ -980,6 +994,7 @@ static bool bm_loop_reverse_loop(BMesh *bm, BMFace *f
 	}
 
 	BM_CHECK_ELEMENT(f);
+#endif
 
 	/* Loop indices are no more valid! */
 	bm->elem_index_dirty |= BM_LOOP;
@@ -1106,6 +1121,7 @@ BMFace *BM_faces_join(BMesh *bm, BMFace **faces, int totface, const bool do_del)
 	BMVert *v1 = NULL, *v2 = NULL;
 	const char *err = NULL;
 	int i, tote = 0;
+	const int cd_loop_mdisp_offset = CustomData_get_offset(&bm->ldata, CD_MDISPS);
 
 	if (UNLIKELY(!totface)) {
 		BMESH_ASSERT(0);
@@ -1236,11 +1252,19 @@ BMFace *BM_faces_join(BMesh *bm, BMFace **faces, int totface, const bool do_del)
 	BM_ELEM_API_FLAG_DISABLE(f_new, _FLAG_JF);
 
 	/* handle multi-res data */
-	if (CustomData_has_layer(&bm->ldata, CD_MDISPS)) {
+	if (cd_loop_mdisp_offset != -1) {
+		float f_center[3];
+		float (*faces_center)[3] = BLI_array_alloca(faces_center, totface);
+
+		BM_face_calc_center_mean(f_new, f_center);
+		for (i = 0; i < totface; i++) {
+			BM_face_calc_center_mean(faces[i], faces_center[i]);
+		}
+
 		l_iter = l_first = BM_FACE_FIRST_LOOP(f_new);
 		do {
 			for (i = 0; i < totface; i++) {
-				BM_loop_interp_multires(bm, l_iter, faces[i]);
+				BM_loop_interp_multires_ex(bm, l_iter, faces[i], f_center, faces_center[i], cd_loop_mdisp_offset);
 			}
 		} while ((l_iter = l_iter->next) != l_first);
 	}
@@ -2030,7 +2054,7 @@ bool BM_vert_splice_check_double(BMVert *v_a, BMVert *v_b)
  *
  * \return Success
  *
- * \warning This does't work for collapsing edges,
+ * \warning This doesn't work for collapsing edges,
  * where \a v and \a vtarget are connected by an edge
  * (assert checks for this case).
  */
@@ -2409,6 +2433,8 @@ void bmesh_edge_separate(
  * Disconnects a face from its vertex fan at loop \a l_sep
  *
  * \return The newly created BMVert
+ *
+ * \note Will be a no-op and return original vertex if only two edges at that vertex.
  */
 BMVert *bmesh_urmv_loop(BMesh *bm, BMLoop *l_sep)
 {
@@ -2420,8 +2446,10 @@ BMVert *bmesh_urmv_loop(BMesh *bm, BMLoop *l_sep)
 
 	/* peel the face from the edge radials on both sides of the
 	 * loop vert, disconnecting the face from its fan */
-	bmesh_edge_separate(bm, l_sep->e, l_sep, false);
-	bmesh_edge_separate(bm, l_sep->prev->e, l_sep->prev, false);
+	if (!BM_edge_is_boundary(l_sep->e))
+		bmesh_edge_separate(bm, l_sep->e, l_sep, false);
+	if (!BM_edge_is_boundary(l_sep->prev->e))
+		bmesh_edge_separate(bm, l_sep->prev->e, l_sep->prev, false);
 
 	/* do inline, below */
 #if 0

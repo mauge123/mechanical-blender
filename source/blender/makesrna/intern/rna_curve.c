@@ -385,6 +385,7 @@ static void rna_Curve_bevelObject_set(PointerRNA *ptr, PointerRNA value)
 		/* set as bevobj, there could be infinity loop in displist calculation */
 		if (ob->type == OB_CURVE && ob->data != cu) {
 			cu->bevobj = ob;
+			id_lib_extern((ID *)ob);
 		}
 	}
 	else {
@@ -427,6 +428,7 @@ static void rna_Curve_taperObject_set(PointerRNA *ptr, PointerRNA value)
 		/* set as bevobj, there could be infinity loop in displist calculation */
 		if (ob->type == OB_CURVE && ob->data != cu) {
 			cu->taperobj = ob;
+			id_lib_extern((ID *)ob);
 		}
 	}
 	else {
@@ -747,11 +749,12 @@ static int rna_Curve_is_editmode_get(PointerRNA *ptr)
 
 #else
 
+static const float tilt_limit = DEG2RADF(21600.0f);
+
 static void rna_def_bpoint(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-	const float tilt_limit = DEG2RADF(21600.0f);
 
 	srna = RNA_def_struct(brna, "SplinePoint", NULL);
 	RNA_def_struct_sdna(srna, "BPoint");
@@ -785,7 +788,7 @@ static void rna_def_bpoint(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "tilt", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_sdna(prop, NULL, "alfa");
 	RNA_def_property_range(prop, -tilt_limit, tilt_limit);
-	RNA_def_property_ui_range(prop, -tilt_limit, tilt_limit, 0.1, 3);
+	RNA_def_property_ui_range(prop, -tilt_limit, tilt_limit, 10, 3);
 	RNA_def_property_ui_text(prop, "Tilt", "Tilt in 3D View");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
@@ -872,7 +875,8 @@ static void rna_def_beztriple(BlenderRNA *brna)
 	/* Number values */
 	prop = RNA_def_property(srna, "tilt", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_sdna(prop, NULL, "alfa");
-	/*RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);*/
+	RNA_def_property_range(prop, -tilt_limit, tilt_limit);
+	RNA_def_property_ui_range(prop, -tilt_limit, tilt_limit, 10, 3);
 	RNA_def_property_ui_text(prop, "Tilt", "Tilt in 3D View");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
@@ -1189,7 +1193,7 @@ static void rna_def_surface(BlenderRNA *brna)
 	
 	srna = RNA_def_struct(brna, "SurfaceCurve", "Curve");
 	RNA_def_struct_sdna(srna, "Curve");
-	RNA_def_struct_ui_text(srna, "Surface Curve", "Curve datablock used for storing surfaces");
+	RNA_def_struct_ui_text(srna, "Surface Curve", "Curve data-block used for storing surfaces");
 	RNA_def_struct_ui_icon(srna, ICON_SURFACE_DATA);
 
 	rna_def_nurbs(brna, srna);
@@ -1201,7 +1205,7 @@ static void rna_def_text(BlenderRNA *brna)
 	
 	srna = RNA_def_struct(brna, "TextCurve", "Curve");
 	RNA_def_struct_sdna(srna, "Curve");
-	RNA_def_struct_ui_text(srna, "Text Curve", "Curve datablock used for storing text");
+	RNA_def_struct_ui_text(srna, "Text Curve", "Curve data-block used for storing text");
 	RNA_def_struct_ui_icon(srna, ICON_FONT_DATA);
 
 	rna_def_font(brna, srna);
@@ -1332,7 +1336,7 @@ static void rna_def_curve(BlenderRNA *brna)
 	};
 
 	srna = RNA_def_struct(brna, "Curve", "ID");
-	RNA_def_struct_ui_text(srna, "Curve", "Curve datablock storing curves, splines and NURBS");
+	RNA_def_struct_ui_text(srna, "Curve", "Curve data-block storing curves, splines and NURBS");
 	RNA_def_struct_ui_icon(srna, ICON_CURVE_DATA);
 	RNA_def_struct_refine_func(srna, "rna_Curve_refine");
 

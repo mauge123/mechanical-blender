@@ -77,6 +77,7 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_collision.h"
 #include "BKE_effect.h"
+#include "BKE_library_query.h"
 #include "BKE_particle.h"
 #include "BKE_global.h"
 
@@ -893,7 +894,7 @@ void psys_get_birth_coords(ParticleSimulationData *sim, ParticleData *pa, Partic
 				float q_imat[4];
 
 				mat4_to_quat(q_obmat, ob->obmat);
-				invert_qt_qt(q_imat, q_obmat);
+				invert_qt_qt_normalized(q_imat, q_obmat);
 
 
 				if (part->rotmode != PART_ROT_NOR_TAN) {
@@ -4209,13 +4210,39 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 		invert_m4_m4(psys->imat, ob->obmat);
 }
 
+/* ID looper */
+
+void BKE_particlesystem_id_loop(ParticleSystem *psys, ParticleSystemIDFunc func, void *userdata)
+{
+	ParticleTarget *pt;
+
+	func(psys, (ID **)&psys->part, userdata, IDWALK_NOP);
+	func(psys, (ID **)&psys->target_ob, userdata, IDWALK_NOP);
+	func(psys, (ID **)&psys->parent, userdata, IDWALK_NOP);
+
+	for (pt = psys->targets.first; pt; pt = pt->next) {
+		func(psys, (ID **)&pt->ob, userdata, IDWALK_NOP);
+	}
+
+	if (psys->part->phystype == PART_PHYS_BOIDS) {
+		ParticleData *pa;
+		int p;
+
+		for (p = 0, pa = psys->particles; p < psys->totpart; p++, pa++) {
+			func(psys, (ID **)&pa->boid->ground, userdata, IDWALK_NOP);
+		}
+	}
+}
+
 /* **** Depsgraph evaluation **** */
 
 void BKE_particle_system_eval(EvaluationContext *UNUSED(eval_ctx),
+                              Scene *scene,
                               Object *ob,
                               ParticleSystem *psys)
 {
 	if (G.debug & G_DEBUG_DEPSGRAPH) {
 		printf("%s on %s:%s\n", __func__, ob->id.name, psys->name);
 	}
+	BKE_ptcache_object_reset(scene, ob, PTCACHE_RESET_DEPSGRAPH);
 }

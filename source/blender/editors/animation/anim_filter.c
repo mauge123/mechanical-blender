@@ -1429,7 +1429,7 @@ static size_t animfilter_block_data(bAnimContext *ac, ListBase *anim_data, bDope
 		IdAdtTemplate *iat = (IdAdtTemplate *)id;
 		
 		/* NOTE: this macro is used instead of inlining the logic here, since this sort of filtering is still needed
-		 * in a few places in he rest of the code still - notably for the few cases where special mode-based
+		 * in a few places in the rest of the code still - notably for the few cases where special mode-based
 		 * different types of data expanders are required.
 		 */
 		ANIMDATA_FILTER_CASES(iat,
@@ -2016,7 +2016,7 @@ typedef struct tAnimFilterModifiersContext {
 
 
 /* dependency walker callback for modifier dependencies */
-static void animfilter_modifier_idpoin_cb(void *afm_ptr, Object *ob, ID **idpoin)
+static void animfilter_modifier_idpoin_cb(void *afm_ptr, Object *ob, ID **idpoin, int UNUSED(cd_flag))
 {
 	tAnimFilterModifiersContext *afm = (tAnimFilterModifiersContext *)afm_ptr;
 	ID *owner_id = &ob->id;

@@ -29,12 +29,6 @@
  * be accesses from scripts.
  */
 
- 
-/* grr, python redefines */
-#ifdef _POSIX_C_SOURCE
-#  undef _POSIX_C_SOURCE
-#endif
-
 #include <Python.h>
 
 #ifdef WIN32
@@ -491,7 +485,9 @@ static int python_script_exec(bContext *C, const char *fn, struct Text *text,
 			 * incompatible'.
 			 * So now we load the script file data to a buffer */
 			{
-				const char *pystring = "with open(__file__, 'r') as f: exec(f.read())";
+				const char *pystring =
+				        "ns = globals().copy()\n"
+				        "with open(__file__, 'rb') as f: exec(compile(f.read(), __file__, 'exec'), ns)";
 
 				fclose(fp);
 
@@ -826,7 +822,7 @@ static void bpy_module_delay_init(PyObject *bpy_proxy)
 	char filename_abs[1024];
 
 	BLI_strncpy(filename_abs, filename_rel, sizeof(filename_abs));
-	BLI_path_cwd(filename_abs);
+	BLI_path_cwd(filename_abs, sizeof(filename_abs));
 
 	argv[0] = filename_abs;
 	argv[1] = NULL;

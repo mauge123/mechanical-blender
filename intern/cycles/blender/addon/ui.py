@@ -259,11 +259,27 @@ class CyclesRender_PT_motion_blur(CyclesButtonsPanel, Panel):
     def draw(self, context):
         layout = self.layout
 
-        rd = context.scene.render
+        scene = context.scene
+        cscene = scene.cycles
+        rd = scene.render
         layout.active = rd.use_motion_blur
 
-        row = layout.row()
-        row.prop(rd, "motion_blur_shutter")
+        col = layout.column()
+        col.prop(cscene, "motion_blur_position", text="Position")
+        col.prop(rd, "motion_blur_shutter")
+
+        col = layout.column()
+        col.label("Shutter curve:")
+        col.template_curve_mapping(rd, "motion_blur_shutter_curve")
+
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.operator("render.shutter_curve_preset", icon='SMOOTHCURVE', text="").shape = 'SMOOTH'
+        row.operator("render.shutter_curve_preset", icon='SPHERECURVE', text="").shape = 'ROUND'
+        row.operator("render.shutter_curve_preset", icon='ROOTCURVE', text="").shape = 'ROOT'
+        row.operator("render.shutter_curve_preset", icon='SHARPCURVE', text="").shape = 'SHARP'
+        row.operator("render.shutter_curve_preset", icon='LINCURVE', text="").shape = 'LINE'
+        row.operator("render.shutter_curve_preset", icon='NOCURVE', text="").shape = 'MAX'
 
 
 class CyclesRender_PT_film(CyclesButtonsPanel, Panel):
@@ -332,7 +348,6 @@ class CyclesRender_PT_performance(CyclesButtonsPanel, Panel):
         col.separator()
 
         col.label(text="Final Render:")
-        col.prop(cscene, "use_cache")
         col.prop(rd, "use_persistent_data", text="Persistent Images")
 
         col.separator()
@@ -1164,12 +1179,16 @@ class CyclesMaterial_PT_settings(CyclesButtonsPanel, Panel):
         col.prop(mat, "alpha")
 
         col.separator()
-        col.prop(mat, "pass_index")
+        col.label("Viewport Alpha:")
+        col.prop(mat.game_settings, "alpha_blend", text="")
 
         col = split.column(align=True)
         col.label("Viewport Specular:")
         col.prop(mat, "specular_color", text="")
         col.prop(mat, "specular_hardness", text="Hardness")
+
+        col.separator()
+        col.prop(mat, "pass_index")
 
 
 class CyclesTexture_PT_context(CyclesButtonsPanel, Panel):

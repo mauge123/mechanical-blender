@@ -43,6 +43,7 @@
 #include "KX_KetsjiEngine.h"
 #include "KX_PythonInit.h"
 #include "KX_PythonMain.h"
+#include "KX_PyConstraintBinding.h" // for PHY_SetActiveEnvironment
 
 /**********************************
 * Begin Blender include block
@@ -854,7 +855,7 @@ int main(int argc, char** argv)
 
 				get_filename(argc_py_clamped, argv, filename);
 				if (filename[0])
-					BLI_path_cwd(filename);
+					BLI_path_cwd(filename, sizeof(filename));
 				
 
 				// fill the GlobalSettings with the first scene files
@@ -1080,6 +1081,11 @@ int main(int argc, char** argv)
 							char *python_code = KX_GetPythonCode(maggie, python_main);
 							if (python_code) {
 #ifdef WITH_PYTHON
+								// Set python environement variable.
+								KX_Scene *startscene = app.GetStartScene();
+								KX_SetActiveScene(startscene);
+								PHY_SetActiveEnvironment(startscene->GetPhysicsEnvironment());
+
 								gpg_nextframestate.system = system;
 								gpg_nextframestate.app = &app;
 								gpg_nextframestate.gs = &gs;

@@ -250,7 +250,7 @@ struct CCGSubSurf {
 
 	/* Limit evaluator, used to evaluate CCG. */
 	struct OpenSubdiv_EvaluatorDescr *osd_evaluator;
-	/* Next PTex face index, used while CCG synchroization
+	/* Next PTex face index, used while CCG synchronization
 	 * to fill in PTex index of CCGFace.
 	 */
 	int osd_next_face_ptex_index;
@@ -302,6 +302,16 @@ void ccgSubSurf__sync_legacy(CCGSubSurf *ss);
 /* * CCGSubSurf_opensubdiv.c * */
 
 void ccgSubSurf__sync_opensubdiv(CCGSubSurf *ss);
+
+/* Delayed free routines. Will do actual free if called from
+ * main thread and schedule free for later free otherwise.
+ */
+
+#ifdef WITH_OPENSUBDIV
+void ccgSubSurf__delete_osdGLMesh(struct OpenSubdiv_GLMesh *osd_mesh);
+void ccgSubSurf__delete_vertex_array(unsigned int vao);
+void ccgSubSurf__delete_pending(void);
+#endif
 
 /* * CCGSubSurf_opensubdiv_converter.c * */
 

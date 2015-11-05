@@ -62,6 +62,9 @@
 
 #define USE_TABLET_SUPPORT
 
+/* ensure the target position is one we can reach, see: T45771 */
+#define USE_PIXELSIZE_NATIVE_SUPPORT
+
 /* prototypes */
 static float getVelocityZeroTime(const float gravity, const float velocity);
 
@@ -519,7 +522,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 	walk->speed = 0.0f;
 	walk->is_fast = false;
 	walk->is_slow = false;
-	walk->grid = 1.f / walk->scene->unit.scale_length;
+	walk->grid = (walk->scene->unit.system == USER_UNIT_NONE) ? 1.f : 1.f / walk->scene->unit.scale_length;
 
 	/* user preference settings */
 	walk->teleport.duration = U.walk_navigation.teleport_time;
@@ -577,6 +580,16 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 	/* center the mouse */
 	walk->center_mval[0] = walk->ar->winx * 0.5f;
 	walk->center_mval[1] = walk->ar->winy * 0.5f;
+
+#ifdef USE_PIXELSIZE_NATIVE_SUPPORT
+	walk->center_mval[0] += walk->ar->winrct.xmin;
+	walk->center_mval[1] += walk->ar->winrct.ymin;
+
+	WM_cursor_compatible_xy(win, &walk->center_mval[0], &walk->center_mval[1]);
+
+	walk->center_mval[0] -= walk->ar->winrct.xmin;
+	walk->center_mval[1] -= walk->ar->winrct.ymin;
+#endif
 
 	copy_v2_v2_int(walk->prev_mval, walk->center_mval);
 
@@ -959,9 +972,6 @@ static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 	float mat[3][3]; /* 3x3 copy of the view matrix so we can move along the view axis */
 	float dvec[3] = {0.0f, 0.0f, 0.0f}; /* this is the direction that's added to the view offset per redraw */
 
-	/* Camera Uprighting variables */
-	float upvec[3] = {0.0f, 0.0f, 0.0f}; /* stores the view's up vector */
-
 	int moffset[2]; /* mouse offset from the views center */
 	float tmp_quat[4]; /* used for rotating the view */
 
@@ -1020,6 +1030,7 @@ static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 			{
 				/* rotate about the X axis- look up/down */
 				if (moffset[1]) {
+					float upvec[3];
 					float angle;
 					float y;
 
@@ -1051,6 +1062,7 @@ static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 
 				/* rotate about the Y axis- look left/right */
 				if (moffset[0]) {
+					float upvec[3];
 					float x;
 
 					/* if we're upside down invert the moffset */
@@ -1069,10 +1081,8 @@ static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 					/* user adjustement factor */
 					x *= walk->mouse_speed;
 
-					copy_v3_fl3(upvec, 0.0f, 0.0f, 1.0f);
-
 					/* Rotate about the relative up vec */
-					axis_angle_normalized_to_quat(tmp_quat, upvec, x);
+					axis_angle_to_quat_single(tmp_quat, 'Z', x);
 					mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, tmp_quat);
 				}
 			}

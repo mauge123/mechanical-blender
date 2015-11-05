@@ -351,6 +351,8 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 		scen->preview = BKE_previewimg_copy(sce->preview);
 	}
 
+	curvemapping_copy_data(&scen->r.mblur_shutter_curve, &sce->r.mblur_shutter_curve);
+
 	return scen;
 }
 
@@ -462,17 +464,18 @@ void BKE_scene_free(Scene *sce)
 	BKE_color_managed_view_settings_free(&sce->view_settings);
 
 	BKE_previewimg_free(&sce->preview);
+	curvemapping_free_data(&sce->r.mblur_shutter_curve);
 }
 
-Scene *BKE_scene_add(Main *bmain, const char *name)
+void BKE_scene_init(Scene *sce)
 {
-	Scene *sce;
 	ParticleEditSettings *pset;
 	int a;
 	const char *colorspace_name;
 	SceneRenderView *srv;
 
-	sce = BKE_libblock_alloc(bmain, ID_SCE, name);
+	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(sce, id));
+
 	sce->lay = sce->layact = 1;
 	
 	sce->r.mode = R_GAMMA | R_OSA | R_SHADOW | R_SSS | R_ENVMAP | R_RAYTRACE;
@@ -743,6 +746,15 @@ Scene *BKE_scene_add(Main *bmain, const char *name)
 	copy_v2_fl2(sce->safe_areas.action_center, 15.0f / 100.0f, 5.0f / 100.0f);
 
 	sce->preview = NULL;
+}
+
+Scene *BKE_scene_add(Main *bmain, const char *name)
+{
+	Scene *sce;
+
+	sce = BKE_libblock_alloc(bmain, ID_SCE, name);
+
+	BKE_scene_init(sce);
 
 	return sce;
 }
@@ -1360,14 +1372,9 @@ static void scene_do_rb_simulation_recursive(Scene *scene, float ctime)
  *
  * Ideally Mballs shouldn't do such an iteration and use DAG
  * queries instead. For the time being we've got new DAG
- * let's keep it simple and update mballs in a ingle thread.
+ * let's keep it simple and update mballs in a single thread.
  */
 #define MBALL_SINGLETHREAD_HACK
-
-/* Need this because CCFDM holds some OpenGL resources. */
-#ifdef WITH_OPENSUBDIV
-#  define OPENSUBDIV_GL_WORKAROUND
-#endif
 
 #ifdef WITH_LEGACY_DEPSGRAPH
 typedef struct StatisicsEntry {
@@ -1570,45 +1577,6 @@ static bool scene_need_update_objects(Main *bmain)
 		DAG_id_type_tagged(bmain, ID_AR);     /* Armature */
 }
 
-#ifdef OPENSUBDIV_GL_WORKAROUND
-/* CCG DrivedMesh currently hold some OpenGL handles, which could only be
- * released from the main thread.
- *
- * Ideally we need to use gpu_buffer_free, but it's a bit tricky because
- * some buffers are only accessible from OpenSubdiv side.
- */
-static void scene_free_unused_opensubdiv_cache(Scene *scene)
-{
-	Base *base;
-	for (base = scene->base.first; base; base = base->next) {
-		Object *object = base->object;
-		if (object->type == OB_MESH && object->recalc & OB_RECALC_DATA) {
-			ModifierData *md = object->modifiers.last;
-			if (md != NULL && md->type == eModifierType_Subsurf) {
-				SubsurfModifierData *smd = (SubsurfModifierData *) md;
-				bool object_in_editmode = object->mode == OB_MODE_EDIT;
-				if (!smd->use_opensubdiv) {
-					if (smd->mCache != NULL) {
-						ccgSubSurf_free_osd_mesh(smd->mCache);
-					}
-					if (smd->emCache != NULL) {
-						ccgSubSurf_free_osd_mesh(smd->emCache);
-					}
-				}
-				if (object_in_editmode && smd->mCache != NULL) {
-					ccgSubSurf_free(smd->mCache);
-					smd->mCache = NULL;
-				}
-				if (!object_in_editmode && smd->emCache != NULL) {
-					ccgSubSurf_free(smd->emCache);
-					smd->emCache = NULL;
-				}
-			}
-		}
-	}
-}
-#endif
-
 static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene *scene, Scene *scene_parent)
 {
 	TaskScheduler *task_scheduler = BLI_task_scheduler_get();
@@ -1626,10 +1594,6 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene
 	if (!scene_need_update_objects(bmain)) {
 		return;
 	}
-
-#ifdef OPENSUBDIV_GL_WORKAROUND
-	scene_free_unused_opensubdiv_cache(scene);
-#endif
 
 	state.eval_ctx = eval_ctx;
 	state.scene = scene;
@@ -1884,6 +1848,8 @@ void BKE_scene_update_for_newframe_ex(EvaluationContext *eval_ctx, Main *bmain, 
 	/* TODO(sergey): Pass to evaluation routines instead of storing layer in the graph? */
 	(void) do_invisible_flush;
 #endif
+
+	DAG_editors_update_pre(bmain, sce, true);
 
 	/* keep this first */
 	BLI_callback_exec(bmain, &sce->id, BLI_CB_EVT_FRAME_CHANGE_PRE);
@@ -2165,8 +2131,8 @@ bool BKE_scene_use_new_shading_nodes(const Scene *scene)
 
 bool BKE_scene_use_shading_nodes_custom(Scene *scene)
 {
-	   RenderEngineType *type = RE_engines_find(scene->r.engine);
-	   return (type && type->flag & RE_USE_SHADING_NODES_CUSTOM);
+	RenderEngineType *type = RE_engines_find(scene->r.engine);
+	return (type && type->flag & RE_USE_SHADING_NODES_CUSTOM);
 }
 
 bool BKE_scene_uses_blender_internal(const  Scene *scene)
@@ -2278,10 +2244,10 @@ double BKE_scene_unit_scale(const UnitSettings *unit, const int unit_type, doubl
 
 /******************** multiview *************************/
 
-size_t BKE_scene_multiview_num_views_get(const RenderData *rd)
+int BKE_scene_multiview_num_views_get(const RenderData *rd)
 {
 	SceneRenderView *srv;
-	size_t totviews	= 0;
+	int totviews = 0;
 
 	if ((rd->scemode & R_MULTIVIEW) == 0)
 		return 1;
@@ -2414,7 +2380,7 @@ const char *BKE_scene_multiview_render_view_name_get(const RenderData *rd, const
 		return "";
 }
 
-size_t BKE_scene_multiview_view_id_get(const RenderData *rd, const char *viewname)
+int BKE_scene_multiview_view_id_get(const RenderData *rd, const char *viewname)
 {
 	SceneRenderView *srv;
 	size_t nr;
@@ -2485,7 +2451,7 @@ const char *BKE_scene_multiview_view_suffix_get(const RenderData *rd, const char
 		return viewname;
 }
 
-const char *BKE_scene_multiview_view_id_suffix_get(const RenderData *rd, const size_t view_id)
+const char *BKE_scene_multiview_view_id_suffix_get(const RenderData *rd, const int view_id)
 {
 	if ((rd->scemode & R_MULTIVIEW) == 0) {
 		return "";
@@ -2540,7 +2506,7 @@ void BKE_scene_multiview_videos_dimensions_get(
 	}
 }
 
-size_t BKE_scene_multiview_num_videos_get(const RenderData *rd)
+int BKE_scene_multiview_num_videos_get(const RenderData *rd)
 {
 	if (BKE_imtype_is_movie(rd->im_format.imtype) == false)
 		return 0;

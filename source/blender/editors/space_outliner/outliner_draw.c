@@ -1002,20 +1002,23 @@ static void tselem_draw_gp_icon_uibut(struct DrawIconArg *arg, ID *id, bGPDlayer
 	}
 	else {
 		PointerRNA ptr;
-		float w = 0.85f * U.widget_unit;
+		const float eps = 0.001f;
+		const bool is_stroke_visible = (gpl->color[3] > eps);
+		const bool is_fill_visible = (gpl->fill[3] > eps);
+		float w = 0.5f  * UI_UNIT_X;
 		float h = 0.85f * UI_UNIT_Y;
-		
+
 		RNA_pointer_create(id, &RNA_GPencilLayer, gpl, &ptr);
-		
+
 		UI_block_align_begin(arg->block);
 		
-		UI_block_emboss_set(arg->block, RNA_boolean_get(&ptr, "is_stroke_visible") ? UI_EMBOSS : UI_EMBOSS_NONE);
+		UI_block_emboss_set(arg->block, is_stroke_visible ? UI_EMBOSS : UI_EMBOSS_NONE);
 		uiDefButR(arg->block, UI_BTYPE_COLOR, 1, "", arg->xb, arg->yb, w, h,
 		          &ptr, "color", -1,
 		          0, 0, 0, 0, NULL);
 		
-		UI_block_emboss_set(arg->block, RNA_boolean_get(&ptr, "is_fill_visible") ? UI_EMBOSS : UI_EMBOSS_NONE);
-		uiDefButR(arg->block, UI_BTYPE_COLOR, 1, "", arg->xb, arg->yb, w, h,
+		UI_block_emboss_set(arg->block, is_fill_visible ? UI_EMBOSS : UI_EMBOSS_NONE);
+		uiDefButR(arg->block, UI_BTYPE_COLOR, 1, "", arg->xb + w, arg->yb, w, h,
 		          &ptr, "fill_color", -1,
 		          0, 0, 0, 0, NULL);
 		
@@ -1315,7 +1318,16 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 			case ID_GR:
 				tselem_draw_icon_uibut(&arg, ICON_GROUP); break;
 			case ID_LI:
-				tselem_draw_icon_uibut(&arg, ICON_LIBRARY_DATA_DIRECT); break;
+				if (tselem->id->flag & LIB_MISSING) {
+					tselem_draw_icon_uibut(&arg, ICON_LIBRARY_DATA_BROKEN);
+				}
+				else if (((Library *)tselem->id)->parent) {
+					tselem_draw_icon_uibut(&arg, ICON_LIBRARY_DATA_INDIRECT);
+				}
+				else {
+					tselem_draw_icon_uibut(&arg, ICON_LIBRARY_DATA_DIRECT);
+				}
+				break;
 			case ID_LS:
 				tselem_draw_icon_uibut(&arg, ICON_LINE_DATA); break;
 			case ID_GD:
@@ -1550,10 +1562,15 @@ static void outliner_draw_tree_element(
 		
 		if (tselem->type == 0 && tselem->id->lib) {
 			glPixelTransferf(GL_ALPHA_SCALE, 0.5f);
-			if (tselem->id->flag & LIB_INDIRECT)
+			if (tselem->id->flag & LIB_MISSING) {
+				UI_icon_draw((float)startx + offsx, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_BROKEN);
+			}
+			else if (tselem->id->flag & LIB_INDIRECT) {
 				UI_icon_draw((float)startx + offsx, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_INDIRECT);
-			else
+			}
+			else {
 				UI_icon_draw((float)startx + offsx, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_DIRECT);
+			}
 			glPixelTransferf(GL_ALPHA_SCALE, 1.0f);
 			offsx += UI_UNIT_X;
 		}

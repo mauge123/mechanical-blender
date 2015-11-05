@@ -327,8 +327,10 @@ typedef struct SpaceIpo {
 	short autosnap;         /* time-transform autosnapping settings for Graph editor (eAnimEdit_AutoSnap in DNA_action_types.h) */
 	int flag;               /* settings for Graph editor (eGraphEdit_Flag) */
 	
+	float cursorTime;       /* time value for cursor (when in drivers mode; animation uses current frame) */
 	float cursorVal;        /* cursor value (y-value, x-value is current frame) */
 	int around;             /* pivot point for transforms */
+	int pad;
 } SpaceIpo;
 
 
@@ -964,7 +966,11 @@ typedef enum eSpaceImage_Flag {
 	SI_COLOR_CORRECTION   = (1 << 24),
 
 	SI_NO_DRAW_TEXPAINT   = (1 << 25),
-	SI_DRAW_METADATA      = (1 << 26)
+	SI_DRAW_METADATA      = (1 << 26),
+
+	SI_SHOW_R             = (1 << 27),
+	SI_SHOW_G             = (1 << 28),
+	SI_SHOW_B             = (1 << 29),
 } eSpaceImage_Flag;
 
 /* Text Editor ============================================ */

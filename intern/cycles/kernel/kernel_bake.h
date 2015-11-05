@@ -31,6 +31,13 @@ ccl_device void compute_light_pass(KernelGlobals *kg, ShaderData *sd, PathRadian
 	float3 throughput = make_float3(1.0f, 1.0f, 1.0f);
 	bool is_sss_sample = is_sss;
 
+	ray.P = sd->P + sd->Ng;
+	ray.D = -sd->Ng;
+	ray.t = FLT_MAX;
+#ifdef __CAMERA_MOTION__
+	ray.time = TIME_INVALID;
+#endif
+
 	/* init radiance */
 	path_radiance_init(&L_sample, kernel_data.film.use_light_pass);
 
@@ -143,7 +150,7 @@ ccl_device bool is_aa_pass(ShaderEvalType type)
 
 ccl_device bool is_light_pass(ShaderEvalType type)
 {
-	switch (type) {
+	switch(type) {
 		case SHADER_EVAL_AO:
 		case SHADER_EVAL_COMBINED:
 		case SHADER_EVAL_SHADOW:
@@ -255,7 +262,7 @@ ccl_device void kernel_bake_evaluate(KernelGlobals *kg, ccl_global uint4 *input,
 		                   sample);
 	}
 
-	switch (type) {
+	switch(type) {
 		/* data passes */
 		case SHADER_EVAL_NORMAL:
 		{

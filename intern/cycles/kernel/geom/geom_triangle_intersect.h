@@ -98,7 +98,7 @@ void triangle_intersect_precalc(float3 dir,
 }
 
 /* TODO(sergey): Make it general utility function. */
-ccl_device_inline float xor_signmast(float x, int y)
+ccl_device_inline float xor_signmask(float x, int y)
 {
 	return __int_as_float(__float_as_int(x) ^ y);
 }
@@ -140,13 +140,11 @@ ccl_device_inline bool triangle_intersect(KernelGlobals *kg,
 
 	/* Calculate scaled barycentric coordinates. */
 	float U = Cx * By - Cy * Bx;
-	int sign_mask = (__float_as_int(U) & 0x80000000);
 	float V = Ax * Cy - Ay * Cx;
-	if(sign_mask != (__float_as_int(V) & 0x80000000)) {
-		return false;
-	}
 	float W = Bx * Ay - By * Ax;
-	if(sign_mask != (__float_as_int(W) & 0x80000000)) {
+	if((U < 0.0f || V < 0.0f || W < 0.0f) &&
+	   (U > 0.0f || V > 0.0f || W > 0.0f))
+	{
 		return false;
 	}
 
@@ -156,13 +154,14 @@ ccl_device_inline bool triangle_intersect(KernelGlobals *kg,
 		return false;
 	}
 
-	/* Calculate scaled z−coordinates of vertices and use them to calculate
+	/* Calculate scaled z-coordinates of vertices and use them to calculate
 	 * the hit distance.
 	 */
 	const float T = (U * A_kz + V * B_kz + W * C_kz) * Sz;
-	const float sign_T = xor_signmast(T, sign_mask);
+	const int sign_det = (__float_as_int(det) & 0x80000000);
+	const float sign_T = xor_signmask(T, sign_det);
 	if((sign_T < 0.0f) ||
-	   (sign_T > isect->t * xor_signmast(det, sign_mask)))
+	   (sign_T > isect->t * xor_signmask(det, sign_det)))
 	{
 		return false;
 	}
@@ -173,6 +172,16 @@ ccl_device_inline bool triangle_intersect(KernelGlobals *kg,
 	if(kernel_tex_fetch(__prim_visibility, triAddr) & visibility)
 #endif
 	{
+#ifdef __KERNEL_GPU__
+		float4 a = tri_b - tri_a, b = tri_c - tri_a;
+		if(len_squared(make_float3(a.y*b.z - a.z*b.y,
+		                           a.z*b.x - a.x*b.z,
+		                           a.x*b.y - a.y*b.x)) == 0.0f)
+		{
+			return false;
+		}
+#endif
+
 		/* Normalize U, V, W, and T. */
 		const float inv_det = 1.0f / det;
 		isect->prim = triAddr;
@@ -233,13 +242,12 @@ ccl_device_inline void triangle_intersect_subsurface(
 
 	/* Calculate scaled barycentric coordinates. */
 	float U = Cx * By - Cy * Bx;
-	int sign_mask = (__float_as_int(U) & 0x80000000);
 	float V = Ax * Cy - Ay * Cx;
-	if(sign_mask != (__float_as_int(V) & 0x80000000)) {
-		return;
-	}
 	float W = Bx * Ay - By * Ax;
-	if(sign_mask != (__float_as_int(W) & 0x80000000)) {
+
+	if((U < 0.0f || V < 0.0f || W < 0.0f) &&
+	   (U > 0.0f || V > 0.0f || W > 0.0f))
+	{
 		return;
 	}
 
@@ -252,10 +260,11 @@ ccl_device_inline void triangle_intersect_subsurface(
 	/* Calculate scaled z−coordinates of vertices and use them to calculate
 	 * the hit distance.
 	 */
+	const int sign_det = (__float_as_int(det) & 0x80000000);
 	const float T = (U * A_kz + V * B_kz + W * C_kz) * Sz;
-	const float sign_T = xor_signmast(T, sign_mask);
+	const float sign_T = xor_signmask(T, sign_det);
 	if((sign_T < 0.0f) ||
-	   (sign_T > tmax * xor_signmast(det, sign_mask)))
+	   (sign_T > tmax * xor_signmask(det, sign_det)))
 	{
 		return;
 	}

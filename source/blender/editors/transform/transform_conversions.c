@@ -1252,7 +1252,18 @@ static void createTransArmatureVerts(TransInfo *t)
 			else {
 				if (ebo->flag & BONE_TIPSEL) {
 					copy_v3_v3(td->iloc, ebo->tail);
-					copy_v3_v3(td->center, (t->around == V3D_LOCAL) ? ebo->head : td->iloc);
+
+					/* Don't allow single selected tips to have a modified center,
+					 * causes problem with snapping (see T45974).
+					 * However, in rotation mode, we want to keep that 'rotate bone around root with
+					 * only its tip selected' behavior (see T46325). */
+					if ((t->around == V3D_LOCAL) && ((t->mode == TFM_ROTATION) || (ebo->flag & BONE_ROOTSEL))) {
+						copy_v3_v3(td->center, ebo->head);
+					}
+					else {
+						copy_v3_v3(td->center, td->iloc);
+					}
+
 					td->loc = ebo->tail;
 					td->flag = TD_SELECTED;
 					if (ebo->flag & BONE_EDITMODE_LOCKED)
@@ -1655,7 +1666,7 @@ static void createTransCurveVerts(TransInfo *t)
 
 			/* TODO - in the case of tilt and radius we can also avoid allocating the initTransDataCurveHandles
 			 * but for now just don't change handle types */
-			if (ELEM(t->mode, TFM_CURVE_SHRINKFATTEN, TFM_TILT) == 0) {
+			if (ELEM(t->mode, TFM_CURVE_SHRINKFATTEN, TFM_TILT, TFM_DUMMY) == 0) {
 				/* sets the handles based on their selection, do this after the data is copied to the TransData */
 				BKE_nurb_handles_test(nu, !hide_handles);
 			}
@@ -2218,7 +2229,7 @@ static void VertsToTransData(TransInfo *t, TransData *td, TransDataExtension *tx
 	if ((t->mode == TFM_SHRINKFATTEN) &&
 	    (em->selectmode & SCE_SELECT_FACE) &&
 	    BM_elem_flag_test(eve, BM_ELEM_SELECT) &&
-	    (BM_vert_normal_update_ex(eve, BM_ELEM_SELECT, _no)))
+	    (BM_vert_calc_normal_ex(eve, BM_ELEM_SELECT, _no)))
 	{
 		no = _no;
 	}
@@ -3016,7 +3027,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 		/* only side on which mouse is gets transformed */
 		float xmouse, ymouse;
 		
-		UI_view2d_region_to_view(&ac.ar->v2d, t->imval[0], t->imval[1], &xmouse, &ymouse);
+		UI_view2d_region_to_view(&ac.ar->v2d, t->mouse.imval[0], t->mouse.imval[1], &xmouse, &ymouse);
 		t->frame_side = (xmouse > CFRA) ? 'R' : 'L';
 	}
 	else {
@@ -3653,7 +3664,7 @@ static void createTransActionData(bContext *C, TransInfo *t)
 		/* only side on which mouse is gets transformed */
 		float xmouse, ymouse;
 		
-		UI_view2d_region_to_view(&ac.ar->v2d, t->imval[0], t->imval[1], &xmouse, &ymouse);
+		UI_view2d_region_to_view(&ac.ar->v2d, t->mouse.imval[0], t->mouse.imval[1], &xmouse, &ymouse);
 		t->frame_side = (xmouse > CFRA) ? 'R' : 'L'; // XXX use t->frame_side
 	}
 	else {
@@ -4052,7 +4063,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		/* only side on which mouse is gets transformed */
 		float xmouse, ymouse;
 		
-		UI_view2d_region_to_view(v2d, t->imval[0], t->imval[1], &xmouse, &ymouse);
+		UI_view2d_region_to_view(v2d, t->mouse.imval[0], t->mouse.imval[1], &xmouse, &ymouse);
 		t->frame_side = (xmouse > CFRA) ? 'R' : 'L'; // XXX use t->frame_side
 	}
 	else {
@@ -5097,7 +5108,7 @@ static void createTransSeqData(bContext *C, TransInfo *t)
 
 	t->customFree = freeSeqData;
 
-	xmouse = (int)UI_view2d_region_to_view_x(v2d, t->imval[0]);
+	xmouse = (int)UI_view2d_region_to_view_x(v2d, t->mouse.imval[0]);
 
 	/* which side of the current frame should be allowed */
 	if (t->mode == TFM_TIME_EXTEND) {
@@ -5548,7 +5559,7 @@ void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob,
 		
 		if (IS_AUTOKEY_FLAG(scene, ONLYKEYINGSET) && (active_ks)) {
 			/* only insert into active keyingset 
-			 * NOTE: we assume here that the active Keying Set does not need to have its iterator overridden spe
+			 * NOTE: we assume here that the active Keying Set does not need to have its iterator overridden
 			 */
 			ANIM_apply_keyingset(C, &dsources, NULL, active_ks, MODIFYKEY_MODE_INSERT, cfra);
 		}
@@ -6346,12 +6357,6 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 	}
 
 	clear_trans_object_base_flags(t);
-
-
-#if 0 // TRANSFORM_FIX_ME
-	if (resetslowpar)
-		reset_slowparents();
-#endif
 }
 
 int special_transform_moving(TransInfo *t)
@@ -8080,8 +8085,4 @@ void createTransData(bContext *C, TransInfo *t)
 			}
 		}
 	}
-
-// TRANSFORM_FIX_ME
-//	/* temporal...? */
-//	t->scene->recalc |= SCE_PRV_CHANGED;	/* test for 3d preview */
 }

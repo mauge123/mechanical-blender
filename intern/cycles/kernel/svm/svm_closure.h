@@ -63,6 +63,9 @@ ccl_device_inline ShaderClosure *svm_node_closure_get_non_bsdf(ShaderData *sd, C
 	if(ccl_fetch(sd, num_closure) < MAX_CLOSURE) {
 		sc->weight *= mix_weight;
 		sc->type = type;
+		sc->data0 = 0.0f;
+		sc->data1 = 0.0f;
+		sc->data2 = 0.0f;
 #ifdef __OSL__
 		sc->prim = NULL;
 #endif
@@ -408,7 +411,10 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 					sc->data1 = param2;
 					sc->data2 = -stack_load_float(stack, data_node.z);
 
-					if(!(ccl_fetch(sd, type) & PRIMITIVE_ALL_CURVE)) {
+					if(stack_valid(data_node.y)) {
+						sc->T = normalize(stack_load_float3(stack, data_node.y));
+					}
+					else if(!(ccl_fetch(sd, type) & PRIMITIVE_ALL_CURVE)) {
 						sc->T = normalize(ccl_fetch(sd, dPdv));
 						sc->data2 = 0.0f;
 					}

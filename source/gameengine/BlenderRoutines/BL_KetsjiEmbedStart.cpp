@@ -359,25 +359,22 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		}
 
 		// some blender stuff
-		float camzoom;
+		float camzoom = 1.0f;
 		int draw_letterbox = 0;
-		
+
 		if (rv3d->persp==RV3D_CAMOB) {
 			if (startscene->gm.framing.type == SCE_GAMEFRAMING_BARS) { /* Letterbox */
-				camzoom = 1.0f;
 				draw_letterbox = 1;
 			}
 			else {
 				camzoom = 1.0f / BKE_screen_view3d_zoom_to_fac(rv3d->camzoom);
 			}
 		}
-		else {
-			camzoom = 2.0;
-		}
 
 		rasterizer->SetDrawingMode(drawtype);
 		ketsjiengine->SetCameraZoom(camzoom);
-		
+		ketsjiengine->SetCameraOverrideZoom(2.0f);
+
 		// if we got an exitcode 3 (KX_EXIT_REQUEST_START_OTHER_GAME) load a different file
 		if (exitrequested == KX_EXIT_REQUEST_START_OTHER_GAME || exitrequested == KX_EXIT_REQUEST_RESTART_GAME)
 		{
@@ -544,6 +541,10 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				if (python_main) {
 					char *python_code = KX_GetPythonCode(blenderdata, python_main);
 					if (python_code) {
+						// Set python environement variable.
+						KX_SetActiveScene(startscene);
+						PHY_SetActiveEnvironment(startscene->GetPhysicsEnvironment());
+
 						ketsjinextframestate.ketsjiengine = ketsjiengine;
 						ketsjinextframestate.C = C;
 						ketsjinextframestate.win = win;
@@ -584,11 +585,22 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				// inside the GameLogic dictionary when the python interpreter is finalized.
 				// which allows the scene to safely delete them :)
 				// see: (space.c)->start_game
-
-				PyDict_Clear(PyModule_GetDict(gameLogic));
-				PyDict_SetItemString(PyModule_GetDict(gameLogic), "globalDict", pyGlobalDict);
+				
+				//PyDict_Clear(PyModule_GetDict(gameLogic));
+				
+				// Keep original items, means python plugins will autocomplete members
+				PyObject *gameLogic_keys_new = PyDict_Keys(PyModule_GetDict(gameLogic));
+				const Py_ssize_t numitems= PyList_GET_SIZE(gameLogic_keys_new);
+				Py_ssize_t listIndex;
+				for (listIndex=0; listIndex < numitems; listIndex++) {
+					PyObject *item = PyList_GET_ITEM(gameLogic_keys_new, listIndex);
+					if (!PySequence_Contains(gameLogic_keys, item)) {
+						PyDict_DelItem(	PyModule_GetDict(gameLogic), item);
+					}
+				}
+				Py_DECREF(gameLogic_keys_new);
+				gameLogic_keys_new = NULL;
 #endif
-
 				ketsjiengine->StopEngine();
 #ifdef WITH_PYTHON
 				exitGamePythonScripting();

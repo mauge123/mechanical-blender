@@ -79,12 +79,13 @@ void BKE_object_free_modifiers(struct Object *ob);
 void BKE_object_make_proxy(struct Object *ob, struct Object *target, struct Object *gob);
 void BKE_object_copy_proxy_drivers(struct Object *ob, struct Object *target);
 
-void BKE_object_unlink(struct Object *ob);
+void BKE_object_unlink(struct Main *bmain, struct Object *ob);
 bool BKE_object_exists_check(struct Object *obtest);
 bool BKE_object_is_in_editmode(struct Object *ob);
 bool BKE_object_is_in_editmode_vgroup(struct Object *ob);
 bool BKE_object_is_in_wpaint_select_vert(struct Object *ob);
 
+void BKE_object_init(struct Object *ob);
 struct Object *BKE_object_add_only_object(
         struct Main *bmain,
         int type, const char *name)
@@ -142,6 +143,9 @@ bool BKE_boundbox_ray_hit_check(
         float *r_lambda);
 void BKE_boundbox_calc_center_aabb(const struct BoundBox *bb, float r_cent[3]);
 void BKE_boundbox_calc_size_aabb(const struct BoundBox *bb, float r_size[3]);
+void BKE_boundbox_minmax(const struct BoundBox *bb, float obmat[4][4], float r_min[3], float r_max[3]);
+struct BoundBox *BKE_boundbox_ensure_minimum_dimensions(
+        struct BoundBox *bb, struct BoundBox *bb_temp, const float epsilon);
 
 struct BoundBox *BKE_object_boundbox_get(struct Object *ob);
 void BKE_object_dimensions_get(struct Object *ob, float vec[3]);
@@ -231,6 +235,7 @@ int BKE_object_is_modified(struct Scene *scene, struct Object *ob);
 int BKE_object_is_deform_modified(struct Scene *scene, struct Object *ob);
 
 void BKE_object_relink(struct Object *ob);
+void BKE_object_data_relink(struct Object *ob);
 
 struct MovieClip *BKE_object_movieclip_get(struct Scene *scene, struct Object *ob, bool use_default);
 

@@ -394,7 +394,7 @@ static SpaceLink *view3d_new(const bContext *C)
 	rv3d = ar->regiondata;
 	rv3d->viewquat[0] = 1.0f;
 	rv3d->persp = RV3D_PERSP;
-	rv3d->view = RV3D_VIEW_PERSPORTHO;
+	rv3d->view = RV3D_VIEW_USER;
 	rv3d->dist = 10.0;
 	
 	return (SpaceLink *)v3d;
@@ -928,6 +928,7 @@ static void view3d_main_area_listener(bScreen *sc, ScrArea *sa, ARegion *ar, wmN
 				case ND_SHADING:
 				case ND_NODES:
 				{
+#ifdef WITH_LEGACY_DEPSGRAPH
 					Object *ob = OBACT;
 					if ((v3d->drawtype == OB_MATERIAL) ||
 					    (ob && (ob->mode == OB_MODE_TEXTURE_PAINT)) ||
@@ -935,6 +936,7 @@ static void view3d_main_area_listener(bScreen *sc, ScrArea *sa, ARegion *ar, wmN
 					     (scene->gm.matmode == GAME_MAT_GLSL ||
 					      BKE_scene_use_new_shading_nodes(scene))) ||
 					    !DEG_depsgraph_use_legacy())
+#endif
 					{
 						ED_region_tag_redraw(ar);
 					}

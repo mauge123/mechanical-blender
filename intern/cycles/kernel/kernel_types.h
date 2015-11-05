@@ -39,6 +39,7 @@ CCL_NAMESPACE_BEGIN
 #define LIGHT_SIZE			5
 #define FILTER_TABLE_SIZE	256
 #define RAMP_TABLE_SIZE		256
+#define SHUTTER_TABLE_SIZE		256
 #define PARTICLE_SIZE 		5
 #define TIME_INVALID		FLT_MAX
 
@@ -813,6 +814,9 @@ typedef struct KernelCamera {
 	 * Used for camera zoom motion blur,
 	 */
 	PerspectiveMotionTransform perspective_motion;
+
+	int shutter_table_offset;
+	int pad;
 } KernelCamera;
 
 typedef struct KernelFilm {
@@ -1036,7 +1040,7 @@ enum QueueNumber {
 	                                            * contribution for AO are enqueued here.
 	                                            */
 	QUEUE_SHADOW_RAY_CAST_DL_RAYS = 3,         /* All rays for which a shadow ray should be cast to determine radiance
-	                                            * contributuin for direct lighting are enqueued here.
+	                                            * contributing for direct lighting are enqueued here.
 	                                            */
 };
 

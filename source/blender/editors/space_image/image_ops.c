@@ -176,6 +176,14 @@ static int image_not_packed_poll(bContext *C)
 	return false;
 }
 
+static bool imbuf_format_writeable(const ImBuf *ibuf)
+{
+	ImageFormatData im_format;
+	ImbFormatOptions options_dummy;
+	BKE_imbuf_to_image_format(&im_format, ibuf);
+	return (BKE_image_imtype_to_ftype(im_format.imtype, &options_dummy) == ibuf->ftype);
+}
+
 static int space_image_file_exists_poll(bContext *C)
 {
 	if (space_image_buffer_exists_poll(C)) {
@@ -196,6 +204,9 @@ static int space_image_file_exists_poll(bContext *C)
 			}
 			else if (!BLI_file_is_writable(name)) {
 				CTX_wm_operator_poll_msg_set(C, "image path can't be written to");
+			}
+			else if (!imbuf_format_writeable(ibuf)) {
+				CTX_wm_operator_poll_msg_set(C, "image format is read-only");
 			}
 			else {
 				ret = true;
@@ -1142,8 +1153,6 @@ static int image_open_exec(bContext *C, wmOperator *op)
 	}
 	else {
 		ima->flag &= ~IMA_USE_VIEWS;
-		ima->flag &= ~IMA_IS_STEREO;
-		ima->flag &= ~IMA_IS_MULTIVIEW;
 		BKE_image_free_views(ima);
 	}
 
@@ -1307,7 +1316,7 @@ void IMAGE_OT_open(wmOperatorType *ot)
 
 	/* properties */
 	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH | WM_FILESEL_DIRECTORY | WM_FILESEL_FILES | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
+	                               WM_FILESEL_FILEPATH | WM_FILESEL_DIRECTORY | WM_FILESEL_FILES | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 /******************** Match movie length operator ********************/
@@ -1426,7 +1435,7 @@ void IMAGE_OT_replace(wmOperatorType *ot)
 
 	/* properties */
 	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
+	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 /******************** save image as operator ********************/
@@ -1692,7 +1701,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 		/* we need renderresult for exr and rendered multiview */
 		scene = CTX_data_scene(C);
 		rr = BKE_image_acquire_renderresult(scene, ima);
-		is_mono = rr ? BLI_listbase_count_ex(&rr->views, 2) < 2 : (ima->flag & IMA_IS_MULTIVIEW) == 0;
+		is_mono = rr ? BLI_listbase_count_ex(&rr->views, 2) < 2 : BLI_listbase_count_ex(&ima->views, 2) < 2;
 
 		/* error handling */
 		if (!rr) {
@@ -1703,7 +1712,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 		}
 		else {
 			if (imf->views_format == R_IMF_VIEWS_STEREO_3D) {
-				if ((ima->flag & IMA_IS_STEREO) == 0) {
+				if (!BKE_image_is_stereo(ima)) {
 					BKE_reportf(op->reports, RPT_ERROR, "Did not write, the image doesn't have a \"%s\" and \"%s\" views",
 					           STEREO_LEFT_NAME, STEREO_RIGHT_NAME);
 					goto cleanup;
@@ -1749,9 +1758,9 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 		}
 		/* individual multiview images */
 		else if (imf->views_format == R_IMF_VIEWS_INDIVIDUAL) {
-			size_t i;
+			int i;
 			unsigned char planes = ibuf->planes;
-			const size_t totviews = (rr ? BLI_listbase_count(&rr->views) : BLI_listbase_count(&ima->views));
+			const int totviews = (rr ? BLI_listbase_count(&rr->views) : BLI_listbase_count(&ima->views));
 
 			if (!is_multilayer) {
 				ED_space_image_release_buffer(sima, ibuf, lock);
@@ -1948,9 +1957,9 @@ static int image_save_as_invoke(bContext *C, wmOperator *op, const wmEvent *UNUS
 
 	/* show multiview save options only if image has multiviews */
 	prop = RNA_struct_find_property(op->ptr, "show_multiview");
-	RNA_property_boolean_set(op->ptr, prop, (ima->flag & IMA_IS_MULTIVIEW) != 0);
+	RNA_property_boolean_set(op->ptr, prop, BKE_image_is_multiview(ima));
 	prop = RNA_struct_find_property(op->ptr, "use_multiview");
-	RNA_property_boolean_set(op->ptr, prop, (ima->flag & IMA_IS_MULTIVIEW) != 0);
+	RNA_property_boolean_set(op->ptr, prop, BKE_image_is_multiview(ima));
 
 	image_filesel(C, op, simopts.filepath);
 
@@ -2035,7 +2044,7 @@ void IMAGE_OT_save_as(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "copy", 0, "Copy", "Create a new image file without modifying the current image in blender");
 
 	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_SAVE,
-	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
+	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 /******************** save image operator ********************/

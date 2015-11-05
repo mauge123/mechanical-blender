@@ -94,4 +94,8 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 endif()
 
+if(WITH_LEGACY_DEPSGRAPH)
+	add_definitions(-DWITH_LEGACY_DEPSGRAPH)
+endif()
+
 blender_add_lib(bf_editor_space_view3d "${SRC}" "${INC}" "${INC_SYS}")

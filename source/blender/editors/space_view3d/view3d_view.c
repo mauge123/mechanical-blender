@@ -137,6 +137,9 @@ struct SmoothView3DStore {
 	struct SmoothView3DState org;  /* original */
 
 	bool to_camera;
+
+	/* When smooth-view is enabled, store the 'rv3d->view' here,
+	 * assign back when the view motion is completed. */
 	char org_view;
 
 	double time_allowed;
@@ -180,12 +183,12 @@ void ED_view3d_smooth_view_ex(
 	/* if smoothview runs multiple times... */
 	if (rv3d->sms == NULL) {
 		view3d_smooth_view_state_backup(&sms.org, v3d, rv3d);
-		sms.org_view = rv3d->view;
 	}
 	else {
 		sms.org = rv3d->sms->org;
-		sms.org_view = rv3d->sms->org_view;
 	}
+	sms.org_view = rv3d->view;
+
 	/* sms.to_camera = false; */  /* initizlized to zero anyway */
 
 	/* note on camera locking, this is a little confusing but works ok.
@@ -252,8 +255,8 @@ void ED_view3d_smooth_view_ex(
 				float vec1[3] = {0, 0, 1}, vec2[3] = {0, 0, 1};
 				float q1[4], q2[4];
 
-				invert_qt_qt(q1, sms.dst.quat);
-				invert_qt_qt(q2, sms.src.quat);
+				invert_qt_qt_normalized(q1, sms.dst.quat);
+				invert_qt_qt_normalized(q2, sms.src.quat);
 
 				mul_qt_v3(q1, vec1);
 				mul_qt_v3(q2, vec2);
@@ -761,7 +764,6 @@ bool ED_view3d_clip_range_get(
 	return params.is_ortho;
 }
 
-/* also exposed in previewrender.c */
 bool ED_view3d_viewplane_get(
         const View3D *v3d, const RegionView3D *rv3d, int winx, int winy,
         rctf *r_viewplane, float *r_clipsta, float *r_clipend, float *r_pixsize)
@@ -847,17 +849,14 @@ void view3d_winmatrix_set(ARegion *ar, const View3D *v3d, const rctf *rect)
 static void obmat_to_viewmat(RegionView3D *rv3d, Object *ob)
 {
 	float bmat[4][4];
-	float tmat[3][3];
-	
+
 	rv3d->view = RV3D_VIEW_USER; /* don't show the grid */
-	
-	copy_m4_m4(bmat, ob->obmat);
-	normalize_m4(bmat);
+
+	normalize_m4_m4(bmat, ob->obmat);
 	invert_m4_m4(rv3d->viewmat, bmat);
-	
+
 	/* view quat calculation, needed for add object */
-	copy_m3_m4(tmat, rv3d->viewmat);
-	mat3_to_quat(rv3d->viewquat, tmat);
+	mat4_normalized_to_quat(rv3d->viewquat, rv3d->viewmat);
 }
 
 static float view3d_quat_axis[6][4] = {
@@ -1133,7 +1132,6 @@ short view3d_opengl_select(ViewContext *vc, unsigned int *buffer, unsigned int b
 		v3d->zbuf = 0;
 		glDisable(GL_DEPTH_TEST);
 	}
-// XXX	persp(PERSP_WIN);
 	
 	if (vc->rv3d->rflag & RV3D_CLIPPING)
 		ED_view3d_clipping_disable();
@@ -1782,7 +1780,7 @@ float ED_view3d_radius_to_dist(
 			lens = params.lens;
 			sensor_size = BKE_camera_sensor_size(params.sensor_fit, params.sensor_x, params.sensor_y);
 
-			/* ignore 'rv3d->camzoom' because we wan't to fit to the cameras frame */
+			/* ignore 'rv3d->camzoom' because we want to fit to the cameras frame */
 			zoom = CAMERA_PARAM_ZOOM_INIT_CAMOB;
 		}
 		else {

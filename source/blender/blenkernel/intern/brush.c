@@ -131,11 +131,9 @@ static void brush_defaults(Brush *brush)
 
 /* Datablock add/copy/free/make_local */
 
-Brush *BKE_brush_add(Main *bmain, const char *name)
+void BKE_brush_init(Brush *brush)
 {
-	Brush *brush;
-
-	brush = BKE_libblock_alloc(bmain, ID_BR, name);
+	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(brush, id));
 
 	/* enable fake user by default */
 	brush->id.flag |= LIB_FAKEUSER;
@@ -146,8 +144,30 @@ Brush *BKE_brush_add(Main *bmain, const char *name)
 
 	/* the default alpha falloff curve */
 	BKE_brush_curve_preset(brush, CURVE_PRESET_SMOOTH);
+}
+
+Brush *BKE_brush_add(Main *bmain, const char *name, short ob_mode)
+{
+	Brush *brush;
+
+	brush = BKE_libblock_alloc(bmain, ID_BR, name);
+
+	BKE_brush_init(brush);
+
+	brush->ob_mode = ob_mode;
 
 	return brush;
+}
+
+struct Brush *BKE_brush_first_search(struct Main *bmain, short ob_mode)
+{
+	Brush *brush;
+
+	for (brush = bmain->brush.first; brush; brush = brush->id.next) {
+		if (brush->ob_mode & ob_mode)
+			return brush;
+	}
+	return NULL;
 }
 
 Brush *BKE_brush_copy(Brush *brush)
@@ -203,11 +223,27 @@ void BKE_brush_free(Brush *brush)
 		MEM_freeN(brush->gradient);
 }
 
+/**
+ * \note Currently users don't remove brushes from the UI (as is done for scene, text... etc)
+ * This is only used by RNA, which can remove brushes.
+ */
+void BKE_brush_unlink(Main *bmain, Brush *brush)
+{
+	Brush *brush_iter;
+
+	for (brush_iter = bmain->brush.first; brush_iter; brush_iter = brush_iter->id.next) {
+		if (brush_iter->toggle_brush == brush) {
+			brush_iter->toggle_brush = NULL;
+		}
+	}
+}
+
 static void extern_local_brush(Brush *brush)
 {
 	id_lib_extern((ID *)brush->mtex.tex);
 	id_lib_extern((ID *)brush->mask_mtex.tex);
 	id_lib_extern((ID *)brush->clone.image);
+	id_lib_extern((ID *)brush->toggle_brush);
 	id_lib_extern((ID *)brush->paint_curve);
 }
 

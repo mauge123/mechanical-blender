@@ -463,11 +463,6 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
                 description="Use BVH spatial splits: longer builder time, faster render",
                 default=False,
                 )
-        cls.use_cache = BoolProperty(
-                name="Cache BVH",
-                description="Cache last built BVH to disk for faster re-render if no geometry changed",
-                default=False,
-                )
         cls.tile_order = EnumProperty(
                 name="Tile Order",
                 description="Tile order for rendering",
@@ -523,6 +518,17 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
                 default=0.1,
                 min=0.0, max=5.0
                 )
+
+        cls.motion_blur_position = EnumProperty(
+            name="Motion Blur Position",
+            default='CENTER',
+            description="Offset for the shutter's time interval, allows to change the motion blur trails",
+            items=(
+                ('START', "Start on Frame", "The shutter opens at the current frame"),
+                ('CENTER', "Center on Frame", "The shutter is open during the current frame"),
+                ('END', "End on Frame", "The shutter closes at the current frame"),
+                ),
+            )
 
     @classmethod
     def unregister(cls):
@@ -743,7 +749,7 @@ class CyclesWorldSettings(bpy.types.PropertyGroup):
                 name="Map Resolution",
                 description="Importance map size is resolution x resolution; "
                             "higher values potentially produce less noise, at the cost of memory and speed",
-                min=4, max=8096,
+                min=4, max=8192,
                 default=256,
                 )
         cls.samples = IntProperty(

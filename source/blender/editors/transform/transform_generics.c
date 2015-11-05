@@ -1112,19 +1112,20 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	t->redraw = TREDRAW_HARD;  /* redraw first time */
 	
 	if (event) {
-		copy_v2_v2_int(t->imval, event->mval);
 		t->event_type = event->type;
+		t->mouse.imval[0] = event->mval[0];
+		t->mouse.imval[1] = event->mval[1];
 	}
 	else {
-		t->imval[0] = 0;
-		t->imval[1] = 0;
+		t->mouse.imval[0] = 0;
+		t->mouse.imval[1] = 0;
 	}
 	
-	t->con.imval[0] = t->imval[0];
-	t->con.imval[1] = t->imval[1];
+	t->con.imval[0] = t->mouse.imval[0];
+	t->con.imval[1] = t->mouse.imval[1];
 	
-	t->mval[0] = t->imval[0];
-	t->mval[1] = t->imval[1];
+	t->mval[0] = t->mouse.imval[0];
+	t->mval[1] = t->mouse.imval[1];
 	
 	t->transform        = NULL;
 	t->handleEvent      = NULL;
@@ -1207,18 +1208,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			t->around = V3D_CURSOR;
 		}
 
-		if (op && ((prop = RNA_struct_find_property(op->ptr, "constraint_orientation")) &&
-		           RNA_property_is_set(op->ptr, prop)))
-		{
-			t->current_orientation = RNA_property_enum_get(op->ptr, prop);
-
-			if (t->current_orientation >= V3D_MANIP_CUSTOM + BIF_countTransformOrientation(C)) {
-				t->current_orientation = V3D_MANIP_GLOBAL;
-			}
-		}
-		else {
-			t->current_orientation = v3d->twmode;
-		}
+		t->current_orientation = v3d->twmode;
 
 		/* exceptional case */
 		if (t->around == V3D_LOCAL) {
@@ -1304,6 +1294,16 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			t->view = NULL;
 		}
 		t->around = V3D_CENTER;
+	}
+
+	if (op && ((prop = RNA_struct_find_property(op->ptr, "constraint_orientation")) &&
+	           RNA_property_is_set(op->ptr, prop)))
+	{
+		t->current_orientation = RNA_property_enum_get(op->ptr, prop);
+
+		if (t->current_orientation >= V3D_MANIP_CUSTOM + BIF_countTransformOrientation(C)) {
+			t->current_orientation = V3D_MANIP_GLOBAL;
+		}
 	}
 	
 	if (op && ((prop = RNA_struct_find_property(op->ptr, "release_confirm")) &&
@@ -1666,8 +1666,14 @@ void calculateCenterCursorGraph2D(TransInfo *t, float r_center[2])
 	Scene *scene = t->scene;
 	
 	/* cursor is combination of current frame, and graph-editor cursor value */
-	r_center[0] = (float)(scene->r.cfra);
-	r_center[1] = sipo->cursorVal;
+	if (sipo->mode == SIPO_MODE_DRIVERS) {
+		r_center[0] = sipo->cursorTime;
+		r_center[1] = sipo->cursorVal;
+	}
+	else {
+		r_center[0] = (float)(scene->r.cfra);
+		r_center[1] = sipo->cursorVal;
+	}
 }
 
 void calculateCenterMedian(TransInfo *t, float r_center[3])
@@ -1832,7 +1838,7 @@ void calculateCenter(TransInfo *t)
 		/* zfac is only used convertViewVec only in cases operator was invoked in RGN_TYPE_WINDOW
 		 * and never used in other cases.
 		 *
-		 * We need special case here as well, since ED_view3d_calc_zfac will crahs when called
+		 * We need special case here as well, since ED_view3d_calc_zfac will crash when called
 		 * for a region different from RGN_TYPE_WINDOW.
 		 */
 		if (t->ar->regiontype == RGN_TYPE_WINDOW) {

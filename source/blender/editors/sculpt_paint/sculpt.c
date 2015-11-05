@@ -4062,7 +4062,7 @@ static void sculpt_update_cache_variants(bContext *C, Sculpt *sd, Object *ob,
 	 *      brush coord/pressure/etc.
 	 *      It's more an events design issue, which doesn't split coordinate/pressure/angle
 	 *      changing events. We should avoid this after events system re-design */
-	if (paint_supports_dynamic_size(brush, PAINT_SCULPT) || cache->first_time) {
+	if (paint_supports_dynamic_size(brush, ePaintSculpt) || cache->first_time) {
 		cache->pressure = RNA_float_get(ptr, "pressure");
 	}
 
@@ -4079,7 +4079,7 @@ static void sculpt_update_cache_variants(bContext *C, Sculpt *sd, Object *ob,
 		}
 	}
 
-	if (BKE_brush_use_size_pressure(scene, brush) && paint_supports_dynamic_size(brush, PAINT_SCULPT)) {
+	if (BKE_brush_use_size_pressure(scene, brush) && paint_supports_dynamic_size(brush, ePaintSculpt)) {
 		cache->radius = cache->initial_radius * cache->pressure;
 	}
 	else {
@@ -4217,7 +4217,10 @@ static float sculpt_raycast_init(ViewContext *vc, const float mouse[2], float ra
 	sub_v3_v3v3(ray_normal, ray_end, ray_start);
 	dist = normalize_v3(ray_normal);
 
-	if (!rv3d->is_persp) {
+	if ((rv3d->is_persp == false) &&
+	    /* if the ray is clipped, don't adjust its start/end */
+	    ((rv3d->rflag & RV3D_CLIPPING) == 0))
+	{
 		BKE_pbvh_raycast_project_ray_root(ob->sculpt->pbvh, original, ray_start, ray_end, ray_normal);
 
 		/* recalculate the normal */
@@ -4519,7 +4522,7 @@ static void sculpt_stroke_done(const bContext *C, struct PaintStroke *UNUSED(str
 		sculpt_cache_free(ss->cache);
 		ss->cache = NULL;
 
-		sculpt_undo_push_end();
+		sculpt_undo_push_end(C);
 
 		BKE_pbvh_update(ss->pbvh, PBVH_UpdateOriginalBB, NULL);
 		
@@ -4843,7 +4846,7 @@ static int sculpt_dynamic_topology_toggle_exec(bContext *C, wmOperator *UNUSED(o
 		sculpt_dynamic_topology_enable(C);
 		sculpt_undo_push_node(ob, NULL, SCULPT_UNDO_DYNTOPO_BEGIN);
 	}
-	sculpt_undo_push_end();
+	sculpt_undo_push_end(C);
 
 	return OPERATOR_FINISHED;
 }
@@ -5005,7 +5008,7 @@ static int sculpt_symmetrize_exec(bContext *C, wmOperator *UNUSED(op))
 
 	/* Finish undo */
 	BM_log_all_added(ss->bm, ss->bm_log);
-	sculpt_undo_push_end();
+	sculpt_undo_push_end(C);
 
 	/* Redraw */
 	sculpt_pbvh_clear(ob);
@@ -5141,7 +5144,7 @@ static int sculpt_mode_toggle_exec(bContext *C, wmOperator *op)
 			           "Object has negative scale, sculpting may be unpredictable");
 		}
 
-		BKE_paint_init(&ts->unified_paint_settings, &ts->sculpt->paint, PAINT_CURSOR_SCULPT);
+		BKE_paint_init(scene, ePaintSculpt, PAINT_CURSOR_SCULPT);
 
 		paint_cursor_start(C, sculpt_poll_view3d);
 	}
@@ -5213,7 +5216,7 @@ static int sculpt_detail_flood_fill_exec(bContext *C, wmOperator *UNUSED(op))
 	}
 
 	MEM_freeN(nodes);
-	sculpt_undo_push_end();
+	sculpt_undo_push_end(C);
 
 	/* force rebuild of pbvh for better BB placement */
 	sculpt_pbvh_clear(ob);

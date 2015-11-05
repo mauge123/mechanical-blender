@@ -73,9 +73,8 @@ void BKE_group_free(Group *group)
 	}
 }
 
-void BKE_group_unlink(Group *group)
+void BKE_group_unlink(Main *bmain, Group *group)
 {
-	Main *bmain = G.main;
 	Material *ma;
 	Object *ob;
 	Scene *sce;
@@ -156,6 +155,7 @@ Group *BKE_group_copy(Group *group)
 	BLI_duplicatelist(&groupn->gobject, &group->gobject);
 
 	/* Do not copy group's preview (same behavior as for objects). */
+	groupn->preview = NULL;
 
 	if (group->id.lib) {
 		BKE_id_lib_local_paths(G.main, group->id.lib, &groupn->id);

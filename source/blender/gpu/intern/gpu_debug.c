@@ -43,7 +43,7 @@
 
 #define CASE_CODE_RETURN_STR(code) case code: return #code;
 
-static const char* gpu_gl_error_symbol(GLenum err)
+static const char *gpu_gl_error_symbol(GLenum err)
 {
 	switch (err) {
 		CASE_CODE_RETURN_STR(GL_NO_ERROR)
@@ -81,8 +81,8 @@ static bool gpu_report_gl_errors(const char *file, int line, const char *str)
 	}
 	else {
 		/* glGetError should have cleared the error flag, so if we get the
-		   same flag twice that means glGetError itself probably triggered
-		   the error. This happens on Windows if the GL context is invalid.
+		 * same flag twice that means glGetError itself probably triggered
+		 * the error. This happens on Windows if the GL context is invalid.
 		 */
 		{
 			GLenum new_error = glGetError();
@@ -92,22 +92,18 @@ static bool gpu_report_gl_errors(const char *file, int line, const char *str)
 			}
 		}
 
-		fprintf(
-			stderr,
-			"%s(%d): ``%s'' -> GL Error (0x%04X - %s): %s\n",
-			file,
-			line,
-			str,
-			gl_error,
-			gpu_gl_error_symbol(gl_error),
-			gpuErrorString(gl_error));
+		fprintf(stderr,
+		        "%s:%d: ``%s'' -> GL Error (0x%04X - %s): %s\n",
+		        file, line, str, gl_error,
+		        gpu_gl_error_symbol(gl_error),
+		        gpuErrorString(gl_error));
 
 		return false;
 	}
 }
 
 
-const char* gpuErrorString(GLenum err)
+const char *gpuErrorString(GLenum err)
 {
 	switch (err) {
 		case GL_NO_ERROR:
@@ -163,9 +159,10 @@ const char* gpuErrorString(GLenum err)
 #endif
 
 
-static void APIENTRY gpu_debug_proc(GLenum source, GLenum type, GLuint UNUSED(id),
-                               GLenum UNUSED(severity), GLsizei UNUSED(length),
-                               const GLchar *message, GLvoid *UNUSED(userParm))
+static void APIENTRY gpu_debug_proc(
+        GLenum source, GLenum type, GLuint UNUSED(id),
+        GLenum UNUSED(severity), GLsizei UNUSED(length),
+        const GLchar *message, const GLvoid *UNUSED(userParm))
 {
 	if (source == GL_DEBUG_SOURCE_API && type == GL_DEBUG_TYPE_ERROR) {
 		fprintf(stderr, "GL: %s\n", message);
@@ -179,9 +176,10 @@ static void APIENTRY gpu_debug_proc(GLenum source, GLenum type, GLuint UNUSED(id
 
 
 #ifndef GLEW_ES_ONLY
-static void APIENTRY gpu_debug_proc_amd(GLuint UNUSED(id), GLenum UNUSED(category),
-                               GLenum UNUSED(severity), GLsizei UNUSED(length),
-                               const GLchar *message,  GLvoid *UNUSED(userParm))
+static void APIENTRY gpu_debug_proc_amd(
+        GLuint UNUSED(id), GLenum UNUSED(category),
+        GLenum UNUSED(severity), GLsizei UNUSED(length),
+        const GLchar *message,  GLvoid *UNUSED(userParm))
 {
 	fprintf(stderr, "GL: %s\n", message);
 }
@@ -206,9 +204,9 @@ void gpu_debug_init(void)
 
 	if (GLEW_KHR_debug) {
 #ifndef GLEW_ES_ONLY
-			glDebugMessageCallback(gpu_debug_proc, mxGetCurrentContext());
-			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-			GPU_string_marker(sizeof(success), success);
+		glDebugMessageCallback(gpu_debug_proc, mxGetCurrentContext());
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
+		GPU_string_marker(sizeof(success), success);
 #endif
 		return;
 	}
@@ -322,7 +320,7 @@ void GPU_print_error_debug(const char *str)
 }
 
 
-void GPU_assert_no_gl_errors(const char* file, int line, const char* str)
+void GPU_assert_no_gl_errors(const char *file, int line, const char *str)
 {
 	if (G.debug) {
 		GLboolean gl_ok = gpu_report_gl_errors(file, line, str);
