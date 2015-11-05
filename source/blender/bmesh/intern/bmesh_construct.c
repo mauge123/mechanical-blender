@@ -807,6 +807,13 @@ char BM_edge_flag_from_mflag(const short meflag)
 	         ((meflag & ME_HIDE)       ? BM_ELEM_HIDDEN : 0)
 	         );
 }
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+char BM_dim_flag_from_mflag(const short meflag)
+{
+	return ( ((meflag & SELECT)        ? BM_ELEM_SELECT : 0)
+	         );
+}
+#endif
 char BM_face_flag_from_mflag(const char  meflag)
 {
 	return ( ((meflag & ME_FACE_SEL)  ? BM_ELEM_SELECT : 0) |

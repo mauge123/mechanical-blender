@@ -233,6 +233,10 @@ void BM_mesh_bm_from_me(
 	KeyBlock *actkey, *block;
 	BMVert *v, **vtable = NULL;
 	BMEdge *e, **etable = NULL;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	MDim *mdim;
+	BMDim *d, **dtable = NULL;
+#endif
 	BMFace *f;
 	float (*keyco)[3] = NULL;
 	int totuv, totloops, i, j;
@@ -364,6 +368,28 @@ void BM_mesh_bm_from_me(
 	}
 
 	bm->elem_index_dirty &= ~BM_VERT; /* added in order, clear dirty flag */
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (me->totdim) {
+		dtable = MEM_mallocN(sizeof(void **) * me->totdim, "mesh to bmesh dtable");
+
+		mdim = me->mdim;
+		for (i = 0; i < me->totdim; i++, mdim++) {
+			d = dtable[i] = BM_dim_create(bm, vtable[mdim->v1], vtable[mdim->v2], NULL, BM_CREATE_SKIP_CD);
+			BM_elem_index_set(d, i); /* set_ok */
+
+			/* transfer flags */
+			d->head.hflag = BM_dim_flag_from_mflag(mdim->flag & ~SELECT);
+
+			/* this is necessary for selection counts to work properly */
+			if (mdim->flag & SELECT) {
+				BM_dim_select_set(bm, d, true);
+			}
+		}
+
+		bm->elem_index_dirty &= ~BM_DIM; /* added in order, clear dirty flag */
+	}
+#endif
 
 	if (!me->totedge) {
 		MEM_freeN(vtable);
@@ -577,6 +603,10 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	BMVert *v, *eve;
 	BMEdge *e;
 	BMFace *f;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BMDim *d;
+	MDim *md, *mdim;
+#endif
 	BMIter iter;
 	int i, j, ototvert;
 
@@ -602,6 +632,13 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	if (bm->totloop == 0) mloop = NULL;
 	else mloop = MEM_callocN(bm->totloop * sizeof(MLoop), "loadeditbMesh loop");
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	/* new dimension block */
+	if (bm->totdim == 0) mdim = NULL;
+	else mdim = MEM_callocN(bm->totdim * sizeof(MDim), "loadeditbMesh dimension");
+#endif
+
+
 	/* lets save the old verts just in case we are actually working on
 	 * a key ... we now do processing of the keys at the end */
 	oldverts = me->mvert;
@@ -618,11 +655,15 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
 
+
 	/* add new custom data */
 	me->totvert = bm->totvert;
 	me->totedge = bm->totedge;
 	me->totloop = bm->totloop;
 	me->totpoly = bm->totface;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	me->totdim =  bm->totdim;
+#endif
 	/* will be overwritten with a valid value if 'dotess' is set, otherwise we
 	 * end up with 'me->totface' and me->mface == NULL which can crash [#28625]
 	 */
@@ -638,6 +679,10 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, me->totedge);
 	CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
 	CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_add_layer(&me->ddata, CD_MDIM, CD_ASSIGN, mdim, me->totdim);
+#endif
 
 	me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 
@@ -688,6 +733,22 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		BM_CHECK_ELEMENT(e);
 	}
 	bm->elem_index_dirty &= ~BM_EDGE;
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	md = mdim;
+	i = 0;
+	BM_ITER_MESH (d, &iter, bm, BM_DIMS_OF_MESH) {
+		md->v1 = BM_elem_index_get(d->v1);
+		md->v2 = BM_elem_index_get(d->v2);
+
+		BM_elem_index_set(d, i); /* set_inline */
+
+		i++;
+		md++;
+		BM_CHECK_ELEMENT(d);
+	}
+	bm->elem_index_dirty &= ~BM_DIM;
+#endif
 
 	i = 0;
 	j = 0;

@@ -462,6 +462,18 @@ void BM_edge_select_set(BMesh *bm, BMEdge *e, const bool select)
 
 	}
 }
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+/**
+ * @brief BM_dim_select_set
+ * @param bm
+ * @param e
+ * @param select
+ */
+void BM_dim_select_set(BMesh *bm, BMDim *e, const bool select)
+{
+	//MECHANICAL: TODO
+}
+#endif
 
 /**
  * \brief Select Face

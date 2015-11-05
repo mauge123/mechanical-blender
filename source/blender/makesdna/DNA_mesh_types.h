@@ -127,6 +127,14 @@ typedef struct Mesh {
 	short totcol;
 
 	struct Multires *mr DNA_DEPRECATED; /* deprecated multiresolution modeling data, only keep for loading old files */
+
+	/* WITH_MECHANICAL_MESH_DIMENSIONS */
+	struct MDim *mdim;	/* array of dimensions */
+	int totdim;
+	char pad3[4];
+	struct CustomData ddata;
+
+
 } Mesh;
 
 /* deprecated by MTFace, only here for file reading */

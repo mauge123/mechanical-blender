@@ -265,6 +265,8 @@ typedef struct BMesh {
 	BMDim **dtable;
 	int dtable_tot;
 
+	CustomData ddata;
+
 #endif
 
 } BMesh;
