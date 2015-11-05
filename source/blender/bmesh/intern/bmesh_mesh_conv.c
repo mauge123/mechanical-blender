@@ -654,6 +654,9 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	CustomData_free(&me->fdata, me->totface);
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_free(&me->ddata, me->totdim);
+#endif
 
 
 	/* add new custom data */
@@ -674,12 +677,14 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	CustomData_copy(&bm->edata, &me->edata, CD_MASK_MESH, CD_CALLOC, me->totedge);
 	CustomData_copy(&bm->ldata, &me->ldata, CD_MASK_MESH, CD_CALLOC, me->totloop);
 	CustomData_copy(&bm->pdata, &me->pdata, CD_MASK_MESH, CD_CALLOC, me->totpoly);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_copy(&bm->ddata, &me->ddata, CD_MASK_MESH, CD_CALLOC, me->totdim);
+#endif
 
 	CustomData_add_layer(&me->vdata, CD_MVERT, CD_ASSIGN, mvert, me->totvert);
 	CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, me->totedge);
 	CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
 	CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
-
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	CustomData_add_layer(&me->ddata, CD_MDIM, CD_ASSIGN, mdim, me->totdim);
 #endif
