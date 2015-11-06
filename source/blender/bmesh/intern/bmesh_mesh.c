@@ -1449,6 +1449,18 @@ BMVert *BM_vert_at_index_find_or_table(BMesh *bm, const int index)
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+BMDim *BM_dim_at_index_find_or_table(BMesh *bm, const int index)
+{
+	if ((bm->elem_table_dirty & BM_DIM) == 0) {
+		return (index < bm->totdim) ? bm->dtable[index] : NULL;
+	}
+	else {
+		return BM_vert_at_index_find(bm, index);
+	}
+}
+#endif
+
 BMEdge *BM_edge_at_index_find_or_table(BMesh *bm, const int index)
 {
 	if ((bm->elem_table_dirty & BM_EDGE) == 0) {

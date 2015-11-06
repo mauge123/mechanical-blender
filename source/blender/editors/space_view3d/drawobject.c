@@ -2709,12 +2709,12 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
  * /param no1 normal for vertex 1
  * /param no2 normal for vertex 2
  */
-static void draw_dm_dims__mapFunc(void *userData, int index, const float no1[3],const float no2[3])
+static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
 {
 	drawDMDims_userData *data = userData;
 	BMEditMesh *em = data->em;
 	ARegion *ar = data->ar;
-	BMDim *edm = BM_dim_at_index(em->bm, index);
+	BMDim *	edm = BM_dim_at_index(em->bm, index);
 
 	float end[3], start[3];
 	float temp[3];
@@ -2727,7 +2727,7 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float no1[3],
 
 	//Use only one normal, as the lines should be parallel!
 	sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
-	cross_v3_v3v3(temp,d,no1);
+	cross_v3_v3v3(temp,d,edm->v1->co);
 	cross_v3_v3v3(n1,temp,d);
 	normalize_v3(n1);
 	add_v3_v3v3(start,n1, edm->v1->co);
@@ -2740,6 +2740,9 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float no1[3],
 	sub_v3_v3v3(txt_pos, end, start);
 	mul_v3_fl(txt_pos, 0.5);
 	add_v3_v3(txt_pos, start);
+
+	//Store location
+	copy_v3_v3(edm->dpos, txt_pos);
 
 
 	glBegin(GL_POINTS);
@@ -2765,8 +2768,13 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float no1[3],
 	{
 		char numstr[32]; /* Stores the measurement display text here */
 		size_t numstr_len;
-		unsigned char col[4] = {0, 0, 0, 255}; /* color of the text to draw */
+		unsigned char col_sel[4]; /* color of the text to draw */
+		unsigned char col_unsel[4]; /* color of the text to draw */
 		bglMats mats = {{0}};
+
+		UI_GetThemeColor4ubv(TH_TEXT, col_unsel);
+		UI_GetThemeColor4ubv(TH_SELECT, col_sel);
+
 
 		//draw dimension length
 		view3d_get_transformation(ar, ar->regiondata, em->ob, &mats);
@@ -2774,7 +2782,8 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float no1[3],
 
 		numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(edm->v1->co, edm->v2->co));
 
-		view3d_cached_text_draw_add(txt_pos, numstr, numstr_len, 0, txt_flag, col);
+		view3d_cached_text_draw_add(txt_pos, numstr, numstr_len, 0, txt_flag,
+		                            (BM_elem_flag_test(edm, BM_ELEM_SELECT) ? col_sel : col_unsel));
 	}
 
 }

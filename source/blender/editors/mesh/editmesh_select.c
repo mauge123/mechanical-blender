@@ -488,6 +488,100 @@ BMVert *EDBM_vert_find_nearest_ex(
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct NearestDimUserData_Hit {
+	float   dist;
+	float   dist_bias;
+	int     index;
+	BMDim *dim;
+};
+
+struct NearestDimUserData {
+	float mval_fl[2];
+	bool use_select_bias;
+	bool use_cycle;
+	int cycle_index_prev;
+
+	struct NearestDimUserData_Hit hit;
+	struct NearestDimUserData_Hit hit_cycle;
+};
+
+static void findnearestdim__doClosest(void *userData, BMDim *edm, const float screen_co[2], int index)
+{
+	struct NearestDimUserData *data = userData;
+	float dist_test, dist_test_bias;
+
+	dist_test = dist_test_bias = len_manhattan_v2v2(data->mval_fl, screen_co);
+
+	if (data->use_select_bias && BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+		dist_test_bias += FIND_NEAR_SELECT_BIAS;
+	}
+
+	if (dist_test_bias < data->hit.dist_bias) {
+		data->hit.dist_bias = dist_test_bias;
+		data->hit.dist = dist_test;
+		data->hit.index = index;
+		data->hit.dim = edm;
+	}
+
+	if (data->use_cycle) {
+		if ((data->hit_cycle.dim == NULL) &&
+		    (index > data->cycle_index_prev) &&
+		    (dist_test_bias < FIND_NEAR_CYCLE_THRESHOLD_MIN))
+		{
+			data->hit_cycle.dist_bias = dist_test_bias;
+			data->hit_cycle.dist = dist_test;
+			data->hit_cycle.index = index;
+			data->hit_cycle.dim = edm;
+		}
+	}
+}
+
+
+
+BMDim *EDBM_dim_find_nearest_ex(
+        ViewContext *vc, float *r_dist,
+        const bool use_select_bias, bool use_cycle)
+{
+	BMesh *bm = vc->em->bm;
+
+	struct NearestDimUserData data = {{0}};
+	const struct NearestDimUserData_Hit *hit;
+	const eV3DProjTest clip_flag = V3D_PROJ_TEST_CLIP_DEFAULT;
+
+	static int prev_select_index = 0;
+	static const BMDim *prev_select_elem = NULL;
+
+	if ((use_cycle == false) ||
+	    (prev_select_elem && (prev_select_elem != BM_dim_at_index_find_or_table(bm, prev_select_index))))
+	{
+		prev_select_index = 0;
+		prev_select_elem = NULL;
+	}
+
+	data.mval_fl[0] = vc->mval[0];
+	data.mval_fl[1] = vc->mval[1];
+	data.use_select_bias = use_select_bias;
+	data.use_cycle = use_cycle;
+	data.hit.dist      = data.hit_cycle.dist = \
+	data.hit.dist_bias = data.hit_cycle.dist_bias = *r_dist;
+	data.cycle_index_prev = prev_select_index;
+
+	ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
+	mesh_foreachScreenDim(vc, findnearestdim__doClosest, &data, clip_flag);
+
+	hit = (data.use_cycle && data.hit_cycle.dim) ? &data.hit_cycle : &data.hit;
+	*r_dist = hit->dist;
+
+	prev_select_elem = hit->dim;
+	prev_select_index = hit->index;
+
+	return hit->dim;
+
+
+}
+#endif
+
 BMVert *EDBM_vert_find_nearest(ViewContext *vc, float *r_dist)
 {
 	return EDBM_vert_find_nearest_ex(vc, r_dist, false, false);
@@ -876,7 +970,11 @@ BMFace *EDBM_face_find_nearest(ViewContext *vc, float *r_dist)
  * selected vertices and edges get disadvantage
  * return 1 if found one
  */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, BMFace **r_efa, BMDim **r_edm)
+#else
 static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, BMFace **r_efa)
+#endif
 {
 	BMEditMesh *em = vc->em;
 	static short mval_prev[2] = {-1, -1};
@@ -892,6 +990,9 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	BMVert *eve = NULL;
 	BMEdge *eed = NULL;
 	BMFace *efa = NULL;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BMDim *edm = NULL;
+#endif
 
 
 	/* no afterqueue (yet), so we check it now, otherwise the em_xxxofs indices are bad */
@@ -918,9 +1019,17 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	if ((dist > 0.0f) && em->selectmode & SCE_SELECT_VERTEX) {
 		eve = EDBM_vert_find_nearest_ex(vc, &dist, true, use_cycle);
 	}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (dist > 0.0f) {
+		edm = EDBM_dim_find_nearest_ex(vc, &dist,true,use_cycle);
+	}
+#endif
 
-	/* return only one of 3 pointers, for frontbuffer redraws */
-	if (eve) {
+	/* return only one of 4 pointers, for frontbuffer redraws */
+	if (edm) {
+		eve = NULL, efa = NULL; eed = NULL;
+	}
+	else if (eve) {
 		efa = NULL; eed = NULL;
 	}
 	else if (eed) {
@@ -929,7 +1038,7 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 
 	/* there may be a face under the cursor, who's center if too far away
 	 * use this if all else fails, it makes sense to select this */
-	if ((eve || eed || efa) == 0) {
+	if ((edm || eve || eed || efa) == 0) {
 		if (eed_zbuf) {
 			eed = eed_zbuf;
 		}
@@ -944,8 +1053,9 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	*r_eve = eve;
 	*r_eed = eed;
 	*r_efa = efa;
+	*r_edm = edm;
 
-	return (eve || eed || efa);
+	return (edm || eve || eed || efa);
 }
 
 /** \} */
@@ -1814,13 +1924,16 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 	BMVert *eve = NULL;
 	BMEdge *eed = NULL;
 	BMFace *efa = NULL;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BMDim *edm = NULL;
+#endif
 
 	/* setup view context for argument to callbacks */
 	em_setup_viewcontext(C, &vc);
 	vc.mval[0] = mval[0];
 	vc.mval[1] = mval[1];
 
-	if (unified_findnearest(&vc, &eve, &eed, &efa)) {
+	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm)) {
 
 		/* Deselect everything */
 		if (extend == false && deselect == false && toggle == false)
@@ -1904,7 +2017,32 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				}
 			}
 		}
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		else if (edm) {
+			if (extend) {
+				/* Work-around: deselect first, so we can guarantee it will */
+				/* be active even if it was already selected */
+				BM_select_history_remove(vc.em->bm, edm);
+				BM_dim_select_set(vc.em->bm, edm, false);
+				BM_select_history_store(vc.em->bm, edm);
+				BM_dim_select_set(vc.em->bm, edm, true);
+			}
+			else if (deselect) {
+				BM_select_history_remove(vc.em->bm, edm);
+				BM_dim_select_set(vc.em->bm, edm, false);
+			}
+			else {
+				if (!BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+					BM_select_history_store(vc.em->bm, edm);
+					BM_dim_select_set(vc.em->bm, edm, true);
+				}
+				else if (toggle) {
+					BM_select_history_remove(vc.em->bm, edm);
+					BM_dim_select_set(vc.em->bm, edm, false);
+				}
+			}
+		}
+#endif
 		EDBM_selectmode_flush(vc.em);
 
 		/* change active material on object */
@@ -2722,6 +2860,9 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 	BMVert *eve;
 	BMEdge *eed;
 	BMFace *efa;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BMDim *edm;
+#endif
 	const bool sel = !RNA_boolean_get(op->ptr, "deselect");
 	const int delimit = RNA_enum_get(op->ptr, "delimit");
 	int index;
@@ -2746,7 +2887,7 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 	vc.mval[1] = event->mval[1];
 
 	/* return warning! */
-	if (unified_findnearest(&vc, &eve, &eed, &efa) == 0) {
+	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm) == 0) {
 		WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit);
 
 		return OPERATOR_CANCELLED;

@@ -163,6 +163,12 @@ struct BMFace *EDBM_face_find_nearest_ex(
 struct BMFace *EDBM_face_find_nearest(
         struct ViewContext *vc, float *r_dist);
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct BMDim *EDBM_dim_find_nearest_ex(
+        struct ViewContext *vc, float *r_dist,
+        const bool use_select_bias, bool use_cycle);
+#endif
+
 bool EDBM_select_pick(struct bContext *C, const int mval[2], bool extend, bool deselect, bool toggle);
 
 void EDBM_selectmode_set(struct BMEditMesh *em);

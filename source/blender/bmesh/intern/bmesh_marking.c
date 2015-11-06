@@ -469,9 +469,26 @@ void BM_edge_select_set(BMesh *bm, BMEdge *e, const bool select)
  * @param e
  * @param select
  */
-void BM_dim_select_set(BMesh *bm, BMDim *e, const bool select)
+void BM_dim_select_set(BMesh *bm, BMDim *d, const bool select)
 {
-	//MECHANICAL: TODO
+	BLI_assert(d->head.htype == BM_DIM);
+
+	if (BM_elem_flag_test(d, BM_ELEM_HIDDEN)) {
+		return;
+	}
+
+	if (select) {
+		if (!BM_elem_flag_test(d, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(d, BM_ELEM_SELECT);
+			bm->totdimsel += 1;
+		}
+	}
+	else {
+		if (BM_elem_flag_test(d, BM_ELEM_SELECT)) {
+			bm->totdimsel -= 1;
+			BM_elem_flag_disable(d, BM_ELEM_SELECT);
+		}
+	}
 }
 #endif
 
@@ -1068,11 +1085,12 @@ void BM_mesh_elem_hflag_disable_test(
         BMesh *bm, const char htype, const char hflag,
         const bool respecthide, const bool overwrite, const char hflag_test)
 {
-	const char iter_types[3] = {BM_VERTS_OF_MESH,
+	const char iter_types[3] = {BM_DIMS_OF_MESH,
+								BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 
-	const char flag_types[3] = {BM_VERT, BM_EDGE, BM_FACE};
+	const char flag_types[3] = {BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
 
 	const char hflag_nosel = hflag & ~BM_ELEM_SELECT;
 
@@ -1084,7 +1102,7 @@ void BM_mesh_elem_hflag_disable_test(
 		BM_select_history_clear(bm);
 	}
 
-	if ((htype == (BM_VERT | BM_EDGE | BM_FACE)) &&
+	if ((htype == (BM_DIM | BM_VERT | BM_EDGE | BM_FACE)) &&
 	    (hflag == BM_ELEM_SELECT) &&
 	    (respecthide == false) &&
 	    (hflag_test == 0))
