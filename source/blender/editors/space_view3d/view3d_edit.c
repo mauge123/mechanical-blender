@@ -630,28 +630,28 @@ static bool view3d_orbit_calc_center(bContext *C, float r_dyn_ofs[3])
 	bool is_set = false;
 
 	Scene *scene = CTX_data_scene(C);
-	Object *ob = OBACT;
+	Object *ob_act = OBACT;
 
-	if (ob && (ob->mode & OB_MODE_ALL_PAINT) &&
+	if (ob_act && (ob_act->mode & OB_MODE_ALL_PAINT) &&
 	    /* with weight-paint + pose-mode, fall through to using calculateTransformCenter */
-	    ((ob->mode & OB_MODE_WEIGHT_PAINT) && BKE_object_pose_armature_get(ob)) == 0)
+	    ((ob_act->mode & OB_MODE_WEIGHT_PAINT) && BKE_object_pose_armature_get(ob_act)) == 0)
 	{
 		/* in case of sculpting use last average stroke position as a rotation
 		 * center, in other cases it's not clear what rotation center shall be
 		 * so just rotate around object origin
 		 */
-		if (ob->mode & (OB_MODE_SCULPT | OB_MODE_TEXTURE_PAINT | OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT)) {
+		if (ob_act->mode & (OB_MODE_SCULPT | OB_MODE_TEXTURE_PAINT | OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT)) {
 			float stroke[3];
-			BKE_paint_stroke_get_average(scene, ob, stroke);
+			BKE_paint_stroke_get_average(scene, ob_act, stroke);
 			copy_v3_v3(lastofs, stroke);
 		}
 		else {
-			copy_v3_v3(lastofs, ob->obmat[3]);
+			copy_v3_v3(lastofs, ob_act->obmat[3]);
 		}
 		is_set = true;
 	}
-	else if (ob && (ob->mode & OB_MODE_EDIT) && (ob->type == OB_FONT)) {
-		Curve *cu = ob->data;
+	else if (ob_act && (ob_act->mode & OB_MODE_EDIT) && (ob_act->type == OB_FONT)) {
+		Curve *cu = ob_act->data;
 		EditFont *ef = cu->editfont;
 		int i;
 
@@ -661,11 +661,11 @@ static bool view3d_orbit_calc_center(bContext *C, float r_dyn_ofs[3])
 		}
 		mul_v2_fl(lastofs, 1.0f / 4.0f);
 
-		mul_m4_v3(ob->obmat, lastofs);
+		mul_m4_v3(ob_act->obmat, lastofs);
 
 		is_set = true;
 	}
-	else if (ob == NULL || ob->mode == OB_MODE_OBJECT) {
+	else if (ob_act == NULL || ob_act->mode == OB_MODE_OBJECT) {
 		/* object mode use boundbox centers */
 		View3D *v3d = CTX_wm_view3d(C);
 		Base *base;
@@ -700,7 +700,7 @@ static bool view3d_orbit_calc_center(bContext *C, float r_dyn_ofs[3])
 	}
 	else {
 		/* If there's no selection, lastofs is unmodified and last value since static */
-		is_set = calculateTransformCenter(C, V3D_CENTROID, lastofs, NULL);
+		is_set = calculateTransformCenter(C, V3D_AROUND_CENTER_MEAN, lastofs, NULL);
 	}
 
 	copy_v3_v3(r_dyn_ofs, lastofs);
@@ -3757,7 +3757,7 @@ static void axis_set_view(bContext *C, View3D *v3d, ARegion *ar,
 			float twmat[3][3];
 
 			/* same as transform manipulator when normal is set */
-			ED_getTransformOrientationMatrix(C, twmat, V3D_ACTIVE);
+			ED_getTransformOrientationMatrix(C, twmat, V3D_AROUND_ACTIVE);
 
 			mat3_to_quat(obact_quat, twmat);
 			invert_qt_normalized(obact_quat);
@@ -5146,4 +5146,86 @@ void ED_view3D_lock_clear(View3D *v3d)
 	v3d->ob_centre_bone[0] = '\0';
 	v3d->ob_centre_cursor = false;
 	v3d->flag2 &= ~V3D_LOCK_CAMERA;
+}
+
+/**
+ * Convenience function for snap ray-casting.
+ *
+ * Given a ray, cast it into the scene (snapping to faces).
+ *
+ * \return Snap success
+ */
+bool ED_view3d_snap_from_ray(
+        Scene *scene,
+        const float ray_start[3], const float ray_normal[3],
+        float r_co[3])
+{
+	float r_no_dummy[3];
+	float ray_dist = TRANSFORM_DIST_MAX_RAY;
+	bool ret;
+
+	struct Object *obedit = scene->obedit;
+
+	/* try snap edge, then face if it fails */
+	ret = snapObjectsRayEx(
+	        scene, NULL, NULL, NULL, obedit,
+	        NULL, SNAP_ALL, SCE_SNAP_MODE_FACE,
+	        ray_start, ray_normal, &ray_dist,
+	        r_co, r_no_dummy, NULL, NULL,
+	        NULL, NULL);
+
+	return ret;
+}
+
+/**
+ * Convenience function for performing snapping.
+ *
+ * Given a 2D region value, snap to vert/edge/face.
+ *
+ * \param mval: Screenspace coordinate.
+ * \param dist_px: Maximum distance to snap (in pixels).
+ * \param use_depth: Snap to the closest element, use when using more than one snap type.
+ * \param use_obedit: Use editmode cage.
+ * \param use_vert: Snap to verts.
+ * \param use_edge: Snap to edges.
+ * \param use_face: Snap to faces.
+ * \param r_co: hit location.
+ * \param r_no: hit normal (optional).
+ * \return Snap success
+ */
+bool ED_view3d_snap_from_region(
+        Scene *scene, View3D *v3d, ARegion *ar,
+        const float mval[2], float dist_px,
+        bool use_depth, bool use_obedit,
+        bool use_vert, bool use_edge, bool use_face,
+        float r_co[3], float r_no[3])
+{
+	float r_no_dummy[3];
+	float ray_dist = TRANSFORM_DIST_MAX_RAY;
+	bool is_hit = false;
+	float *r_no_ptr = r_no ? r_no : r_no_dummy;
+
+	struct Object *obedit = use_obedit ? scene->obedit : NULL;
+	const int  elem_type[3] = {SCE_SNAP_MODE_VERTEX, SCE_SNAP_MODE_EDGE, SCE_SNAP_MODE_FACE};
+	const bool elem_test[3] = {use_vert, use_edge, use_face};
+
+	BLI_assert(use_vert || use_edge || use_face);
+
+	for (int i = 0; i < 3; i++) {
+		if (elem_test[i] && (is_hit == false || use_depth)) {
+			if (use_depth == false) {
+				ray_dist = TRANSFORM_DIST_MAX_RAY;
+			}
+			if (snapObjectsEx(
+			        scene, v3d, ar, NULL, obedit,
+			        mval, SNAP_ALL, elem_type[i],
+			        &ray_dist,
+			        r_co, r_no_ptr, &dist_px))
+			{
+				is_hit = true;
+			}
+		}
+	}
+
+	return is_hit;
 }

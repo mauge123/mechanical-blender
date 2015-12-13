@@ -64,8 +64,35 @@ ccl_device void compute_light_pass(KernelGlobals *kg, ShaderData *sd, PathRadian
 		/* sample subsurface scattering */
 		if((is_combined || is_sss_sample) && (sd->flag & SD_BSSRDF)) {
 			/* when mixing BSSRDF and BSDF closures we should skip BSDF lighting if scattering was successful */
-			if(kernel_path_subsurface_scatter(kg, sd, &L_sample, &state, &rng, &ray, &throughput))
+			SubsurfaceIndirectRays ss_indirect;
+			kernel_path_subsurface_init_indirect(&ss_indirect);
+			if(kernel_path_subsurface_scatter(kg,
+			                                  sd,
+			                                  &L_sample,
+			                                  &state,
+			                                  &rng,
+			                                  &ray,
+			                                  &throughput,
+			                                  &ss_indirect))
+			{
+				while(ss_indirect.num_rays) {
+					kernel_path_subsurface_setup_indirect(kg,
+					                                      &ss_indirect,
+					                                      &state,
+					                                      &ray,
+					                                      &L_sample,
+					                                      &throughput);
+					kernel_path_indirect(kg,
+					                     &rng,
+					                     &ray,
+					                     throughput,
+					                     state.num_samples,
+					                     &state,
+					                     &L_sample);
+					kernel_path_subsurface_accum_indirect(&ss_indirect, &L_sample);
+				}
 				is_sss_sample = true;
+			}
 		}
 #endif
 
@@ -84,7 +111,7 @@ ccl_device void compute_light_pass(KernelGlobals *kg, ShaderData *sd, PathRadian
 				state.ray_t = 0.0f;
 #endif
 				/* compute indirect light */
-				kernel_path_indirect(kg, &rng, ray, throughput, 1, state, &L_sample);
+				kernel_path_indirect(kg, &rng, &ray, throughput, 1, &state, &L_sample);
 
 				/* sum and reset indirect light pass variables for the next samples */
 				path_radiance_sum_indirect(&L_sample);

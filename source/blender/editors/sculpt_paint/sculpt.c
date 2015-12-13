@@ -4677,7 +4677,7 @@ static void SCULPT_OT_set_persistent_base(wmOperatorType *ot)
 static void sculpt_dynamic_topology_triangulate(BMesh *bm)
 {
 	if (bm->totloop != bm->totface * 3) {
-		BM_mesh_triangulate(bm, MOD_TRIANGULATE_QUAD_FIXED, MOD_TRIANGULATE_NGON_EARCLIP, false, NULL, NULL);
+		BM_mesh_triangulate(bm, MOD_TRIANGULATE_QUAD_BEAUTY, MOD_TRIANGULATE_NGON_EARCLIP, false, NULL, NULL, NULL);
 	}
 }
 
@@ -5148,6 +5148,9 @@ static int sculpt_mode_toggle_exec(bContext *C, wmOperator *op)
 
 		paint_cursor_start(C, sculpt_poll_view3d);
 	}
+
+	if (ob->derivedFinal) /* VBO no longer valid */
+		GPU_drawobject_free(ob->derivedFinal);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_MODE, scene);
 

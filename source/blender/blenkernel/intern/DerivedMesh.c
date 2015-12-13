@@ -52,6 +52,7 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_editmesh.h"
 #include "BKE_key.h"
+#include "BKE_library.h"
 #include "BKE_material.h"
 #include "BKE_modifier.h"
 #include "BKE_mesh.h"
@@ -73,8 +74,8 @@ static DerivedMesh *navmesh_dm_createNavMeshForVisualization(DerivedMesh *dm);
 #include "BLI_sys_types.h" /* for intptr_t support */
 
 #include "GPU_buffers.h"
-#include "GPU_extensions.h"
 #include "GPU_glew.h"
+#include "GPU_shader.h"
 
 #ifdef WITH_OPENSUBDIV
 #  include "DNA_userdef_types.h"
@@ -581,7 +582,6 @@ void DM_update_tessface_data(DerivedMesh *dm)
 
 void DM_generate_tangent_tessface_data(DerivedMesh *dm, bool generate)
 {
-	int i;
 	MFace *mf, *mface = dm->getTessFaceArray(dm);
 	MPoly *mp = dm->getPolyArray(dm);
 	MLoop *ml = dm->getLoopArray(dm);
@@ -601,9 +601,10 @@ void DM_generate_tangent_tessface_data(DerivedMesh *dm, bool generate)
 		return;
 
 	if (generate) {
-		for (i = 0; i < ldata->totlayer; i++) {
-			if (ldata->layers[i].type == CD_TANGENT)
+		for (int i = 0; i < ldata->totlayer; i++) {
+			if (ldata->layers[i].type == CD_TANGENT) {
 				CustomData_add_layer_named(fdata, CD_TANGENT, CD_CALLOC, NULL, totface, ldata->layers[i].name);
+			}
 		}
 		CustomData_bmesh_update_active_layers(fdata, pdata, ldata);
 	}
@@ -800,7 +801,8 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	 * stack*/
 	if (tmp.totvert != me->totvert && !did_shapekeys && me->key) {
 		printf("%s: YEEK! this should be recoded! Shape key loss!: ID '%s'\n", __func__, tmp.id.name);
-		if (tmp.key) tmp.key->id.us--;
+		if (tmp.key)
+			id_us_min(&tmp.key->id);
 		tmp.key = NULL;
 	}
 
@@ -3429,7 +3431,7 @@ void DM_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert,
 		if (attribs->orco.gl_texco)
 			glTexCoord3fv(orco);
 		else
-			glVertexAttrib3fvARB(attribs->orco.gl_index, orco);
+			glVertexAttrib3fv(attribs->orco.gl_index, orco);
 	}
 
 	/* uv texture coordinates */
@@ -3447,7 +3449,7 @@ void DM_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert,
 		if (attribs->tface[b].gl_texco)
 			glTexCoord2fv(uv);
 		else
-			glVertexAttrib2fvARB(attribs->tface[b].gl_index, uv);
+			glVertexAttrib2fv(attribs->tface[b].gl_index, uv);
 	}
 
 	/* vertex colors */
@@ -3462,14 +3464,14 @@ void DM_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert,
 			col[0] = 0; col[1] = 0; col[2] = 0; col[3] = 0;
 		}
 
-		glVertexAttrib4ubvARB(attribs->mcol[b].gl_index, col);
+		glVertexAttrib4ubv(attribs->mcol[b].gl_index, col);
 	}
 
 	/* tangent for normal mapping */
 	if (attribs->tottang) {
 		/*const*/ float (*array)[4] = attribs->tang.array;
 		const float *tang = (array) ? array[loop] : zero;
-		glVertexAttrib4fvARB(attribs->tang.gl_index, tang);
+		glVertexAttrib4fv(attribs->tang.gl_index, tang);
 	}
 }
 
@@ -3527,14 +3529,11 @@ static void navmesh_drawColored(DerivedMesh *dm)
 
 #if 0
 	//UI_ThemeColor(TH_WIRE);
-	glDisable(GL_LIGHTING);
 	glLineWidth(2.0);
 	dm->drawEdges(dm, 0, 1);
 	glLineWidth(1.0);
-	glEnable(GL_LIGHTING);
 #endif
 
-	glDisable(GL_LIGHTING);
 	/* if (GPU_buffer_legacy(dm) ) */ /* TODO - VBO draw code, not high priority - campbell */
 	{
 		DEBUG_VBO("Using legacy code. drawNavMeshColored\n");
@@ -3564,7 +3563,6 @@ static void navmesh_drawColored(DerivedMesh *dm)
 		}
 		glEnd();
 	}
-	glEnable(GL_LIGHTING);
 }
 
 static void navmesh_DM_drawFacesTex(
