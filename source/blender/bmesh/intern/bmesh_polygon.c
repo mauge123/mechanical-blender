@@ -38,9 +38,12 @@
 #include "BLI_memarena.h"
 #include "BLI_polyfill2d.h"
 #include "BLI_polyfill2d_beautify.h"
+#include "BLI_linklist.h"
 
 #include "bmesh.h"
 #include "bmesh_tools.h"
+
+#include "BKE_customdata.h"
 
 #include "intern/bmesh_private.h"
 
@@ -147,10 +150,14 @@ static void bm_face_calc_poly_center_mean_vertex_cos(
 /**
  * For tools that insist on using triangles, ideally we would cache this data.
  *
- * \param r_loops  Store face loop pointers, (f->len)
- * \param r_index  Store triangle triples, indices into \a r_loops,  ((f->len - 2) * 3)
+ * \param use_fixed_quad: When true, always split quad along (0 -> 2) regardless of concave corners,
+ * (as done in #BM_mesh_calc_tessellation).
+ * \param r_loops: Store face loop pointers, (f->len)
+ * \param r_index: Store triangle triples, indices into \a r_loops,  `((f->len - 2) * 3)`
  */
-void BM_face_calc_tessellation(const BMFace *f, BMLoop **r_loops, unsigned int (*r_index)[3])
+void BM_face_calc_tessellation(
+        const BMFace *f, const bool use_fixed_quad,
+        BMLoop **r_loops, unsigned int (*r_index)[3])
 {
 	BMLoop *l_first = BM_FACE_FIRST_LOOP(f);
 	BMLoop *l_iter;
@@ -164,7 +171,7 @@ void BM_face_calc_tessellation(const BMFace *f, BMLoop **r_loops, unsigned int (
 		r_index[0][1] = 1;
 		r_index[0][2] = 2;
 	}
-	else if (f->len == 4) {
+	else if (f->len == 4 && use_fixed_quad) {
 		*r_loops++ = (l_iter = l_first);
 		*r_loops++ = (l_iter = l_iter->next);
 		*r_loops++ = (l_iter = l_iter->next);
@@ -196,6 +203,46 @@ void BM_face_calc_tessellation(const BMFace *f, BMLoop **r_loops, unsigned int (
 		/* complete the loop */
 		BLI_polyfill_calc((const float (*)[2])projverts, f->len, -1, r_index);
 	}
+}
+
+/**
+ * Return a point inside the face.
+ */
+void BM_face_calc_point_in_face(const BMFace *f, float r_co[3])
+{
+	const BMLoop *l_tri[3];
+
+	if (f->len == 3) {
+		const BMLoop *l = BM_FACE_FIRST_LOOP(f);
+		ARRAY_SET_ITEMS(l_tri, l, l->next, l->prev);
+	}
+	else {
+		/* tessellation here seems overkill when in many cases this will be the center,
+		 * but without this we can't be sure the point is inside a concave face. */
+		const int tottri = f->len - 2;
+		BMLoop **loops = BLI_array_alloca(loops, f->len);
+		unsigned int  (*index)[3] = BLI_array_alloca(index, tottri);
+		int j;
+		int j_best = 0;  /* use as fallback when unset */
+		float area_best  = -1.0f;
+
+		BM_face_calc_tessellation(f, false, loops, index);
+
+		for (j = 0; j < tottri; j++) {
+			const float *p1 = loops[index[j][0]]->v->co;
+			const float *p2 = loops[index[j][1]]->v->co;
+			const float *p3 = loops[index[j][2]]->v->co;
+			const float area = area_squared_tri_v3(p1, p2, p3);
+			if (area > area_best) {
+				j_best = j;
+				area_best = area;
+			}
+		}
+
+		ARRAY_SET_ITEMS(l_tri, loops[index[j_best][0]], loops[index[j_best][1]], loops[index[j_best][2]]);
+	}
+
+	mid_v3_v3v3v3(r_co, l_tri[0]->v->co, l_tri[1]->v->co, l_tri[2]->v->co);
 }
 
 /**
@@ -765,6 +812,12 @@ bool BM_face_point_inside_test(const BMFace *f, const float co[3])
  * with a length equal to (f->len - 3). It will be filled with the new
  * triangles (not including the original triangle).
  *
+ * \param r_faces_double: When newly created faces are duplicates of existing faces, they're added to this list.
+ * Caller must handle de-duplication.
+ * This is done because its possible _all_ faces exist already,
+ * and in that case we would have to remove all faces including the one passed,
+ * which causes complications adding/removing faces while looking over them.
+ *
  * \note The number of faces is _almost_ always (f->len - 3),
  *       However there may be faces that already occupying the
  *       triangles we would make, so the caller must check \a r_faces_new_tot.
@@ -777,6 +830,7 @@ void BM_face_triangulate(
         int     *r_faces_new_tot,
         BMEdge **r_edges_new,
         int     *r_edges_new_tot,
+        LinkNode **r_faces_double,
         const int quad_method,
         const int ngon_method,
         const bool use_tag,
@@ -785,11 +839,12 @@ void BM_face_triangulate(
         /* use for MOD_TRIANGULATE_NGON_BEAUTY only! */
         struct Heap *pf_heap, struct EdgeHash *pf_ehash)
 {
-	BMLoop *l_iter, *l_first, *l_new;
+	const int cd_loop_mdisp_offset = CustomData_get_offset(&bm->ldata, CD_MDISPS);
+	const bool use_beauty = (ngon_method == MOD_TRIANGULATE_NGON_BEAUTY);
+	BMLoop *l_first, *l_new;
 	BMFace *f_new;
 	int nf_i = 0;
 	int ne_i = 0;
-	bool use_beauty = (ngon_method == MOD_TRIANGULATE_NGON_BEAUTY);
 
 	BLI_assert(BM_face_is_normal_valid(f));
 
@@ -804,6 +859,8 @@ void BM_face_triangulate(
 		const int totfilltri = f->len - 2;
 		const int last_tri = f->len - 3;
 		int i;
+		/* for mdisps */
+		float f_center[3];
 
 		if (f->len == 4) {
 			/* even though we're not using BLI_polyfill, fill in 'tris' and 'loops'
@@ -879,6 +936,7 @@ void BM_face_triangulate(
 			ARRAY_SET_ITEMS(tris[1], 0, 2, 3);
 		}
 		else {
+			BMLoop *l_iter;
 			float axis_mat[3][3];
 			float (*projverts)[2] = BLI_array_alloca(projverts, f->len);
 
@@ -901,9 +959,12 @@ void BM_face_triangulate(
 			BLI_memarena_clear(pf_arena);
 		}
 
+		if (cd_loop_mdisp_offset != -1) {
+			BM_face_calc_center_mean(f, f_center);
+		}
+
 		/* loop over calculated triangles and create new geometry */
 		for (i = 0; i < totfilltri; i++) {
-			/* the order is reverse, otherwise the normal is flipped */
 			BMLoop *l_tri[3] = {
 			    loops[tris[i][0]],
 			    loops[tris[i][1]],
@@ -918,6 +979,18 @@ void BM_face_triangulate(
 			l_new = BM_FACE_FIRST_LOOP(f_new);
 
 			BLI_assert(v_tri[0] == l_new->v);
+
+			/* check for duplicate */
+			if (l_new->radial_next != l_new) {
+				BMLoop *l_iter = l_new->radial_next;
+				do {
+					if (UNLIKELY((l_iter->f->len == 3) && (l_new->prev->v == l_iter->prev->v))) {
+						/* Check the last tri because we swap last f_new with f at the end... */
+						BLI_linklist_prepend(r_faces_double, (i != last_tri) ? f_new : f);
+						break;
+					}
+				} while ((l_iter = l_iter->radial_next) != l_new);
+			}
 
 			/* copy CD data */
 			BM_elem_attrs_copy(bm, bm, l_tri[0], l_new);
@@ -936,6 +1009,8 @@ void BM_face_triangulate(
 
 			if (use_tag || r_edges_new) {
 				/* new faces loops */
+				BMLoop *l_iter;
+
 				l_iter = l_first = l_new;
 				do {
 					BMEdge *e = l_iter->e;
@@ -953,6 +1028,12 @@ void BM_face_triangulate(
 					}
 					/* note, never disable tag's */
 				} while ((l_iter = l_iter->next) != l_first);
+			}
+
+			if (cd_loop_mdisp_offset != -1) {
+				float f_new_center[3];
+				BM_face_calc_center_mean(f_new, f_new_center);
+				BM_face_interp_multires_ex(bm, f_new, f, f_new_center, f_center, cd_loop_mdisp_offset);
 			}
 		}
 

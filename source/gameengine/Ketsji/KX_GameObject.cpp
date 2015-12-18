@@ -700,10 +700,10 @@ void KX_GameObject::ApplyRotation(const MT_Vector3& drot,bool local)
 /**
  * GetOpenGL Matrix, returns an OpenGL 'compatible' matrix
  */
-double*	KX_GameObject::GetOpenGLMatrix()
+float *KX_GameObject::GetOpenGLMatrix()
 {
 	// todo: optimize and only update if necessary
-	double* fl = m_OpenGL_4x4Matrix.getPointer();
+	float *fl = m_OpenGL_4x4Matrix.getPointer();
 	if (GetSGNode()) {
 		MT_Transform trans;
 	
@@ -742,7 +742,7 @@ void KX_GameObject::AddMeshUser()
 		m_meshes[i]->AddMeshUser(this, &m_meshSlots, GetDeformer());
 	}
 	// set the part of the mesh slot that never change
-	double* fl = GetOpenGLMatrixPtr()->getPointer();
+	float *fl = GetOpenGLMatrixPtr()->getPointer();
 
 	SG_QList::iterator<RAS_MeshSlot> mit(m_meshSlots);
 //	RAS_MeshSlot* ms;
@@ -2768,7 +2768,7 @@ PyObject *KX_GameObject::pyattr_get_localTransform(void *self_v, const KX_PYATTR
 {
 	KX_GameObject* self = static_cast<KX_GameObject*>(self_v);
 
-	double mat[16];
+	float mat[16];
 
 	MT_Transform trans;
 	
@@ -3736,8 +3736,9 @@ KX_PYMETHODDEF_DOC(KX_GameObject, rayCastTo,
 
 	RayCastData rayData(propName, false, (1 << OB_MAX_COL_MASKS) - 1);
 	KX_RayCast::Callback<KX_GameObject, RayCastData> callback(this, spc, &rayData);
-	if (KX_RayCast::RayTest(pe, fromPoint, toPoint, callback))
+	if (KX_RayCast::RayTest(pe, fromPoint, toPoint, callback) && rayData.m_hitObject) {
 		return rayData.m_hitObject->GetProxy();
+	}
 	
 	Py_RETURN_NONE;
 }
@@ -3883,8 +3884,7 @@ KX_PYMETHODDEF_DOC(KX_GameObject, rayCast,
 	RayCastData rayData(propName, xray, mask);
 	KX_RayCast::Callback<KX_GameObject, RayCastData> callback(this, spc, &rayData, face, (poly == 2));
 
-	if (KX_RayCast::RayTest(pe, fromPoint, toPoint, callback))
-	{
+	if (KX_RayCast::RayTest(pe, fromPoint, toPoint, callback) && rayData.m_hitObject) {
 		PyObject *returnValue = (poly == 2) ? PyTuple_New(5) : (poly) ? PyTuple_New(4) : PyTuple_New(3);
 		if (returnValue) { // unlikely this would ever fail, if it does python sets an error
 			PyTuple_SET_ITEM(returnValue, 0, rayData.m_hitObject->GetProxy());

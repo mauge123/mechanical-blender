@@ -61,7 +61,10 @@
 #include "IMB_imbuf_types.h"
 
 #include "GPU_extensions.h"
+#include "GPU_framebuffer.h"
 #include "GPU_material.h"
+#include "GPU_shader.h"
+#include "GPU_texture.h"
 
 #include "gpu_codegen.h"
 
@@ -2275,11 +2278,7 @@ GPUShaderExport *GPU_shader_export(struct Scene *scene, struct Material *ma)
 	GPUMaterial *mat;
 	GPUInputUniform *uniform;
 	GPUInputAttribute *attribute;
-	GLint lastbindcode;
 	int i, liblen, fraglen;
-
-	if (!GPU_glsl_support())
-		return NULL;
 
 	/* TODO(sergey): How to detemine whether we need OSD or not here? */
 	mat = GPU_material_from_blender(scene, ma, false);
@@ -2313,12 +2312,11 @@ GPUShaderExport *GPU_shader_export(struct Scene *scene, struct Material *ma)
 				case GPU_TEX2D:
 					if (GPU_texture_opengl_bindcode(input->tex)) {
 						uniform->type = GPU_DYNAMIC_SAMPLER_2DBUFFER;
-						glGetIntegerv(GL_TEXTURE_BINDING_2D, &lastbindcode);
 						glBindTexture(GL_TEXTURE_2D, GPU_texture_opengl_bindcode(input->tex));
-						uniform->texsize = GPU_texture_opengl_width(input->tex) * GPU_texture_opengl_height(input->tex);
+						uniform->texsize = GPU_texture_width(input->tex) * GPU_texture_height(input->tex);
 						uniform->texpixels = MEM_mallocN(uniform->texsize*4, "RGBApixels");
 						glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, uniform->texpixels); 
-						glBindTexture(GL_TEXTURE_2D, lastbindcode);
+						glBindTexture(GL_TEXTURE_2D, 0);
 					}
 					break;
 

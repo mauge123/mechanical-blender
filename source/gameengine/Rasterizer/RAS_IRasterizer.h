@@ -267,7 +267,6 @@ public:
 	 * IndexPrimitives: Renders primitives from mesh slot.
 	 */
 	virtual void IndexPrimitives(class RAS_MeshSlot &ms) = 0;
-	virtual void IndexPrimitivesMulti(class RAS_MeshSlot &ms) = 0;
 
 	/**
 	 * IndexPrimitives_3DText will render text into the polygons.
@@ -423,7 +422,7 @@ public:
 	/**
 	 * Render Tools
 	 */
-	virtual void applyTransform(double *oglmatrix, int drawingmode) = 0;
+	virtual void applyTransform(float *oglmatrix, int drawingmode) = 0;
 
 	/**
 	 * Renders 2D boxes.
@@ -479,6 +478,11 @@ public:
 	virtual void SetClientObject(void *obj) = 0;
 
 	virtual void SetAuxilaryClientInfo(void *inf) = 0;
+
+	/**
+	 * Prints information about what the hardware supports.
+	 */
+	virtual void PrintHardwareInfo() = 0;
 
 #ifdef WITH_CXX_GUARDEDALLOC
 	MEM_CXX_CLASS_ALLOC_FUNCS("GE:RAS_IRasterizer")

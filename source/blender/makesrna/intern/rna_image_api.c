@@ -249,7 +249,6 @@ static int rna_Image_gl_load(Image *image, ReportList *reports, int frame, int f
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLint)filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLint)mag);
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
 	error = glGetError();
 
@@ -333,7 +332,7 @@ void RNA_api_image(StructRNA *srna)
 	func = RNA_def_function(srna, "unpack", "rna_Image_unpack");
 	RNA_def_function_ui_description(func, "Save an image packed in the .blend file to disk");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	RNA_def_enum(func, "method", unpack_method_items, PF_USE_LOCAL, "method", "How to unpack");
+	RNA_def_enum(func, "method", rna_enum_unpack_method_items, PF_USE_LOCAL, "method", "How to unpack");
 
 	func = RNA_def_function(srna, "reload", "rna_Image_reload");
 	RNA_def_function_ui_description(func, "Reload the image from its source path");

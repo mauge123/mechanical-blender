@@ -1366,11 +1366,10 @@ static int edbm_select_similar_region_exec(bContext *C, wmOperator *op)
 			LinkData *link;
 			while ((link = BLI_pophead(&faces_regions))) {
 				BMFace *f, **faces = link->data;
-				unsigned int i = 0;
-				while ((f = faces[i++])) {
+				while ((f = *(faces++))) {
 					BM_face_select_set(bm, f, true);
 				}
-				MEM_freeN(faces);
+				MEM_freeN(link->data);
 				MEM_freeN(link);
 
 				changed = true;
@@ -2742,7 +2741,7 @@ void MESH_OT_select_linked(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
-	RNA_def_enum_flag(ot->srna, "delimit", mesh_delimit_mode_items, BMO_DELIM_SEAM, "Delimit",
+	RNA_def_enum_flag(ot->srna, "delimit", rna_enum_mesh_delimit_mode_items, BMO_DELIM_SEAM, "Delimit",
 	                  "Delimit selected region");
 }
 
@@ -2974,7 +2973,7 @@ void MESH_OT_select_linked_pick(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "");
-	RNA_def_enum_flag(ot->srna, "delimit", mesh_delimit_mode_items, BMO_DELIM_SEAM, "Delimit",
+	RNA_def_enum_flag(ot->srna, "delimit", rna_enum_mesh_delimit_mode_items, BMO_DELIM_SEAM, "Delimit",
 	                  "Delimit selected region");
 
 	/* use for redo */

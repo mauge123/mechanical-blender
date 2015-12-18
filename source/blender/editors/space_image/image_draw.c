@@ -622,7 +622,7 @@ static void draw_image_buffer_tiled(SpaceImage *sima, ARegion *ar, Scene *scene,
 			}
 			else {
 				glaDrawPixelsSafe(x, y, dx, dy, dx, GL_LUMINANCE, GL_UNSIGNED_INT,
-				                  (unsigned char*)rect + channel_offset);
+				                  (unsigned char *)rect + channel_offset);
 			}
 		}
 	}
@@ -816,7 +816,7 @@ static void draw_image_paint_helpers(const bContext *C, ARegion *ar, Scene *scen
 	}
 }
 
-/* draw main image area */
+/* draw main image region */
 
 void draw_image_main(const bContext *C, ARegion *ar)
 {

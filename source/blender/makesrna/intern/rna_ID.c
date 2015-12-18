@@ -47,7 +47,7 @@
 /* enum of ID-block types
  * NOTE: need to keep this in line with the other defines for these
  */
-EnumPropertyItem id_type_items[] = {
+EnumPropertyItem rna_enum_id_type_items[] = {
 	{ID_AC, "ACTION", ICON_ACTION, "Action", ""},
 	{ID_AR, "ARMATURE", ICON_ARMATURE_DATA, "Armature", ""},
 	{ID_BR, "BRUSH", ICON_BRUSH_DATA, "Brush", ""},
@@ -223,13 +223,11 @@ void rna_ID_fake_user_set(PointerRNA *ptr, int value)
 {
 	ID *id = (ID *)ptr->data;
 
-	if (value && !(id->flag & LIB_FAKEUSER)) {
-		id->flag |= LIB_FAKEUSER;
-		id_us_plus(id);
+	if (value) {
+		id_fake_user_set(id);
 	}
-	else if (!value && (id->flag & LIB_FAKEUSER)) {
-		id->flag &= ~LIB_FAKEUSER;
-		id_us_min(id);
+	else {
+		id_fake_user_clear(id);
 	}
 }
 
@@ -329,8 +327,8 @@ static void rna_ID_update_tag(ID *id, ReportList *reports, int flag)
 
 static void rna_ID_user_clear(ID *id)
 {
+	id_fake_user_clear(id);
 	id->us = 0; /* don't save */
-	id->flag &= ~LIB_FAKEUSER;
 }
 
 static AnimData * rna_ID_animation_data_create(ID *id, Main *bmain)

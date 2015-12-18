@@ -208,11 +208,11 @@ static void restrictbutton_recursive_child(bContext *C, Scene *scene, Object *ob
 					id = ptr.id.data;
 					if (autokeyframe_cfra_can_key(scene, id)) {
 						ReportList *reports = CTX_wm_reports(C);
-						short flag = ANIM_get_keyframing_flags(scene, 1);
+						eInsertKeyFlags key_flag = ANIM_get_keyframing_flags(scene, 1);
 
 						fcu->flag &= ~FCURVE_SELECTED;
 						insert_keyframe(reports, id, action, ((fcu->grp) ? (fcu->grp->name) : (NULL)),
-						                fcu->rna_path, fcu->array_index, CFRA, flag);
+						                fcu->rna_path, fcu->array_index, CFRA, key_flag);
 						/* Assuming this is not necessary here, since 'ancestor' object button will do it anyway. */
 						/* WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL); */
 					}
@@ -434,6 +434,7 @@ static void restrictbutton_gr_restrict_view(bContext *C, void *poin, void *poin2
 {
 	restrictbutton_gr_restrict_flag(poin, poin2, OB_RESTRICT_VIEW);
 	WM_event_add_notifier(C, NC_GROUP, NULL);
+	DAG_id_type_tag(CTX_data_main(C), ID_OB);
 }
 static void restrictbutton_gr_restrict_select(bContext *C, void *poin, void *poin2)
 {
