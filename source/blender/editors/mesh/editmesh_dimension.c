@@ -50,6 +50,7 @@
 #include "ED_screen.h"
 #include "ED_object.h"
 #include "BKE_report.h"
+#include "ED_dimensions.h"
 
 #include "mesh_intern.h"  /* own include */
 
@@ -58,8 +59,8 @@ static int mechanical_add_dimension_between_two_vertex (BMEditMesh *em, wmOperat
 	BMOperator bmop;
 
 	EDBM_op_init(
-	        em, &bmop, op,
-	        "create_dimension verts=%hv", BM_ELEM_SELECT);
+			em, &bmop, op,
+			"create_dimension verts=%hv", BM_ELEM_SELECT);
 
 	/* deselect original verts */
 	BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_in, "verts", BM_VERT, BM_ELEM_SELECT, true);
@@ -111,3 +112,15 @@ void MESH_OT_mechanical_dimension_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 }
+
+float get_dimension_value(BMDim *edm){
+	return(len_v3v3(edm->v1->co, edm->v2->co));
+}
+
+void apply_dimension_value (BMDim *edm, float value) {
+    float vect [3];
+	sub_v3_v3v3(vect,edm->v2->co, edm->v1->co);
+	normalize_v3(vect);
+	mul_v3_fl(vect,value);
+	add_v3_v3v3(edm->v2->co,edm->v1->co, vect);
+ }

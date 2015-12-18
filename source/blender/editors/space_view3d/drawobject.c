@@ -95,6 +95,7 @@
 #include "ED_screen.h"
 #include "ED_sculpt.h"
 #include "ED_types.h"
+#include "ED_dimensions.h"
 
 #include "UI_resources.h"
 #include "UI_interface_icons.h"
@@ -116,7 +117,6 @@
  * display ist creating from draw().
  */
 #define SEQUENCER_DAG_WORKAROUND
-
 typedef enum eWireDrawMode {
 	OBDRAW_WIRE_OFF = 0,
 	OBDRAW_WIRE_ON = 1,
@@ -2780,7 +2780,7 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 		view3d_get_transformation(ar, ar->regiondata, em->ob, &mats);
 		//ED_view3d_clipping_calc(&bb, clip_planes, &mats, &rect);
 
-		numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(edm->v1->co, edm->v2->co));
+		numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", get_dimension_value(edm));
 
 		view3d_cached_text_draw_add(txt_pos, numstr, numstr_len, 0, txt_flag,
 		                            (BM_elem_flag_test(edm, BM_ELEM_SELECT) ? col_sel : col_unsel));

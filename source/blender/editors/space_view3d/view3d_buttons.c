@@ -70,6 +70,7 @@
 #include "ED_armature.h"
 #include "ED_mesh.h"
 #include "ED_screen.h"
+#include "ED_dimensions.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -90,6 +91,8 @@ typedef struct {
 	float ob_dims[3];
 	short link_scale;
 	float ve_median[NBR_TRANSFORM_PROPERTIES];
+	float dimension_value;
+	BMDim *dim_sel;
 } TransformProperties;
 
 /* Helper function to compute a median changed value,
@@ -194,13 +197,13 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 	uiBlock *block = (layout) ? uiLayoutAbsoluteBlock(layout) : NULL;
 	TransformProperties *tfp;
 	float median[NBR_TRANSFORM_PROPERTIES], ve_median[NBR_TRANSFORM_PROPERTIES];
-	int tot, totedgedata, totcurvedata, totlattdata, totcurvebweight;
+	int tot, totedgedata, totcurvedata, totlattdata, totcurvebweight, totdim;
 	bool has_meshdata = false;
 	bool has_skinradius = false;
 	PointerRNA data_ptr;
 
 	copy_vn_fl(median, NBR_TRANSFORM_PROPERTIES, 0.0f);
-	tot = totedgedata = totcurvedata = totlattdata = totcurvebweight = 0;
+	tot = totedgedata = totcurvedata = totlattdata = totcurvebweight = totdim = 0;
 
 	/* make sure we got storage */
 	if (v3d->properties_storage == NULL)
@@ -214,6 +217,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		BMVert *eve;
 		BMEdge *eed;
 		BMIter iter;
+		BMDim *edm;
 
 		const int cd_vert_bweight_offset = CustomData_get_offset(&bm->vdata, CD_BWEIGHT);
 		const int cd_vert_skin_offset    = CustomData_get_offset(&bm->vdata, CD_MVERT_SKIN);
@@ -238,6 +242,15 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 					}
 				}
 			}
+		}
+		if (bm->totdimsel) {
+		    BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+			    tot++;
+			    totdim++;
+			    tfp->dim_sel = edm;
+			}
+		    }
 		}
 
 		if ((cd_edge_bweight_offset != -1) || (cd_edge_crease_offset  != -1)) {
@@ -410,40 +423,54 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			else /* Mesh or lattice */
 				c = IFACE_("Vertex:");
 		}
-		else
+		if (totdim == 1) {
+			tfp->dimension_value = get_dimension_value(tfp->dim_sel);
+			//Add dimension info
+			uiDefBut(block, UI_BTYPE_LABEL, 0, totdim == 1 ? IFACE_("Dimension Value:") : IFACE_("Height Dimension:"),
+				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
+		    uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,
+				IFACE_("Dimension:"),
+				0, yi -= buth + but_margin, 200, buth,
+				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
+
+
+		} else if (totdim > 0) {
+			// Only allow modify value for one dimension.
+		}else {
 			c = IFACE_("Median:");
-		uiDefBut(block, UI_BTYPE_LABEL, 0, c, 0, yi -= buth, 200, buth, NULL, 0, 0, 0, 0, "");
+			uiDefBut(block, UI_BTYPE_LABEL, 0, c, 0, yi -= buth, 200, buth, NULL, 0, 0, 0, 0, "");
 
-		UI_block_align_begin(block);
+			UI_block_align_begin(block);
 
-		/* Should be no need to translate these. */
-		but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("X:"), 0, yi -= buth, 200, buth,
-		                &(tfp->ve_median[LOC_X]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
-		UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
-		but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Y:"), 0, yi -= buth, 200, buth,
-		                &(tfp->ve_median[LOC_Y]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
-		UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
-		but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Z:"), 0, yi -= buth, 200, buth,
-		                &(tfp->ve_median[LOC_Z]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
-		UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+			/* Should be no need to translate these. */
+			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("X:"), 0, yi -= buth, 200, buth,
+					&(tfp->ve_median[LOC_X]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Y:"), 0, yi -= buth, 200, buth,
+					&(tfp->ve_median[LOC_Y]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Z:"), 0, yi -= buth, 200, buth,
+					&(tfp->ve_median[LOC_Z]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 
-		if (totcurvebweight == tot) {
-			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("W:"), 0, yi -= buth, 200, buth,
-			          &(tfp->ve_median[C_BWEIGHT]), 0.01, 100.0, 1, 3, "");
+			if (totcurvebweight == tot) {
+				uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("W:"), 0, yi -= buth, 200, buth,
+					  &(tfp->ve_median[C_BWEIGHT]), 0.01, 100.0, 1, 3, "");
+			}
+
+
+			UI_block_align_begin(block);
+			uiDefButBitS(block, UI_BTYPE_TOGGLE, V3D_GLOBAL_STATS, B_REDR, IFACE_("Global"),
+				 0, yi -= buth + but_margin, 100, buth,
+				 &v3d->flag, 0, 0, 0, 0, TIP_("Displays global values"));
+			uiDefButBitS(block, UI_BTYPE_TOGGLE_N, V3D_GLOBAL_STATS, B_REDR, IFACE_("Local"),
+				 100, yi, 100, buth,
+				 &v3d->flag, 0, 0, 0, 0, TIP_("Displays local values"));
+			UI_block_align_end(block);
 		}
-
-		UI_block_align_begin(block);
-		uiDefButBitS(block, UI_BTYPE_TOGGLE, V3D_GLOBAL_STATS, B_REDR, IFACE_("Global"),
-		             0, yi -= buth + but_margin, 100, buth,
-		             &v3d->flag, 0, 0, 0, 0, TIP_("Displays global values"));
-		uiDefButBitS(block, UI_BTYPE_TOGGLE_N, V3D_GLOBAL_STATS, B_REDR, IFACE_("Local"),
-		             100, yi, 100, buth,
-		             &v3d->flag, 0, 0, 0, 0, TIP_("Displays local values"));
-		UI_block_align_end(block);
-
 		/* Meshes... */
 		if (has_meshdata) {
-			if (tot) {
+			if (tot && !totdim) {
 				uiDefBut(block, UI_BTYPE_LABEL, 0, tot == 1 ? IFACE_("Vertex Data:") : IFACE_("Vertices Data:"),
 				         0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
 				/* customdata layer added on demand */
@@ -514,7 +541,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 		UI_block_align_end(block);
 	}
-	else { /* apply */
+    else { /* apply */
 		int i;
 		bool apply_vcos;
 
@@ -534,7 +561,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 		if ((ob->type == OB_MESH) &&
 		    (apply_vcos || median[M_BV_WEIGHT] || median[M_SKIN_X] || median[M_SKIN_Y] ||
-		     median[M_BE_WEIGHT] || median[M_CREASE]))
+		     median[M_BE_WEIGHT] || median[M_CREASE] || totdim == 1 ))
 		{
 			Mesh *me = ob->data;
 			BMEditMesh *em = me->edit_btmesh;
@@ -615,6 +642,11 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			if (apply_vcos) {
 				EDBM_mesh_normals_update(em);
 			}
+
+			if (totdim == 1) {
+				apply_dimension_value (tfp->dim_sel, tfp->dimension_value);
+			}
+
 
 			/* Edges */
 
