@@ -148,6 +148,8 @@ typedef struct BMDim {
 	struct BMVert *v1,*v2;
 	//Dimension position
 	float dpos[3];
+	//Dimension direction
+	int dir;
 } BMDim;
 #endif
 

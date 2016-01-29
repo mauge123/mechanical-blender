@@ -1085,12 +1085,12 @@ void BM_mesh_elem_hflag_disable_test(
         BMesh *bm, const char htype, const char hflag,
         const bool respecthide, const bool overwrite, const char hflag_test)
 {
-	const char iter_types[3] = {BM_DIMS_OF_MESH,
+	const char iter_types[4] = {BM_DIMS_OF_MESH,
 								BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 
-	const char flag_types[3] = {BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
+	const char flag_types[4] = {BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
 
 	const char hflag_nosel = hflag & ~BM_ELEM_SELECT;
 
@@ -1121,7 +1121,7 @@ void BM_mesh_elem_hflag_disable_test(
 			}
 		}
 
-		bm->totvertsel = bm->totedgesel = bm->totfacesel = 0;
+		bm->totvertsel = bm->totedgesel = bm->totfacesel= bm->totdimsel = 0;
 	}
 	else {
 		for (i = 0; i < 3; i++) {

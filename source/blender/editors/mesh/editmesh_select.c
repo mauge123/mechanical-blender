@@ -45,6 +45,8 @@
 #include "BKE_paint.h"
 #include "BKE_editmesh.h"
 
+#include "ED_view3d.h"
+
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 
@@ -1913,6 +1915,46 @@ void MESH_OT_select_interior_faces(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+void select_dimension_data (BMDim *edm, ViewContext *vc) {
+    float screen_co1[2];
+    float screen_co2[2];
+    eV3DProjTest flag=V3D_PROJ_TEST_CLIP_NEAR;
+
+    float fmval[2];
+    fmval[0]=vc->mval[0];
+    fmval[1]=vc->mval[1];
+
+    float end[3], start[3];
+    float temp[3];
+    float d[3];
+    float d1[3],d2[3];
+    float n1[3];
+
+    //Use only one normal, as the lines should be parallel!
+    sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
+    cross_v3_v3v3(temp,d,edm->v1->co);
+    cross_v3_v3v3(n1,temp,d);
+    normalize_v3(n1);
+    add_v3_v3v3(start,n1, edm->v1->co);
+    add_v3_v3v3(end, n1, edm->v2->co);
+
+    mul_v3_fl(n1,1.2f);
+
+    add_v3_v3v3(d1, n1, edm->v1->co);
+    add_v3_v3v3(d2, n1, edm->v2->co);
+
+    ED_view3d_project_float_object(vc->ar,d1, screen_co1, flag);
+    ED_view3d_project_float_object(vc->ar,d2, screen_co2, flag);
+
+    if(len_v2v2(screen_co1,fmval)<=len_v2v2(screen_co2, fmval)){
+
+        edm->dir=-1;
+    }else{
+        edm->dir=1;
+
+    }
+}
+
 
 /* ************************************************** */
 /* here actual select happens */
@@ -2024,19 +2066,23 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				BM_select_history_remove(vc.em->bm, edm);
 				BM_dim_select_set(vc.em->bm, edm, false);
 				BM_select_history_store(vc.em->bm, edm);
+				select_dimension_data(&edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, true);
 			}
 			else if (deselect) {
 				BM_select_history_remove(vc.em->bm, edm);
+        			select_dimension_data(&edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, false);
 			}
 			else {
 				if (!BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					BM_select_history_store(vc.em->bm, edm);
+					select_dimension_data(edm,&vc);
 					BM_dim_select_set(vc.em->bm, edm, true);
 				}
 				else if (toggle) {
 					BM_select_history_remove(vc.em->bm, edm);
+            				select_dimension_data(&edm, &vc);
 					BM_dim_select_set(vc.em->bm, edm, false);
 				}
 			}

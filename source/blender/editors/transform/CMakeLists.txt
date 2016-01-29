@@ -61,6 +61,10 @@ if(WITH_LEGACY_DEPSGRAPH)
 	add_definitions(-DWITH_LEGACY_DEPSGRAPH)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+endif()
+
 add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_editor_transform "${SRC}" "${INC}" "${INC_SYS}")

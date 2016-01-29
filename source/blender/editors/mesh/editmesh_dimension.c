@@ -112,15 +112,27 @@ void MESH_OT_mechanical_dimension_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 }
-
+//Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
 	return(len_v3v3(edm->v1->co, edm->v2->co));
 }
 
-void apply_dimension_value (BMDim *edm, float value) {
-    float vect [3];
-	sub_v3_v3v3(vect,edm->v2->co, edm->v1->co);
+//Apply to the selected direction a dimension value
+
+void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value){
+	float vect [3];
+	sub_v3_v3v3(vect,va->co,vb->co);
 	normalize_v3(vect);
 	mul_v3_fl(vect,value);
-	add_v3_v3v3(edm->v2->co,edm->v1->co, vect);
+	add_v3_v3v3(va->co,vb->co, vect);
+
+}
+void apply_dimension_value (BMDim *edm, float value) {
+
+
+	if(edm->dir==1){
+		apply_dimension_direction_value(edm->v2,edm->v1, value);
+	}else{
+		apply_dimension_direction_value(edm->v1,edm->v2, value);
+	}
  }

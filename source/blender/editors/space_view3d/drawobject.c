@@ -2705,7 +2705,7 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	drawDMDims_userData *data = userData;
 	BMEditMesh *em = data->em;
 	ARegion *ar = data->ar;
-	BMDim *	edm = BM_dim_at_index(em->bm, index);
+	BMDim *edm = BM_dim_at_index(em->bm, index);
 
 	float end[3], start[3];
 	float temp[3];
@@ -2735,7 +2735,7 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	//Store location
 	copy_v3_v3(edm->dpos, txt_pos);
 
-
+	glPointSize(2);
 	glBegin(GL_POINTS);
 	{
 		bglVertex3fv(start);
@@ -2757,26 +2757,57 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	glEnd();
 
 	{
-		char numstr[32]; /* Stores the measurement display text here */
-		size_t numstr_len;
-		unsigned char col_sel[4]; /* color of the text to draw */
-		unsigned char col_unsel[4]; /* color of the text to draw */
-		bglMats mats = {{0}};
+	float w,h;
+	char numstr[32]; /* Stores the measurement display text here */
+	char numstr_dir[32]; /* Stores the measurement display text here with dir info */
+	unsigned char col_sel[4]; /* color of the text to draw */
+	unsigned char col_unsel[4]; /* color of the text to draw */
+	bglMats mats = {{0}};
 
-		UI_GetThemeColor4ubv(TH_TEXT, col_unsel);
-		UI_GetThemeColor4ubv(TH_SELECT, col_sel);
+	UI_GetThemeColor4ubv(TH_TEXT, col_unsel);
+	UI_GetThemeColor4ubv(TH_SELECT, col_sel);
 
 
-		//draw dimension length
-		view3d_get_transformation(ar, ar->regiondata, em->ob, &mats);
-		//ED_view3d_clipping_calc(&bb, clip_planes, &mats, &rect);
+	//draw dimension length
+	view3d_get_transformation(ar, ar->regiondata, em->ob, &mats);
+	//ED_view3d_clipping_calc(&bb, clip_planes, &mats, &rect);
 
-		numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", get_dimension_value(edm));
 
-		view3d_cached_text_draw_add(txt_pos, numstr, numstr_len, 0, txt_flag,
-		                            (BM_elem_flag_test(edm, BM_ELEM_SELECT) ? col_sel : col_unsel));
+	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", get_dimension_value(edm));
+	sprintf (numstr_dir, "%s", numstr);
+
+	//Draw a big point on Dim diection selected or small point on Dim not selected
+	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
+		if(edm->dir==1){
+			glPointSize(7);
+			glBegin(GL_POINTS);
+			{
+				bglVertex3fv(end);
+			}
+			glEnd();
+		}else if(edm->dir==-1){
+			glPointSize(7);
+			glBegin(GL_POINTS);
+			{
+				bglVertex3fv(start);
+			}
+			glEnd();
+		}
+		//Write on the midle of Dim
+		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
+		view3d_cached_text_draw_add(txt_pos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag, col_sel);
+	}else{
+		glPointSize(2);
+		glBegin(GL_POINTS);
+		{
+			bglVertex3fv(start);
+			bglVertex3fv(end);
+		}
+		glEnd();
+		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
+		view3d_cached_text_draw_add(txt_pos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag,col_unsel);
 	}
-
+    }
 }
 
 
