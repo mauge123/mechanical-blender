@@ -1930,6 +1930,8 @@ void select_dimension_data (BMDim *edm, ViewContext *vc) {
     float d1[3],d2[3];
     float n1[3];
 
+	int len1,len2;
+
     //Use only one normal, as the lines should be parallel!
     sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
     cross_v3_v3v3(temp,d,edm->v1->co);
@@ -1945,14 +1947,18 @@ void select_dimension_data (BMDim *edm, ViewContext *vc) {
 
     ED_view3d_project_float_object(vc->ar,d1, screen_co1, flag);
     ED_view3d_project_float_object(vc->ar,d2, screen_co2, flag);
+	len1=len_v2v2(screen_co1,fmval);
+	len2=len_v2v2(screen_co2, fmval);
 
-    if(len_v2v2(screen_co1,fmval)<=len_v2v2(screen_co2, fmval)){
+	if(len1-len2>5){
 
-        edm->dir=-1;
-    }else{
-        edm->dir=1;
+		edm->dir=1;
+	}else if(len2-len1>5){
+		edm->dir=-1;
 
-    }
+	}else{
+		edm->dir=0;
+	}
 }
 
 
@@ -2071,7 +2077,7 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 			}
 			else if (deselect) {
 				BM_select_history_remove(vc.em->bm, edm);
-        			select_dimension_data(&edm, &vc);
+				select_dimension_data(&edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, false);
 			}
 			else {
@@ -2082,7 +2088,7 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				}
 				else if (toggle) {
 					BM_select_history_remove(vc.em->bm, edm);
-            				select_dimension_data(&edm, &vc);
+					select_dimension_data(&edm, &vc);
 					BM_dim_select_set(vc.em->bm, edm, false);
 				}
 			}

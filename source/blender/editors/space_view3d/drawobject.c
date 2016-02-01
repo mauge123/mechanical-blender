@@ -2792,7 +2792,16 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 				bglVertex3fv(start);
 			}
 			glEnd();
+		}else if(edm->dir==0){
+			glPointSize(7);
+			glBegin(GL_POINTS);
+			{
+				bglVertex3fv(end);
+				bglVertex3fv(start);
+			}
+			glEnd();
 		}
+
 		//Write on the midle of Dim
 		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
 		view3d_cached_text_draw_add(txt_pos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag, col_sel);

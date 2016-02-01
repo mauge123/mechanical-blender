@@ -128,11 +128,16 @@ void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value){
 
 }
 void apply_dimension_value (BMDim *edm, float value) {
-
+	float len=get_dimension_value(edm);
+	float len2=(value-len)/2;
 
 	if(edm->dir==1){
 		apply_dimension_direction_value(edm->v2,edm->v1, value);
-	}else{
+	}else if(edm->dir==-1){
 		apply_dimension_direction_value(edm->v1,edm->v2, value);
+	}else{
+		apply_dimension_direction_value(edm->v2,edm->v1, (len+len2));
+
+		apply_dimension_direction_value(edm->v1,edm->v2,value);
 	}
  }
