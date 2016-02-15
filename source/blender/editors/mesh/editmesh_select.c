@@ -2072,12 +2072,12 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				BM_select_history_remove(vc.em->bm, edm);
 				BM_dim_select_set(vc.em->bm, edm, false);
 				BM_select_history_store(vc.em->bm, edm);
-				select_dimension_data(&edm, &vc);
+				select_dimension_data(edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, true);
 			}
 			else if (deselect) {
 				BM_select_history_remove(vc.em->bm, edm);
-				select_dimension_data(&edm, &vc);
+				select_dimension_data(edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, false);
 			}
 			else {
@@ -2088,7 +2088,7 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				}
 				else if (toggle) {
 					BM_select_history_remove(vc.em->bm, edm);
-					select_dimension_data(&edm, &vc);
+					select_dimension_data(edm, &vc);
 					BM_dim_select_set(vc.em->bm, edm, false);
 				}
 			}

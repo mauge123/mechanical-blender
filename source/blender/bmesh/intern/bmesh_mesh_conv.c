@@ -605,7 +605,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	BMFace *f;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *d;
-	MDim *md, *mdim;
+	MDim *mdm, *mdim;
 #endif
 	BMIter iter;
 	int i, j, ototvert;
@@ -740,17 +740,24 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	bm->elem_index_dirty &= ~BM_EDGE;
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	md = mdim;
+	mdm = mdim;
 	i = 0;
 	BM_ITER_MESH (d, &iter, bm, BM_DIMS_OF_MESH) {
-		md->v1 = BM_elem_index_get(d->v1);
-		md->v2 = BM_elem_index_get(d->v2);
+		mdm->v1 = BM_elem_index_get(d->v1);
+		mdm->v2 = BM_elem_index_get(d->v2);
 
 		BM_elem_index_set(d, i); /* set_inline */
 
+		/* copy over customdat */
+		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, d->head.data, i);
+
 		i++;
-		md++;
+		mdm++;
 		BM_CHECK_ELEMENT(d);
+
+
+
+
 	}
 	bm->elem_index_dirty &= ~BM_DIM;
 #endif

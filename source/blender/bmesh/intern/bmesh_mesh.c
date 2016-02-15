@@ -1434,6 +1434,11 @@ BMFace *BM_face_at_index_find(BMesh *bm, const int index)
 	return BLI_mempool_findelem(bm->fpool, index);
 }
 
+BMDim *BM_dim_at_index_find(BMesh *bm, const int index)
+{
+	return BLI_mempool_findelem(bm->dpool, index);
+}
+
 /**
  * Use lookup table when available, else use slower find functions.
  *
@@ -1456,7 +1461,7 @@ BMDim *BM_dim_at_index_find_or_table(BMesh *bm, const int index)
 		return (index < bm->totdim) ? bm->dtable[index] : NULL;
 	}
 	else {
-		return BM_vert_at_index_find(bm, index);
+		return BM_dim_at_index_find(bm, index);
 	}
 }
 #endif

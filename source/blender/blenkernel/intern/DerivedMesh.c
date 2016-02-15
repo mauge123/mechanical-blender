@@ -795,6 +795,9 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	CustomData_free(&me->fdata, me->totface);
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
+#ifdef WITH_MECHCANICAL_DIMENSIONS
+	CustomData_free(&me->ddata, me->totdim);
+#endif
 
 	/* ok, this should now use new CD shapekey data,
 	 * which should be fed through the modifier
