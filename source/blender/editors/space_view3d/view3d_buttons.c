@@ -92,6 +92,7 @@ typedef struct {
 	short link_scale;
 	float ve_median[NBR_TRANSFORM_PROPERTIES];
 	float dimension_value;
+	float dim_txt_pos;
 	BMDim *dim_sel;
 } TransformProperties;
 
@@ -428,10 +429,16 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			//Add dimension info
 			uiDefBut(block, UI_BTYPE_LABEL, 0, totdim == 1 ? IFACE_("Dimension Value:") : IFACE_("Height Dimension:"),
 				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
-		    uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,
-				IFACE_("Dimension:"),
-				0, yi -= buth + but_margin, 200, buth,
+			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Dimension:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
+
+			tfp->dim_txt_pos= tfp->dim_sel->dpos_fact;
+			//Add dimension position
+			uiDefBut(block, UI_BTYPE_LABEL, 0, totdim == 1 ? IFACE_("Dimension Text Position:") : IFACE_(" Dimension Position:"),
+				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
+
+			uiDefButF(block, UI_BTYPE_NUM_SLIDER, B_OBJECTPANELMEDIAN,IFACE_("Dimension:"),0, yi -= buth + but_margin, 200, buth,
+				&tfp->dim_txt_pos,-2.0f,2.0f, 10, RNA_TRANSLATION_PREC_DEFAULT, TIP_("Position"));
 
 
 		} else if (totdim > 0) {
@@ -645,6 +652,8 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 			if (totdim == 1) {
 				apply_dimension_value (tfp->dim_sel, tfp->dimension_value);
+				apply_txt_dimension_value(tfp->dim_sel, tfp->dim_txt_pos);
+
 			}
 
 

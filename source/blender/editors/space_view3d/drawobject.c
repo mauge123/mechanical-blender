@@ -2708,28 +2708,32 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	BMDim *edm = BM_dim_at_index(em->bm, index);
 
 	float end[3], start[3];
-	float temp[3];
-	float d[3];
-	float d1[3],d2[3];
-	float n1[3];
+
 	float txt_pos[3];
 	const short txt_flag = V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII;
 
 
-	//Use only one normal, as the lines should be parallel!
-	sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
-	cross_v3_v3v3(temp,d,edm->v1->co);
-	cross_v3_v3v3(n1,temp,d);
-	normalize_v3(n1);
-	add_v3_v3v3(start,n1, edm->v1->co);
-	add_v3_v3v3(end, n1, edm->v2->co);
+	get_flag_orientation(edm);
 
-	mul_v3_fl(n1,1.2f);
-	add_v3_v3v3(d1, n1, edm->v1->co);
-	add_v3_v3v3(d2, n1, edm->v2->co);
+	//Lenght flag
+	copy_v3_v3(edm->n2,edm->n1);
+	mul_v3_fl(edm->n1, edm->flag_lenght);
 
+
+	//Midline
+	add_v3_v3v3(start,edm->n2, edm->v1->co);
+	add_v3_v3v3(end, edm->n2, edm->v2->co);
+
+	//Verts line
+	add_v3_v3v3(edm->d1, edm->n1, edm->v1->co);
+	add_v3_v3v3(edm->d2,edm->n1, edm->v2->co);
+
+
+	//Move txt pos
 	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos, 0.5);
+	copy_v3_v3(edm->start,start);
+	copy_v3_v3(edm->end,end);
+	mul_v3_fl(txt_pos,  edm->dpos_fact);
 	add_v3_v3(txt_pos, start);
 
 	//Store location
@@ -2746,10 +2750,10 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	glBegin(GL_LINES);
 	{
 		bglVertex3fv(edm->v1->co);
-		bglVertex3fv(d1);
+		bglVertex3fv(edm->d1);
 
 		bglVertex3fv(edm->v2->co);
-		bglVertex3fv(d2);
+		bglVertex3fv(edm->d2);
 
 		bglVertex3fv(start);
 		bglVertex3fv(end);
@@ -2804,7 +2808,7 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 
 		//Write on the midle of Dim
 		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
-		view3d_cached_text_draw_add(txt_pos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag, col_sel);
+		view3d_cached_text_draw_add(edm->dpos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag, col_sel);
 	}else{
 		glPointSize(2);
 		glBegin(GL_POINTS);
@@ -2814,7 +2818,7 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 		}
 		glEnd();
 		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
-		view3d_cached_text_draw_add(txt_pos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag,col_unsel);
+		view3d_cached_text_draw_add(edm->dpos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag,col_unsel);
 	}
     }
 }

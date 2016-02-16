@@ -54,13 +54,14 @@
 
 #include "mesh_intern.h"  /* own include */
 
+#include "BLI_string.h"
+
+
 static int mechanical_add_dimension_between_two_vertex (BMEditMesh *em, wmOperator *op) {
 
 	BMOperator bmop;
 
-	EDBM_op_init(
-			em, &bmop, op,
-			"create_dimension verts=%hv", BM_ELEM_SELECT);
+	EDBM_op_init(em, &bmop, op,"create_dimension verts=%hv", BM_ELEM_SELECT);
 
 	/* deselect original verts */
 	BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_in, "verts", BM_VERT, BM_ELEM_SELECT, true);
@@ -141,3 +142,34 @@ void apply_dimension_value (BMDim *edm, float value) {
 		apply_dimension_direction_value(edm->v1,edm->v2,value);
 	}
  }
+// text Position
+void apply_txt_dimension_value(BMDim *edm, float value){
+
+	edm->dpos_fact = value;
+	sub_v3_v3v3(edm->dpos,edm->start,edm->end);
+	mul_v3_fl(edm->dpos,value);
+	add_v3_v3(edm->dpos, edm->end);
+
+
+}
+
+
+void get_flag_orientation(BMDim *edm){
+	float d[3];
+	float temp[3];
+	if(edm->n1==edm->trans_n1){
+		sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
+		cross_v3_v3v3(temp,d,edm->v1->co);
+		cross_v3_v3v3(edm->n1,temp,d);
+		normalize_v3(edm->n1);
+	}else{
+		copy_v3_v3(edm->n1,edm->trans_n1);
+
+	}
+
+
+
+
+}
+
+

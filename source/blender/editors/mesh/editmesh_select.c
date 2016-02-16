@@ -1916,48 +1916,75 @@ void MESH_OT_select_interior_faces(wmOperatorType *ot)
 }
 
 void select_dimension_data (BMDim *edm, ViewContext *vc) {
-    float screen_co1[2];
-    float screen_co2[2];
-    eV3DProjTest flag=V3D_PROJ_TEST_CLIP_NEAR;
+	float screen_co_start[2];
+	float screen_co_end[2];
+	float screen_co_dpos[2];
+	eV3DProjTest flag=V3D_PROJ_TEST_CLIP_NEAR;
 
-    float fmval[2];
-    fmval[0]=vc->mval[0];
-    fmval[1]=vc->mval[1];
+	float fmval[2];
+	fmval[0]=vc->mval[0];
+	fmval[1]=vc->mval[1];
 
-    float end[3], start[3];
-    float temp[3];
-    float d[3];
-    float d1[3],d2[3];
-    float n1[3];
+	float end[3], start[3];
+	float temp[3];
+	float d[3];
+	float d1[3],d2[3];
+	float n1[3];
 
-	int len1,len2;
+	float len_start_click,len_end_click, len_dpos_end, len_dpos_start, len_start_end;
 
-    //Use only one normal, as the lines should be parallel!
-    sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
-    cross_v3_v3v3(temp,d,edm->v1->co);
-    cross_v3_v3v3(n1,temp,d);
-    normalize_v3(n1);
-    add_v3_v3v3(start,n1, edm->v1->co);
-    add_v3_v3v3(end, n1, edm->v2->co);
+	//Use only one normal, as the lines should be parallel!
+	sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
+	cross_v3_v3v3(temp,d,edm->v1->co);
+	cross_v3_v3v3(n1,temp,d);
+	normalize_v3(n1);
+	add_v3_v3v3(start,n1, edm->v1->co);
+	add_v3_v3v3(end, n1, edm->v2->co);
 
-    mul_v3_fl(n1,1.2f);
+	mul_v3_fl(n1,1.2f);
 
-    add_v3_v3v3(d1, n1, edm->v1->co);
-    add_v3_v3v3(d2, n1, edm->v2->co);
+	add_v3_v3v3(d1, n1, edm->v1->co);
+	add_v3_v3v3(d2, n1, edm->v2->co);
 
-    ED_view3d_project_float_object(vc->ar,d1, screen_co1, flag);
-    ED_view3d_project_float_object(vc->ar,d2, screen_co2, flag);
-	len1=len_v2v2(screen_co1,fmval);
-	len2=len_v2v2(screen_co2, fmval);
+	ED_view3d_project_float_object(vc->ar,edm->start, screen_co_start, flag);
+	ED_view3d_project_float_object(vc->ar,edm->end, screen_co_end, flag);
 
-	if(len1-len2>5){
+	ED_view3d_project_float_object(vc->ar,edm->dpos, screen_co_dpos, flag);
 
-		edm->dir=1;
-	}else if(len2-len1>5){
-		edm->dir=-1;
+	len_start_end=len_v2v2(screen_co_start, screen_co_end);
+	len_start_click=len_v2v2(screen_co_start,fmval);
+	len_end_click=len_v2v2(screen_co_end, fmval);
+	len_dpos_end=len_v2v2(screen_co_dpos,screen_co_end);
+	len_dpos_start=len_v2v2(screen_co_dpos, screen_co_start);
+
+
+	if(len_dpos_end>len_start_end){
+		if(len_dpos_start-len_start_click>5){
+			edm->dir=1;
+		}else if(len_dpos_start-len_start_click<-5){
+			edm->dir=-1;
+		}else{
+			edm->dir=0;
+		}
+	}else if(len_dpos_start>len_start_end){
+		if(len_dpos_end-len_end_click>5){
+			edm->dir=-1;
+		}else if(len_dpos_end-len_end_click<-5){
+				edm->dir=1;
+		}else {
+			edm->dir=0;
+		}
+
 
 	}else{
-		edm->dir=0;
+		if(len_dpos_end-len_end_click>5 ){
+			edm->dir=1;
+		}else if( len_dpos_start-len_start_click>5){
+			edm->dir=-1;
+		}else{
+			edm->dir=0;
+		}
+
 	}
 }
 

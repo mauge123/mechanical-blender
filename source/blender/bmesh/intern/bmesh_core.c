@@ -2930,6 +2930,8 @@ BMDim *BM_dim_create(
         const BMDim *d_example, const eBMCreateFlag create_flag)
 {
 	BMDim *d;
+	float dd[3];
+	float temp[3];
 
 	BLI_assert(v1 != v2);
 	BLI_assert(v1->head.htype == BM_VERT && v2->head.htype == BM_VERT);
@@ -2958,6 +2960,17 @@ BMDim *BM_dim_create(
 
 	d->v1 = v1;
 	d->v2 = v2;
+	d->dpos_fact = 0.5f;
+	d->flag_lenght=1.2f;
+
+
+	sub_v3_v3v3(dd,d->v1->co,d->v2->co);
+	cross_v3_v3v3(temp,dd,d->v1->co);
+	cross_v3_v3v3(d->n1,temp,dd);
+	normalize_v3(d->n1);
+	copy_v3_v3(d->trans_n1,d->n1);
+
+
 
 
 

@@ -59,6 +59,7 @@ struct wmTimer;
 struct ARegion;
 struct ReportList;
 struct EditBone;
+struct BMDim;
 
 /* transinfo->redraw */
 typedef enum {
