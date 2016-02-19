@@ -4510,6 +4510,10 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	direct_link_customdata(fd, &mesh->fdata, mesh->totface);
 	direct_link_customdata(fd, &mesh->ldata, mesh->totloop);
 	direct_link_customdata(fd, &mesh->pdata, mesh->totpoly);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	direct_link_customdata(fd, &mesh->ddata, mesh->totdim);
+#endif
+
 
 	mesh->bb = NULL;
 	mesh->edit_btmesh = NULL;
