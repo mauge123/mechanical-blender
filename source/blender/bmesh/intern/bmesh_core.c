@@ -2929,9 +2929,9 @@ BMDim *BM_dim_create(
         BMesh *bm, BMVert *v1, BMVert *v2,
         const BMDim *d_example, const eBMCreateFlag create_flag)
 {
-	BMDim *d;
-	float dd[3];
-	float temp[3];
+	BMDim *edm;
+	float vect[3], no1[3], no2[3];
+
 
 	BLI_assert(v1 != v2);
 	BLI_assert(v1->head.htype == BM_VERT && v2->head.htype == BM_VERT);
@@ -2939,39 +2939,35 @@ BMDim *BM_dim_create(
 	BLI_assert(!(create_flag & 1));
 
 
-	d = BLI_mempool_alloc(bm->dpool);
+	edm = BLI_mempool_alloc(bm->dpool);
 
 
 	/* --- assign all members --- */
-	d->head.data = NULL;
+	edm->head.data = NULL;
 
 #ifdef USE_DEBUG_INDEX_MEMCHECK
 	DEBUG_MEMCHECK_INDEX_INVALIDATE(d)
 #else
-	BM_elem_index_set(d, -1); /* set_ok_invalid */
+	BM_elem_index_set(edm, -1); /* set_ok_invalid */
 #endif
 
-	d->head.htype = BM_DIM;
-	d->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
-	d->head.api_flag = 0;
+	edm->head.htype = BM_DIM;
+	edm->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
+	edm->head.api_flag = 0;
 
 	/* allocate flags */
-	d->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 
-	d->v1 = v1;
-	d->v2 = v2;
-	d->dpos_fact = 0.5f;
-	d->flag_lenght=1.2f;
+	edm->v1 = v1;
+	edm->v2 = v2;
+	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
+	sub_v3_v3v3(vect,edm->v1->co,edm->v2->co);
+	cross_v3_v3v3(no1,vect, edm->v1->no);
+	cross_v3_v3v3(no2,no1,vect);
+	normalize_v3(no2);
 
-	sub_v3_v3v3(dd,d->v1->co,d->v2->co);
-	cross_v3_v3v3(temp,dd,d->v1->co);
-	cross_v3_v3v3(d->n1,temp,dd);
-	normalize_v3(d->n1);
-	copy_v3_v3(d->trans_n1,d->n1);
-
-
-
+	set_dim_extra_data(edm, 0.5f, no2);
 
 
 	/* --- done --- */
@@ -2985,15 +2981,20 @@ BMDim *BM_dim_create(
 
 	if (!(create_flag & BM_CREATE_SKIP_CD)) {
 		if (d_example) {
-			BM_elem_attrs_copy(bm, bm, d_example, d);
+			BM_elem_attrs_copy(bm, bm, d_example, edm);
 		}
 		else {
-			CustomData_bmesh_set_default(&bm->edata, &d->head.data);
+			CustomData_bmesh_set_default(&bm->edata, &edm->head.data);
 		}
 	}
 
-	BM_CHECK_ELEMENT(d);
+	BM_CHECK_ELEMENT(edm);
 
-	return d;
+	return edm;
+}
+
+void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) {
+	edm->dpos_fact = dpos_fact;
+	copy_v3_v3(edm->fpos, fpos);
 }
 #endif

@@ -87,6 +87,8 @@
 #include "BLI_alloca.h"
 #include "BLI_math_vector.h"
 
+#include "bmesh_dimensions.h"
+
 #include "BKE_mesh.h"
 #include "BKE_customdata.h"
 #include "BKE_multires.h"
@@ -259,11 +261,17 @@ void BM_mesh_bm_from_me(
 			CustomData_copy(&me->edata, &bm->edata, CD_MASK_BMESH, CD_ASSIGN, 0);
 			CustomData_copy(&me->ldata, &bm->ldata, CD_MASK_BMESH, CD_ASSIGN, 0);
 			CustomData_copy(&me->pdata, &bm->pdata, CD_MASK_BMESH, CD_ASSIGN, 0);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			CustomData_copy(&me->ddata, &bm->ddata, CD_MASK_BMESH, CD_ASSIGN, 0);
+#endif
 
 			CustomData_bmesh_init_pool(&bm->vdata, me->totvert, BM_VERT);
 			CustomData_bmesh_init_pool(&bm->edata, me->totedge, BM_EDGE);
 			CustomData_bmesh_init_pool(&bm->ldata, me->totloop, BM_LOOP);
 			CustomData_bmesh_init_pool(&bm->pdata, me->totpoly, BM_FACE);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			CustomData_bmesh_init_pool(&bm->ddata, me->totdim, BM_DIM);
+#endif
 		}
 		return; /* sanity check */
 	}
@@ -274,6 +282,9 @@ void BM_mesh_bm_from_me(
 	CustomData_copy(&me->edata, &bm->edata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&me->ldata, &bm->ldata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&me->pdata, &bm->pdata, CD_MASK_BMESH, CD_CALLOC, 0);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_copy(&me->ddata, &bm->ddata, CD_MASK_BMESH, CD_CALLOC, 0);
+#endif
 
 	/* make sure uv layer names are consisten */
 	totuv = CustomData_number_of_layers(&bm->pdata, CD_MTEXPOLY);
@@ -325,6 +336,9 @@ void BM_mesh_bm_from_me(
 	CustomData_bmesh_init_pool(&bm->edata, me->totedge, BM_EDGE);
 	CustomData_bmesh_init_pool(&bm->ldata, me->totloop, BM_LOOP);
 	CustomData_bmesh_init_pool(&bm->pdata, me->totpoly, BM_FACE);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_bmesh_init_pool(&bm->ddata, me->totdim, BM_DIM);
+#endif
 
 	BM_mesh_cd_flag_apply(bm, me->cd_flag);
 
@@ -375,7 +389,12 @@ void BM_mesh_bm_from_me(
 
 		mdim = me->mdim;
 		for (i = 0; i < me->totdim; i++, mdim++) {
+
+
 			d = dtable[i] = BM_dim_create(bm, vtable[mdim->v1], vtable[mdim->v2], NULL, BM_CREATE_SKIP_CD);
+			set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
+
+
 			BM_elem_index_set(d, i); /* set_ok */
 
 			/* transfer flags */
@@ -745,6 +764,8 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	BM_ITER_MESH (d, &iter, bm, BM_DIMS_OF_MESH) {
 		mdm->v1 = BM_elem_index_get(d->v1);
 		mdm->v2 = BM_elem_index_get(d->v2);
+		mdm->dpos_fact = d->dpos_fact;
+		copy_v3_v3(mdm->fpos, d->fpos);
 
 		BM_elem_index_set(d, i); /* set_inline */
 

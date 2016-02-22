@@ -68,6 +68,7 @@
 #include "ED_curve.h"
 #include "ED_particle.h"
 #include "ED_view3d.h"
+#include "ED_dimensions.h"
 
 #include "UI_resources.h"
 
@@ -275,6 +276,7 @@ static int calc_manipulator_stats(const bContext *C)
 	Base *base;
 	Object *ob = OBACT;
 	bGPdata *gpd = CTX_data_gpencil_data(C);
+	BMDim *edm;
 	const bool is_gp_edit = ((gpd) && (gpd->flag & GP_DATA_STROKE_EDITMODE));
 	int a, totsel = 0;
 
@@ -319,6 +321,7 @@ static int calc_manipulator_stats(const bContext *C)
 			BMEditMesh *em = BKE_editmesh_from_object(obedit);
 			BMEditSelection ese;
 			float vec[3] = {0, 0, 0};
+			float mid[3];
 
 			/* USE LAST SELECTE WITH ACTIVE */
 			if ((v3d->around == V3D_AROUND_ACTIVE) && BM_select_history_active_get(em->bm, &ese)) {
@@ -326,12 +329,17 @@ static int calc_manipulator_stats(const bContext *C)
 				calc_tw_center(scene, vec);
 				totsel = 1;
 			}
-			else {
+			else if( edm=get_selected_dimension(em)){
+				totsel++;
+				get_dimension_mid(mid, edm);
+				calc_tw_center(scene, mid);
+
+			}else{
+
 				BMesh *bm = em->bm;
 				BMVert *eve;
 
 				BMIter iter;
-
 				BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 					if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
 						if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {

@@ -2013,7 +2013,7 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
 							action |= wm_handler_operator_call(C, handlers, handler, event, kmi->ptr);
 							if (action & WM_HANDLER_BREAK) {
 								/* not always_pass here, it denotes removed handler */
-								
+
 								if (G.debug & (G_DEBUG_EVENTS | G_DEBUG_HANDLERS))
 									printf("%s:       handled! '%s'\n", __func__, kmi->idname);
 

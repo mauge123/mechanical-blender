@@ -49,15 +49,19 @@
 #include "BLI_rect.h"
 
 #include "BKE_context.h"
+#include "BKE_editmesh.h"
 
 #include "ED_image.h"
 #include "ED_view3d.h"
+#include "ED_dimensions.h"
 
 #include "BLT_translation.h"
 
 #include "UI_resources.h"
 
 #include "transform.h"
+
+#include"bmesh.h"
 
 static void drawObjectConstraint(TransInfo *t);
 
@@ -194,7 +198,7 @@ static void viewAxisCorrectCenter(TransInfo *t, float t_con_center[3])
 	}
 }
 
-static void axisProjection(TransInfo *t, const float axis[3], const float in[3], float out[3])
+void axisProjection(TransInfo *t, const float axis[3], const float in[3], float out[3])
 {
 	float norm[3], vec[3], factor, angle;
 	float t_con_center[3];

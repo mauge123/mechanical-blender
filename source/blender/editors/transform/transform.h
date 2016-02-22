@@ -624,6 +624,8 @@ void setConstraint(TransInfo *t, float space[3][3], int mode, const char text[])
 void setAxisMatrixConstraint(TransInfo *t, int mode, const char text[]);
 void setLocalConstraint(TransInfo *t, int mode, const char text[]);
 void setUserConstraint(TransInfo *t, short orientation, int mode, const char text[]);
+void axisProjection(TransInfo *t, const float axis[3], const float in[3], float out[3]);
+
 
 void constraintNumInput(TransInfo *t, float vec[3]);
 

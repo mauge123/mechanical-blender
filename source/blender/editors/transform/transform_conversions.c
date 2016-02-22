@@ -108,6 +108,7 @@
 #include "ED_clip.h"
 #include "ED_mask.h"
 #include "ED_gpencil.h"
+#include "ED_dimensions.h"
 
 #include "WM_api.h"  /* for WM_event_add_notifier to deal with stabilization nodes */
 #include "WM_types.h"
@@ -2307,39 +2308,32 @@ static void VertsToTransData(TransInfo *t, TransData *td, TransDataExtension *tx
 static int createTransEditDim(TransInfo *t) {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
     BMesh *bm = em->bm;
-    BMDim *edm;
-    BMIter iter;
+	BMDim *edm=get_selected_dimension(em);
 	TransData *td = NULL;
 	float mtx[3][3], smtx[3][3];
-
     if (bm->totdimsel == 1) {
-        // Add Transdata for dimension
-        BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-            if ( BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 
-				copy_m3_m4(mtx, t->obedit->obmat);
-				/* we use a pseudoinverse so that when one of the axes is scaled to 0,
-				 * matrix inversion still works and we can still moving along the other */
-				pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
+		//Tag the dimension as being moved
+		BM_elem_flag_enable(edm, BM_ELEM_TAG);
+		float mid[3];
+		copy_m3_m4(mtx, t->obedit->obmat);
+		/* we use a pseudoinverse so that when one of the axes is scaled to 0,
+		 * matrix inversion still works and we can still moving along the other */
+		pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
+		t->total = 1; // Only 1 dimension
+		td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Dimension)");
+		td->flag = 0;
+		td->loc = edm->tpos;
 
+		copy_v3_v3(td->iloc, mid);
+		copy_v3_v3(td->center, edm->tpos);
+		td->ext = NULL;
+		td->val = NULL;
+		td->extra = NULL;
 
-				t->total = 1; // Only 1 dimension
-				td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Dimension)");
-				td->flag = 0;
-				td->loc = edm->trans_n1;
-				copy_v3_v3(td->iloc, edm->trans_n1);
-				copy_v3_v3(td->center, edm->trans_n1);
-				td->ext = NULL;
-				td->val = NULL;
-				td->extra = NULL;
+		copy_m3_m3(td->smtx, smtx);
+		copy_m3_m3(td->mtx, mtx);
 
-				copy_m3_m3(td->smtx, smtx);
-				copy_m3_m3(td->mtx, mtx);
-
-
-
-			}
-		}
         return 1;
     } else {
         // no dimension select

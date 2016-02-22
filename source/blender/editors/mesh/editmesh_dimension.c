@@ -152,24 +152,37 @@ void apply_txt_dimension_value(BMDim *edm, float value){
 
 
 }
-
-
-void get_flag_orientation(BMDim *edm){
-	float d[3];
-	float temp[3];
-	if(edm->n1==edm->trans_n1){
-		sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
-		cross_v3_v3v3(temp,d,edm->v1->co);
-		cross_v3_v3v3(edm->n1,temp,d);
-		normalize_v3(edm->n1);
-	}else{
-		copy_v3_v3(edm->n1,edm->trans_n1);
-
+BMDim* get_selected_dimension_BMesh(BMesh *bm){
+	BMDim *edm = NULL;
+	BMIter iter;
+	if (bm->totdimsel == 1) {
+		BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			if ( BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+				break;
+			}
+		}
 	}
+	return edm;
+}
 
 
+//Return edm.
+BMDim* get_selected_dimension(BMEditMesh *em){
+	BMDim *edm = NULL;
+	BMesh *bm = em->bm;
+
+	edm=get_selected_dimension_BMesh(bm);
+	return edm;
+}
+
+void get_dimension_mid(float mid[3],BMDim *edm){
+
+	sub_v3_v3v3(mid, edm->v2->co, edm->v1->co);
+	mul_v3_fl(mid,0.5);
+	add_v3_v3(mid, edm->v1->co);
 
 
 }
+
 
 
