@@ -775,6 +775,8 @@ void BM_face_edges_kill(BMesh *bm, BMFace *f)
 	}
 }
 
+
+
 /**
  * kills all verts associated with \a f, along with any other faces containing
  * those vertices
@@ -945,6 +947,16 @@ void BM_vert_kill(BMesh *bm, BMVert *v)
 
 	bm_kill_only_vert(bm, v);
 }
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void BM_dim_kill(BMesh *bm, BMDim *edm)
+{
+
+
+	bm_kill_only_dim(bm, edm);
+}
+
+#endif
 
 /********** private disk and radial cycle functions ********** */
 
@@ -2918,6 +2930,7 @@ static void bm_kill_only_dim(BMesh *bm, BMDim *d)
 	BLI_mempool_free(bm->dpool, d);
 }
 
+#endif
 
 
 /**
@@ -2996,5 +3009,6 @@ BMDim *BM_dim_create(
 void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) {
 	edm->dpos_fact = dpos_fact;
 	copy_v3_v3(edm->fpos, fpos);
+
 }
-#endif
+

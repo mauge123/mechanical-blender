@@ -37,6 +37,9 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
 
+#include "bmesh_dimensions.h"
+
+
 
 /* -------------------------------------------------------------------- */
 /* BMO functions */
@@ -95,6 +98,17 @@ static void bmo_remove_tagged_verts_loose(BMesh *bm, const short oflag)
 		}
 	}
 }
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void bmo_remove_tagged_dim(BMesh *bm, const short oflag)
+{
+	BMDim *edm=get_selected_dimension_BMesh(bm);
+	BM_dim_kill(bm,edm);
+
+
+}
+#endif
+
+
 
 void BMO_mesh_delete_oflag_tagged(BMesh *bm, const short oflag, const char htype)
 {
@@ -117,7 +131,6 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 {
 	BMEdge *e;
 	BMFace *f;
-
 	BMIter eiter;
 	BMIter fiter;
 
@@ -204,6 +217,14 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 
 			break;
 		}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case DEL_DIM:
+		{
+			bmo_remove_tagged_dim(bm, oflag);
+
+			break;
+		}
+#endif
 	}
 }
 

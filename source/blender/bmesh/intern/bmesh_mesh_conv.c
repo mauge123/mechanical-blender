@@ -390,8 +390,9 @@ void BM_mesh_bm_from_me(
 		mdim = me->mdim;
 		for (i = 0; i < me->totdim; i++, mdim++) {
 
-
+			BM_mesh_elem_toolflags_ensure(bm);
 			d = dtable[i] = BM_dim_create(bm, vtable[mdim->v1], vtable[mdim->v2], NULL, BM_CREATE_SKIP_CD);
+
 			set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
 
 
@@ -766,9 +767,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		mdm->v2 = BM_elem_index_get(d->v2);
 		mdm->dpos_fact = d->dpos_fact;
 		copy_v3_v3(mdm->fpos, d->fpos);
-
 		BM_elem_index_set(d, i); /* set_inline */
-
 		/* copy over customdat */
 		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, d->head.data, i);
 

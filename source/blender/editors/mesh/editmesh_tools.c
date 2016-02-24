@@ -325,6 +325,9 @@ enum {
 	MESH_DELETE_FACE      = 2,
 	MESH_DELETE_EDGE_FACE = 3,
 	MESH_DELETE_ONLY_FACE = 4,
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	MESH_DELETE_DIM	      = 5,
+#endif
 };
 
 static void edbm_report_delete_info(ReportList *reports, BMesh *bm, const int totelem[3])
@@ -353,6 +356,8 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 			if (!EDBM_op_callf(em, op, "delete geom=%hf context=%i", BM_ELEM_SELECT, DEL_FACES))  /* Erase Faces */
 				return OPERATOR_CANCELLED;
 			break;
+
+
 		case MESH_DELETE_EDGE_FACE:
 			/* Edges and Faces */
 			if (!EDBM_op_callf(em, op, "delete geom=%hef context=%i", BM_ELEM_SELECT, DEL_EDGESFACES))
@@ -363,6 +368,15 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 			if (!EDBM_op_callf(em, op, "delete geom=%hf context=%i", BM_ELEM_SELECT, DEL_ONLYFACES))
 				return OPERATOR_CANCELLED;
 			break;
+	#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case MESH_DELETE_DIM:
+			if (!EDBM_op_callf(em, op, "delete geom=%hv context=%i", BM_ELEM_SELECT, DEL_DIM))  /* Erase DIM */
+				return OPERATOR_CANCELLED;
+			break;
+	#endif
+
+
+
 		default:
 			BLI_assert(0);
 			break;
@@ -383,12 +397,15 @@ void MESH_OT_delete(wmOperatorType *ot)
 		{MESH_DELETE_FACE,      "FACE",      0, "Faces", ""},
 		{MESH_DELETE_EDGE_FACE, "EDGE_FACE", 0, "Only Edges & Faces", ""},
 		{MESH_DELETE_ONLY_FACE, "ONLY_FACE", 0, "Only Faces", ""},
+	#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		{MESH_DELETE_DIM,      "DIM",      0, "Dimension", ""},
+	#endif
 		{0, NULL, 0, NULL, NULL}
 	};
 
 	/* identifiers */
 	ot->name = "Delete";
-	ot->description = "Delete selected vertices, edges or faces";
+	ot->description = "Delete selected vertices, edges, faces or dimension";
 	ot->idname = "MESH_OT_delete";
 	
 	/* api callbacks */

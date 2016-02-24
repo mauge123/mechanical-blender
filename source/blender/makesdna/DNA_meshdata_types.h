@@ -74,6 +74,7 @@ typedef struct MDim {
 	float fpos[3];
 	char flag;
 	char pad[3];
+
 } MDim;
 
 /* tessellation vertex color data.
