@@ -50,12 +50,12 @@
 #include "ED_screen.h"
 #include "ED_object.h"
 #include "BKE_report.h"
-#include "ED_dimensions.h"
 
 #include "mesh_intern.h"  /* own include */
 
 #include "BLI_string.h"
 
+#include "ED_dimensions.h"
 
 static int mechanical_add_dimension_between_two_vertex (BMEditMesh *em, wmOperator *op) {
 

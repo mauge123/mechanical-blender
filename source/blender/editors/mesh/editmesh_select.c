@@ -60,6 +60,7 @@
 #include "ED_mesh.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
+#include "ED_dimensions.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -1915,7 +1916,8 @@ void MESH_OT_select_interior_faces(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-void select_dimension_data (BMDim *edm, ViewContext *vc) {
+void select_dimension_data (BMDim *edm, void *context) {
+	ViewContext *vc = (ViewContext*) context;
 	float screen_co_start[2];
 	float screen_co_end[2];
 	float screen_co_dpos[2];

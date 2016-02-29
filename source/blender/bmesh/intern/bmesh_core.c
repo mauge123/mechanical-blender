@@ -951,8 +951,6 @@ void BM_vert_kill(BMesh *bm, BMVert *v)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void BM_dim_kill(BMesh *bm, BMDim *edm)
 {
-
-
 	bm_kill_only_dim(bm, edm);
 }
 
@@ -2913,7 +2911,7 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void bm_kill_only_dim(BMesh *bm, BMDim *d)
+void bm_kill_only_dim(BMesh *bm, BMDim *d)
 {
 	bm->totdim--;
 	bm->elem_index_dirty |= BM_DIM;
