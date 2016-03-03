@@ -2328,7 +2328,7 @@ static int createTransEditDim(TransInfo *t) {
 		get_dimension_mid(mid,edm);
 
 		copy_v3_v3(td->iloc, mid);
-		copy_v3_v3(td->center, edm->tpos);
+		copy_v3_v3(td->center, mid);
 		td->ext = NULL;
 		td->val = NULL;
 		td->extra = NULL;

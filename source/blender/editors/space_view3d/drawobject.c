@@ -2719,8 +2719,9 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	}
 
 	if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
-		copy_v3_v3(edm->fpos,edm->tpos);
-
+		get_dimension_mid(edm->fpos,edm);
+		sub_v3_v3(edm->fpos,edm->tpos);
+		mul_v3_fl(edm->fpos,-1.0f);
 	}
 
 	//Midline
