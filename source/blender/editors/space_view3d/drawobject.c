@@ -2699,21 +2699,21 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	glPointSize(2);
 	glBegin(GL_POINTS);
 	{
-		bglVertex3fv(start);
-		bglVertex3fv(end);
+		glVertex3fv(start);
+		glVertex3fv(end);
 	}
 	glEnd();
 
 	glBegin(GL_LINES);
 	{
-		bglVertex3fv(edm->v1->co);
-		bglVertex3fv(start);
+		glVertex3fv(edm->v1->co);
+		glVertex3fv(start);
 
-		bglVertex3fv(edm->v2->co);
-		bglVertex3fv(end);
+		glVertex3fv(edm->v2->co);
+		glVertex3fv(end);
 
-		bglVertex3fv(start);
-		bglVertex3fv(end);
+		glVertex3fv(start);
+		glVertex3fv(end);
 	}
 	glEnd();
 
@@ -2743,22 +2743,22 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 			glPointSize(7);
 			glBegin(GL_POINTS);
 			{
-				bglVertex3fv(end);
+				glVertex3fv(end);
 			}
 			glEnd();
 		}else if(edm->dir==-1){
 			glPointSize(7);
 			glBegin(GL_POINTS);
 			{
-				bglVertex3fv(start);
+				glVertex3fv(start);
 			}
 			glEnd();
 		}else if(edm->dir==0){
 			glPointSize(7);
 			glBegin(GL_POINTS);
 			{
-				bglVertex3fv(end);
-				bglVertex3fv(start);
+				glVertex3fv(end);
+				glVertex3fv(start);
 			}
 			glEnd();
 		}
@@ -2770,8 +2770,8 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 		glPointSize(2);
 		glBegin(GL_POINTS);
 		{
-			bglVertex3fv(start);
-			bglVertex3fv(end);
+			glVertex3fv(start);
+			glVertex3fv(end);
 		}
 		glEnd();
 		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
