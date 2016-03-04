@@ -492,6 +492,8 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 					cp = ts->transition; break;
 				case TH_SEQ_META:
 					cp = ts->meta; break;
+				case TH_SEQ_TEXT:
+					cp = ts->text_strip; break;
 				case TH_SEQ_PREVIEW:
 					cp = ts->preview_back; break;
 
@@ -1062,6 +1064,7 @@ void ui_theme_init_default(void)
 	rgba_char_args_set(btheme->tseq.effect,     169, 84, 124, 255);
 	rgba_char_args_set(btheme->tseq.transition, 162, 95, 111, 255);
 	rgba_char_args_set(btheme->tseq.meta,   109, 145, 131, 255);
+	rgba_char_args_set(btheme->tseq.text_strip,   162, 151, 0, 255);
 	rgba_char_args_set(btheme->tseq.preview_back,   0, 0, 0, 255);
 	rgba_char_args_set(btheme->tseq.grid,   64, 64, 64, 255);
 
@@ -1380,6 +1383,23 @@ int UI_GetThemeValue(int colorid)
 	
 	cp = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	return ((int) cp[0]);
+}
+
+/* versions of the function above, which take a space-type */
+float UI_GetThemeValueTypef(int colorid, int spacetype)
+{
+	const unsigned char *cp;
+
+	cp = UI_ThemeGetColorPtr(theme_active, spacetype, colorid);
+	return ((float)cp[0]);
+}
+
+int UI_GetThemeValueType(int colorid, int spacetype)
+{
+	const unsigned char *cp;
+
+	cp = UI_ThemeGetColorPtr(theme_active, spacetype, colorid);
+	return ((int)cp[0]);
 }
 
 
@@ -1920,11 +1940,7 @@ void init_userdef_do_versions(void)
 		if (U.audioformat == 0)
 			U.audioformat = 0x24;
 		if (U.audiorate == 0)
-			U.audiorate = 44100;
-	}
-
-	if (!USER_VERSION_ATLEAST(250, 3)) {
-		U.gameflags |= USER_DISABLE_VBO;
+			U.audiorate = 48000;
 	}
 	
 	if (!USER_VERSION_ATLEAST(250, 8)) {
@@ -2008,7 +2024,7 @@ void init_userdef_do_versions(void)
 			{0, 0, 0, 255},
 			{190, 190, 190, 255},
 			{100, 100, 100, 180},
-			{68, 68, 68, 255},
+			{128, 128, 128, 255},
 			
 			{0, 0, 0, 255},
 			{255, 255, 255, 255},
@@ -2653,6 +2669,47 @@ void init_userdef_do_versions(void)
 			rgba_char_args_set(btheme->tclip.gp_vertex_select, 255, 133, 0, 255);
 			btheme->tclip.gp_vertex_size = 3;
 		}
+	}
+
+	if (!USER_VERSION_ATLEAST(276, 3)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			rgba_char_args_set(btheme->tseq.text_strip, 162, 151, 0, 255);
+		}
+	}
+
+	if (!USER_VERSION_ATLEAST(276, 8)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			rgba_char_args_set(btheme->tui.wcol_progress.item, 128, 128, 128, 255);
+		}
+	}
+
+	if (!USER_VERSION_ATLEAST(276, 10)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			/* 3dView Keyframe Indicators */
+			rgba_char_args_set(btheme->tv3d.time_keyframe, 0xDD, 0xD7, 0x00, 1.0);
+			rgba_char_args_set(btheme->tv3d.time_gp_keyframe, 0xB5, 0xE6, 0x1D, 1.0);
+		}
+	}
+
+	if (!USER_VERSION_ATLEAST(277, 0)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			if (memcmp(btheme->tui.wcol_list_item.item, btheme->tui.wcol_list_item.text_sel, sizeof(char) * 3) == 0) {
+				copy_v4_v4_char(btheme->tui.wcol_list_item.item, btheme->tui.wcol_text.item);
+				copy_v4_v4_char(btheme->tui.wcol_list_item.text_sel, btheme->tui.wcol_text.text_sel);
+			}
+		}
+	}
+
+	/**
+	 * Include next version bump.
+	 *
+	 * (keep this block even if it becomes empty).
+	 */
+	{
 	}
 
 	if (U.pixelsize == 0.0f)

@@ -217,7 +217,7 @@ void ED_uvedit_get_aspect(Scene *scene, Object *ob, BMesh *bm, float *aspx, floa
 }
 
 static void construct_param_handle_face_add(ParamHandle *handle, Scene *scene,
-                                            BMFace *efa, const int cd_loop_uv_offset)
+                                            BMFace *efa, int face_index, const int cd_loop_uv_offset)
 {
 	ParamKey key;
 	ParamKey *vkeys = BLI_array_alloca(vkeys, efa->len);
@@ -230,7 +230,7 @@ static void construct_param_handle_face_add(ParamHandle *handle, Scene *scene,
 	BMIter liter;
 	BMLoop *l;
 
-	key = (ParamKey)efa;
+	key = (ParamKey)face_index;
 
 	/* let parametrizer split the ngon, it can make better decisions
 	 * about which split is best for unwrapping than scanfill */
@@ -256,6 +256,7 @@ static ParamHandle *construct_param_handle(Scene *scene, Object *ob, BMesh *bm,
 	BMLoop *l;
 	BMEdge *eed;
 	BMIter iter, liter;
+	int i;
 	
 	const int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
 
@@ -273,7 +274,7 @@ static ParamHandle *construct_param_handle(Scene *scene, Object *ob, BMesh *bm,
 	/* we need the vert indices */
 	BM_mesh_elem_index_ensure(bm, BM_VERT);
 	
-	BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
+	BM_ITER_MESH_INDEX (efa, &iter, bm, BM_FACES_OF_MESH, i) {
 
 		if ((BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) || (sel && BM_elem_flag_test(efa, BM_ELEM_SELECT) == 0)) {
 			continue;
@@ -293,7 +294,7 @@ static ParamHandle *construct_param_handle(Scene *scene, Object *ob, BMesh *bm,
 			}
 		}
 
-		construct_param_handle_face_add(handle, scene, efa, cd_loop_uv_offset);
+		construct_param_handle_face_add(handle, scene, efa, i, cd_loop_uv_offset);
 	}
 
 	if (!implicit) {
@@ -449,7 +450,7 @@ static ParamHandle *construct_param_handle_subsurfed(Scene *scene, Object *ob, B
 
 		/* We will not check for v4 here. Subsurfed mfaces always have 4 vertices. */
 		BLI_assert(mpoly->totloop == 4);
-		key = (ParamKey)mpoly;
+		key = (ParamKey)i;
 		vkeys[0] = (ParamKey)mloop[0].v;
 		vkeys[1] = (ParamKey)mloop[1].v;
 		vkeys[2] = (ParamKey)mloop[2].v;
@@ -859,12 +860,12 @@ void ED_uvedit_live_unwrap(Scene *scene, Object *obedit)
 static void uv_map_transform_center(Scene *scene, View3D *v3d, float *result, 
                                     Object *ob, BMEditMesh *em)
 {
-	int around = (v3d) ? v3d->around : V3D_CENTER;
+	const int around = (v3d) ? v3d->around : V3D_AROUND_CENTER_BOUNDS;
 
 	/* only operates on the edit object - this is all that's needed now */
 
 	switch (around) {
-		case V3D_CENTER: /* bounding box center */
+		case V3D_AROUND_CENTER_BOUNDS: /* bounding box center */
 		{
 			BMFace *efa;
 			BMLoop *l;
@@ -883,15 +884,15 @@ static void uv_map_transform_center(Scene *scene, View3D *v3d, float *result,
 			mid_v3_v3v3(result, min, max);
 			break;
 		}
-		case V3D_CURSOR:  /* cursor center */
+		case V3D_AROUND_CURSOR:  /* cursor center */
 		{
 			const float *curs = ED_view3d_cursor3d_get(scene, v3d);
 			/* shift to objects world */
 			sub_v3_v3v3(result, curs, ob->obmat[3]);
 			break;
 		}
-		case V3D_LOCAL:     /* object center */
-		case V3D_CENTROID:  /* multiple objects centers, only one object here*/
+		case V3D_AROUND_LOCAL_ORIGINS:  /* object center */
+		case V3D_AROUND_CENTER_MEAN:    /* multiple objects centers, only one object here*/
 		default:
 			zero_v3(result);
 			break;

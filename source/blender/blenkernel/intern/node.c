@@ -1970,7 +1970,16 @@ bNodeTree *ntreeFromID(ID *id)
 	}
 }
 
-void ntreeMakeLocal(bNodeTree *ntree)
+static void extern_local_ntree(bNodeTree *ntree)
+{
+	for (bNode *node = ntree->nodes.first; node; node = node->next) {
+		if (node->id) {
+			id_lib_extern(node->id);
+		}
+	}
+}
+
+void ntreeMakeLocal(bNodeTree *ntree, bool id_in_mainlist)
 {
 	Main *bmain = G.main;
 	bool lib = false, local = false;
@@ -1982,7 +1991,8 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	
 	if (ntree->id.lib == NULL) return;
 	if (ntree->id.us == 1) {
-		id_clear_lib_data(bmain, (ID *)ntree);
+		id_clear_lib_data_ex(bmain, (ID *)ntree, id_in_mainlist);
+		extern_local_ntree(ntree);
 		return;
 	}
 	
@@ -2002,7 +2012,8 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	
 	/* if all users are local, we simply make tree local */
 	if (local && !lib) {
-		id_clear_lib_data(bmain, (ID *)ntree);
+		id_clear_lib_data_ex(bmain, (ID *)ntree, id_in_mainlist);
+		extern_local_ntree(ntree);
 	}
 	else if (local && lib) {
 		/* this is the mixed case, we copy the tree and assign it to local users */
@@ -2017,8 +2028,8 @@ void ntreeMakeLocal(bNodeTree *ntree)
 				if (node->id == (ID *)ntree) {
 					if (owner_id->lib == NULL) {
 						node->id = (ID *)newtree;
-						newtree->id.us++;
-						ntree->id.us--;
+						id_us_plus(&newtree->id);
+						id_us_min(&ntree->id);
 					}
 				}
 			}
@@ -2106,8 +2117,10 @@ bNodeTree *ntreeLocalize(bNodeTree *ntree)
 			adt->action = ladt->action = action_backup;
 			adt->tmpact = ladt->tmpact = tmpact_backup;
 
-			if (action_backup) action_backup->id.us++;
-			if (tmpact_backup) tmpact_backup->id.us++;
+			if (action_backup)
+				id_us_plus(&action_backup->id);
+			if (tmpact_backup)
+				id_us_plus(&tmpact_backup->id);
 
 		}
 		/* end animdata uglyness */
@@ -3424,6 +3437,10 @@ void node_type_size_preset(struct bNodeType *ntype, eNodeSizePreset size)
 	}
 }
 
+/**
+ * \warning Nodes defining a storage type _must_ allocate this for new nodes.
+ * Otherwise nodes will reload as undefined (T46619).
+ */
 void node_type_storage(bNodeType *ntype,
 	const char *storagename,
 	void (*freefunc)(struct bNode *node),

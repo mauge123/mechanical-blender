@@ -61,7 +61,7 @@ static EnumPropertyItem texture_filter_items[] = {
 };
 #endif
 
-EnumPropertyItem texture_type_items[] = {
+EnumPropertyItem rna_enum_texture_type_items[] = {
 	{0, "NONE", 0, "None", ""},
 	{TEX_BLEND, "BLEND", ICON_TEXTURE, "Blend", "Procedural - create a ramp texture"},
 	{TEX_CLOUDS, "CLOUDS", ICON_TEXTURE, "Clouds", "Procedural - create a cloud-like fractal noise texture"},
@@ -174,7 +174,7 @@ static void rna_Texture_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *pt
 	}
 	else if (GS(id->name) == ID_NT) {
 		bNodeTree *ntree = ptr->id.data;
-		ED_node_tag_update_nodetree(bmain, ntree);
+		ED_node_tag_update_nodetree(bmain, ntree, NULL);
 	}
 }
 
@@ -2028,7 +2028,7 @@ static void rna_def_texture(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 	/*RNA_def_property_clear_flag(prop, PROP_EDITABLE); */
 	RNA_def_property_enum_sdna(prop, NULL, "type");
-	RNA_def_property_enum_items(prop, texture_type_items);
+	RNA_def_property_enum_items(prop, rna_enum_texture_type_items);
 	RNA_def_property_enum_funcs(prop, NULL, "rna_Texture_type_set", NULL);
 	RNA_def_property_ui_text(prop, "Type", "");
 	RNA_def_property_update(prop, 0, "rna_Texture_update");

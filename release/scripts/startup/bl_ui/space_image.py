@@ -28,6 +28,7 @@ from bl_ui.properties_paint_common import (
 from bl_ui.properties_grease_pencil_common import (
         GreasePencilDrawingToolsPanel,
         GreasePencilStrokeEditPanel,
+        GreasePencilStrokeSculptPanel,
         GreasePencilDataPanel,
         )
 from bpy.app.translations import pgettext_iface as iface_
@@ -207,18 +208,17 @@ class IMAGE_MT_image(Menu):
             layout.menu("IMAGE_MT_image_invert")
 
             if not show_render:
-                layout.separator()
-
                 if not ima.packed_file:
+                    layout.separator()
                     layout.operator("image.pack")
 
                 # only for dirty && specific image types, perhaps
                 # this could be done in operator poll too
                 if ima.is_dirty:
                     if ima.source in {'FILE', 'GENERATED'} and ima.type != 'OPEN_EXR_MULTILAYER':
+                        if ima.packed_file:
+                            layout.separator()
                         layout.operator("image.pack", text="Pack As PNG").as_png = True
-
-            layout.separator()
 
 
 class IMAGE_MT_image_invert(Menu):
@@ -727,6 +727,7 @@ class IMAGE_PT_paint(Panel, ImagePaintPanel):
         toolsettings = context.tool_settings.image_paint
         return sima.show_paint
 
+
 class IMAGE_PT_tools_brush_overlay(BrushButtonsPanel, Panel):
     bl_label = "Overlay"
     bl_options = {'DEFAULT_CLOSED'}
@@ -1189,6 +1190,11 @@ class IMAGE_PT_tools_grease_pencil_draw(GreasePencilDrawingToolsPanel, Panel):
 
 # Grease Pencil stroke editing tools
 class IMAGE_PT_tools_grease_pencil_edit(GreasePencilStrokeEditPanel, Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+
+
+# Grease Pencil stroke sculpting tools
+class IMAGE_PT_tools_grease_pencil_sculpt(GreasePencilStrokeSculptPanel, Panel):
     bl_space_type = 'IMAGE_EDITOR'
 
 

@@ -211,7 +211,7 @@ float BPY_driver_exec(ChannelDriver *driver, const float evaltime)
 	/* init global dictionary for py-driver evaluation settings */
 	if (!bpy_pydriver_Dict) {
 		if (bpy_pydriver_create_dict() != 0) {
-			fprintf(stderr, "Pydriver error: couldn't create Python dictionary");
+			fprintf(stderr, "PyDriver error: couldn't create Python dictionary\n");
 			if (use_gil)
 				PyGILState_Release(gilstate);
 			return 0.0f;
@@ -259,7 +259,7 @@ float BPY_driver_exec(ChannelDriver *driver, const float evaltime)
 	}
 
 	/* add target values to a dict that will be used as '__locals__' dict */
-	driver_vars = PyDict_New(); // XXX do we need to decref this?
+	driver_vars = PyDict_New();
 	for (dvar = driver->variables.first, i = 0; dvar; dvar = dvar->next) {
 		PyObject *driver_arg = NULL;
 		float tval = 0.0f;

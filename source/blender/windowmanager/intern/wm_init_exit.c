@@ -64,6 +64,7 @@
 #include "BKE_mball_tessellate.h"
 #include "BKE_node.h"
 #include "BKE_report.h"
+#include "BKE_font.h"
 
 #include "BKE_addon.h"
 #include "BKE_appdir.h"
@@ -118,7 +119,7 @@
 #include "COM_compositor.h"
 
 #ifdef WITH_OPENSUBDIV
-#  include "opensubdiv_capi.h"
+#  include "BKE_subsurf.h"
 #endif
 
 static void wm_init_reports(bContext *C)
@@ -196,7 +197,7 @@ void WM_init(bContext *C, int argc, const char **argv)
 		GPU_set_gpu_mipmapping(U.use_gpu_mipmap);
 
 #ifdef WITH_OPENSUBDIV
-		openSubdiv_init();
+		BKE_subsurf_osd_init();
 #endif
 
 		UI_init();
@@ -428,8 +429,9 @@ static void wait_for_console_key(void)
 }
 #endif
 
-/* called in creator.c even... tsk, split this! */
-/* note, doesnt run exit() call WM_exit() for that */
+/**
+ * \note doesn't run exit() call #WM_exit() for that.
+ */
 void WM_exit_ext(bContext *C, const bool do_python)
 {
 	wmWindowManager *wm = C ? CTX_wm_manager(C) : NULL;
@@ -503,6 +505,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	BKE_sequencer_free_clipboard(); /* sequencer.c */
 	BKE_tracking_clipboard_free();
 	BKE_mask_clipboard_free();
+	BKE_vfont_clipboard_free();
 		
 #ifdef WITH_COMPOSITOR
 	COM_deinitialize();
@@ -513,6 +516,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	free_anim_copybuf();
 	free_anim_drivers_copybuf();
 	free_fmodifiers_copybuf();
+	ED_gpencil_anim_copybuf_free();
 	ED_gpencil_strokes_copybuf_free();
 	ED_clipboard_posebuf_free();
 	BKE_node_clipboard_clear();
@@ -546,11 +550,11 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	(void)do_python;
 #endif
 
+	if (!G.background) {
 #ifdef WITH_OPENSUBDIV
-	openSubdiv_cleanup();
+		BKE_subsurf_osd_cleanup();
 #endif
 
-	if (!G.background) {
 		GPU_global_buffer_pool_free();
 		GPU_free_unused_buffers();
 

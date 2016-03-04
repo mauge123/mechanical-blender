@@ -302,8 +302,6 @@ char *BLI_sprintfN(const char *__restrict format, ...)
 	va_list arg;
 	char *n;
 
-	BLI_assert(format != NULL);
-
 	va_start(arg, format);
 
 	ds = BLI_dynstr_new();
@@ -841,7 +839,7 @@ bool BLI_strn_endswith(const char *__restrict str, const char *__restrict end, s
  * \param end The string we look for at the end.
  * \return If str ends with end.
  */
-bool BLI_str_endswith(const char *__restrict str, const char *end)
+bool BLI_str_endswith(const char *__restrict str, const char * __restrict end)
 {
 	const size_t slength = strlen(str);
 	return BLI_strn_endswith(str, end, slength);

@@ -71,9 +71,6 @@ _CRTIMP void __cdecl _invalid_parameter_noinfo(void)
 #include "IMB_allocimbuf.h"
 #include "IMB_metadata.h"
 
-#include "IMB_colormanagement.h"
-#include "IMB_colormanagement_intern.h"
-
 #include "openexr_multi.h"
 }
 
@@ -103,6 +100,11 @@ _CRTIMP void __cdecl _invalid_parameter_noinfo(void)
 #include <ImfTiledOutputPart.h>
 #include <ImfPartType.h>
 #include <ImfPartHelper.h>
+
+extern "C" {
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
+}
 
 using namespace Imf;
 using namespace Imath;
@@ -420,14 +422,14 @@ static bool imb_save_openexr_half(
 		OutputFile file(file_stream, header);
 
 		/* we store first everything in half array */
-		RGBAZ *pixels = new RGBAZ[height * width * totviews];
+		std::vector<RGBAZ> pixels(height * width * totviews);
 		int xstride = sizeof(RGBAZ);
 		int ystride = xstride * width;
 
 		for (view_id = 0; view_id < totviews; view_id ++) {
 			ImBuf *view_ibuf = is_multiview ? getbuffer(ibuf->userdata, view_id) : ibuf;
 			const size_t offset = view_id * width * height;
-			RGBAZ *to = pixels + offset;
+			RGBAZ *to = &pixels[offset];
 
 			/* TODO (dfelinto)
 			 * In some cases we get NULL ibufs, it needs investigation, meanwhile prevent crash
@@ -485,8 +487,6 @@ static bool imb_save_openexr_half(
 
 		file.setFrameBuffer(frameBuffer);
 		file.writePixels(height);
-
-		delete[] pixels;
 	}
 	catch (const std::exception& exc)
 	{

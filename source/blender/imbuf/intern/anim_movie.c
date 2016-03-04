@@ -85,26 +85,20 @@
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
+
 #include "IMB_anim.h"
 #include "IMB_indexer.h"
 
 #ifdef WITH_FFMPEG
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libavutil/rational.h>
-#include <libswscale/swscale.h>
+#  include <libavformat/avformat.h>
+#  include <libavcodec/avcodec.h>
+#  include <libavutil/rational.h>
+#  include <libswscale/swscale.h>
 
-#include "ffmpeg_compat.h"
-
+#  include "ffmpeg_compat.h"
 #endif //WITH_FFMPEG
-
-#ifdef WITH_REDCODE
-#  include "libredcode/format.h"
-#  include "libredcode/codec.h"
-#endif
-
-#include "IMB_colormanagement.h"
-#include "IMB_colormanagement_intern.h"
 
 int ismovie(const char *UNUSED(filepath))
 {
@@ -127,9 +121,9 @@ static void free_anim_movie(struct anim *UNUSED(anim))
 
 
 #if defined(_WIN32)
-# define PATHSEPERATOR '\\'
+# define PATHSEPARATOR '\\'
 #else
-# define PATHSEPERATOR '/'
+# define PATHSEPARATOR '/'
 #endif
 
 static int an_stringdec(const char *string, char *head, char *tail, unsigned short *numlen)
@@ -142,7 +136,7 @@ static int an_stringdec(const char *string, char *head, char *tail, unsigned sho
 	nume = len;
 
 	for (i = len - 1; i >= 0; i--) {
-		if (string[i] == PATHSEPERATOR) break;
+		if (string[i] == PATHSEPARATOR) break;
 		if (isdigit(string[i])) {
 			if (found) {
 				nums = i;
@@ -216,9 +210,6 @@ static void free_anim_avi(struct anim *anim)
 #ifdef WITH_FFMPEG
 static void free_anim_ffmpeg(struct anim *anim);
 #endif
-#ifdef WITH_REDCODE
-static void free_anim_redcode(struct anim *anim);
-#endif
 
 void IMB_free_anim(struct anim *anim)
 {
@@ -238,9 +229,6 @@ void IMB_free_anim(struct anim *anim)
 #endif
 #ifdef WITH_FFMPEG
 	free_anim_ffmpeg(anim);
-#endif
-#ifdef WITH_REDCODE
-	free_anim_redcode(anim);
 #endif
 	IMB_free_indices(anim);
 
@@ -525,9 +513,14 @@ static int startffmpeg(struct anim *anim)
 	}
 
 	frame_rate = av_get_r_frame_rate_compat(pFormatCtx->streams[videoStream]);
-	anim->duration = ceil(pFormatCtx->duration *
-	                      av_q2d(frame_rate) /
-	                      AV_TIME_BASE);
+	if (pFormatCtx->streams[videoStream]->nb_frames != 0) {
+		anim->duration = pFormatCtx->streams[videoStream]->nb_frames;
+	}
+	else {
+		anim->duration = ceil(pFormatCtx->duration *
+		                      av_q2d(frame_rate) /
+		                      AV_TIME_BASE);
+	}
 
 	frs_num = frame_rate.num;
 	frs_den = frame_rate.den;
@@ -562,12 +555,12 @@ static int startffmpeg(struct anim *anim)
 	anim->next_pts = -1;
 	anim->next_packet.stream_index = -1;
 
-	anim->pFrame = avcodec_alloc_frame();
+	anim->pFrame = av_frame_alloc();
 	anim->pFrameComplete = false;
-	anim->pFrameDeinterlaced = avcodec_alloc_frame();
-	anim->pFrameRGB = avcodec_alloc_frame();
+	anim->pFrameDeinterlaced = av_frame_alloc();
+	anim->pFrameRGB = av_frame_alloc();
 
-	if (avpicture_get_size(PIX_FMT_RGBA, anim->x, anim->y) !=
+	if (avpicture_get_size(AV_PIX_FMT_RGBA, anim->x, anim->y) !=
 	    anim->x * anim->y * 4)
 	{
 		fprintf(stderr,
@@ -606,7 +599,7 @@ static int startffmpeg(struct anim *anim)
 	        anim->pCodecCtx->pix_fmt,
 	        anim->x,
 	        anim->y,
-	        PIX_FMT_RGBA,
+	        AV_PIX_FMT_RGBA,
 	        SWS_FAST_BILINEAR | SWS_PRINT_INFO | SWS_FULL_CHR_H_INT,
 	        NULL, NULL, NULL);
 		
@@ -695,7 +688,7 @@ static void ffmpeg_postprocess(struct anim *anim)
 	
 	avpicture_fill((AVPicture *) anim->pFrameRGB,
 	               (unsigned char *) ibuf->rect,
-	               PIX_FMT_RGBA, anim->x, anim->y);
+	               AV_PIX_FMT_RGBA, anim->x, anim->y);
 
 	if (ENDIAN_ORDER == B_ENDIAN) {
 		int *dstStride   = anim->pFrameRGB->linesize;
@@ -826,7 +819,7 @@ static int ffmpeg_decode_video_frame(struct anim *anim)
 		 * which is necessary to decode the remaining data
 		 * in the decoder engine after EOF. It also prevents a memory
 		 * leak, since av_read_frame spills out a full size packet even
-		 * on EOF... (and: it's save to call on NULL packets) */
+		 * on EOF... (and: it's safe to call on NULL packets) */
 
 		av_free_packet(&anim->next_packet);
 
@@ -1159,62 +1152,6 @@ static void free_anim_ffmpeg(struct anim *anim)
 
 #endif
 
-#ifdef WITH_REDCODE
-
-static int startredcode(struct anim *anim)
-{
-	anim->redcodeCtx = redcode_open(anim->name);
-	if (!anim->redcodeCtx) {
-		return -1;
-	}
-	anim->duration = redcode_get_length(anim->redcodeCtx);
-	
-	return 0;
-}
-
-static ImBuf *redcode_fetchibuf(struct anim *anim, int position)
-{
-	struct ImBuf *ibuf;
-	struct redcode_frame *frame;
-	struct redcode_frame_raw *raw_frame;
-
-	if (!anim->redcodeCtx) {
-		return NULL;
-	}
-
-	frame = redcode_read_video_frame(anim->redcodeCtx, position);
-	
-	if (!frame) {
-		return NULL;
-	}
-
-	raw_frame = redcode_decode_video_raw(frame, 1);
-
-	redcode_free_frame(frame);
-
-	if (!raw_frame) {
-		return NULL;
-	}
-	
-	ibuf = IMB_allocImBuf(raw_frame->width * 2,
-	                      raw_frame->height * 2, 32, IB_rectfloat);
-
-	redcode_decode_video_float(raw_frame, ibuf->rect_float, 1);
-
-	return ibuf;
-}
-
-static void free_anim_redcode(struct anim *anim)
-{
-	if (anim->redcodeCtx) {
-		redcode_close(anim->redcodeCtx);
-		anim->redcodeCtx = 0;
-	}
-	anim->duration = 0;
-}
-
-#endif
-
 /* Try next picture to read */
 /* No picture, try to open next animation */
 /* Succeed, remove first image from animation */
@@ -1237,10 +1174,6 @@ static ImBuf *anim_getnew(struct anim *anim)
 #ifdef WITH_FFMPEG
 	free_anim_ffmpeg(anim);
 #endif
-#ifdef WITH_REDCODE
-	free_anim_redcode(anim);
-#endif
-
 
 	if (anim->curtype != 0) return (NULL);
 	anim->curtype = imb_get_anim_type(anim->name);
@@ -1276,12 +1209,6 @@ static ImBuf *anim_getnew(struct anim *anim)
 		case ANIM_FFMPEG:
 			if (startffmpeg(anim)) return (0);
 			ibuf = IMB_allocImBuf(anim->x, anim->y, 24, 0);
-			break;
-#endif
-#ifdef WITH_REDCODE
-		case ANIM_REDCODE:
-			if (startredcode(anim)) return (0);
-			ibuf = IMB_allocImBuf(8, 8, 32, 0);
 			break;
 #endif
 	}
@@ -1388,12 +1315,6 @@ struct ImBuf *IMB_anim_absolute(struct anim *anim, int position,
 			if (ibuf)
 				anim->curposition = position;
 			filter_y = 0; /* done internally */
-			break;
-#endif
-#ifdef WITH_REDCODE
-		case ANIM_REDCODE:
-			ibuf = redcode_fetchibuf(anim, position);
-			if (ibuf) anim->curposition = position;
 			break;
 #endif
 	}

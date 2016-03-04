@@ -705,6 +705,35 @@ void shade_input_set_viewco(ShadeInput *shi, float x, float y, float xs, float y
 	shade_input_calc_viewco(shi, xs, ys, z, shi->view, dxyview, shi->co, dxco, dyco);
 }
 
+void barycentric_differentials_from_position(
+	const float co[3], const float v1[3], const float v2[3], const float v3[3],
+	const float dxco[3], const float dyco[3], const float facenor[3], const bool differentials,
+	float *u, float *v, float *dx_u, float *dx_v, float *dy_u, float *dy_v)
+{
+	/* find most stable axis to project */
+	int axis1, axis2;
+	axis_dominant_v3(&axis1, &axis2, facenor);
+
+	/* compute u,v and derivatives */
+	float t00 = v3[axis1] - v1[axis1];
+	float t01 = v3[axis2] - v1[axis2];
+	float t10 = v3[axis1] - v2[axis1];
+	float t11 = v3[axis2] - v2[axis2];
+
+	float detsh = (t00 * t11 - t10 * t01);
+	detsh = (detsh != 0.0f) ? 1.0f / detsh : 0.0f;
+	t00 *= detsh; t01 *= detsh;
+	t10 *= detsh; t11 *= detsh;
+
+	*u = (v3[axis1] - co[axis1]) * t11 - (v3[axis2] - co[axis2]) * t10;
+	*v = (v3[axis2] - co[axis2]) * t00 - (v3[axis1] - co[axis1]) * t01;
+	if (differentials) {
+		*dx_u =  dxco[axis1] * t11 - dxco[axis2] * t10;
+		*dx_v =  dxco[axis2] * t00 - dxco[axis1] * t01;
+		*dy_u =  dyco[axis1] * t11 - dyco[axis2] * t10;
+		*dy_v =  dyco[axis2] * t00 - dyco[axis1] * t01;
+	}
+}
 /* calculate U and V, for scanline (silly render face u and v are in range -1 to 0) */
 void shade_input_set_uv(ShadeInput *shi)
 {
@@ -746,30 +775,12 @@ void shade_input_set_uv(ShadeInput *shi)
 			}
 		}
 		else {
-			/* most of this could become re-used for faces */
-			float detsh, t00, t10, t01, t11;
-			int axis1, axis2;
+			barycentric_differentials_from_position(
+				shi->co, v1, v2, v3, shi->dxco, shi->dyco, shi->facenor, shi->osatex,
+				&shi->u, &shi->v, &shi->dx_u, &shi->dx_v, &shi->dy_u, &shi->dy_v);
 
-			/* find most stable axis to project */
-			axis_dominant_v3(&axis1, &axis2, shi->facenor);
-
-			/* compute u,v and derivatives */
-			t00 = v3[axis1] - v1[axis1]; t01 = v3[axis2] - v1[axis2];
-			t10 = v3[axis1] - v2[axis1]; t11 = v3[axis2] - v2[axis2];
-
-			detsh = (t00 * t11 - t10 * t01);
-			detsh = (detsh != 0.0f) ? 1.0f / detsh : 0.0f;
-			t00 *= detsh; t01 *= detsh;
-			t10 *= detsh; t11 *= detsh;
-
-			shi->u = (shi->co[axis1] - v3[axis1]) * t11 - (shi->co[axis2] - v3[axis2]) * t10;
-			shi->v = (shi->co[axis2] - v3[axis2]) * t00 - (shi->co[axis1] - v3[axis1]) * t01;
-			if (shi->osatex) {
-				shi->dx_u =  shi->dxco[axis1] * t11 - shi->dxco[axis2] * t10;
-				shi->dx_v =  shi->dxco[axis2] * t00 - shi->dxco[axis1] * t01;
-				shi->dy_u =  shi->dyco[axis1] * t11 - shi->dyco[axis2] * t10;
-				shi->dy_v =  shi->dyco[axis2] * t00 - shi->dyco[axis1] * t01;
-			}
+			shi->u = -shi->u;
+			shi->v = -shi->v;
 
 			/* u and v are in range -1 to 0, we allow a little bit extra but not too much, screws up speedvectors */
 			CLAMP(shi->u, -2.0f, 1.0f);
@@ -1131,7 +1142,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 					float obwinmat[4][4], winmat[4][4], ho1[4], ho2[4], ho3[4];
 					float Zmulx, Zmuly;
-					float hox, hoy, l, dl, u, v;
+					float hox, hoy, l_proj, dl_proj, u_proj, v_proj;
 					float s00, s01, s10, s11, detsh;
 
 					/* old globals, localized now */
@@ -1161,12 +1172,12 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 					/* recalc u and v again */
 					hox = x / Zmulx - 1.0f;
 					hoy = y / Zmuly - 1.0f;
-					u = (hox - ho3[0] / ho3[3]) * s11 - (hoy - ho3[1] / ho3[3]) * s10;
-					v = (hoy - ho3[1] / ho3[3]) * s00 - (hox - ho3[0] / ho3[3]) * s01;
-					l = 1.0f + u + v;
+					u_proj = (hox - ho3[0] / ho3[3]) * s11 - (hoy - ho3[1] / ho3[3]) * s10;
+					v_proj = (hoy - ho3[1] / ho3[3]) * s00 - (hox - ho3[0] / ho3[3]) * s01;
+					l_proj = 1.0f + u_proj + v_proj;
 
-					suv->uv[0] = l * s3[0] - u * s1[0] - v * s2[0];
-					suv->uv[1] = l * s3[1] - u * s1[1] - v * s2[1];
+					suv->uv[0] = l_proj * s3[0] - u_proj * s1[0] - v_proj * s2[0];
+					suv->uv[1] = l_proj * s3[1] - u_proj * s1[1] - v_proj * s2[1];
 					suv->uv[2] = 0.0f;
 
 					if (shi->osatex) {
@@ -1176,12 +1187,12 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 						dyuv[0] =  -s10 / Zmuly;
 						dyuv[1] =  s00 / Zmuly;
 
-						dl = dxuv[0] + dxuv[1];
-						suv->dxuv[0] = dl * s3[0] - dxuv[0] * s1[0] - dxuv[1] * s2[0];
-						suv->dxuv[1] = dl * s3[1] - dxuv[0] * s1[1] - dxuv[1] * s2[1];
-						dl = dyuv[0] + dyuv[1];
-						suv->dyuv[0] = dl * s3[0] - dyuv[0] * s1[0] - dyuv[1] * s2[0];
-						suv->dyuv[1] = dl * s3[1] - dyuv[0] * s1[1] - dyuv[1] * s2[1];
+						dl_proj = dxuv[0] + dxuv[1];
+						suv->dxuv[0] = dl_proj * s3[0] - dxuv[0] * s1[0] - dxuv[1] * s2[0];
+						suv->dxuv[1] = dl_proj * s3[1] - dxuv[0] * s1[1] - dxuv[1] * s2[1];
+						dl_proj = dyuv[0] + dyuv[1];
+						suv->dyuv[0] = dl_proj * s3[0] - dyuv[0] * s1[0] - dyuv[1] * s2[0];
+						suv->dyuv[1] = dl_proj * s3[1] - dyuv[0] * s1[1] - dyuv[1] * s2[1];
 					}
 				}
 				else {

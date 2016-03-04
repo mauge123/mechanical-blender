@@ -406,9 +406,9 @@ extern "C" {
 	CHECK_TYPE_INLINE(a, float), CHECK_TYPE_INLINE(b, float), \
 	((fabsf((float)((a) - (b))) >= (float) FLT_EPSILON) ? false : true))
 
-#define IS_EQT(a, b, c) ((a > b) ? ((((a) - (b)) <= c) ? 1 : 0) : (((((b) - (a)) <= c) ? 1 : 0)))
-#define IN_RANGE(a, b, c) ((b < c) ? ((b < a && a < c) ? 1 : 0) : ((c < a && a < b) ? 1 : 0))
-#define IN_RANGE_INCL(a, b, c) ((b < c) ? ((b <= a && a <= c) ? 1 : 0) : ((c <= a && a <= b) ? 1 : 0))
+#define IS_EQT(a, b, c)        (((a) > (b)) ? ((((a) - (b)) <= (c))) : (((((b) - (a)) <= (c)))))
+#define IN_RANGE(a, b, c)      (((b) < (c)) ? (((b) <  (a) && (a) <  (c))) : (((c) <  (a) && (a) <  (b))))
+#define IN_RANGE_INCL(a, b, c) (((b) < (c)) ? (((b) <= (a) && (a) <= (c))) : (((c) <= (a) && (a) <= (b))))
 
 /* unpack vector for args */
 #define UNPACK2(a)  ((a)[0]),   ((a)[1])
@@ -626,18 +626,6 @@ extern bool BLI_memory_is_zero(const void *arr, const size_t arr_size);
 #  define UNUSED_VARS_NDEBUG(...)
 #else
 #  define UNUSED_VARS_NDEBUG UNUSED_VARS
-#endif
-
-/*little macro so inline keyword works*/
-#if defined(_MSC_VER)
-#  define BLI_INLINE static __forceinline
-#else
-#  if (defined(__APPLE__) && defined(__ppc__))
-/* static inline __attribute__ here breaks osx ppc gcc42 build */
-#    define BLI_INLINE static __attribute__((always_inline)) __attribute__((__unused__))
-#  else
-#    define BLI_INLINE static inline __attribute__((always_inline)) __attribute__((__unused__))
-#  endif
 #endif
 
 

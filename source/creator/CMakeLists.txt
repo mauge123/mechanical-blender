@@ -49,7 +49,7 @@ if(WIN32)
 endif()
 
 if(WITH_LIBMV)
-	blender_include_dirs(../../extern/libmv)
+	blender_include_dirs(../../intern/libmv)
 	add_definitions(-DWITH_LIBMV)
 endif()
 
@@ -102,6 +102,10 @@ endif()
 # Setup the exe sources and buildinfo
 set(SRC
 	creator.c
+	creator_args.c
+	creator_signals.c
+
+	creator_intern.h
 )
 
 # MSVC 2010 gives linking errors with the manifest
@@ -130,7 +134,7 @@ if(WIN32 AND NOT UNIX)
 
 
 	list(APPEND SRC
-		../icons/winblender.rc
+		${CMAKE_SOURCE_DIR}/release/windows/icons/winblender.rc
 	)
 endif()
 
@@ -250,8 +254,10 @@ endif()
 
 set(BLENDER_TEXT_FILES
 	${CMAKE_SOURCE_DIR}/release/text/GPL-license.txt
+	${CMAKE_SOURCE_DIR}/release/text/GPL3-license.txt
 	${CMAKE_SOURCE_DIR}/release/text/Python-license.txt
 	${CMAKE_SOURCE_DIR}/release/text/copyright.txt
+	${CMAKE_SOURCE_DIR}/release/text/jemalloc-license.txt
 	# generate this file
 	# ${CMAKE_SOURCE_DIR}/release/text/readme.html
 	${CMAKE_SOURCE_DIR}/release/datafiles/LICENSE-bfont.ttf.txt
@@ -292,7 +298,8 @@ elseif(APPLE)
 	else()
 		set(TARGETDIR_VER blender.app/Contents/Resources/${BLENDER_VERSION})
 	endif()
-
+	# Skip relinking on cpack / install
+	set_target_properties(blender PROPERTIES BUILD_WITH_INSTALL_RPATH true)
 endif()
 
 
@@ -503,7 +510,7 @@ if(UNIX AND NOT APPLE)
 		if(WITH_PYTHON_INSTALL)
 
 			install(
-				FILES ${PYTHON_EXECUTABLE}
+				PROGRAMS ${PYTHON_EXECUTABLE}
 				DESTINATION ${TARGETDIR_VER}/python/bin
 			)
 
@@ -521,17 +528,12 @@ if(UNIX AND NOT APPLE)
 			unset(_pypath_real)
 
 			# Copy the systems python into the install directory
-			# Scons copy in tools/Blender.py
 			# install(CODE "message(\"copying a subset of the systems python...\")")
 			install(
 				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
 				DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}
-				PATTERN ".svn" EXCLUDE
 				PATTERN "__pycache__" EXCLUDE               # * any cache *
-				PATTERN "distutils" EXCLUDE                 # ./distutils
 				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
-				PATTERN "config" EXCLUDE                    # ./config
-				PATTERN "config-*" EXCLUDE                  # ./config-*
 				PATTERN "site-packages/*" EXCLUDE           # ./site-packages/*
 				PATTERN "tkinter" EXCLUDE                   # ./tkinter
 				PATTERN "lib-dynload/_tkinter.*" EXCLUDE    # ./lib-dynload/_tkinter.co
@@ -540,6 +542,15 @@ if(UNIX AND NOT APPLE)
 				PATTERN "turtledemo" EXCLUDE                # ./turtledemo
 				PATTERN "turtle.py" EXCLUDE                 # ./turtle.py
 			)
+
+			# Needed for distutils/pip
+			# get the last part of the include dir, will be 'python{version}{abiflag}',
+			get_filename_component(_py_inc_suffix ${PYTHON_INCLUDE_DIR} NAME)
+			install(
+				FILES ${PYTHON_INCLUDE_DIR}/pyconfig.h
+				DESTINATION ${TARGETDIR_VER}/python/include/${_py_inc_suffix}
+			)
+			unset(_py_inc_suffix)
 
 			# # doesnt work, todo
 			# install(CODE "execute_process(COMMAND find ${CMAKE_INSTALL_PREFIX}/${BLENDER_VERSION}/python/lib/ -name '*.so' -exec strip -s {} '\;')")
@@ -558,7 +569,6 @@ if(UNIX AND NOT APPLE)
 					PATTERN "__pycache__" EXCLUDE           # * any cache *
 					PATTERN "*.pyc" EXCLUDE                 # * any cache *
 					PATTERN "*.pyo" EXCLUDE                 # * any cache *
-					PATTERN "distutils" EXCLUDE             # ./distutils
 					PATTERN "oldnumeric" EXCLUDE            # ./oldnumeric
 					PATTERN "doc" EXCLUDE                   # ./doc
 					PATTERN "tests" EXCLUDE                 # ./tests
@@ -620,17 +630,20 @@ elseif(WIN32)
 	if(WITH_PYTHON)
 		string(REPLACE "." "" _PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
 
-		install(
-			FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}.dll ${LIBDIR}/python/lib/sqlite3.dll
-			DESTINATION "."
-			CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
-		)
+		# MinGW TODO: This bit of Python configuration diverges from MSVC
+		if(NOT CMAKE_COMPILER_IS_GNUCC)
+			install(
+				FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}.dll
+				DESTINATION "."
+				CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
+			)
 
-		install(
-			FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}_d.dll ${LIBDIR}/python/lib/sqlite3_d.dll
-			DESTINATION "."
-			CONFIGURATIONS Debug
-		)
+			install(
+				FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}_d.dll
+				DESTINATION "."
+				CONFIGURATIONS Debug
+			)
+		endif()
 
 		if(WITH_PYTHON_INSTALL)
 			# note, as far as python is concerned 'RelWithDebInfo' is not debug since its without debug flags.
@@ -703,6 +716,20 @@ elseif(WIN32)
 				DESTINATION ${BLENDER_VERSION}/python/bin
 				CONFIGURATIONS Debug
 			)
+
+			# MinGW needs Python DLL
+			if(MINGW)
+				install(
+					FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}.dll
+					DESTINATION "."
+					CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
+				)
+				install(
+					FILES ${LIBDIR}/python/lib/python${_PYTHON_VERSION_NO_DOTS}_d.dll
+					DESTINATION "."
+					CONFIGURATIONS Debug
+				)
+			endif()
 		endif()
 
 		unset(_PYTHON_VERSION_NO_DOTS)
@@ -790,13 +817,30 @@ elseif(WIN32)
 				${LIBDIR}/openal/lib/OpenAL32.dll
 			DESTINATION "."
 		)
+		# MinGW TODO: Need to update to a newer OpenAL version
+		# which does not depend on wrap_oal.dll
+		if(CMAKE_COMPILER_IS_GNUCC)
+			install(
+				FILES
+					${LIBDIR}/openal/lib/wrap_oal.dll
+				DESTINATION "."
+			)
+		endif()
 	endif()
 
 	if(WITH_SDL)
-		install(
-			FILES ${LIBDIR}/sdl/lib/SDL2.dll
-			DESTINATION "."
-		)
+		#MinGW TODO: Update to SDL2
+		if(NOT CMAKE_COMPILER_IS_GNUCC)
+			install(
+				FILES ${LIBDIR}/sdl/lib/SDL2.dll
+				DESTINATION "."
+			)
+		else()
+			install(
+				FILES ${LIBDIR}/sdl/lib/SDL.dll
+				DESTINATION "."
+			)
+		endif()
 	endif()
 	
 	if(WITH_SYSTEM_AUDASPACE)
@@ -945,7 +989,7 @@ elseif(APPLE)
 		# copy site-packages files
 		install_dir(
 			${LIBDIR}/release/site-packages
-			${CMAKE_CURRENT_BINARY_DIR}/python/lib/python${PYTHON_VERSION}/site-packages
+			${CMAKE_CURRENT_BINARY_DIR}/python/lib/python${PYTHON_VERSION}
 		)
 
 		install(DIRECTORY ${LIBDIR}/python/bin
@@ -1020,7 +1064,7 @@ if(DEFINED BLENDER_TEXT_FILES_DESTINATION)
 		"
 		file(READ \"${CMAKE_SOURCE_DIR}/release/text/readme.html\" DATA_SRC)
 		string(REGEX REPLACE \"BLENDER_VERSION\" \"${BLENDER_VERSION}\" DATA_DST \"\${DATA_SRC}\")
-		file(WRITE \"\${CMAKE_BINARY_DIR}/release/text/readme.html\" \"\${DATA_DST}\")
+		file(WRITE \"${CMAKE_BINARY_DIR}/release/text/readme.html\" \"\${DATA_DST}\")
 		unset(DATA_SRC)
 		unset(DATA_DST)
 		"
@@ -1058,7 +1102,7 @@ setup_liblinks(blender)
 if(WIN32 AND NOT WITH_PYTHON_MODULE)
 	set(LAUNCHER_SRC
 		creator_launch_win.c
-		../icons/winblender.rc
+		${CMAKE_SOURCE_DIR}/release/windows/icons/winblender.rc
 	)
 	add_executable(blender-launcher ${LAUNCHER_SRC})
 	target_link_libraries(blender-launcher bf_intern_utfconv ${PLATFORM_LINKLIBS})

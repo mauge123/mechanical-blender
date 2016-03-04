@@ -69,6 +69,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <errno.h>
 
 /* ---------- FILE SELECTION ------------ */
 static FileSelection find_file_mouse_rect(SpaceFile *sfile, ARegion *ar, const rcti *rect_region)
@@ -1041,7 +1042,7 @@ static int bookmark_move_exec(bContext *C, wmOperator *op)
 void FILE_OT_bookmark_move(wmOperatorType *ot)
 {
 	static EnumPropertyItem slot_move[] = {
-	    {FILE_BOOKMARK_MOVE_TOP, "TOP", 0, "Top", "Top of the list"},
+		{FILE_BOOKMARK_MOVE_TOP, "TOP", 0, "Top", "Top of the list"},
 		{FILE_BOOKMARK_MOVE_UP, "UP", 0, "Up", ""},
 		{FILE_BOOKMARK_MOVE_DOWN, "DOWN", 0, "Down", ""},
 		{FILE_BOOKMARK_MOVE_BOTTOM, "BOTTOM", 0, "Bottom", "Bottom of the list"},
@@ -1188,7 +1189,7 @@ void FILE_OT_cancel(struct wmOperatorType *ot)
 }
 
 
-void file_sfile_to_operator(wmOperator *op, SpaceFile *sfile, char *filepath)
+void file_sfile_to_operator_ex(wmOperator *op, SpaceFile *sfile, char *filepath)
 {
 	PropertyRNA *prop;
 
@@ -1258,6 +1259,12 @@ void file_sfile_to_operator(wmOperator *op, SpaceFile *sfile, char *filepath)
 
 	}
 }
+void file_sfile_to_operator(wmOperator *op, SpaceFile *sfile)
+{
+	char filepath[FILE_MAX];
+
+	file_sfile_to_operator_ex(op, sfile, filepath);
+}
 
 void file_operator_to_sfile(SpaceFile *sfile, wmOperator *op)
 {
@@ -1285,14 +1292,35 @@ void file_operator_to_sfile(SpaceFile *sfile, wmOperator *op)
 	/* XXX, files and dirs updates missing, not really so important though */
 }
 
+/**
+ * Use to set the file selector path from some arbitrary source.
+ */
+void file_sfile_filepath_set(SpaceFile *sfile, const char *filepath)
+{
+	BLI_assert(BLI_exists(filepath));
+
+	if (BLI_is_dir(filepath)) {
+		BLI_strncpy(sfile->params->dir, filepath, sizeof(sfile->params->dir));
+		sfile->params->file[0] = '\0';
+	}
+	else {
+		if ((sfile->params->flag & FILE_DIRSEL_ONLY) == 0) {
+			BLI_split_dirfile(filepath, sfile->params->dir, sfile->params->file,
+			                  sizeof(sfile->params->dir), sizeof(sfile->params->file));
+		}
+		else {
+			BLI_split_dir_part(filepath, sfile->params->dir, sizeof(sfile->params->dir));
+		}
+	}
+}
+
 void file_draw_check(bContext *C)
 {
 	SpaceFile *sfile = CTX_wm_space_file(C);
 	wmOperator *op = sfile->op;
 	if (op) { /* fail on reload */
 		if (op->type->check) {
-			char filepath[FILE_MAX];
-			file_sfile_to_operator(op, sfile, filepath);
+			file_sfile_to_operator(op, sfile);
 			
 			/* redraw */
 			if (op->type->check(C, op)) {
@@ -1347,7 +1375,7 @@ int file_exec(bContext *C, wmOperator *exec_op)
 		}
 		else {
 			BLI_cleanup_dir(G.main->name, sfile->params->dir);
-			strcat(sfile->params->dir, file->relpath);
+			strncat(sfile->params->dir, file->relpath, sizeof(sfile->params->dir));
 			BLI_add_slash(sfile->params->dir);
 		}
 
@@ -1375,7 +1403,7 @@ int file_exec(bContext *C, wmOperator *exec_op)
 		
 		sfile->op = NULL;
 
-		file_sfile_to_operator(op, sfile, filepath);
+		file_sfile_to_operator_ex(op, sfile, filepath);
 
 		if (BLI_exists(sfile->params->dir)) {
 			fsmenu_insert_entry(ED_fsmenu_get(), FS_CATEGORY_RECENT, sfile->params->dir, NULL,
@@ -1652,6 +1680,45 @@ void FILE_OT_smoothscroll(wmOperatorType *ot)
 }
 
 
+static int filepath_drop_exec(bContext *C, wmOperator *op)
+{
+	SpaceFile *sfile = CTX_wm_space_file(C);
+
+	if (sfile) {
+		char filepath[FILE_MAX];
+
+		RNA_string_get(op->ptr, "filepath", filepath);
+		if (!BLI_exists(filepath)) {
+			BKE_report(op->reports, RPT_ERROR, "File does not exist");
+			return OPERATOR_CANCELLED;
+		}
+
+		file_sfile_filepath_set(sfile, filepath);
+
+		if (sfile->op) {
+			file_sfile_to_operator(sfile->op, sfile);
+			file_draw_check(C);
+		}
+
+		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+		return OPERATOR_FINISHED;
+	}
+
+	return OPERATOR_CANCELLED;
+}
+
+void FILE_OT_filepath_drop(wmOperatorType *ot)
+{
+	ot->name = "File Selector Drop";
+	ot->description = "";
+	ot->idname = "FILE_OT_filepath_drop";
+
+	ot->exec = filepath_drop_exec;
+	ot->poll = WM_operator_winactive;
+
+	RNA_def_string_file_path(ot->srna, "filepath", "Path", FILE_MAX, "", "");
+}
+
 /* create a new, non-existing folder name, returns 1 if successful, 0 if name couldn't be created.
  * The actual name is returned in 'name', 'folder' contains the complete path, including the new folder name.
  */
@@ -1717,16 +1784,18 @@ int file_directory_new_exec(bContext *C, wmOperator *op)
 	}
 
 	/* create the file */
-	if (!BLI_dir_create_recursive(path)) {
-		BKE_report(op->reports, RPT_ERROR, "Could not create new folder");
+	errno = 0;
+	if (!BLI_dir_create_recursive(path) ||
+	    /* Should no more be needed,
+	     * now that BLI_dir_create_recursive returns a success state - but kept just in case. */
+	    !BLI_exists(path))
+	{
+		BKE_reportf(op->reports, RPT_ERROR,
+		            "Could not create new folder: %s",
+		            errno ? strerror(errno) : "unknown error");
 		return OPERATOR_CANCELLED;
 	}
 
-	/* Should no more be needed, now that BLI_dir_create_recursive returns a success state - but kept just in case. */
-	if (!BLI_exists(path)) {
-		BKE_report(op->reports, RPT_ERROR, "Could not create new folder");
-		return OPERATOR_CANCELLED;
-	}
 
 	/* now remember file to jump into editing */
 	BLI_strncpy(sfile->params->renamefile, name, FILE_MAXFILE);
@@ -2190,7 +2259,7 @@ static int file_delete_poll(bContext *C)
 	return poll;
 }
 
-int file_delete_exec(bContext *C, wmOperator *UNUSED(op))
+int file_delete_exec(bContext *C, wmOperator *op)
 {
 	char str[FILE_MAX];
 	wmWindowManager *wm = CTX_wm_manager(C);
@@ -2200,14 +2269,26 @@ int file_delete_exec(bContext *C, wmOperator *UNUSED(op))
 	int numfiles = filelist_files_ensure(sfile->files);
 	int i;
 
+	bool report_error = false;
+	errno = 0;
 	for (i = 0; i < numfiles; i++) {
 		if (filelist_entry_select_index_get(sfile->files, i, CHECK_FILES)) {
 			file = filelist_file(sfile->files, i);
 			BLI_make_file_string(G.main->name, str, sfile->params->dir, file->relpath);
-			BLI_delete(str, false, false);
+			if (BLI_delete(str, false, false) != 0 ||
+			    BLI_exists(str))
+			{
+				report_error = true;
+			}
 		}
 	}
 	
+	if (report_error) {
+		BKE_reportf(op->reports, RPT_ERROR,
+		            "Could not delete file: %s",
+		            errno ? strerror(errno) : "unknown error");
+	}
+
 	ED_fileselect_clear(wm, sa, sfile);
 	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 	

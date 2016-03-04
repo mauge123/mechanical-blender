@@ -125,8 +125,12 @@ public:
 class SceneParams {
 public:
 	ShadingSystem shadingsystem;
-	enum BVHType { BVH_DYNAMIC, BVH_STATIC } bvh_type;
-	bool use_bvh_cache;
+	enum BVHType {
+		BVH_DYNAMIC = 0,
+		BVH_STATIC = 1,
+
+		BVH_NUM_TYPES,
+	} bvh_type;
 	bool use_bvh_spatial_split;
 	bool use_qbvh;
 	bool persistent_data;
@@ -135,7 +139,6 @@ public:
 	{
 		shadingsystem = SHADINGSYSTEM_SVM;
 		bvh_type = BVH_DYNAMIC;
-		use_bvh_cache = false;
 		use_bvh_spatial_split = false;
 		use_qbvh = false;
 		persistent_data = false;
@@ -144,7 +147,6 @@ public:
 	bool modified(const SceneParams& params)
 	{ return !(shadingsystem == params.shadingsystem
 		&& bvh_type == params.bvh_type
-		&& use_bvh_cache == params.use_bvh_cache
 		&& use_bvh_spatial_split == params.use_bvh_spatial_split
 		&& use_qbvh == params.use_qbvh
 		&& persistent_data == params.persistent_data); }

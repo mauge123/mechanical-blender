@@ -74,27 +74,28 @@ void BKE_curve_unlink(Curve *cu)
 	int a;
 
 	for (a = 0; a < cu->totcol; a++) {
-		if (cu->mat[a]) cu->mat[a]->id.us--;
+		if (cu->mat[a])
+			id_us_min(&cu->mat[a]->id);
 		cu->mat[a] = NULL;
 	}
 	if (cu->vfont)
-		cu->vfont->id.us--;
+		id_us_min(&cu->vfont->id);
 	cu->vfont = NULL;
 
 	if (cu->vfontb)
-		cu->vfontb->id.us--;
+		id_us_min(&cu->vfontb->id);
 	cu->vfontb = NULL;
 
 	if (cu->vfonti)
-		cu->vfonti->id.us--;
+		id_us_min(&cu->vfonti->id);
 	cu->vfonti = NULL;
 
 	if (cu->vfontbi)
-		cu->vfontbi->id.us--;
+		id_us_min(&cu->vfontbi->id);
 	cu->vfontbi = NULL;
 
 	if (cu->key)
-		cu->key->id.us--;
+		id_us_min(&cu->key->id);
 	cu->key = NULL;
 }
 
@@ -108,10 +109,6 @@ void BKE_curve_editfont_free(Curve *cu)
 			MEM_freeN(ef->textbuf);
 		if (ef->textbufinfo)
 			MEM_freeN(ef->textbufinfo);
-		if (ef->copybuf)
-			MEM_freeN(ef->copybuf);
-		if (ef->copybufinfo)
-			MEM_freeN(ef->copybufinfo);
 		if (ef->selboxes)
 			MEM_freeN(ef->selboxes);
 
@@ -305,8 +302,8 @@ void BKE_curve_make_local(Curve *cu)
 			if (ob->data == cu) {
 				if (ob->id.lib == NULL) {
 					ob->data = cu_new;
-					cu_new->id.us++;
-					cu->id.us--;
+					id_us_plus(&cu_new->id);
+					id_us_min(&cu->id);
 				}
 			}
 		}
@@ -2631,7 +2628,7 @@ void BKE_curve_bevelList_make(Object *ob, ListBase *nurbs, bool for_render)
 	BezTriple *bezt, *prevbezt;
 	BPoint *bp;
 	BevList *bl, *blnew, *blnext;
-	BevPoint *bevp, *bevp2, *bevp1 = NULL, *bevp0;
+	BevPoint *bevp2, *bevp1 = NULL, *bevp0;
 	const float treshold = 0.00001f;
 	float min, inp;
 	float *seglen = NULL;
@@ -2680,6 +2677,8 @@ void BKE_curve_bevelList_make(Object *ob, ListBase *nurbs, bool for_render)
 			bl->charidx = nu->charidx;
 		}
 		else {
+			BevPoint *bevp;
+
 			if (for_render && cu->resolu_ren != 0)
 				resolu = cu->resolu_ren;
 			else
@@ -3011,6 +3010,7 @@ void BKE_curve_bevelList_make(Object *ob, ListBase *nurbs, bool for_render)
 		bl = bev->first;
 		while (bl) {
 			if (bl->poly > 0) {
+				BevPoint *bevp;
 
 				min = 300000.0;
 				bevp = bl->bevpoints;
@@ -3120,14 +3120,17 @@ void BKE_curve_bevelList_make(Object *ob, ListBase *nurbs, bool for_render)
 
 /* ****************** HANDLES ************** */
 
-static void calchandleNurb_intern(BezTriple *bezt, BezTriple *prev, BezTriple *next,
-                                  bool is_fcurve, bool skip_align)
+static void calchandleNurb_intern(
+        BezTriple *bezt, const BezTriple *prev, const BezTriple *next,
+        bool is_fcurve, bool skip_align)
 {
 	/* defines to avoid confusion */
 #define p2_h1 ((p2) - 3)
 #define p2_h2 ((p2) + 3)
 
-	float *p1, *p2, *p3, pt[3];
+	const float *p1, *p3;
+	float *p2;
+	float pt[3];
 	float dvec_a[3], dvec_b[3];
 	float len, len_a, len_b;
 	float len_ratio;

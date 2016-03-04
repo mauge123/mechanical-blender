@@ -43,6 +43,12 @@ rna_reverse_prop = BoolProperty(
         default=False,
         )
 
+rna_wrap_prop = BoolProperty(
+        name="Wrap",
+        description="Wrap back to the first/last values",
+        default=False,
+        )
+
 rna_relative_prop = BoolProperty(
         name="Relative",
         description="Apply relative to the current value (delta)",
@@ -399,6 +405,7 @@ class WM_OT_context_cycle_int(Operator):
 
     data_path = rna_path_prop
     reverse = rna_reverse_prop
+    wrap = rna_wrap_prop
 
     def execute(self, context):
         data_path = self.data_path
@@ -413,14 +420,15 @@ class WM_OT_context_cycle_int(Operator):
 
         exec("context.%s = value" % data_path)
 
-        if value != eval("context.%s" % data_path):
-            # relies on rna clamping integers out of the range
-            if self.reverse:
-                value = (1 << 31) - 1
-            else:
-                value = -1 << 31
+        if self.wrap:
+            if value != eval("context.%s" % data_path):
+                # relies on rna clamping integers out of the range
+                if self.reverse:
+                    value = (1 << 31) - 1
+                else:
+                    value = -1 << 31
 
-            exec("context.%s = value" % data_path)
+                exec("context.%s = value" % data_path)
 
         return operator_path_undo_return(context, data_path)
 
@@ -433,6 +441,7 @@ class WM_OT_context_cycle_enum(Operator):
 
     data_path = rna_path_prop
     reverse = rna_reverse_prop
+    wrap = rna_wrap_prop
 
     def execute(self, context):
         data_path = self.data_path
@@ -460,15 +469,18 @@ class WM_OT_context_cycle_enum(Operator):
         enums = rna_struct.properties[rna_prop_str].enum_items.keys()
         orig_index = enums.index(orig_value)
 
-        # Have the info we need, advance to the next item
+        # Have the info we need, advance to the next item.
+        #
+        # When wrap's disabled we may set the value to its self,
+        # this is done to ensure update callbacks run.
         if self.reverse:
             if orig_index == 0:
-                advance_enum = enums[-1]
+                advance_enum = enums[-1] if self.wrap else enums[0]
             else:
                 advance_enum = enums[orig_index - 1]
         else:
             if orig_index == len(enums) - 1:
-                advance_enum = enums[0]
+                advance_enum = enums[0] if self.wrap else enums[-1]
             else:
                 advance_enum = enums[orig_index + 1]
 
@@ -1115,6 +1127,10 @@ rna_max = FloatProperty(
         precision=3,
         )
 
+rna_use_soft_limits = BoolProperty(
+        name="Use Soft Limits",
+        )
+
 
 class WM_OT_properties_edit(Operator):
     bl_idname = "wm.properties_edit"
@@ -1127,9 +1143,20 @@ class WM_OT_properties_edit(Operator):
     value = rna_value
     min = rna_min
     max = rna_max
+    use_soft_limits = rna_use_soft_limits
+    soft_min = rna_min
+    soft_max = rna_max
     description = StringProperty(
             name="Tooltip",
             )
+
+    def _cmp_props_get(self):
+        # Changing these properties will refresh the UI
+        return {
+            "use_soft_limits": self.use_soft_limits,
+            "soft_range": (self.soft_min, self.soft_max),
+            "hard_range": (self.min, self.max),
+            }
 
     def execute(self, context):
         from rna_prop_ui import (
@@ -1178,8 +1205,15 @@ class WM_OT_properties_edit(Operator):
         prop_ui = rna_idprop_ui_prop_get(item, prop)
 
         if prop_type in {float, int}:
-            prop_ui["soft_min"] = prop_ui["min"] = prop_type(self.min)
-            prop_ui["soft_max"] = prop_ui["max"] = prop_type(self.max)
+            prop_ui["min"] = prop_type(self.min)
+            prop_ui["max"] = prop_type(self.max)
+
+            if self.use_soft_limits:
+                prop_ui["soft_min"] = prop_type(self.soft_min)
+                prop_ui["soft_max"] = prop_type(self.soft_max)
+            else:
+                prop_ui["soft_min"] = prop_type(self.min)
+                prop_ui["soft_max"] = prop_type(self.max)
 
         prop_ui["description"] = self.description
 
@@ -1240,8 +1274,61 @@ class WM_OT_properties_edit(Operator):
             self.max = prop_ui.get("max", 1000000000)
             self.description = prop_ui.get("description", "")
 
+            self.soft_min = prop_ui.get("soft_min", self.min)
+            self.soft_max = prop_ui.get("soft_max", self.max)
+            self.use_soft_limits = (
+                    self.min != self.soft_min or
+                    self.max != self.soft_max)
+
+        # store for comparison
+        self._cmp_props = self._cmp_props_get()
+
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
+
+    def check(self, context):
+        cmp_props = self._cmp_props_get()
+        changed = False
+        if self._cmp_props != cmp_props:
+            if cmp_props["use_soft_limits"]:
+                if cmp_props["soft_range"] != self._cmp_props["soft_range"]:
+                    self.min = min(self.min, self.soft_min)
+                    self.max = max(self.max, self.soft_max)
+                    changed = True
+                if cmp_props["hard_range"] != self._cmp_props["hard_range"]:
+                    self.soft_min = max(self.min, self.soft_min)
+                    self.soft_max = min(self.max, self.soft_max)
+                    changed = True
+            else:
+                if cmp_props["soft_range"] != cmp_props["hard_range"]:
+                    self.soft_min = self.min
+                    self.soft_max = self.max
+                    changed = True
+
+            changed |= (cmp_props["use_soft_limits"] != self._cmp_props["use_soft_limits"])
+
+            if changed:
+                cmp_props = self._cmp_props_get()
+
+            self._cmp_props = cmp_props
+
+        return changed
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "property")
+        layout.prop(self, "value")
+        row = layout.row(align=True)
+        row.prop(self, "min")
+        row.prop(self, "max")
+
+        layout.prop(self, "use_soft_limits")
+
+        row = layout.row(align=True)
+        row.enabled = self.use_soft_limits
+        row.prop(self, "soft_min", text="Soft Min")
+        row.prop(self, "soft_max", text="Soft Max")
+        layout.prop(self, "description")
 
 
 class WM_OT_properties_add(Operator):
@@ -1376,14 +1463,31 @@ class WM_OT_appconfig_activate(Operator):
 
 
 class WM_OT_sysinfo(Operator):
-    """Generate System Info"""
+    """Generate system information, saved into a text file"""
+
     bl_idname = "wm.sysinfo"
-    bl_label = "System Info"
+    bl_label = "Save System Info"
+
+    filepath = StringProperty(
+            subtype='FILE_PATH',
+            options={'SKIP_SAVE'},
+            )
 
     def execute(self, context):
         import sys_info
-        sys_info.write_sysinfo(self)
+        sys_info.write_sysinfo(self.filepath)
         return {'FINISHED'}
+
+    def invoke(self, context, event):
+        import os
+
+        if not self.filepath:
+            self.filepath = os.path.join(
+                    os.path.expanduser("~"), "system-info.txt")
+
+        wm = context.window_manager
+        wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
 
 
 class WM_OT_copy_prev_settings(Operator):
@@ -1402,7 +1506,7 @@ class WM_OT_copy_prev_settings(Operator):
         if os.path.isdir(path_dst):
             self.report({'ERROR'}, "Target path %r exists" % path_dst)
         elif not os.path.isdir(path_src):
-            self.report({'ERROR'}, "Source path %r exists" % path_src)
+            self.report({'ERROR'}, "Source path %r does not exist" % path_src)
         else:
             shutil.copytree(path_src, path_dst, symlinks=True)
 
@@ -1739,13 +1843,13 @@ class WM_OT_operator_cheat_sheet(Operator):
 # Addon Operators
 
 class WM_OT_addon_enable(Operator):
-    "Enable an addon"
+    "Enable an add-on"
     bl_idname = "wm.addon_enable"
     bl_label = "Enable Addon"
 
     module = StringProperty(
             name="Module",
-            description="Module name of the addon to enable",
+            description="Module name of the add-on to enable",
             )
 
     def execute(self, context):
@@ -1753,7 +1857,7 @@ class WM_OT_addon_enable(Operator):
 
         err_str = ""
 
-        def err_cb():
+        def err_cb(ex):
             import traceback
             nonlocal err_str
             err_str = traceback.format_exc()
@@ -1783,13 +1887,13 @@ class WM_OT_addon_enable(Operator):
 
 
 class WM_OT_addon_disable(Operator):
-    "Disable an addon"
+    "Disable an add-on"
     bl_idname = "wm.addon_disable"
     bl_label = "Disable Addon"
 
     module = StringProperty(
             name="Module",
-            description="Module name of the addon to disable",
+            description="Module name of the add-on to disable",
             )
 
     def execute(self, context):
@@ -1797,7 +1901,7 @@ class WM_OT_addon_disable(Operator):
 
         err_str = ""
 
-        def err_cb():
+        def err_cb(ex):
             import traceback
             nonlocal err_str
             err_str = traceback.format_exc()
@@ -1871,7 +1975,7 @@ class WM_OT_theme_install(Operator):
 
 
 class WM_OT_addon_refresh(Operator):
-    "Scan addon directories for new modules"
+    "Scan add-on directories for new modules"
     bl_idname = "wm.addon_refresh"
     bl_label = "Refresh"
 
@@ -1884,7 +1988,7 @@ class WM_OT_addon_refresh(Operator):
 
 
 class WM_OT_addon_install(Operator):
-    "Install an addon"
+    "Install an add-on"
     bl_idname = "wm.addon_install"
     bl_label = "Install from File..."
 
@@ -1965,7 +2069,7 @@ class WM_OT_addon_install(Operator):
         pyfile_dir = os.path.dirname(pyfile)
         for addon_path in addon_utils.paths():
             if os.path.samefile(pyfile_dir, addon_path):
-                self.report({'ERROR'}, "Source file is in the addon search path: %r" % addon_path)
+                self.report({'ERROR'}, "Source file is in the add-on search path: %r" % addon_path)
                 return {'CANCELLED'}
         del addon_path
         del pyfile_dir
@@ -2049,13 +2153,13 @@ class WM_OT_addon_install(Operator):
 
 
 class WM_OT_addon_remove(Operator):
-    "Delete the addon from the file system"
+    "Delete the add-on from the file system"
     bl_idname = "wm.addon_remove"
     bl_label = "Remove Addon"
 
     module = StringProperty(
             name="Module",
-            description="Module name of the addon to remove",
+            description="Module name of the add-on to remove",
             )
 
     @staticmethod
@@ -2108,14 +2212,14 @@ class WM_OT_addon_remove(Operator):
 
 
 class WM_OT_addon_expand(Operator):
-    "Display more information on this addon"
+    "Display information and preferences for this add-on"
     bl_idname = "wm.addon_expand"
     bl_label = ""
     bl_options = {'INTERNAL'}
 
     module = StringProperty(
             name="Module",
-            description="Module name of the addon to expand",
+            description="Module name of the add-on to expand",
             )
 
     def execute(self, context):

@@ -34,7 +34,10 @@
 // INT64_C fix for some linux machines (C99ism)
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
+#ifdef  __STDC_CONSTANT_MACROS  /* quiet warning */
 #endif
+#endif
+
 #include <stdint.h>
 
 
@@ -138,23 +141,23 @@ bool VideoFFmpeg::release()
 AVFrame	*VideoFFmpeg::allocFrameRGB()
 {
 	AVFrame *frame;
-	frame = avcodec_alloc_frame();
+	frame = av_frame_alloc();
 	if (m_format == RGBA32)
 	{
 		avpicture_fill((AVPicture*)frame, 
 			(uint8_t*)MEM_callocN(avpicture_get_size(
-				PIX_FMT_RGBA,
+				AV_PIX_FMT_RGBA,
 				m_codecCtx->width, m_codecCtx->height),
 				"ffmpeg rgba"),
-			PIX_FMT_RGBA, m_codecCtx->width, m_codecCtx->height);
+			AV_PIX_FMT_RGBA, m_codecCtx->width, m_codecCtx->height);
 	} else 
 	{
 		avpicture_fill((AVPicture*)frame, 
 			(uint8_t*)MEM_callocN(avpicture_get_size(
-				PIX_FMT_RGB24,
+				AV_PIX_FMT_RGB24,
 				m_codecCtx->width, m_codecCtx->height),
 				"ffmpeg rgb"),
-			PIX_FMT_RGB24, m_codecCtx->width, m_codecCtx->height);
+			AV_PIX_FMT_RGB24, m_codecCtx->width, m_codecCtx->height);
 	}
 	return frame;
 }
@@ -234,8 +237,8 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 	m_codecCtx = codecCtx;
 	m_formatCtx = formatCtx;
 	m_videoStream = videoStream;
-	m_frame = avcodec_alloc_frame();
-	m_frameDeinterlaced = avcodec_alloc_frame();
+	m_frame = av_frame_alloc();
+	m_frameDeinterlaced = av_frame_alloc();
 
 	// allocate buffer if deinterlacing is required
 	avpicture_fill((AVPicture*)m_frameDeinterlaced, 
@@ -246,10 +249,10 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 		m_codecCtx->pix_fmt, m_codecCtx->width, m_codecCtx->height);
 
 	// check if the pixel format supports Alpha
-	if (m_codecCtx->pix_fmt == PIX_FMT_RGB32 ||
-		m_codecCtx->pix_fmt == PIX_FMT_BGR32 ||
-		m_codecCtx->pix_fmt == PIX_FMT_RGB32_1 ||
-		m_codecCtx->pix_fmt == PIX_FMT_BGR32_1) 
+	if (m_codecCtx->pix_fmt == AV_PIX_FMT_RGB32 ||
+		m_codecCtx->pix_fmt == AV_PIX_FMT_BGR32 ||
+		m_codecCtx->pix_fmt == AV_PIX_FMT_RGB32_1 ||
+		m_codecCtx->pix_fmt == AV_PIX_FMT_BGR32_1) 
 	{
 		// allocate buffer to store final decoded frame
 		m_format = RGBA32;
@@ -260,7 +263,7 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 			m_codecCtx->pix_fmt,
 			m_codecCtx->width,
 			m_codecCtx->height,
-			PIX_FMT_RGBA,
+			AV_PIX_FMT_RGBA,
 			SWS_FAST_BILINEAR,
 			NULL, NULL, NULL);
 	} else
@@ -274,7 +277,7 @@ int VideoFFmpeg::openStream(const char *filename, AVInputFormat *inputFormat, AV
 			m_codecCtx->pix_fmt,
 			m_codecCtx->width,
 			m_codecCtx->height,
-			PIX_FMT_RGB24,
+			AV_PIX_FMT_RGB24,
 			SWS_FAST_BILINEAR,
 			NULL, NULL, NULL);
 	}
@@ -1024,11 +1027,11 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 			AVFrame *input = m_frame;
 			short counter = 0;
 
-			/* While the data is not read properly (png, tiffs, etc formats may need several pass)*/
-			while ((input->data[0] == 0 && input->data[1] == 0 && input->data[2] == 0 && input->data[3] == 0) && counter < 10) {
+			/* If m_isImage, while the data is not read properly (png, tiffs, etc formats may need several pass), else don't need while loop*/
+			do {
 				avcodec_decode_video2(m_codecCtx, m_frame, &frameFinished, &packet);
 				counter++;
-			}
+			} while ((input->data[0] == 0 && input->data[1] == 0 && input->data[2] == 0 && input->data[3] == 0) && counter < 10 && m_isImage);
 
 			// remember dts to compute exact frame number
 			dts = packet.dts;

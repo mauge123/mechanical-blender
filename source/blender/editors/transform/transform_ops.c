@@ -126,7 +126,7 @@ static TransformModeItem transform_modes[] =
 	{NULL, 0}
 };
 
-EnumPropertyItem transform_mode_types[] =
+EnumPropertyItem rna_enum_transform_mode_types[] =
 {
 	{TFM_INIT, "INIT", 0, "Init", ""},
 	{TFM_DUMMY, "DUMMY", 0, "Dummy", ""},
@@ -441,7 +441,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
 		found = snapCursor(t,mval,&dist_px,loc);
 	} else {
-		found = snapObjectsTransform(t, mval, &dist_px, loc, no, SNAP_ALL);
+		found = snapObjectsTransform(t, mval,SNAP_ALL, loc, no, &dist_px);
 	}
 
 	if (found) {
@@ -652,8 +652,8 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 
 
 	if (flags & P_PROPORTIONAL) {
-		RNA_def_enum(ot->srna, "proportional", proportional_editing_items, 0, "Proportional Editing", "");
-		prop = RNA_def_enum(ot->srna, "proportional_edit_falloff", proportional_falloff_items, 0,
+		RNA_def_enum(ot->srna, "proportional", rna_enum_proportional_editing_items, 0, "Proportional Editing", "");
+		prop = RNA_def_enum(ot->srna, "proportional_edit_falloff", rna_enum_proportional_falloff_items, 0,
 		                    "Proportional Editing Falloff", "Falloff type for proportional editing mode");
 		RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_CURVE); /* Abusing id_curve :/ */
 		RNA_def_float(ot->srna, "proportional_size", 1, 0.00001f, FLT_MAX, "Proportional Size", "", 0.001, 100);
@@ -664,7 +664,7 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 
 		if (flags & P_GEO_SNAP) {
-			prop = RNA_def_enum(ot->srna, "snap_target", snap_target_items, 0, "Target", "");
+			prop = RNA_def_enum(ot->srna, "snap_target", rna_enum_snap_target_items, 0, "Target", "");
 			RNA_def_property_flag(prop, PROP_HIDDEN);
 			prop = RNA_def_float_vector(ot->srna, "snap_point", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "", -FLT_MAX, FLT_MAX);
 			RNA_def_property_flag(prop, PROP_HIDDEN);
@@ -843,8 +843,6 @@ static void TRANSFORM_OT_rotate(struct wmOperatorType *ot)
 
 static void TRANSFORM_OT_tilt(struct wmOperatorType *ot)
 {
-	PropertyRNA *prop;
-
 	/* identifiers */
 	ot->name = "Tilt";
 	/* optionals - 
@@ -861,8 +859,7 @@ static void TRANSFORM_OT_tilt(struct wmOperatorType *ot)
 	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_editcurve_3d;
 
-	prop = RNA_def_float(ot->srna, "value", 0.0, -FLT_MAX, FLT_MAX, "Angle", "", -M_PI * 2, M_PI * 2);
-	RNA_def_property_subtype(prop, PROP_ANGLE);
+	RNA_def_float_rotation(ot->srna, "value", 0, NULL, -FLT_MAX, FLT_MAX, "Angle", "", -M_PI * 2, M_PI * 2);
 
 	Transform_Properties(ot, P_PROPORTIONAL | P_MIRROR | P_SNAP);
 }
@@ -975,7 +972,7 @@ static void TRANSFORM_OT_mirror(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Mirror";
-	ot->description = "Mirror selected vertices around one or more axes";
+	ot->description = "Mirror selected items around one or more axes";
 	ot->idname = OP_MIRROR;
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
 
@@ -1144,7 +1141,7 @@ static void TRANSFORM_OT_transform(struct wmOperatorType *ot)
 	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
-	prop = RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
+	prop = RNA_def_enum(ot->srna, "mode", rna_enum_transform_mode_types, TFM_TRANSLATION, "Mode", "");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 
 	RNA_def_float_vector(ot->srna, "value", 4, NULL, -FLT_MAX, FLT_MAX, "Values", "", -FLT_MAX, FLT_MAX);

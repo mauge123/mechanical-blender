@@ -71,7 +71,8 @@ void BKE_mball_unlink(MetaBall *mb)
 	int a;
 	
 	for (a = 0; a < mb->totcol; a++) {
-		if (mb->mat[a]) mb->mat[a]->id.us--;
+		if (mb->mat[a])
+			id_us_min(&mb->mat[a]->id);
 		mb->mat[a] = NULL;
 	}
 }
@@ -186,8 +187,8 @@ void BKE_mball_make_local(MetaBall *mb)
 			if (ob->data == mb) {
 				if (ob->id.lib == NULL) {
 					ob->data = mb_new;
-					mb_new->id.us++;
-					mb->id.us--;
+					id_us_plus(&mb_new->id);
+					id_us_min(&mb->id);
 				}
 			}
 		}
@@ -291,6 +292,8 @@ void BKE_mball_texspace_calc(Object *ob)
 	size[2] = (max[2] - min[2]) / 2.0f;
 #endif
 	BKE_boundbox_init_from_minmax(bb, min, max);
+
+	bb->flag &= ~BOUNDBOX_DIRTY;
 }
 
 float *BKE_mball_make_orco(Object *ob, ListBase *dispbase)

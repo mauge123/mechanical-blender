@@ -1,3 +1,13 @@
+/* Converters */
+
+float convert_rgba_to_float(vec4 color)
+{
+#ifdef USE_NEW_SHADING
+	return color.r*0.2126 + color.g*0.7152 + color.b*0.0722;
+#else
+	return (color.r + color.g + color.b) / 3.0;
+#endif
+}
 
 float exp_blender(float f)
 {
@@ -164,6 +174,21 @@ void particle_info(vec4 sprops, vec3 loc, vec3 vel, vec3 avel, out float index, 
     location = loc;
     velocity = vel;
     angular_velocity = avel;
+}
+
+void vect_normalize(vec3 vin, out vec3 vout)
+{
+	vout = normalize(vin);
+}
+
+void direction_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
+{
+	vout = (mat*vec4(vin, 0.0)).xyz;
+}
+
+void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
+{
+	vout = (mat*vec4(vin, 1.0)).xyz;
 }
 
 void mapping(vec3 vec, mat4 mat, vec3 minvec, vec3 maxvec, float domin, float domax, out vec3 outvec)
@@ -367,6 +392,12 @@ void vec_math_normalize(vec3 v, out vec3 outvec, out float outval)
 void vec_math_negate(vec3 v, out vec3 outv)
 {
 	outv = -v;
+}
+
+void invert_z(vec3 v, out vec3 outv)
+{
+        v.z = -v.z;
+        outv = v;
 }
 
 void normal(vec3 dir, vec3 nor, out vec3 outnor, out float outdot)
@@ -722,7 +753,11 @@ void valtorgb(float fac, sampler2D colormap, out vec4 outcol, out float outalpha
 
 void rgbtobw(vec4 color, out float outval)  
 {
+#ifdef USE_NEW_SHADING
+	outval = color.r*0.2126 + color.g*0.7152 + color.b*0.0722;
+#else
 	outval = color.r*0.35 + color.g*0.45 + color.b*0.2; /* keep these factors in sync with texture.h:RGBTOBW */
+#endif
 }
 
 void invert(float fac, vec4 col, out vec4 outcol)
@@ -1189,6 +1224,11 @@ void mtex_alpha_to_col(vec4 col, float alpha, out vec4 outcol)
 	outcol = vec4(col.rgb, alpha);
 }
 
+void mtex_alpha_multiply_value(vec4 col, float value, out vec4 outcol)
+{
+    outcol = vec4(col.rgb, col.a * value);
+}
+
 void mtex_rgbtoint(vec4 rgb, out float intensity)
 {
 	intensity = dot(vec3(0.35, 0.45, 0.2), rgb.rgb);
@@ -1236,6 +1276,21 @@ void mtex_2d_mapping(vec3 vec, out vec3 outvec)
 vec3 mtex_2d_mapping(vec3 vec)
 {
 	return vec3(vec.xy*0.5 + vec2(0.5), vec.z);
+}
+
+void mtex_cube_map(vec3 co, samplerCube ima, out float value, out vec4 color)
+{
+	color = textureCube(ima, co);
+	value = 1.0;
+}
+
+void mtex_cube_map_refl(samplerCube ima, vec3 vp, vec3 vn, mat4 viewmatrixinverse, mat4 viewmatrix, out float value, out vec4 color)
+{
+	vec3 viewdirection = vec3(viewmatrixinverse * vec4(vp, 0.0));
+	vec3 normaldirection = normalize(vec3(vec4(vn, 0.0) * viewmatrix));
+	vec3 reflecteddirection = reflect(viewdirection, normaldirection);
+	color = textureCube(ima, reflecteddirection);
+	value = 1.0;
 }
 
 void mtex_image(vec3 texco, sampler2D ima, out float value, out vec4 color)
@@ -1636,6 +1691,40 @@ void lamp_visibility_spot(float spotsi, float spotbl, float inpr, float visifac,
 void lamp_visibility_clamp(float visifac, out float outvisifac)
 {
 	outvisifac = (visifac < 0.001)? 0.0: visifac;
+}
+
+void world_paper_view(vec3 vec, out vec3 outvec)
+{
+	vec3 nvec = normalize(vec);
+	outvec = (gl_ProjectionMatrix[3][3] == 0.0) ? vec3(nvec.x, 0.0, nvec.y) : vec3(0.0, 0.0, -1.0);
+}
+
+void world_zen_mapping(vec3 view, float zenup, float zendown, out float zenfac)
+{
+	if (view.z >= 0.0)
+		zenfac = zenup;
+	else
+		zenfac = zendown;
+}
+
+void world_blend_paper_real(vec3 vec, out float blend)
+{
+	blend = abs(vec.y);
+}
+
+void world_blend_paper(vec3 vec, out float blend)
+{
+	blend = (vec.y + 1.0) * 0.5;
+}
+
+void world_blend_real(vec3 vec, out float blend)
+{
+	blend = abs(normalize(vec).z);
+}
+
+void world_blend(vec3 vec, out float blend)
+{
+	blend = (normalize(vec).z + 1) * 0.5;
 }
 
 void shade_view(vec3 co, out vec3 view)
@@ -2324,27 +2413,29 @@ void node_add_shader(vec4 shader1, vec4 shader2, out vec4 shader)
 
 /* fresnel */
 
-void node_fresnel(float ior, vec3 N, vec3 I, out float result)
+void node_fresnel(float ior, vec3 N, vec3 I, mat4 toworld, out float result)
 {
 	/* handle perspective/orthographic */
 	vec3 I_view = (gl_ProjectionMatrix[3][3] == 0.0)? normalize(I): vec3(0.0, 0.0, -1.0);
+	vec3 normal = (toworld*vec4(N, 0.0)).xyz;
 
 	float eta = max(ior, 0.00001);
-	result = fresnel_dielectric(I_view, N, (gl_FrontFacing)? eta: 1.0/eta);
+	result = fresnel_dielectric(I_view, normal, (gl_FrontFacing)? eta: 1.0/eta);
 }
 
 /* layer_weight */
 
-void node_layer_weight(float blend, vec3 N, vec3 I, out float fresnel, out float facing)
+void node_layer_weight(float blend, vec3 N, vec3 I, mat4 toworld, out float fresnel, out float facing)
 {
 	/* fresnel */
 	float eta = max(1.0 - blend, 0.00001);
 	vec3 I_view = (gl_ProjectionMatrix[3][3] == 0.0)? normalize(I): vec3(0.0, 0.0, -1.0);
+	vec3 normal = (toworld*vec4(N, 0.0)).xyz;
 
-	fresnel = fresnel_dielectric(I_view, N, (gl_FrontFacing)? 1.0/eta : eta );
+	fresnel = fresnel_dielectric(I_view, normal, (gl_FrontFacing)? 1.0/eta : eta );
 
 	/* facing */
-	facing = abs(dot(I_view, N));
+	facing = abs(dot(I_view, normal));
 	if(blend != 0.5) {
 		blend = clamp(blend, 0.0, 0.99999);
 		blend = (blend < 0.5)? 2.0*blend: 0.5/(1.0 - blend);
@@ -2560,7 +2651,8 @@ void node_light_path(
 	out float is_transmission_ray,
 	out float ray_length,
 	out float ray_depth,
-	out float transparent_depth)
+	out float transparent_depth,
+	out float transmission_depth)
 {
 	is_camera_ray = 1.0;
 	is_shadow_ray = 0.0;
@@ -2572,6 +2664,7 @@ void node_light_path(
 	ray_length = 1.0;
 	ray_depth = 1.0;
 	transparent_depth = 1.0;
+	transmission_depth = 1.0;
 }
 
 void node_light_falloff(float strength, float tsmooth, out float quadratic, out float linear, out float constant)

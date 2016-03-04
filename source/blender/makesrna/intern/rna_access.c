@@ -1215,14 +1215,15 @@ EnumPropertyItem DummyRNA_DEFAULT_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-void RNA_property_enum_items(bContext *C, PointerRNA *ptr, PropertyRNA *prop, EnumPropertyItem **r_item,
-                             int *r_totitem, bool *r_free)
+void RNA_property_enum_items_ex(
+        bContext *C, PointerRNA *ptr, PropertyRNA *prop, const bool use_static,
+        EnumPropertyItem **r_item, int *r_totitem, bool *r_free)
 {
 	EnumPropertyRNA *eprop = (EnumPropertyRNA *)rna_ensure_property(prop);
 
 	*r_free = false;
 
-	if (eprop->itemf && (C != NULL || (prop->flag & PROP_ENUM_NO_CONTEXT))) {
+	if (!use_static && eprop->itemf && (C != NULL || (prop->flag & PROP_ENUM_NO_CONTEXT))) {
 		EnumPropertyItem *item;
 
 		if (prop->flag & PROP_ENUM_NO_CONTEXT)
@@ -1248,6 +1249,12 @@ void RNA_property_enum_items(bContext *C, PointerRNA *ptr, PropertyRNA *prop, En
 		if (r_totitem)
 			*r_totitem = eprop->totitem;
 	}
+}
+
+void RNA_property_enum_items(
+        bContext *C, PointerRNA *ptr, PropertyRNA *prop, EnumPropertyItem **r_item, int *r_totitem, bool *r_free)
+{
+	RNA_property_enum_items_ex(C, ptr, prop, false, r_item, r_totitem, r_free);
 }
 
 #ifdef WITH_INTERNATIONAL
@@ -2091,6 +2098,7 @@ void RNA_property_int_set(PointerRNA *ptr, PropertyRNA *prop, int value)
 	/* BLI_assert(RNA_property_int_clamp(ptr, prop, &value) == 0); */
 
 	if ((idprop = rna_idproperty_check(&prop, ptr))) {
+		RNA_property_int_clamp(ptr, prop, &value);
 		IDP_Int(idprop) = value;
 		rna_idproperty_touch(idprop);
 	}
@@ -2349,6 +2357,7 @@ void RNA_property_float_set(PointerRNA *ptr, PropertyRNA *prop, float value)
 	/* BLI_assert(RNA_property_float_clamp(ptr, prop, &value) == 0); */
 
 	if ((idprop = rna_idproperty_check(&prop, ptr))) {
+		RNA_property_float_clamp(ptr, prop, &value);
 		if (idprop->type == IDP_FLOAT)
 			IDP_Float(idprop) = value;
 		else
@@ -3413,7 +3422,7 @@ static int rna_raw_access(ReportList *reports, PointerRNA *ptr, PropertyRNA *pro
                           void *inarray, RawPropertyType intype, int inlen, int set)
 {
 	StructRNA *ptype;
-	PointerRNA itemptr;
+	PointerRNA itemptr_base;
 	PropertyRNA *itemprop, *iprop;
 	PropertyType itemtype = 0;
 	RawArray in;
@@ -3428,8 +3437,8 @@ static int rna_raw_access(ReportList *reports, PointerRNA *ptr, PropertyRNA *pro
 	ptype = RNA_property_pointer_type(ptr, prop);
 
 	/* try to get item property pointer */
-	RNA_pointer_create(NULL, ptype, NULL, &itemptr);
-	itemprop = RNA_struct_find_property(&itemptr, propname);
+	RNA_pointer_create(NULL, ptype, NULL, &itemptr_base);
+	itemprop = RNA_struct_find_property(&itemptr_base, propname);
 
 	if (itemprop) {
 		/* we have item property pointer */
@@ -3444,7 +3453,7 @@ static int rna_raw_access(ReportList *reports, PointerRNA *ptr, PropertyRNA *pro
 		}
 
 		/* check item array */
-		itemlen = RNA_property_array_length(&itemptr, itemprop);
+		itemlen = RNA_property_array_length(&itemptr_base, itemprop);
 
 		/* dynamic array? need to get length per item */
 		if (itemprop->getlength) {
@@ -4239,7 +4248,7 @@ static bool rna_path_parse(PointerRNA *ptr, const char *path,
 		*r_index = index;
 
 	if (prop_elem && (prop_elem->ptr.data != curptr.data || prop_elem->prop != prop || prop_elem->index != index)) {
-		PropertyElemRNA *prop_elem = MEM_mallocN(sizeof(PropertyElemRNA), __func__);
+		prop_elem = MEM_mallocN(sizeof(PropertyElemRNA), __func__);
 		prop_elem->ptr = curptr;
 		prop_elem->prop = prop;
 		prop_elem->index = index;
@@ -4522,12 +4531,12 @@ static char *rna_idp_path(PointerRNA *ptr, IDProperty *haystack, IDProperty *nee
 						break;
 					}
 					else {
-						int i;
+						int j;
 						link.name = iter->name;
-						for (i = 0; i < iter->len; i++, array++) {
+						for (j = 0; j < iter->len; j++, array++) {
 							PointerRNA child_ptr;
-							if (RNA_property_collection_lookup_int(ptr, prop, i, &child_ptr)) {
-								link.index = i;
+							if (RNA_property_collection_lookup_int(ptr, prop, j, &child_ptr)) {
+								link.index = j;
 								if ((path = rna_idp_path(&child_ptr, array, needle, &link))) {
 									break;
 								}
@@ -4736,11 +4745,12 @@ char *RNA_path_full_struct_py(struct PointerRNA *ptr)
  * Get the ID.struct.property as a python representation, eg:
  *   bpy.data.foo["bar"].some_struct.some_prop[10]
  */
-char *RNA_path_full_property_py(PointerRNA *ptr, PropertyRNA *prop, int index)
+char *RNA_path_full_property_py_ex(PointerRNA *ptr, PropertyRNA *prop, int index, bool use_fallback)
 {
 	char *id_path;
 	const char *data_delim;
-	char *data_path;
+	const char *data_path;
+	bool  data_path_free;
 
 	char *ret;
 
@@ -4752,8 +4762,23 @@ char *RNA_path_full_property_py(PointerRNA *ptr, PropertyRNA *prop, int index)
 	id_path = RNA_path_full_ID_py(ptr->id.data);
 
 	data_path = RNA_path_from_ID_to_property(ptr, prop);
+	if (data_path) {
+		data_delim = (data_path[0] == '[') ? "" : ".";
+		data_path_free = true;
+	}
+	else {
+		if (use_fallback) {
+			/* fuzzy fallback. be explicit in our ignoranc. */
+			data_path = RNA_property_identifier(prop);
+			data_delim = " ... ";
+		}
+		else {
+			data_delim = ".";
 
-	data_delim = (data_path && data_path[0] == '[') ? "" : ".";
+		}
+		data_path_free = false;
+	}
+
 
 	if ((index == -1) || (RNA_property_array_check(prop) == false)) {
 		ret = BLI_sprintfN("%s%s%s",
@@ -4764,11 +4789,16 @@ char *RNA_path_full_property_py(PointerRNA *ptr, PropertyRNA *prop, int index)
 		                   id_path, data_delim, data_path, index);
 	}
 	MEM_freeN(id_path);
-	if (data_path) {
-		MEM_freeN(data_path);
+	if (data_path_free) {
+		MEM_freeN((void *)data_path);
 	}
 
 	return ret;
+}
+
+char *RNA_path_full_property_py(PointerRNA *ptr, PropertyRNA *prop, int index)
+{
+	return RNA_path_full_property_py_ex(ptr, prop, index, false);
 }
 
 /**
@@ -4988,13 +5018,13 @@ void RNA_enum_set(PointerRNA *ptr, const char *name, int value)
 		printf("%s: %s.%s not found.\n", __func__, ptr->type->identifier, name);
 }
 
-void RNA_enum_set_identifier(PointerRNA *ptr, const char *name, const char *id)
+void RNA_enum_set_identifier(bContext *C, PointerRNA *ptr, const char *name, const char *id)
 {
 	PropertyRNA *prop = RNA_struct_find_property(ptr, name);
 
 	if (prop) {
 		int value;
-		if (RNA_property_enum_value(NULL, ptr, prop, id, &value))
+		if (RNA_property_enum_value(C, ptr, prop, id, &value))
 			RNA_property_enum_set(ptr, prop, value);
 		else
 			printf("%s: %s.%s has no enum id '%s'.\n", __func__, ptr->type->identifier, name, id);
@@ -5476,7 +5506,6 @@ char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop, in
 {
 	int type = RNA_property_type(prop);
 	int len = RNA_property_array_length(ptr, prop);
-	int i;
 
 	DynStr *dynstr = BLI_dynstr_new();
 	char *cstring;
@@ -5498,7 +5527,7 @@ char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop, in
 
 					RNA_property_boolean_get_array(ptr, prop, buf);
 					BLI_dynstr_append(dynstr, "(");
-					for (i = 0; i < len; i++) {
+					for (int i = 0; i < len; i++) {
 						BLI_dynstr_appendf(dynstr, i ? ", %s" : "%s", bool_as_py_string(buf[i]));
 					}
 					if (len == 1)
@@ -5524,7 +5553,7 @@ char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop, in
 
 					RNA_property_int_get_array(ptr, prop, buf);
 					BLI_dynstr_append(dynstr, "(");
-					for (i = 0; i < len; i++) {
+					for (int i = 0; i < len; i++) {
 						BLI_dynstr_appendf(dynstr, i ? ", %d" : "%d", buf[i]);
 					}
 					if (len == 1)
@@ -5550,7 +5579,7 @@ char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop, in
 
 					RNA_property_float_get_array(ptr, prop, buf);
 					BLI_dynstr_append(dynstr, "(");
-					for (i = 0; i < len; i++) {
+					for (int i = 0; i < len; i++) {
 						BLI_dynstr_appendf(dynstr, i ? ", %g" : "%g", buf[i]);
 					}
 					if (len == 1)
@@ -6096,7 +6125,7 @@ static int rna_function_format_array_length(const char *format, int ofs, int fle
 }
 
 static int rna_function_parameter_parse(PointerRNA *ptr, PropertyRNA *prop, PropertyType type,
-                                        char ftype, int len, void *dest, void *src, StructRNA *srna,
+                                        char ftype, int len, void *dest, const void *src, StructRNA *srna,
                                         const char *tid, const char *fid, const char *pid)
 {
 	/* ptr is always a function pointer, prop always a parameter */
@@ -6391,7 +6420,7 @@ int RNA_function_call_direct_va(bContext *C, ReportList *reports, PointerRNA *pt
 				}
 				case PROP_STRING:
 				{
-					const char **arg = va_arg(args, const char **);
+					char **arg = va_arg(args, char **);
 					err = rna_function_parameter_parse(&funcptr, parm, type, ftype, len, arg, retdata,
 					                                   NULL, tid, fid, pid);
 					break;

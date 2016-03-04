@@ -51,7 +51,7 @@
 
 #include "WM_types.h"
 
-EnumPropertyItem mesh_delimit_mode_items[] = {
+EnumPropertyItem rna_enum_mesh_delimit_mode_items[] = {
 	{BMO_DELIM_NORMAL, "NORMAL", 0, "Normal", "Delimit by face directions"},
 	{BMO_DELIM_MATERIAL, "MATERIAL", 0, "Material", "Delimit by face material"},
 	{BMO_DELIM_SEAM, "SEAM", 0, "Seam", "Delimit by edge seams"},
@@ -416,6 +416,14 @@ static float rna_MeshPolygon_area_get(PointerRNA *ptr)
 	MPoly *mp = (MPoly *)ptr->data;
 
 	return BKE_mesh_calc_poly_area(mp, me->mloop + mp->loopstart, me->mvert);
+}
+
+static void rna_MeshPolygon_flip(ID *id, MPoly *mp)
+{
+	Mesh *me = (Mesh *)id;
+
+	BKE_mesh_polygon_flip(mp, me->mloop, &me->ldata);
+	BKE_mesh_tessface_clear(me);
 }
 
 static void rna_MeshTessFace_normal_get(PointerRNA *ptr, float *values)
@@ -2138,6 +2146,7 @@ static void rna_def_mpolygon(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+	FunctionRNA *func;
 
 	srna = RNA_def_struct(brna, "MeshPolygon", NULL);
 	RNA_def_struct_sdna(srna, "MPoly");
@@ -2216,6 +2225,11 @@ static void rna_def_mpolygon(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_int_funcs(prop, "rna_MeshPolygon_index_get", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Index", "Index of this polygon");
+
+	func = RNA_def_function(srna, "flip", "rna_MeshPolygon_flip");
+	RNA_def_function_flag(func, FUNC_USE_SELF_ID);
+	RNA_def_function_ui_description(func, "Invert winding of this polygon (flip its normal)");
+
 }
 
 /* mesh.loop_uvs */
@@ -3460,7 +3474,6 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "smoothresh");
 	RNA_def_property_float_default(prop, DEG2RADF(180.0f));
 	RNA_def_property_range(prop, 0.0f, DEG2RADF(180.0f));
-	RNA_def_property_ui_range(prop, DEG2RADF(0.0f), DEG2RADF(180.0f), 1.0, 1);
 	RNA_def_property_ui_text(prop, "Auto Smooth Angle",
 	                         "Maximum angle between face normals that will be considered as smooth "
 	                         "(unused if custom split normals data are available)");

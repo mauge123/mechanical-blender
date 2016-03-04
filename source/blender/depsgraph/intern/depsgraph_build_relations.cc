@@ -240,10 +240,10 @@ void DepsgraphRelationBuilder::add_operation_relation(
 
 void DepsgraphRelationBuilder::build_scene(Main *bmain, Scene *scene)
 {
-	/* LIB_DOIT is used to indicate whether node for given ID was already
+	/* LIB_TAG_DOIT is used to indicate whether node for given ID was already
 	 * created or not.
 	 */
-	BKE_main_id_tag_all(bmain, false);
+	BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, false);
 
 	if (scene->set) {
 		// TODO: link set to scene, especially our timesource...
@@ -305,7 +305,7 @@ void DepsgraphRelationBuilder::build_group(Main *bmain,
                                            Group *group)
 {
 	ID *group_id = &group->id;
-	bool group_done = (group_id->flag & LIB_DOIT) != 0;
+	bool group_done = (group_id->tag & LIB_TAG_DOIT) != 0;
 	OperationKey object_local_transform_key(&object->id,
 	                                        DEPSNODE_TYPE_TRANSFORM,
 	                                        DEG_OPCODE_TRANSFORM_LOCAL);
@@ -322,12 +322,12 @@ void DepsgraphRelationBuilder::build_group(Main *bmain,
 		             DEPSREL_TYPE_TRANSFORM,
 		             "Dupligroup");
 	}
-	group_id->flag |= LIB_DOIT;
+	group_id->tag |= LIB_TAG_DOIT;
 }
 
 void DepsgraphRelationBuilder::build_object(Main *bmain, Scene *scene, Object *ob)
 {
-	if (ob->id.flag & LIB_DOIT) {
+	if (ob->id.tag & LIB_TAG_DOIT) {
 		return;
 	}
 
@@ -565,9 +565,9 @@ void DepsgraphRelationBuilder::build_constraints(Scene *scene, ID *id, eDepsNode
 				add_relation(camera_key, constraint_op_key, DEPSREL_TYPE_TRANSFORM, cti->name);
 			}
 
-			/* tracker <-> constraints */
-			// FIXME: actually motionclip dependency on results of motionclip block here...
-			//dag_add_relation(dag, scenenode, node, DAG_RL_SCENE, "Scene Relation");
+			/* TODO(sergey): This is more a TimeSource -> MovieClip -> Constraint dependency chain. */
+			TimeSourceKey time_src_key;
+			add_relation(time_src_key, constraint_op_key, DEPSREL_TYPE_TIME, "[TimeSrc -> Animation]");
 		}
 		else if (cti->get_constraint_targets) {
 			ListBase targets = {NULL, NULL};
@@ -910,10 +910,10 @@ void DepsgraphRelationBuilder::build_driver(ID *id, FCurve *fcu)
 void DepsgraphRelationBuilder::build_world(World *world)
 {
 	ID *world_id = &world->id;
-	if (world_id->flag & LIB_DOIT) {
+	if (world_id->tag & LIB_TAG_DOIT) {
 		return;
 	}
-	world_id->flag |= LIB_DOIT;
+	world_id->tag |= LIB_TAG_DOIT;
 
 	build_animdata(world_id);
 
@@ -1122,7 +1122,27 @@ void DepsgraphRelationBuilder::build_particles(Scene *scene, Object *ob)
 				}
 			}
 		}
+
+		if (part->ren_as == PART_DRAW_OB && part->dup_ob) {
+			ComponentKey dup_ob_key(&part->dup_ob->id, DEPSNODE_TYPE_TRANSFORM);
+			add_relation(dup_ob_key,
+			             psys_key,
+			             DEPSREL_TYPE_TRANSFORM,
+			             "Particle Object Visualization");
+		}
 	}
+
+	/* Particle depends on the object transform, so that channel is to be ready
+	 * first.
+	 *
+	 * TODO(sergey): This relation should be altered once real granular update
+	 * is implemented.
+	 */
+	ComponentKey transform_key(&ob->id, DEPSNODE_TYPE_TRANSFORM);
+	add_relation(transform_key,
+	             obdata_ubereval_key,
+	             DEPSREL_TYPE_GEOMETRY_EVAL,
+	             "Partcile Eval");
 
 	/* pointcache */
 	// TODO...
@@ -1631,10 +1651,10 @@ void DepsgraphRelationBuilder::build_obdata_geom(Main *bmain, Scene *scene, Obje
 		}
 	}
 
-	if (obdata->flag & LIB_DOIT) {
+	if (obdata->tag & LIB_TAG_DOIT) {
 		return;
 	}
-	obdata->flag |= LIB_DOIT;
+	obdata->tag |= LIB_TAG_DOIT;
 
 	/* Link object data evaluation node to exit operation. */
 	OperationKey obdata_geom_eval_key(obdata, DEPSNODE_TYPE_GEOMETRY, DEG_OPCODE_PLACEHOLDER, "Geometry Eval");
@@ -1718,10 +1738,10 @@ void DepsgraphRelationBuilder::build_camera(Object *ob)
 {
 	Camera *cam = (Camera *)ob->data;
 	ID *camera_id = &cam->id;
-	if (camera_id->flag & LIB_DOIT) {
+	if (camera_id->tag & LIB_TAG_DOIT) {
 		return;
 	}
-	camera_id->flag |= LIB_DOIT;
+	camera_id->tag |= LIB_TAG_DOIT;
 
 	ComponentKey parameters_key(camera_id, DEPSNODE_TYPE_PARAMETERS);
 
@@ -1744,10 +1764,10 @@ void DepsgraphRelationBuilder::build_lamp(Object *ob)
 {
 	Lamp *la = (Lamp *)ob->data;
 	ID *lamp_id = &la->id;
-	if (lamp_id->flag & LIB_DOIT) {
+	if (lamp_id->tag & LIB_TAG_DOIT) {
 		return;
 	}
-	lamp_id->flag |= LIB_DOIT;
+	lamp_id->tag |= LIB_TAG_DOIT;
 
 	ComponentKey parameters_key(lamp_id, DEPSNODE_TYPE_PARAMETERS);
 
@@ -1778,6 +1798,11 @@ void DepsgraphRelationBuilder::build_nodetree(ID *owner, bNodeTree *ntree)
 
 	build_animdata(ntree_id);
 
+	OperationKey parameters_key(ntree_id,
+	                            DEPSNODE_TYPE_PARAMETERS,
+	                            DEG_OPCODE_PLACEHOLDER,
+	                            "Parameters Eval");
+
 	/* nodetree's nodes... */
 	for (bNode *bnode = (bNode *)ntree->nodes.first; bnode; bnode = bnode->next) {
 		if (bnode->id) {
@@ -1788,17 +1813,22 @@ void DepsgraphRelationBuilder::build_nodetree(ID *owner, bNodeTree *ntree)
 				build_texture(owner, (Tex *)bnode->id);
 			}
 			else if (bnode->type == NODE_GROUP) {
-				bNodeTree *ntree = (bNodeTree *)bnode->id;
-				if ((ntree_id->flag & LIB_DOIT) == 0) {
-					build_nodetree(owner, ntree);
-					ntree_id->flag |= LIB_DOIT;
+				bNodeTree *group_ntree = (bNodeTree *)bnode->id;
+				if ((group_ntree->id.tag & LIB_TAG_DOIT) == 0) {
+					build_nodetree(owner, group_ntree);
+					group_ntree->id.tag |= LIB_TAG_DOIT;
 				}
+				OperationKey group_parameters_key(&group_ntree->id,
+				                                  DEPSNODE_TYPE_PARAMETERS,
+				                                  DEG_OPCODE_PLACEHOLDER,
+				                                  "Parameters Eval");
+				add_relation(group_parameters_key, parameters_key,
+				             DEPSREL_TYPE_COMPONENT_ORDER, "Group Node");
 			}
 		}
 	}
 
 	if (needs_animdata_node(ntree_id)) {
-		ComponentKey parameters_key(ntree_id, DEPSNODE_TYPE_PARAMETERS);
 		ComponentKey animation_key(ntree_id, DEPSNODE_TYPE_ANIMATION);
 		add_relation(animation_key, parameters_key,
 		             DEPSREL_TYPE_COMPONENT_ORDER, "NTree Parameters");
@@ -1811,10 +1841,10 @@ void DepsgraphRelationBuilder::build_nodetree(ID *owner, bNodeTree *ntree)
 void DepsgraphRelationBuilder::build_material(ID *owner, Material *ma)
 {
 	ID *ma_id = &ma->id;
-	if (ma_id->flag & LIB_DOIT) {
+	if (ma_id->tag & LIB_TAG_DOIT) {
 		return;
 	}
-	ma_id->flag |= LIB_DOIT;
+	ma_id->tag |= LIB_TAG_DOIT;
 
 	/* animation */
 	build_animdata(ma_id);
@@ -1830,10 +1860,10 @@ void DepsgraphRelationBuilder::build_material(ID *owner, Material *ma)
 void DepsgraphRelationBuilder::build_texture(ID *owner, Tex *tex)
 {
 	ID *tex_id = &tex->id;
-	if (tex_id->flag & LIB_DOIT) {
+	if (tex_id->tag & LIB_TAG_DOIT) {
 		return;
 	}
-	tex_id->flag |= LIB_DOIT;
+	tex_id->tag |= LIB_TAG_DOIT;
 
 	/* texture itself */
 	build_animdata(tex_id);

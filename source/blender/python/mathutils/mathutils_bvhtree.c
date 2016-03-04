@@ -328,7 +328,7 @@ static void py_bvhtree_nearest_point_cb(void *userdata, int index, const float c
 }
 
 PyDoc_STRVAR(py_bvhtree_ray_cast_doc,
-".. method:: ray_cast(co, direction, distance=sys.float_info.max)\n"
+".. method:: ray_cast(origin, direction, distance=sys.float_info.max)\n"
 "\n"
 "   Cast a ray onto the mesh.\n"
 "\n"
@@ -383,7 +383,7 @@ static PyObject *py_bvhtree_ray_cast(PyBVHTree *self, PyObject *args)
 }
 
 PyDoc_STRVAR(py_bvhtree_find_nearest_doc,
-".. method:: find_nearest(co, distance=" PYBVH_MAX_DIST_STR ")\n"
+".. method:: find_nearest(origin, distance=" PYBVH_MAX_DIST_STR ")\n"
 "\n"
 "   Find the nearest element to a point.\n"
 "\n"
@@ -777,7 +777,7 @@ static PyObject *C_BVHTree_FromPolygons(PyObject *UNUSED(cls), PyObject *args, P
 				axis_dominant_v3_to_m3_negate(axis_mat, normal);
 
 				for (j = 0; j < plink->len; j++) {
-					mul_v2_m3v3(proj_coords[i], axis_mat, coords[plink->poly[j]]);
+					mul_v2_m3v3(proj_coords[j], axis_mat, coords[plink->poly[j]]);
 				}
 
 				BLI_polyfill_calc_arena((const float (*)[2])proj_coords, plink->len, 1, tris_offset, pf_arena);
@@ -894,7 +894,7 @@ static PyObject *C_BVHTree_FromBMesh(PyObject *UNUSED(cls), PyObject *args, PyOb
 
 		looptris = MEM_mallocN(sizeof(*looptris) * (size_t)tris_len, __func__);
 
-		BM_bmesh_calc_tessellation(bm, looptris, &tris_len_dummy);
+		BM_mesh_calc_tessellation(bm, looptris, &tris_len_dummy);
 		BLI_assert(tris_len_dummy == (int)tris_len);
 	}
 
@@ -1132,7 +1132,7 @@ static PyObject *C_BVHTree_FromObject(PyObject *UNUSED(cls), PyObject *args, PyO
 
 static PyMethodDef py_bvhtree_methods[] = {
 	{"ray_cast", (PyCFunction)py_bvhtree_ray_cast, METH_VARARGS, py_bvhtree_ray_cast_doc},
-	{"find", (PyCFunction)py_bvhtree_find_nearest, METH_VARARGS, py_bvhtree_find_nearest_doc},
+	{"find_nearest", (PyCFunction)py_bvhtree_find_nearest, METH_VARARGS, py_bvhtree_find_nearest_doc},
 	{"overlap", (PyCFunction)py_bvhtree_overlap, METH_O, py_bvhtree_overlap_doc},
 
 	/* class methods */

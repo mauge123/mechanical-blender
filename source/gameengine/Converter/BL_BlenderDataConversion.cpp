@@ -228,17 +228,7 @@ static std::map<int, SCA_IInputDevice::KX_EnumInputs> create_translate_table()
 	m[EKEY				] = SCA_IInputDevice::KX_EKEY;                  
 	m[FKEY				] = SCA_IInputDevice::KX_FKEY;                  
 	m[GKEY				] = SCA_IInputDevice::KX_GKEY;                  
-
-//XXX clean up
-#ifdef WIN32
-#define HKEY	'h'
-#endif
 	m[HKEY				] = SCA_IInputDevice::KX_HKEY;                  
-//XXX clean up
-#ifdef WIN32
-#undef HKEY
-#endif
-
 	m[IKEY				] = SCA_IInputDevice::KX_IKEY;                  
 	m[JKEY				] = SCA_IInputDevice::KX_JKEY;                  
 	m[KKEY				] = SCA_IInputDevice::KX_KKEY;                  
@@ -1432,6 +1422,15 @@ static KX_LightObject *gamelight_from_blamp(Object *ob, Lamp *la, unsigned int l
 	lightobj->m_color[2] = la->b;
 	lightobj->m_distance = la->dist;
 	lightobj->m_energy = la->energy;
+	lightobj->m_shadowclipstart = la->clipsta;
+	lightobj->m_shadowclipend = la->clipend;
+	lightobj->m_shadowbias = la->bias;
+	lightobj->m_shadowbleedbias = la->bleedbias;
+	lightobj->m_shadowmaptype = la->shadowmap_type;
+	lightobj->m_shadowfrustumsize = la->shadow_frustum_size;
+	lightobj->m_shadowcolor[0] = la->shdwr;
+	lightobj->m_shadowcolor[1] = la->shdwg;
+	lightobj->m_shadowcolor[2] = la->shdwb;
 	lightobj->m_layer = layerflag;
 	lightobj->m_spotblend = la->spotblend;
 	lightobj->m_spotsize = la->spotsize;

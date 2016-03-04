@@ -156,7 +156,7 @@ void ED_armature_origin_set(Scene *scene, Object *ob, float cursor[3], int cente
 		mul_m4_v3(ob->imat, cent);
 	}
 	else {
-		if (around == V3D_CENTROID) {
+		if (around == V3D_AROUND_CENTER_MEAN) {
 			int total = 0;
 			zero_v3(cent);
 			for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
@@ -457,6 +457,58 @@ void ARMATURE_OT_calculate_roll(wmOperatorType *ot)
 	ot->prop = RNA_def_enum(ot->srna, "type", prop_calc_roll_types, CALC_ROLL_TAN_POS_X, "Type", "");
 	RNA_def_boolean(ot->srna, "axis_flip", 0, "Flip Axis", "Negate the alignment axis");
 	RNA_def_boolean(ot->srna, "axis_only", 0, "Shortest Rotation", "Ignore the axis direction, use the shortest rotation to align");
+}
+
+static int armature_roll_clear_exec(bContext *C, wmOperator *op)
+{
+	Object *ob = CTX_data_edit_object(C);
+
+	bArmature *arm = ob->data;
+	EditBone *ebone;
+
+	const float roll = RNA_float_get(op->ptr, "roll");
+
+	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
+		if (EBONE_VISIBLE(arm, ebone) && EBONE_EDITABLE(ebone)) {
+			/* roll func is a callback which assumes that all is well */
+			ebone->roll = roll;
+		}
+	}
+
+	if (arm->flag & ARM_MIRROR_EDIT) {
+		for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
+			if ((EBONE_VISIBLE(arm, ebone) && EBONE_EDITABLE(ebone)) == 0) {
+				EditBone *ebone_mirr = ED_armature_bone_get_mirrored(arm->edbo, ebone);
+				if (ebone_mirr && (EBONE_VISIBLE(arm, ebone_mirr) && EBONE_EDITABLE(ebone_mirr))) {
+					ebone->roll = -ebone_mirr->roll;
+				}
+			}
+		}
+	}
+
+	/* note, notifier might evolve */
+	WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, ob);
+
+	return OPERATOR_FINISHED;
+}
+
+void ARMATURE_OT_roll_clear(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Clear Roll";
+	ot->idname = "ARMATURE_OT_roll_clear";
+	ot->description = "Clear roll for select bones";
+
+	/* api callbacks */
+	ot->exec = armature_roll_clear_exec;
+	ot->poll = ED_operator_editarmature;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_float_rotation(
+	        ot->srna, "roll", 0, NULL, DEG2RADF(-360.0f), DEG2RADF(360.0f),
+	        "Roll", "", DEG2RADF(-360.0f), DEG2RADF(360.0f));
 }
 
 /* ******************************** Chain-Based Tools ********************************* */

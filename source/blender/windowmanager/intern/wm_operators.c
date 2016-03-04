@@ -105,6 +105,7 @@
 #include "ED_util.h"
 #include "ED_view3d.h"
 
+#include "GPU_basic_shader.h"
 #include "GPU_material.h"
 
 #include "RNA_access.h"
@@ -1209,215 +1210,6 @@ bool WM_operator_filesel_ensure_ext_imtype(wmOperator *op, const struct ImageFor
 	return false;
 }
 
-/* default properties for fileselect */
-void WM_operator_properties_filesel(wmOperatorType *ot, int filter, short type, short action, short flag, short display, short sort)
-{
-	PropertyRNA *prop;
-
-	static EnumPropertyItem file_display_items[] = {
-		{FILE_DEFAULTDISPLAY, "DEFAULT", 0, "Default", "Automatically determine display type for files"},
-		{FILE_SHORTDISPLAY, "LIST_SHORT", ICON_SHORTDISPLAY, "Short List", "Display files as short list"},
-		{FILE_LONGDISPLAY, "LIST_LONG", ICON_LONGDISPLAY, "Long List", "Display files as a detailed list"},
-		{FILE_IMGDISPLAY, "THUMBNAIL", ICON_IMGDISPLAY, "Thumbnails", "Display files as thumbnails"},
-		{0, NULL, 0, NULL, NULL}
-	};
-
-	if (flag & WM_FILESEL_FILEPATH)
-		RNA_def_string_file_path(ot->srna, "filepath", NULL, FILE_MAX, "File Path", "Path to file");
-
-	if (flag & WM_FILESEL_DIRECTORY)
-		RNA_def_string_dir_path(ot->srna, "directory", NULL, FILE_MAX, "Directory", "Directory of the file");
-
-	if (flag & WM_FILESEL_FILENAME)
-		RNA_def_string_file_name(ot->srna, "filename", NULL, FILE_MAX, "File Name", "Name of the file");
-
-	if (flag & WM_FILESEL_FILES)
-		RNA_def_collection_runtime(ot->srna, "files", &RNA_OperatorFileListElement, "Files", "");
-
-	if (action == FILE_SAVE) {
-		/* note, this is only used to check if we should highlight the filename area red when the
-		 * filepath is an existing file. */
-		prop = RNA_def_boolean(ot->srna, "check_existing", true, "Check Existing",
-		                       "Check and warn on overwriting existing files");
-		RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	}
-	
-	prop = RNA_def_boolean(ot->srna, "filter_blender", (filter & FILE_TYPE_BLENDER) != 0, "Filter .blend files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_backup", (filter & FILE_TYPE_BLENDER_BACKUP) != 0, "Filter .blend files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_image", (filter & FILE_TYPE_IMAGE) != 0, "Filter image files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_movie", (filter & FILE_TYPE_MOVIE) != 0, "Filter movie files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_python", (filter & FILE_TYPE_PYSCRIPT) != 0, "Filter python files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_font", (filter & FILE_TYPE_FTFONT) != 0, "Filter font files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_sound", (filter & FILE_TYPE_SOUND) != 0, "Filter sound files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_text", (filter & FILE_TYPE_TEXT) != 0, "Filter text files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_btx", (filter & FILE_TYPE_BTX) != 0, "Filter btx files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_collada", (filter & FILE_TYPE_COLLADA) != 0, "Filter COLLADA files", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_folder", (filter & FILE_TYPE_FOLDER) != 0, "Filter folders", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "filter_blenlib", (filter & FILE_TYPE_BLENDERLIB) != 0, "Filter Blender IDs", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-
-	prop = RNA_def_int(ot->srna, "filemode", type, FILE_LOADLIB, FILE_SPECIAL,
-	                   "File Browser Mode", "The setting for the file browser mode to load a .blend file, a library or a special file",
-	                   FILE_LOADLIB, FILE_SPECIAL);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-
-	if (flag & WM_FILESEL_RELPATH)
-		RNA_def_boolean(ot->srna, "relative_path", true, "Relative Path", "Select the file relative to the blend file");
-
-	if ((filter & FILE_TYPE_IMAGE) || (filter & FILE_TYPE_MOVIE)) {
-		prop = RNA_def_boolean(ot->srna, "show_multiview", 0, "Enable Multi-View", "");
-		RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-		prop = RNA_def_boolean(ot->srna, "use_multiview", 0, "Use Multi-View", "");
-		RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	}
-
-	prop = RNA_def_enum(ot->srna, "display_type", file_display_items, display, "Display Type", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-
-	prop = RNA_def_enum(ot->srna, "sort_method", file_sort_items, sort, "File sorting mode", "");
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-
-}
-
-static void wm_operator_properties_select_action_ex(wmOperatorType *ot, int default_action,
-                                                    const EnumPropertyItem *select_actions)
-{
-	RNA_def_enum(ot->srna, "action", select_actions, default_action, "Action", "Selection action to execute");
-}
-
-void WM_operator_properties_select_action(wmOperatorType *ot, int default_action)
-{
-	static EnumPropertyItem select_actions[] = {
-		{SEL_TOGGLE, "TOGGLE", 0, "Toggle", "Toggle selection for all elements"},
-		{SEL_SELECT, "SELECT", 0, "Select", "Select all elements"},
-		{SEL_DESELECT, "DESELECT", 0, "Deselect", "Deselect all elements"},
-		{SEL_INVERT, "INVERT", 0, "Invert", "Invert selection of all elements"},
-		{0, NULL, 0, NULL, NULL}
-	};
-
-	wm_operator_properties_select_action_ex(ot, default_action, select_actions);
-}
-
-/**
- * only SELECT/DESELECT
- */
-void WM_operator_properties_select_action_simple(wmOperatorType *ot, int default_action)
-{
-	static EnumPropertyItem select_actions[] = {
-		{SEL_SELECT, "SELECT", 0, "Select", "Select all elements"},
-		{SEL_DESELECT, "DESELECT", 0, "Deselect", "Deselect all elements"},
-		{0, NULL, 0, NULL, NULL}
-	};
-
-	wm_operator_properties_select_action_ex(ot, default_action, select_actions);
-}
-
-/**
- * Use for all select random operators.
- * Adds properties: percent, seed, action.
- */
-void WM_operator_properties_select_random(wmOperatorType *ot)
-{
-	RNA_def_float_percentage(
-	        ot->srna, "percent", 50.f, 0.0f, 100.0f,
-	        "Percent", "Percentage of objects to select randomly", 0.f, 100.0f);
-	RNA_def_int(
-	        ot->srna, "seed", 0, 0, INT_MAX,
-	        "Random Seed", "Seed for the random number generator", 0, 255);
-
-	WM_operator_properties_select_action_simple(ot, SEL_SELECT);
-}
-
-void WM_operator_properties_select_all(wmOperatorType *ot)
-{
-	WM_operator_properties_select_action(ot, SEL_TOGGLE);
-}
-
-void WM_operator_properties_border(wmOperatorType *ot)
-{
-	PropertyRNA *prop;
-
-	prop = RNA_def_int(ot->srna, "xmin", 0, INT_MIN, INT_MAX, "X Min", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_int(ot->srna, "xmax", 0, INT_MIN, INT_MAX, "X Max", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_int(ot->srna, "ymin", 0, INT_MIN, INT_MAX, "Y Min", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_int(ot->srna, "ymax", 0, INT_MIN, INT_MAX, "Y Max", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-}
-
-void WM_operator_properties_border_to_rcti(struct wmOperator *op, rcti *rect)
-{
-	rect->xmin = RNA_int_get(op->ptr, "xmin");
-	rect->ymin = RNA_int_get(op->ptr, "ymin");
-	rect->xmax = RNA_int_get(op->ptr, "xmax");
-	rect->ymax = RNA_int_get(op->ptr, "ymax");
-}
-
-void WM_operator_properties_border_to_rctf(struct wmOperator *op, rctf *rect)
-{
-	rcti rect_i;
-	WM_operator_properties_border_to_rcti(op, &rect_i);
-	BLI_rctf_rcti_copy(rect, &rect_i);
-}
-
-void WM_operator_properties_gesture_border(wmOperatorType *ot, bool extend)
-{
-	RNA_def_int(ot->srna, "gesture_mode", 0, INT_MIN, INT_MAX, "Gesture Mode", "", INT_MIN, INT_MAX);
-
-	WM_operator_properties_border(ot);
-
-	if (extend) {
-		RNA_def_boolean(ot->srna, "extend", true, "Extend", "Extend selection instead of deselecting everything first");
-	}
-}
-
-void WM_operator_properties_mouse_select(wmOperatorType *ot)
-{
-	PropertyRNA *prop;
-	
-	prop = RNA_def_boolean(ot->srna, "extend", false, "Extend",
-	                       "Extend selection instead of deselecting everything first");
-	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "deselect", false, "Deselect", "Remove from selection");
-	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-	prop = RNA_def_boolean(ot->srna, "toggle", false, "Toggle Selection", "Toggle the selection");
-	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-}
-
-void WM_operator_properties_gesture_straightline(wmOperatorType *ot, int cursor)
-{
-	PropertyRNA *prop;
-
-	prop = RNA_def_int(ot->srna, "xstart", 0, INT_MIN, INT_MAX, "X Start", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_int(ot->srna, "xend", 0, INT_MIN, INT_MAX, "X End", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_int(ot->srna, "ystart", 0, INT_MIN, INT_MAX, "Y Start", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	prop = RNA_def_int(ot->srna, "yend", 0, INT_MIN, INT_MAX, "Y End", "", INT_MIN, INT_MAX);
-	RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-	
-	if (cursor) {
-		prop = RNA_def_int(ot->srna, "cursor", cursor, 0, INT_MAX,
-		                   "Cursor", "Mouse cursor style to use during the modal operator", 0, INT_MAX);
-		RNA_def_property_flag(prop, PROP_HIDDEN);
-	}
-}
-
-
 /* op->poll */
 int WM_operator_winactive(bContext *C)
 {
@@ -2108,8 +1900,14 @@ static void WM_OT_splash(wmOperatorType *ot)
 
 
 /* ***************** Search menu ************************* */
-static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *UNUSED(arg_op))
+
+struct SearchPopupInit_Data {
+	int size[2];
+};
+
+static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *userdata)
 {
+	const struct SearchPopupInit_Data *init_data = userdata;
 	static char search[256] = "";
 	wmEvent event;
 	wmWindow *win = CTX_wm_window(C);
@@ -2119,11 +1917,12 @@ static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *UNUSED(arg_
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
 	UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
 	
-	but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, UI_searchbox_size_x(), UI_UNIT_Y, 0, 0, "");
+	but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, init_data->size[0], UI_UNIT_Y, 0, 0, "");
 	UI_but_func_operator_search(but);
 	
 	/* fake button, it holds space for search items */
-	uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 10 - UI_searchbox_size_y(), UI_searchbox_size_x(), UI_searchbox_size_y(), NULL, 0, 0, 0, 0, NULL);
+	uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 10 - init_data->size[1],
+	         init_data->size[0], init_data->size[1], NULL, 0, 0, 0, 0, NULL);
 	
 	UI_block_bounds_set_popup(block, 6, 0, -UI_UNIT_Y); /* move it downwards, mouse over button */
 	
@@ -2142,9 +1941,16 @@ static int wm_search_menu_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-static int wm_search_menu_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int wm_search_menu_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *UNUSED(event))
 {
-	UI_popup_block_invoke(C, wm_block_search_menu, op);
+	struct SearchPopupInit_Data data = {
+		.size = {
+		    UI_searchbox_size_x() * 2,
+		    UI_searchbox_size_y(),
+		},
+	};
+
+	UI_popup_block_invoke(C, wm_block_search_menu, &data);
 	
 	return OPERATOR_INTERFACE;
 }
@@ -2528,8 +2334,9 @@ static void WM_OT_open_mainfile(wmOperatorType *ot)
 	ot->ui = wm_open_mainfile_ui;
 	/* omit window poll so this can work in background mode */
 
-	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER, FILE_BLENDER, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+	WM_operator_properties_filesel(
+	        ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER, FILE_BLENDER, FILE_OPENFILE,
+	        WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 
 	RNA_def_boolean(ot->srna, "load_ui", true, "Load UI", "Load user interface setup in the .blend file");
 	RNA_def_boolean(ot->srna, "use_scripts", true, "Trusted Source",
@@ -2832,8 +2639,8 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 	/* tag everything, all untagged data can be made local
 	 * its also generally useful to know what is new
 	 *
-	 * take extra care BKE_main_id_flag_all(bmain, LIB_PRE_EXISTING, false) is called after! */
-	BKE_main_id_flag_all(bmain, LIB_PRE_EXISTING, true);
+	 * take extra care BKE_main_id_flag_all(bmain, LIB_TAG_PRE_EXISTING, false) is called after! */
+	BKE_main_id_tag_all(bmain, LIB_TAG_PRE_EXISTING, true);
 
 	/* We define our working data...
 	 * Note that here, each item 'uses' one library, and only one. */
@@ -2908,12 +2715,13 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 
 	/* append, rather than linking */
 	if ((flag & FILE_LINK) == 0) {
-		BKE_library_make_local(bmain, NULL, true);
+		bool set_fake = RNA_boolean_get(op->ptr, "set_fake");
+		BKE_library_make_local(bmain, NULL, true, set_fake);
 	}
 
 	/* important we unset, otherwise these object wont
 	 * link into other scenes from this blend file */
-	BKE_main_id_flag_all(bmain, LIB_PRE_EXISTING, false);
+	BKE_main_id_tag_all(bmain, LIB_TAG_PRE_EXISTING, false);
 
 	/* recreate dependency graph to include new objects */
 	DAG_scene_relations_rebuild(bmain, scene);
@@ -2982,11 +2790,12 @@ static void WM_OT_append(wmOperatorType *ot)
 	ot->flag |= OPTYPE_UNDO;
 
 	WM_operator_properties_filesel(
-		ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER | FILE_TYPE_BLENDERLIB, FILE_LOADLIB, FILE_OPENFILE,
-		WM_FILESEL_FILEPATH | WM_FILESEL_DIRECTORY | WM_FILESEL_FILENAME | WM_FILESEL_FILES,
-		FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+	        ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER | FILE_TYPE_BLENDERLIB, FILE_LOADLIB, FILE_OPENFILE,
+	        WM_FILESEL_FILEPATH | WM_FILESEL_DIRECTORY | WM_FILESEL_FILENAME | WM_FILESEL_FILES,
+	        FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 
 	wm_link_append_properties_common(ot, false);
+	RNA_def_boolean(ot->srna, "set_fake", false, "Fake User", "Set Fake User for appended items (except Objects and Groups)");
 }
 
 /* *************** recover last session **************** */
@@ -3074,8 +2883,9 @@ static void WM_OT_recover_auto_save(wmOperatorType *ot)
 	ot->exec = wm_recover_auto_save_exec;
 	ot->invoke = wm_recover_auto_save_invoke;
 
-	WM_operator_properties_filesel(ot, FILE_TYPE_BLENDER, FILE_BLENDER, FILE_OPENFILE,
-	                               WM_FILESEL_FILEPATH, FILE_LONGDISPLAY, FILE_SORT_TIME);
+	WM_operator_properties_filesel(
+	        ot, FILE_TYPE_BLENDER, FILE_BLENDER, FILE_OPENFILE,
+	        WM_FILESEL_FILEPATH, FILE_LONGDISPLAY, FILE_SORT_TIME);
 }
 
 /* *************** save file as **************** */
@@ -3207,8 +3017,9 @@ static void WM_OT_save_as_mainfile(wmOperatorType *ot)
 	ot->check = blend_save_check;
 	/* omit window poll so this can work in background mode */
 
-	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER, FILE_BLENDER, FILE_SAVE,
-	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+	WM_operator_properties_filesel(
+	        ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER, FILE_BLENDER, FILE_SAVE,
+	        WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 	RNA_def_boolean(ot->srna, "compress", false, "Compress", "Write compressed .blend file");
 	RNA_def_boolean(ot->srna, "relative_remap", true, "Remap Relative",
 	                "Remap relative paths when saving in a different directory");
@@ -3274,8 +3085,9 @@ static void WM_OT_save_mainfile(wmOperatorType *ot)
 	ot->check = blend_save_check;
 	/* omit window poll so this can work in background mode */
 	
-	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER, FILE_BLENDER, FILE_SAVE,
-	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+	WM_operator_properties_filesel(
+	        ot, FILE_TYPE_FOLDER | FILE_TYPE_BLENDER, FILE_BLENDER, FILE_SAVE,
+	        WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 	RNA_def_boolean(ot->srna, "compress", false, "Compress", "Write compressed .blend file");
 	RNA_def_boolean(ot->srna, "relative_remap", false, "Remap Relative",
 	                "Remap relative paths when saving in a different directory");
@@ -4068,7 +3880,9 @@ typedef struct {
 	PropertyType type;
 	PropertySubType subtype;
 	PointerRNA ptr, col_ptr, fill_col_ptr, rot_ptr, zoom_ptr, image_id_ptr;
+	PointerRNA fill_col_override_ptr, fill_col_override_test_ptr;
 	PropertyRNA *prop, *col_prop, *fill_col_prop, *rot_prop, *zoom_prop;
+	PropertyRNA *fill_col_override_prop, *fill_col_override_test_prop;
 	StructRNA *image_id_srna;
 	float initial_value, current_value, min_value, max_value;
 	int initial_mouse[2];
@@ -4144,7 +3958,7 @@ static void radial_control_set_tex(RadialControl *rc)
 			if ((ibuf = BKE_brush_gen_radial_control_imbuf(rc->image_id_ptr.data, rc->use_secondary_tex))) {
 				glGenTextures(1, &rc->gltex);
 				glBindTexture(GL_TEXTURE_2D, rc->gltex);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ibuf->x, ibuf->y, 0,
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA8, ibuf->x, ibuf->y, 0,
 				             GL_ALPHA, GL_FLOAT, ibuf->rect_float);
 				MEM_freeN(ibuf->rect_float);
 				MEM_freeN(ibuf);
@@ -4161,8 +3975,23 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 	float rot;
 
 	/* set fill color */
-	if (rc->fill_col_prop)
-		RNA_property_float_get_array(&rc->fill_col_ptr, rc->fill_col_prop, col);
+	if (rc->fill_col_prop) {
+		PointerRNA *fill_ptr;
+		PropertyRNA *fill_prop;
+
+		if (rc->fill_col_override_prop &&
+		    RNA_property_boolean_get(&rc->fill_col_override_test_ptr, rc->fill_col_override_test_prop))
+		{
+			fill_ptr = &rc->fill_col_override_ptr;
+			fill_prop = rc->fill_col_override_prop;
+		}
+		else {
+			fill_ptr = &rc->fill_col_ptr;
+			fill_prop = rc->fill_col_prop;
+		}
+
+		RNA_property_float_get_array(fill_ptr, fill_prop, col);
+	}
 	glColor4f(col[0], col[1], col[2], alpha);
 
 	if (rc->gltex) {
@@ -4179,7 +4008,7 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 		}
 
 		/* draw textured quad */
-		glEnable(GL_TEXTURE_2D);
+		GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0, 0);
 		glVertex2f(-radius, -radius);
@@ -4190,7 +4019,7 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 		glTexCoord2f(0, 1);
 		glVertex2f(-radius, radius);
 		glEnd();
-		glDisable(GL_TEXTURE_2D);
+		GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 
 		/* undo rotation */
 		if (rc->rot_prop)
@@ -4426,9 +4255,27 @@ static int radial_control_get_properties(bContext *C, wmOperator *op)
 		return 0;
 	if (!radial_control_get_path(&ctx_ptr, op, "color_path", &rc->col_ptr, &rc->col_prop, 3, RC_PROP_REQUIRE_FLOAT))
 		return 0;
-	if (!radial_control_get_path(&ctx_ptr, op, "fill_color_path", &rc->fill_col_ptr, &rc->fill_col_prop, 3, RC_PROP_REQUIRE_FLOAT))
+
+
+	if (!radial_control_get_path(
+	        &ctx_ptr, op, "fill_color_path", &rc->fill_col_ptr, &rc->fill_col_prop, 3, RC_PROP_REQUIRE_FLOAT))
+	{
 		return 0;
-	
+	}
+
+	if (!radial_control_get_path(
+	        &ctx_ptr, op, "fill_color_override_path",
+	        &rc->fill_col_override_ptr, &rc->fill_col_override_prop, 3, RC_PROP_REQUIRE_FLOAT))
+	{
+		return 0;
+	}
+	if (!radial_control_get_path(
+	        &ctx_ptr, op, "fill_color_override_test_path",
+	        &rc->fill_col_override_test_ptr, &rc->fill_col_override_test_prop, 0, RC_PROP_REQUIRE_BOOL))
+	{
+		return 0;
+	}
+
 	/* slightly ugly; allow this property to not resolve
 	 * correctly. needed because 3d texture paint shares the same
 	 * keymap as 2d image paint */
@@ -4799,6 +4646,9 @@ static void WM_OT_radial_control(wmOperatorType *ot)
 
 	RNA_def_string(ot->srna, "fill_color_path", NULL, 0, "Fill Color Path", "Path of property used to set the fill color of the control");
 
+	RNA_def_string(ot->srna, "fill_color_override_path", NULL, 0, "Fill Color Override Path", "");
+	RNA_def_string(ot->srna, "fill_color_override_test_path", NULL, 0, "Fill Color Override Test", "");
+
 	RNA_def_string(ot->srna, "zoom_path", NULL, 0, "Zoom Path", "Path of property used to set the zoom level for the control");
 
 	RNA_def_string(ot->srna, "image_id", NULL, 0, "Image ID", "Path of ID that is used to generate an image for the control");
@@ -5040,11 +4890,11 @@ static bool previews_id_ensure_callback(void *todo_v, ID **idptr, int UNUSED(cd_
 	PreviewsIDEnsureStack *todo = todo_v;
 	ID *id = *idptr;
 
-	if (id && (id->flag & LIB_DOIT)) {
+	if (id && (id->tag & LIB_TAG_DOIT)) {
 		if (ELEM(GS(id->name), ID_MA, ID_TE, ID_IM, ID_WO, ID_LA)) {
 			previews_id_ensure(todo->C, todo->scene, id);
 		}
-		id->flag &= ~LIB_DOIT;  /* Tag the ID as done in any case. */
+		id->tag &= ~LIB_TAG_DOIT;  /* Tag the ID as done in any case. */
 		BLI_LINKSTACK_PUSH(todo->id_stack, id);
 	}
 
@@ -5060,8 +4910,8 @@ static int previews_ensure_exec(bContext *C, wmOperator *UNUSED(op))
 	ID *id;
 	int i;
 
-	/* We use LIB_DOIT to check whether we have already handled a given ID or not. */
-	BKE_main_id_flag_all(bmain, LIB_DOIT, true);
+	/* We use LIB_TAG_DOIT to check whether we have already handled a given ID or not. */
+	BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, true);
 
 	BLI_LINKSTACK_INIT(preview_id_stack.id_stack);
 
@@ -5160,7 +5010,7 @@ static void WM_OT_previews_clear(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum_flag(ot->srna, "id_type", preview_id_type_items,
 	                             FILTER_ID_SCE | FILTER_ID_OB | FILTER_ID_GR |
-		                         FILTER_ID_MA | FILTER_ID_LA | FILTER_ID_WO | FILTER_ID_TE | FILTER_ID_IM,
+	                             FILTER_ID_MA | FILTER_ID_LA | FILTER_ID_WO | FILTER_ID_TE | FILTER_ID_IM,
 	                             "DataBlock Type", "Which datablock previews to clear");
 }
 
@@ -5233,11 +5083,11 @@ static void WM_OT_stereo3d_set(wmOperatorType *ot)
 	ot->check = wm_stereo3d_set_check;
 	ot->cancel = wm_stereo3d_set_cancel;
 
-	prop = RNA_def_enum(ot->srna, "display_mode", stereo3d_display_items, S3D_DISPLAY_ANAGLYPH, "Display Mode", "");
+	prop = RNA_def_enum(ot->srna, "display_mode", rna_enum_stereo3d_display_items, S3D_DISPLAY_ANAGLYPH, "Display Mode", "");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-	prop = RNA_def_enum(ot->srna, "anaglyph_type", stereo3d_anaglyph_type_items, S3D_ANAGLYPH_REDCYAN, "Anaglyph Type", "");
+	prop = RNA_def_enum(ot->srna, "anaglyph_type", rna_enum_stereo3d_anaglyph_type_items, S3D_ANAGLYPH_REDCYAN, "Anaglyph Type", "");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-	prop = RNA_def_enum(ot->srna, "interlace_type", stereo3d_interlace_type_items, S3D_INTERLACE_ROW, "Interlace Type", "");
+	prop = RNA_def_enum(ot->srna, "interlace_type", rna_enum_stereo3d_interlace_type_items, S3D_INTERLACE_ROW, "Interlace Type", "");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 	prop = RNA_def_boolean(ot->srna, "use_interlace_swap", false, "Swap Left/Right",
 	                       "Swap left and right stereo channels");
