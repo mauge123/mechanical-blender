@@ -146,8 +146,21 @@ typedef struct BMDim {
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 
 	struct BMVert *v1,*v2;
-	//relative position
-	float rpos[3];
+
+	//Dimension position, used for select
+	float dpos[3];
+
+	//Dimension position fact
+	float dpos_fact;
+
+	//Dimension direction
+	int dir;
+	float end[3], start[3];
+
+	//Dimension position, from midpoint
+	float fpos[3]; //fixed
+	float tpos[3]; //while moving: used when tagged
+
 } BMDim;
 #endif
 
@@ -259,11 +272,14 @@ typedef struct BMesh {
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	int totdim;
+	int totdimsel;
 	struct BLI_mempool *dpool;
 	struct BLI_mempool *dtoolflagpool;
 
 	BMDim **dtable;
 	int dtable_tot;
+
+	CustomData ddata;
 
 #endif
 

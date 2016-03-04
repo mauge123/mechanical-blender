@@ -413,6 +413,10 @@ void BKE_mesh_update_customdata_pointers(Mesh *me, const bool do_ensure_tess_cd)
 	me->mtpoly = CustomData_get_layer(&me->pdata, CD_MTEXPOLY);
 	me->mloopcol = CustomData_get_layer(&me->ldata, CD_MLOOPCOL);
 	me->mloopuv = CustomData_get_layer(&me->ldata, CD_MLOOPUV);
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	me->mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
+#endif
 }
 
 bool BKE_mesh_has_custom_loop_normals(Mesh *me)

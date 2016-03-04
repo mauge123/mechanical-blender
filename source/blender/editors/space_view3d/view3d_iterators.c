@@ -61,6 +61,16 @@ typedef struct foreachScreenVert_userData {
 	eV3DProjTest clip_flag;
 } foreachScreenVert_userData;
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+typedef struct foreachScreenDim_userData {
+	void (*func)(void *userData, BMDim *edm, const float screen_co_b[2], int index);
+	void *userData;
+	ViewContext vc;
+	eV3DProjTest clip_flag;
+} foreachScreenDim_userData;
+
+#endif
+
 /* user data structures for derived mesh callbacks */
 typedef struct foreachScreenEdge_userData {
 	void (*func)(void *userData, BMEdge *eed, const float screen_co_a[2], const float screen_co_b[2], int index);
@@ -144,6 +154,24 @@ static void mesh_foreachScreenVert__mapFunc(void *userData, int index, const flo
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void mesh_foreachScreenDim__mapFunc(void *userData, int index, const float pos[3])
+{
+	foreachScreenDim_userData *data = userData;
+	BMDim *edm = BM_dim_at_index(data->vc.em->bm, index);
+
+	if (!BM_elem_flag_test(edm, BM_ELEM_HIDDEN)) {
+		float screen_co[2];
+
+		if (ED_view3d_project_float_object(data->vc.ar, pos, screen_co, data->clip_flag) != V3D_PROJ_RET_OK) {
+			return;
+		}
+
+		data->func(data->userData, edm, screen_co, index);
+	}
+}
+#endif
+
 void mesh_foreachScreenVert(
         ViewContext *vc,
         void (*func)(void *userData, BMVert *eve, const float screen_co[2], int index),
@@ -168,6 +196,34 @@ void mesh_foreachScreenVert(
 
 	dm->release(dm);
 }
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void mesh_foreachScreenDim(
+        ViewContext *vc,
+        void (*func)(void *userData, BMDim *edm, const float screen_co[2], int index),
+        void *userData, eV3DProjTest clip_flag)
+{
+	foreachScreenDim_userData data;
+	DerivedMesh *dm = editbmesh_get_derived_cage(vc->scene, vc->obedit, vc->em, CD_MASK_BAREMESH);
+
+	ED_view3d_check_mats_rv3d(vc->rv3d);
+
+	data.vc = *vc;
+	data.func = func;
+	data.userData = userData;
+	data.clip_flag = clip_flag;
+
+	if (clip_flag & V3D_PROJ_TEST_CLIP_BB) {
+		ED_view3d_clipping_local(vc->rv3d, vc->obedit->obmat);  /* for local clipping lookups */
+	}
+
+	BM_mesh_elem_table_ensure(vc->em->bm, BM_DIM);
+	dm->foreachMappedDim(dm, mesh_foreachScreenDim__mapFunc, &data, DM_FOREACH_NOP);
+
+	dm->release(dm);
+}
+
+#endif
 
 /* ------------------------------------------------------------------------ */
 

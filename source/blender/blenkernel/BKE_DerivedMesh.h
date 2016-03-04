@@ -494,8 +494,7 @@ struct DerivedMesh {
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	void (*foreachMappedDim)(DerivedMesh *dm,
-	                          void (*func)(void *userData, int index, const float v1[3],
-	                                       const float v2[3]),
+	                          void (*func)(void *userData, int index, const float pos[3]),
 	                          void *userData,
 	                          DMForeachFlag flag);
 #endif

@@ -2002,6 +2002,7 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 		CustomDataLayer *flayers = NULL, flayers_buff[CD_TEMP_CHUNK_SIZE];
 		CustomDataLayer *llayers = NULL, llayers_buff[CD_TEMP_CHUNK_SIZE];
 		CustomDataLayer *players = NULL, players_buff[CD_TEMP_CHUNK_SIZE];
+		CustomDataLayer *dlayers = NULL, dlayers_buff[CD_TEMP_CHUNK_SIZE];
 
 		if (mesh->id.us>0 || wd->current) {
 			/* write LibData */
@@ -2035,6 +2036,9 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 #endif
 				CustomData_file_write_prepare(&mesh->ldata, &llayers, llayers_buff, ARRAY_SIZE(llayers_buff));
 				CustomData_file_write_prepare(&mesh->pdata, &players, players_buff, ARRAY_SIZE(players_buff));
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+				CustomData_file_write_prepare(&mesh->ddata, &dlayers, dlayers_buff, ARRAY_SIZE(dlayers_buff));
+#endif
 
 				writestruct_at_address(wd, ID_ME, "Mesh", 1, old_mesh, mesh);
 
@@ -2051,6 +2055,9 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 				write_customdata(wd, &mesh->id, mesh->totface, &mesh->fdata, flayers, -1, 0);
 				write_customdata(wd, &mesh->id, mesh->totloop, &mesh->ldata, llayers, -1, 0);
 				write_customdata(wd, &mesh->id, mesh->totpoly, &mesh->pdata, players, -1, 0);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+				write_customdata(wd, &mesh->id, mesh->totdim, &mesh->ddata, dlayers, -1, 0);
+#endif
 
 				/* restore pointer */
 				mesh = old_mesh;

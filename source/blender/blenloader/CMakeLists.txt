@@ -73,4 +73,8 @@ if(WITH_CODEC_FFMPEG)
 	add_definitions(-DWITH_FFMPEG)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+endif()
+
 blender_add_lib(bf_blenloader "${SRC}" "${INC}" "${INC_SYS}")

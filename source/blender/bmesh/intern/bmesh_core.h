@@ -122,6 +122,10 @@ void    bmesh_face_swap_data(BMFace *f_a, BMFace *f_b);
 BMDim *BM_dim_create(
         BMesh *bm, BMVert *v1, BMVert *v2,
         const BMDim *e_example, const eBMCreateFlag create_flag);
+
+void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) ;
+void BM_dim_kill(BMesh *bm, BMDim *edm);
+void bm_kill_only_dim(BMesh *bm, BMDim *d);
 #endif
 
 

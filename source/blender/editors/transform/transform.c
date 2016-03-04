@@ -1009,9 +1009,9 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 				}
 			}
 			else {
-				if (!(t->modifiers & MOD_CONSTRAINT_PLANE))
+				if (!(t->modifiers & MOD_CONSTRAINT_PLANE)){
 					setUserConstraint(t, V3D_MANIP_GLOBAL, constraint_axis, msg2);
-				else if (t->modifiers & MOD_CONSTRAINT_PLANE)
+				}else if (t->modifiers & MOD_CONSTRAINT_PLANE)
 					setUserConstraint(t, V3D_MANIP_GLOBAL, constraint_plane, msg3);
 			}
 		}

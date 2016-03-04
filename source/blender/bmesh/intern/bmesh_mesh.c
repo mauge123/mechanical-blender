@@ -75,14 +75,16 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 
 void BM_mesh_elem_toolflags_ensure(BMesh *bm)
 {
-	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool) {
+	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool&&bm->dtoolflagpool) {
 		return;
 	}
 
 	bm->vtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totvert, 512, BLI_MEMPOOL_NOP);
 	bm->etoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totedge, 512, BLI_MEMPOOL_NOP);
 	bm->ftoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totface, 512, BLI_MEMPOOL_NOP);
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	bm->dtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totdim, 512, BLI_MEMPOOL_NOP);
+#endif
 #pragma omp parallel sections if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
 	{
 #pragma omp section
@@ -1434,6 +1436,11 @@ BMFace *BM_face_at_index_find(BMesh *bm, const int index)
 	return BLI_mempool_findelem(bm->fpool, index);
 }
 
+BMDim *BM_dim_at_index_find(BMesh *bm, const int index)
+{
+	return BLI_mempool_findelem(bm->dpool, index);
+}
+
 /**
  * Use lookup table when available, else use slower find functions.
  *
@@ -1448,6 +1455,18 @@ BMVert *BM_vert_at_index_find_or_table(BMesh *bm, const int index)
 		return BM_vert_at_index_find(bm, index);
 	}
 }
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+BMDim *BM_dim_at_index_find_or_table(BMesh *bm, const int index)
+{
+	if ((bm->elem_table_dirty & BM_DIM) == 0) {
+		return (index < bm->totdim) ? bm->dtable[index] : NULL;
+	}
+	else {
+		return BM_dim_at_index_find(bm, index);
+	}
+}
+#endif
 
 BMEdge *BM_edge_at_index_find_or_table(BMesh *bm, const int index)
 {

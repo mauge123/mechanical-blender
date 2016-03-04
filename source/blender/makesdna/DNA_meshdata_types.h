@@ -67,6 +67,16 @@ typedef struct MVert {
 	char flag, bweight;
 } MVert;
 
+/* WITH_MECHANICAL_MESH_DIMENSIONS */
+typedef struct MDim {
+	unsigned int v1, v2;
+	float dpos_fact;
+	float fpos[3];
+	char flag;
+	char pad[3];
+
+} MDim;
+
 /* tessellation vertex color data.
  * at the moment alpha is abused for vertex painting and not used for transparency, note that red and blue are swapped
  */

@@ -856,6 +856,8 @@ void BM_face_edges_kill(BMesh *bm, BMFace *f)
 	}
 }
 
+
+
 /**
  * kills all verts associated with \a f, along with any other faces containing
  * those vertices
@@ -1026,6 +1028,14 @@ void BM_vert_kill(BMesh *bm, BMVert *v)
 
 	bm_kill_only_vert(bm, v);
 }
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void BM_dim_kill(BMesh *bm, BMDim *edm)
+{
+	bm_kill_only_dim(bm, edm);
+}
+
+#endif
 
 /********** private disk and radial cycle functions ********** */
 
@@ -3006,7 +3016,7 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void bm_kill_only_dim(BMesh *bm, BMDim *d)
+void bm_kill_only_dim(BMesh *bm, BMDim *d)
 {
 	bm->totdim--;
 	bm->elem_index_dirty |= BM_DIM;
@@ -3023,6 +3033,7 @@ static void bm_kill_only_dim(BMesh *bm, BMDim *d)
 	BLI_mempool_free(bm->dpool, d);
 }
 
+#endif
 
 
 /**
@@ -3034,7 +3045,9 @@ BMDim *BM_dim_create(
         BMesh *bm, BMVert *v1, BMVert *v2,
         const BMDim *d_example, const eBMCreateFlag create_flag)
 {
-	BMDim *d;
+	BMDim *edm;
+	float vect[3], no1[3], no2[3];
+
 
 	BLI_assert(v1 != v2);
 	BLI_assert(v1->head.htype == BM_VERT && v2->head.htype == BM_VERT);
@@ -3042,28 +3055,35 @@ BMDim *BM_dim_create(
 	BLI_assert(!(create_flag & 1));
 
 
-	d = BLI_mempool_alloc(bm->dpool);
+	edm = BLI_mempool_alloc(bm->dpool);
 
 
 	/* --- assign all members --- */
-	d->head.data = NULL;
+	edm->head.data = NULL;
 
 #ifdef USE_DEBUG_INDEX_MEMCHECK
 	DEBUG_MEMCHECK_INDEX_INVALIDATE(d)
 #else
-	BM_elem_index_set(d, -1); /* set_ok_invalid */
+	BM_elem_index_set(edm, -1); /* set_ok_invalid */
 #endif
 
-	d->head.htype = BM_DIM;
-	d->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
-	d->head.api_flag = 0;
+	edm->head.htype = BM_DIM;
+	edm->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
+	edm->head.api_flag = 0;
 
 	/* allocate flags */
-	d->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 
-	d->v1 = v1;
-	d->v2 = v2;
+	edm->v1 = v1;
+	edm->v2 = v2;
+	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
+	sub_v3_v3v3(vect,edm->v1->co,edm->v2->co);
+	cross_v3_v3v3(no1,vect, edm->v1->no);
+	cross_v3_v3v3(no2,no1,vect);
+	normalize_v3(no2);
+
+	set_dim_extra_data(edm, 0.5f, no2);
 
 
 	/* --- done --- */
@@ -3077,15 +3097,21 @@ BMDim *BM_dim_create(
 
 	if (!(create_flag & BM_CREATE_SKIP_CD)) {
 		if (d_example) {
-			BM_elem_attrs_copy(bm, bm, d_example, d);
+			BM_elem_attrs_copy(bm, bm, d_example, edm);
 		}
 		else {
-			CustomData_bmesh_set_default(&bm->edata, &d->head.data);
+			CustomData_bmesh_set_default(&bm->edata, &edm->head.data);
 		}
 	}
 
-	BM_CHECK_ELEMENT(d);
+	BM_CHECK_ELEMENT(edm);
 
-	return d;
+	return edm;
 }
-#endif
+
+void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) {
+	edm->dpos_fact = dpos_fact;
+	copy_v3_v3(edm->fpos, fpos);
+
+}
+

@@ -273,7 +273,7 @@ BMOpSlot *BMO_slot_get(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *identif
 	}
 
 	return &slot_args[slot_code];
-}
+ }
 
 /**
  * \brief BMESH OPSTACK COPY SLOT
@@ -1279,7 +1279,9 @@ static void bmo_flag_layer_free(BMesh *bm)
 	BLI_mempool *voldpool = bm->vtoolflagpool;
 	BLI_mempool *eoldpool = bm->etoolflagpool;
 	BLI_mempool *foldpool = bm->ftoolflagpool;
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BLI_mempool *doldpool = bm->dtoolflagpool;
+#endif
 	/* store memcpy size for reuse */
 	const size_t new_totflags_size = ((bm->totflags - 1) * sizeof(BMFlagLayer));
 
@@ -1289,7 +1291,9 @@ static void bmo_flag_layer_free(BMesh *bm)
 	bm->vtoolflagpool = BLI_mempool_create(new_totflags_size, bm->totvert, 512, BLI_MEMPOOL_NOP);
 	bm->etoolflagpool = BLI_mempool_create(new_totflags_size, bm->totedge, 512, BLI_MEMPOOL_NOP);
 	bm->ftoolflagpool = BLI_mempool_create(new_totflags_size, bm->totface, 512, BLI_MEMPOOL_NOP);
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	bm->dtoolflagpool = BLI_mempool_create(new_totflags_size, bm->totdim, 512, BLI_MEMPOOL_NOP);
+#endif
 #pragma omp parallel sections if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
 	{
 #pragma omp section
@@ -1346,8 +1350,9 @@ static void bmo_flag_layer_free(BMesh *bm)
 	BLI_mempool_destroy(voldpool);
 	BLI_mempool_destroy(eoldpool);
 	BLI_mempool_destroy(foldpool);
+	BLI_mempool_destroy(doldpool);
 
-	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE);
+	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE |BM_DIM);
 }
 
 static void bmo_flag_layer_clear(BMesh *bm)

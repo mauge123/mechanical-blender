@@ -81,7 +81,7 @@ typedef enum BMIterType {
 #endif
 } BMIterType;
 
-#define BM_ITYPE_MAX 14
+#define BM_ITYPE_MAX 15
 
 /* the iterator htype for each iterator */
 extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];

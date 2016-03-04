@@ -62,6 +62,9 @@ void BM_mesh_elem_hflag_disable_all(
 void BM_vert_select_set(BMesh *bm, BMVert *v, const bool select);
 void BM_edge_select_set(BMesh *bm, BMEdge *e, const bool select);
 void BM_face_select_set(BMesh *bm, BMFace *f, const bool select);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void BM_dim_select_set(BMesh *bm, BMDim *f, const bool select);
+#endif
 
 /* lower level functions which don't do flushing */
 void BM_edge_select_set_noflush(BMesh *bm, BMEdge *e, const bool select);

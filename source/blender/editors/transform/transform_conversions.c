@@ -108,6 +108,7 @@
 #include "ED_clip.h"
 #include "ED_mask.h"
 #include "ED_gpencil.h"
+#include "ED_dimensions.h"
 
 #include "WM_api.h"  /* for WM_event_add_notifier to deal with stabilization nodes */
 #include "WM_types.h"
@@ -2302,6 +2303,45 @@ static void VertsToTransData(TransInfo *t, TransData *td, TransDataExtension *tx
 		td->ext = tx;
 		tx->isize[0] = BM_vert_calc_shell_factor_ex(eve, no, BM_ELEM_SELECT);
 	}
+}
+
+static int createTransEditDim(TransInfo *t) {
+	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
+    BMesh *bm = em->bm;
+	BMDim *edm=get_selected_dimension(em);
+	TransData *td = NULL;
+	float mtx[3][3], smtx[3][3];
+    if (bm->totdimsel == 1) {
+
+		//Tag the dimension as being moved
+		BM_elem_flag_enable(edm, BM_ELEM_TAG);
+		float mid[3];
+		copy_m3_m4(mtx, t->obedit->obmat);
+		/* we use a pseudoinverse so that when one of the axes is scaled to 0,
+		 * matrix inversion still works and we can still moving along the other */
+		pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
+		t->total = 1; // Only 1 dimension
+		td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Dimension)");
+		td->flag = 0;
+		td->loc = edm->tpos;
+
+		get_dimension_mid(mid,edm);
+
+		copy_v3_v3(td->iloc, mid);
+		copy_v3_v3(td->center, mid);
+		td->ext = NULL;
+		td->val = NULL;
+		td->extra = NULL;
+
+		copy_m3_m3(td->smtx, smtx);
+		copy_m3_m3(td->mtx, mtx);
+
+        return 1;
+    } else {
+        // no dimension select
+        return 0;
+    }
+
 }
 
 static void createTransEditVerts(TransInfo *t)
@@ -7876,6 +7916,7 @@ void createTransData(bContext *C, TransInfo *t)
 		}
 		else if (t->obedit) {
 			createTransUVs(C, t);
+
 			if (t->data && (t->flag & T_PROP_EDIT)) {
 				sort_trans_data(t); // makes selected become first in array
 				set_prop_dist(t, 1);
@@ -7939,7 +7980,10 @@ void createTransData(bContext *C, TransInfo *t)
 	else if (t->obedit) {
 		t->ext = NULL;
 		if (t->obedit->type == OB_MESH) {
-			createTransEditVerts(t);
+    		//Dim
+    		if (!createTransEditDim (t)) {
+       			createTransEditVerts(t);
+    		}
 		}
 		else if (ELEM(t->obedit->type, OB_CURVE, OB_SURF)) {
 			createTransCurveVerts(t);
