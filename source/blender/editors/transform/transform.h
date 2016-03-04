@@ -91,12 +91,16 @@ typedef struct TransSnap {
 	char	snapNodeBorder;
 	ListBase points;
 	TransSnapPoint	*selectedPoint;
-	float	dist; // Distance from snapPoint to snapTarget
 	double	last;
 	void  (*applySnap)(struct TransInfo *, float *);
 	void  (*calcSnap)(struct TransInfo *, float *);
 	void  (*targetSnap)(struct TransInfo *);
-	/* Get the transform distance between two points (used by Closest snap) */
+	/**
+	 * Get the transform distance between two points (used by Closest snap)
+	 *
+	 * \note Return value can be anything,
+	 * where the smallest absolute value defines whats closest.
+	 */
 	float  (*distance)(struct TransInfo *, const float p1[3], const float p2[3]);
 } TransSnap;
 
@@ -354,6 +358,12 @@ typedef struct MouseInput {
 	} virtual_mval;
 } MouseInput;
 
+typedef struct TransCustomData {
+	void       *data;
+	void      (*free_cb)(struct TransInfo *, struct TransCustomData *);
+	unsigned int use_free : 1;
+} TransCustomData;
+
 typedef struct TransInfo {
 	int         mode;           /* current mode                         */
 	int	        flag;           /* generic flags for special behaviors  */
@@ -361,7 +371,6 @@ typedef struct TransInfo {
 	short		state;			/* current state (running, canceled,...)*/
 	int         options;        /* current context/options for transform                      */
 	float       val;            /* init value for some transformations (and rotation angle)  */
-	float       fac;            /* factor for distance based transform  */
 	void      (*transform)(struct TransInfo *, const int[2]);
 								/* transform function pointer           */
 	eRedrawFlag (*handleEvent)(struct TransInfo *, const struct wmEvent *);
@@ -382,7 +391,6 @@ typedef struct TransInfo {
 	float       center[3];      /* center of transformation (in local-space) */
 	float       center_global[3];  /* center of transformation (in global-space) */
 	float       center2d[2];    /* center in screen coordinates         */
-	short		event_type;		/* event->type used to invoke transform */
 	short       idx_max;		/* maximum index on the input vector	*/
 	float		snap[3];		/* Snapping Gears						*/
 	float		snap_spatial[3]; /* Spatial snapping gears(even when rotating, scaling... etc) */
@@ -405,8 +413,22 @@ typedef struct TransInfo {
 
 	struct Object *poseobj;		/* if t->flag & T_POSE, this denotes pose object */
 
-	void       *customData;		/* Per Transform custom data */
-	void  	  (*customFree)(struct TransInfo *); /* if a special free function is needed */
+	/**
+	 * Rule of thumb for choosing between mode/type:
+	 * - If transform mode uses the data, assign to `mode`
+	 *   (typically in transform.c).
+	 * - If conversion uses the data as an extension to the #TransData, assign to `type`
+	 *   (typically in transform_conversion.c).
+	 */
+	struct {
+		/* owned by the mode (grab, scale, bend... )*/
+		union {
+			TransCustomData mode, first_elem;
+		};
+		/* owned by the type (mesh, armature, nla...) */
+		TransCustomData type;
+	} custom;
+#define TRANS_CUSTOM_DATA_ELEM_MAX (sizeof(((TransInfo *)NULL)->custom) / sizeof(TransCustomData))
 
 	/*************** NEW STUFF *********************/
 	short		launch_event; 	/* event type used to launch transform */
@@ -481,7 +503,6 @@ typedef struct TransInfo {
 #define T_2D_EDIT			(1 << 15)
 #define T_CLIP_UV			(1 << 16)
 
-#define T_FREE_CUSTOMDATA	(1 << 17)
 	/* auto-ik is on */
 #define T_AUTOIK			(1 << 18)
 
@@ -757,11 +778,11 @@ int getTransformOrientation_ex(const struct bContext *C, float normal[3], float 
 int getTransformOrientation(const struct bContext *C, float normal[3], float plane[3]);
 
 void freeEdgeSlideTempFaces(EdgeSlideData *sld);
-void freeEdgeSlideVerts(TransInfo *t);
+void freeEdgeSlideVerts(TransInfo *t, TransCustomData *custom_data);
 void projectEdgeSlideData(TransInfo *t, bool is_final);
 
 void freeVertSlideTempFaces(VertSlideData *sld);
-void freeVertSlideVerts(TransInfo *t);
+void freeVertSlideVerts(TransInfo *t, TransCustomData *custom_data);
 void projectVertSlideData(TransInfo *t, bool is_final);
 
 

@@ -1102,6 +1102,14 @@ static EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSED(C), 
 	return item;
 }
 
+static void rna_SpaceProperties_context_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	SpaceButs *sbuts = (SpaceButs *)(ptr->data);
+	if (ELEM(sbuts->mainb, BCONTEXT_WORLD, BCONTEXT_MATERIAL, BCONTEXT_TEXTURE)) {
+		sbuts->preview = 1;
+	}
+}
+
 static void rna_SpaceProperties_align_set(PointerRNA *ptr, int value)
 {
 	SpaceButs *sbuts = (SpaceButs *)(ptr->data);
@@ -1227,7 +1235,7 @@ static void rna_SpaceDopeSheetEditor_action_set(PointerRNA *ptr, PointerRNA valu
 	}
 }
 
-static void rna_SpaceDopeSheetEditor_action_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
+static void rna_SpaceDopeSheetEditor_action_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	SpaceAction *saction = (SpaceAction *)(ptr->data);
 	Object *obact = (scene->basact) ? scene->basact->object : NULL;
@@ -1297,6 +1305,8 @@ static void rna_SpaceDopeSheetEditor_action_update(Main *UNUSED(bmain), Scene *s
 		
 		/* force depsgraph flush too */
 		DAG_id_tag_update(&obact->id, OB_RECALC_OB | OB_RECALC_DATA);
+		/* Update relations as well, so new time source dependency is added. */
+		DAG_relations_tag_update(bmain);
 	}
 }
 
@@ -1351,6 +1361,12 @@ static int rna_SpaceGraphEditor_has_ghost_curves_get(PointerRNA *ptr)
 {
 	SpaceIpo *sipo = (SpaceIpo *)(ptr->data);
 	return (BLI_listbase_is_empty(&sipo->ghostCurves) == false);
+}
+
+static void rna_SpaceConsole_rect_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	SpaceConsole *sc = ptr->data;
+	WM_main_add_notifier(NC_SPACE | ND_SPACE_CONSOLE | NA_EDITED, sc);
 }
 
 static void rna_Sequencer_view_type_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
@@ -2034,7 +2050,7 @@ static void rna_def_space_outliner(BlenderRNA *brna)
 		{SO_ALL_SCENES, "ALL_SCENES", 0, "All Scenes", "Display data-blocks in all scenes"},
 		{SO_CUR_SCENE, "CURRENT_SCENE", 0, "Current Scene", "Display data-blocks in current scene"},
 		{SO_VISIBLE, "VISIBLE_LAYERS", 0, "Visible Layers", "Display data-blocks in visible layers"},
-		{SO_SELECTED, "SELECTED", 0, "Selected", "Display data-blocks of selected objects"},
+		{SO_SELECTED, "SELECTED", 0, "Selected", "Display data-blocks of selected, visible objects"},
 		{SO_ACTIVE, "ACTIVE", 0, "Active", "Display data-blocks of active object"},
 		{SO_SAME_TYPE, "SAME_TYPES", 0, "Same Types",
 		               "Display data-blocks of all objects of same type as selected object"},
@@ -2634,7 +2650,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	                                  "rna_iterator_listbase_end", "rna_SpaceView3D_region_quadviews_get",
 	                                  NULL, NULL, NULL, NULL);
 	RNA_def_property_ui_text(prop, "Quad View Regions", "3D regions (the third one defines quad view settings, "
-	                                                    "the forth one is same as 'region_3d')");
+	                                                    "the fourth one is same as 'region_3d')");
 
 	prop = RNA_def_property(srna, "show_reconstruction", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_SHOW_RECONSTRUCTION);
@@ -2837,7 +2853,7 @@ static void rna_def_space_buttons(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, buttons_context_items);
 	RNA_def_property_enum_funcs(prop, NULL, "rna_SpaceProperties_context_set", "rna_SpaceProperties_context_itemf");
 	RNA_def_property_ui_text(prop, "Context", "Type of active data to display and edit");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_PROPERTIES, NULL);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_PROPERTIES, "rna_SpaceProperties_context_update");
 	
 	prop = RNA_def_property(srna, "align", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "align");
@@ -3713,7 +3729,7 @@ static void rna_def_space_console(BlenderRNA *brna)
 	RNA_def_property_int_sdna(prop, NULL, "lheight");
 	RNA_def_property_range(prop, 8, 32);
 	RNA_def_property_ui_text(prop, "Font Size", "Font size to use for displaying the text");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CONSOLE, NULL);
+	RNA_def_property_update(prop, 0, "rna_SpaceConsole_rect_update");
 
 
 	prop = RNA_def_property(srna, "select_start", PROP_INT, PROP_UNSIGNED); /* copied from text editor */

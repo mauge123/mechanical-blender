@@ -79,7 +79,6 @@ void FONT_OT_text_copy(struct wmOperatorType *ot);
 void FONT_OT_text_cut(struct wmOperatorType *ot);
 void FONT_OT_text_paste(struct wmOperatorType *ot);
 void FONT_OT_text_paste_from_file(struct wmOperatorType *ot);
-void FONT_OT_text_paste_from_clipboard(struct wmOperatorType *ot);
 
 void FONT_OT_move(struct wmOperatorType *ot);
 void FONT_OT_move_select(struct wmOperatorType *ot);
@@ -134,7 +133,7 @@ bool ED_curve_pick_vert(
 
 /* helper functions */
 void ed_editnurb_translate_flag(struct ListBase *editnurb, short flag, const float vec[3]);
-bool ed_editnurb_extrude_flag(struct EditNurb *editnurb, short flag);
+bool ed_editnurb_extrude_flag(struct EditNurb *editnurb, const short flag);
 bool ed_editnurb_spin(float viewmat[4][4], struct Object *obedit, const float axis[3], const float cent[3]);
 
 /* editcurve_select.c */

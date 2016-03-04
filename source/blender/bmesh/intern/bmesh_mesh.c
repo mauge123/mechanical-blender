@@ -160,7 +160,7 @@ BMesh *BM_mesh_create(const BMAllocTemplate *allocsize)
 	bm_mempool_init(bm, allocsize);
 
 	/* allocate one flag pool that we don't get rid of. */
-	bm->stackdepth = 1;
+	bm->toolflag_index = 0;
 	bm->totflags = 0;
 
 	CustomData_reset(&bm->vdata);
@@ -269,7 +269,7 @@ void BM_mesh_clear(BMesh *bm)
 	/* allocate the memory pools for the mesh elements */
 	bm_mempool_init(bm, &bm_mesh_allocsize_default);
 
-	bm->stackdepth = 1;
+	bm->toolflag_index = 0;
 	bm->totflags = 0;
 
 	CustomData_reset(&bm->vdata);

@@ -118,7 +118,7 @@ def line_style_shader_nodes_poll(context):
 def world_shader_nodes_poll(context):
     snode = context.space_data
     return (snode.tree_type == 'ShaderNodeTree' and
-                snode.shader_type == 'WORLD')
+            snode.shader_type == 'WORLD')
 
 
 # only show nodes working in object node trees
@@ -159,6 +159,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeNormal"),
         NodeItem("ShaderNodeMapping"),
         NodeItem("ShaderNodeVectorCurve"),
+        NodeItem("ShaderNodeVectorTransform"),
         ]),
     ShaderOldNodeCategory("SH_CONVERTOR", "Converter", items=[
         NodeItem("ShaderNodeValToRGB"),

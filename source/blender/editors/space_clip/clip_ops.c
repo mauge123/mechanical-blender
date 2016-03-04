@@ -300,8 +300,9 @@ void CLIP_OT_open(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_OPENFILE,
-	                               WM_FILESEL_RELPATH | WM_FILESEL_FILES | WM_FILESEL_DIRECTORY, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+	WM_operator_properties_filesel(
+	        ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_OPENFILE,
+	        WM_FILESEL_RELPATH | WM_FILESEL_FILES | WM_FILESEL_DIRECTORY, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 }
 
 /******************* reload clip operator *********************/
@@ -1180,7 +1181,7 @@ static unsigned char *proxy_thread_next_frame(ProxyQueue *queue, MovieClip *clip
 	return mem;
 }
 
-static void proxy_task_func(TaskPool *pool, void *task_data, int UNUSED(threadid))
+static void proxy_task_func(TaskPool * __restrict pool, void *task_data, int UNUSED(threadid))
 {
 	ProxyThread *data = (ProxyThread *)task_data;
 	ProxyQueue *queue = (ProxyQueue *)BLI_task_pool_userdata(pool);

@@ -26,6 +26,8 @@ StructMetaPropGroup = bpy_types.bpy_struct_meta_idprop
 # StructRNA = bpy_types.Struct
 
 bpy_types.BlendDataLibraries.load = _bpy._library_load
+bpy_types.BlendDataLibraries.write = _bpy._library_write
+bpy_types.BlendData.user_map = _bpy._rna_id_collection_user_map
 
 
 class Context(StructRNA):
@@ -34,8 +36,10 @@ class Context(StructRNA):
     def copy(self):
         from types import BuiltinMethodType
         new_context = {}
-        generic_attrs = (list(StructRNA.__dict__.keys()) +
-                         ["bl_rna", "rna_type", "copy"])
+        generic_attrs = (
+            *StructRNA.__dict__.keys(),
+            "bl_rna", "rna_type", "copy",
+            )
         for attr in dir(self):
             if not (attr.startswith("_") or attr in generic_attrs):
                 value = getattr(self, attr)
@@ -205,7 +209,7 @@ class _GenericBone:
     @property
     def basename(self):
         """The name of this bone before any '.' character"""
-        #return self.name.rsplit(".", 1)[0]
+        # return self.name.rsplit(".", 1)[0]
         return self.name.split(".")[0]
 
     @property

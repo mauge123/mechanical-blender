@@ -265,6 +265,16 @@ public:
 	static vector<DeviceType>& available_types();
 	static vector<DeviceInfo>& available_devices();
 	static string device_capabilities();
+
+	/* Tag devices lists for update. */
+	static void tag_update();
+
+	static void free_memory();
+private:
+	/* Indicted whether device types and devices lists were initialized. */
+	static bool need_types_update, need_devices_update;
+	static vector<DeviceType> types;
+	static vector<DeviceInfo> devices;
 };
 
 CCL_NAMESPACE_END

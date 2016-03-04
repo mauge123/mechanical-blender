@@ -83,13 +83,8 @@ CCL_NAMESPACE_BEGIN
 #define __BRANCHED_PATH__
 #define __VOLUME__
 #define __VOLUME_SCATTER__
-
-/* Experimental on GPU */
-#ifdef __KERNEL_EXPERIMENTAL__
 #define __SUBSURFACE__
 #define __CMJ__
-#endif
-
 #endif
 
 #ifdef __KERNEL_OPENCL__
@@ -223,14 +218,10 @@ typedef enum ShaderEvalType {
 	SHADER_EVAL_AO,
 	SHADER_EVAL_COMBINED,
 	SHADER_EVAL_SHADOW,
-	SHADER_EVAL_DIFFUSE_DIRECT,
-	SHADER_EVAL_GLOSSY_DIRECT,
-	SHADER_EVAL_TRANSMISSION_DIRECT,
-	SHADER_EVAL_SUBSURFACE_DIRECT,
-	SHADER_EVAL_DIFFUSE_INDIRECT,
-	SHADER_EVAL_GLOSSY_INDIRECT,
-	SHADER_EVAL_TRANSMISSION_INDIRECT,
-	SHADER_EVAL_SUBSURFACE_INDIRECT,
+	SHADER_EVAL_DIFFUSE,
+	SHADER_EVAL_GLOSSY,
+	SHADER_EVAL_TRANSMISSION,
+	SHADER_EVAL_SUBSURFACE,
 
 	/* extra */
 	SHADER_EVAL_ENVIRONMENT,
@@ -273,7 +264,9 @@ enum PathTraceDimension {
 
 enum SamplingPattern {
 	SAMPLING_PATTERN_SOBOL = 0,
-	SAMPLING_PATTERN_CMJ = 1
+	SAMPLING_PATTERN_CMJ = 1,
+
+	SAMPLING_NUM_PATTERNS,
 };
 
 /* these flags values correspond to raytypes in osl.cpp, so keep them in sync!
@@ -359,6 +352,39 @@ typedef enum PassType {
 } PassType;
 
 #define PASS_ALL (~0)
+
+typedef enum BakePassFilter {
+	BAKE_FILTER_NONE = 0,
+	BAKE_FILTER_DIRECT = (1 << 0),
+	BAKE_FILTER_INDIRECT = (1 << 1),
+	BAKE_FILTER_COLOR = (1 << 2),
+	BAKE_FILTER_DIFFUSE = (1 << 3),
+	BAKE_FILTER_GLOSSY = (1 << 4),
+	BAKE_FILTER_TRANSMISSION = (1 << 5),
+	BAKE_FILTER_SUBSURFACE = (1 << 6),
+	BAKE_FILTER_EMISSION = (1 << 7),
+	BAKE_FILTER_AO = (1 << 8),
+} BakePassFilter;
+
+typedef enum BakePassFilterCombos {
+	BAKE_FILTER_COMBINED = (
+	    BAKE_FILTER_DIRECT |
+	    BAKE_FILTER_INDIRECT |
+	    BAKE_FILTER_DIFFUSE |
+	    BAKE_FILTER_GLOSSY |
+	    BAKE_FILTER_TRANSMISSION |
+	    BAKE_FILTER_SUBSURFACE |
+	    BAKE_FILTER_EMISSION |
+	    BAKE_FILTER_AO),
+	BAKE_FILTER_DIFFUSE_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_DIFFUSE),
+	BAKE_FILTER_GLOSSY_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_GLOSSY),
+	BAKE_FILTER_TRANSMISSION_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_TRANSMISSION),
+	BAKE_FILTER_SUBSURFACE_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_SUBSURFACE),
+	BAKE_FILTER_DIFFUSE_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_DIFFUSE),
+	BAKE_FILTER_GLOSSY_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_GLOSSY),
+	BAKE_FILTER_TRANSMISSION_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_TRANSMISSION),
+	BAKE_FILTER_SUBSURFACE_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_SUBSURFACE),
+} BakePassFilterCombos;
 
 #ifdef __PASSES__
 
@@ -458,10 +484,12 @@ enum CameraType {
 /* Panorama Type */
 
 enum PanoramaType {
-	PANORAMA_EQUIRECTANGULAR,
-	PANORAMA_MIRRORBALL,
-	PANORAMA_FISHEYE_EQUIDISTANT,
-	PANORAMA_FISHEYE_EQUISOLID
+	PANORAMA_EQUIRECTANGULAR = 0,
+	PANORAMA_FISHEYE_EQUIDISTANT = 1,
+	PANORAMA_FISHEYE_EQUISOLID = 2,
+	PANORAMA_MIRRORBALL = 3,
+
+	PANORAMA_NUM_TYPES,
 };
 
 /* Differential */
@@ -618,7 +646,14 @@ typedef ccl_addr_space struct ShaderClosure {
 	float data0;
 	float data1;
 	float data2;
-	int pad1, pad2, pad3;
+
+	/* Following fields could be used to store pre-calculated
+	 * values by various BSDF closures for more effective sampling
+	 * and evaluation.
+	 */
+	float custom1;
+	float custom2;
+	float custom3;
 
 #ifdef __OSL__
 	void *prim, *pad4;
@@ -694,22 +729,93 @@ enum ShaderDataFlag {
 struct KernelGlobals;
 
 #ifdef __SPLIT_KERNEL__
-#define SD_VAR(type, what) ccl_global type *what;
-#define SD_CLOSURE_VAR(type, what, max_closure) type *what;
-#define TIDX (get_global_id(1) * get_global_size(0) + get_global_id(0))
-#define ccl_fetch(s, t) (s->t[TIDX])
-#define ccl_fetch_array(s, t, index) (&s->t[TIDX * MAX_CLOSURE + index])
+#  define SD_THREAD (get_global_id(1) * get_global_size(0) + get_global_id(0))
+#  if defined(__SPLIT_KERNEL_AOS__)
+     /* ShaderData is stored as an Array-of-Structures */
+#    define ccl_fetch(s, t) (s[SD_THREAD].t)
+#    define ccl_fetch_array(s, t, index) (&s[SD_THREAD].t[index])
+#  else
+     /* ShaderData is stored as an Structure-of-Arrays */
+#    define SD_GLOBAL_SIZE (get_global_size(0) * get_global_size(1))
+#    define SD_FIELD_SIZE(t) sizeof(((struct ShaderData*)0)->t)
+#    define SD_OFFSETOF(t) ((char*)(&((struct ShaderData*)0)->t) - (char*)0)
+#    define ccl_fetch(s, t) (((ShaderData*)((ccl_addr_space char*)s + SD_GLOBAL_SIZE * SD_OFFSETOF(t) +  SD_FIELD_SIZE(t) * SD_THREAD - SD_OFFSETOF(t)))->t)
+#    define ccl_fetch_array(s, t, index) (&ccl_fetch(s, t)[index])
+#  endif
 #else
-#define SD_VAR(type, what) type what;
-#define SD_CLOSURE_VAR(type, what, max_closure) type what[max_closure];
-#define ccl_fetch(s, t) (s->t)
-#define ccl_fetch_array(s, t, index) (&s->t[index])
+#  define ccl_fetch(s, t) (s->t)
+#  define ccl_fetch_array(s, t, index) (&s->t[index])
 #endif
 
 typedef ccl_addr_space struct ShaderData {
+	/* position */
+	float3 P;
+	/* smooth normal for shading */
+	float3 N;
+	/* true geometric normal */
+	float3 Ng;
+	/* view/incoming direction */
+	float3 I;
+	/* shader id */
+	int shader;
+	/* booleans describing shader, see ShaderDataFlag */
+	int flag;
 
-#include "kernel_shaderdata_vars.h"
+	/* primitive id if there is one, ~0 otherwise */
+	int prim;
 
+	/* combined type and curve segment for hair */
+	int type;
+
+	/* parametric coordinates
+	* - barycentric weights for triangles */
+	float u;
+	float v;
+	/* object id if there is one, ~0 otherwise */
+	int object;
+
+	/* motion blur sample time */
+	float time;
+
+	/* length of the ray being shaded */
+	float ray_length;
+
+#ifdef __RAY_DIFFERENTIALS__
+	/* differential of P. these are orthogonal to Ng, not N */
+	differential3 dP;
+	/* differential of I */
+	differential3 dI;
+	/* differential of u, v */
+	differential du;
+	differential dv;
+#endif
+#ifdef __DPDU__
+	/* differential of P w.r.t. parametric coordinates. note that dPdu is
+	* not readily suitable as a tangent for shading on triangles. */
+	float3 dPdu;
+	float3 dPdv;
+#endif
+
+#ifdef __OBJECT_MOTION__
+	/* object <-> world space transformations, cached to avoid
+	* re-interpolating them constantly for shading */
+	Transform ob_tfm;
+	Transform ob_itfm;
+#endif
+
+	/* Closure data, we store a fixed array of closures */
+	struct ShaderClosure closure[MAX_CLOSURE];
+	int num_closure;
+	float randb_closure;
+
+	/* ray start position, only set for backgrounds */
+	float3 ray_P;
+	differential3 ray_dP;
+
+#ifdef __OSL__
+	struct KernelGlobals * osl_globals;
+	struct PathState *osl_path_state;
+#endif
 } ShaderData;
 
 /* Path State */
@@ -849,6 +955,11 @@ typedef struct KernelCamera {
 	PerspectiveMotionTransform perspective_motion;
 
 	int shutter_table_offset;
+
+	/* Rolling shutter */
+	int rolling_shutter_type;
+	float rolling_shutter_duration;
+
 	int pad;
 } KernelCamera;
 

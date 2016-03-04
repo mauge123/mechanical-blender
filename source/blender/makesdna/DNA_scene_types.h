@@ -355,7 +355,10 @@ typedef struct ImageFormatData {
 	char  jp2_flag;
 	char jp2_codec;
 
-	char pad[5];
+	/* TIFF */
+	char tiff_codec;
+
+	char pad[4];
 
 	/* Multiview */
 	char views_format;
@@ -442,6 +445,14 @@ typedef struct ImageFormatData {
 /* ImageFormatData.cineon_flag */
 #define R_IMF_CINEON_FLAG_LOG (1<<0)  /* was R_CINEON_LOG */
 
+/* ImageFormatData.tiff_codec */
+enum {
+	R_IMF_TIFF_CODEC_DEFLATE   = 0,
+	R_IMF_TIFF_CODEC_LZW       = 1,
+	R_IMF_TIFF_CODEC_PACKBITS  = 2,
+	R_IMF_TIFF_CODEC_NONE      = 3,
+};
+
 typedef struct BakeData {
 	struct ImageFormatData im_format;
 
@@ -451,7 +462,7 @@ typedef struct BakeData {
 	short margin, flag;
 
 	float cage_extrusion;
-	float pad2;
+	int pass_filter;
 
 	char normal_swizzle[3];
 	char normal_space;
@@ -477,6 +488,22 @@ typedef enum BakeSaveMode {
 	R_BAKE_SAVE_INTERNAL = 0,
 	R_BAKE_SAVE_EXTERNAL = 1,
 } BakeSaveMode;
+
+/* bake->pass_filter */
+typedef enum BakePassFilter {
+	R_BAKE_PASS_FILTER_NONE           = 0,
+	R_BAKE_PASS_FILTER_AO             = (1 << 0),
+	R_BAKE_PASS_FILTER_EMIT           = (1 << 1),
+	R_BAKE_PASS_FILTER_DIFFUSE        = (1 << 2),
+	R_BAKE_PASS_FILTER_GLOSSY         = (1 << 3),
+	R_BAKE_PASS_FILTER_TRANSM         = (1 << 4),
+	R_BAKE_PASS_FILTER_SUBSURFACE     = (1 << 5),
+	R_BAKE_PASS_FILTER_DIRECT         = (1 << 6),
+	R_BAKE_PASS_FILTER_INDIRECT       = (1 << 7),
+	R_BAKE_PASS_FILTER_COLOR          = (1 << 8),
+} BakePassFilter;
+
+#define R_BAKE_PASS_FILTER_ALL (~0)
 
 /* *************************************************************** */
 /* Render Data */
@@ -773,7 +800,7 @@ typedef struct RecastData {
 
 typedef struct GameData {
 
-	/*  standalone player */
+	/* standalone player */
 	struct GameFraming framing;
 	short playerflag, xplay, yplay, freqplay;
 	short depth, attrib, rt1, rt2;
@@ -796,7 +823,7 @@ typedef struct GameData {
 
 	/*
 	 * bit 3: (gameengine): Activity culling is enabled.
-	 * bit 5: (gameengine) : enable Bullet DBVT tree for view frustrum culling
+	 * bit 5: (gameengine) : enable Bullet DBVT tree for view frustum culling
 	 */
 	int flag;
 	short mode, matmode;
@@ -1079,7 +1106,7 @@ typedef enum eGP_EditBrush_Types {
 	GP_EDITBRUSH_TYPE_PUSH      = 3,
 	GP_EDITBRUSH_TYPE_TWIST     = 4,
 	GP_EDITBRUSH_TYPE_PINCH     = 5,
-	GP_EDITBRUSH_TYPE_RANDOMISE = 6,
+	GP_EDITBRUSH_TYPE_RANDOMIZE = 6,
 	GP_EDITBRUSH_TYPE_SUBDIVIDE = 7,
 	GP_EDITBRUSH_TYPE_SIMPLIFY  = 8,
 	GP_EDITBRUSH_TYPE_CLONE     = 9,
@@ -1618,7 +1645,7 @@ typedef struct Scene {
 #define R_FREE_IMAGE		0x0100
 #define R_SINGLE_LAYER		0x0200
 #define R_EXR_TILE_FILE		0x0400
-#define R_COMP_FREE			0x0800
+/* #define R_COMP_FREE			0x0800 */
 #define R_NO_IMAGE_LOAD		0x1000
 #define R_NO_TEX			0x2000
 #define R_NO_FRAME_UPDATE	0x4000
@@ -1712,16 +1739,17 @@ extern const char *RE_engine_id_CYCLES;
 
 /* **************** SCENE ********************* */
 
+/* note that much higher maxframes give imprecise sub-frames, see: T46859 */
 /* for general use */
-#define MAXFRAME	300000
-#define MAXFRAMEF	300000.0f
+#define MAXFRAME	500000
+#define MAXFRAMEF	500000.0f
 
 #define MINFRAME	0
 #define MINFRAMEF	0.0f
 
 /* (minimum frame number for current-frame) */
-#define MINAFRAME	-300000
-#define MINAFRAMEF	-300000.0f
+#define MINAFRAME	-500000
+#define MINAFRAMEF	-500000.0f
 
 /* depricate this! */
 #define TESTBASE(v3d, base)  (                                                \

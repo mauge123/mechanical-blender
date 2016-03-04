@@ -84,7 +84,7 @@ static int gpencil_editmode_toggle_poll(bContext *C)
 	return ED_gpencil_data_get_active(C) != NULL;
 }
 
-static int gpencil_editmode_toggle_exec(bContext *C, wmOperator *op)
+static int gpencil_editmode_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	bGPdata *gpd = ED_gpencil_data_get_active(C);
 	
@@ -389,9 +389,9 @@ static int gp_strokes_paste_exec(bContext *C, wmOperator *op)
 	}
 	else if (gpl == NULL) {
 		/* no active layer - let's just create one */
-		gpl = gpencil_layer_addnew(gpd, DATA_("GP_Layer"), 1);
+		gpl = gpencil_layer_addnew(gpd, DATA_("GP_Layer"), true);
 	}
-	else if (gpl->flag & (GP_LAYER_HIDE | GP_LAYER_LOCKED)) {
+	else if (gpencil_layer_is_editable(gpl) == false) {
 		BKE_report(op->reports, RPT_ERROR, "Can not paste strokes when active layer is hidden or locked");
 		return OPERATOR_CANCELLED;
 	}
@@ -854,7 +854,7 @@ void gp_stroke_delete_tagged_points(bGPDframe *gpf, bGPDstroke *gps, bGPDstroke 
 			 * timings of these new strokes:
 			 *
 			 * Each point's timing data is a delta from stroke's inittime, so as we erase some points from
-			 * the start of the stroke, we have to offset this inittime and all remaing points' delta values.
+			 * the start of the stroke, we have to offset this inittime and all remaining points' delta values.
 			 * This way we get a new stroke with exactly the same timing as if user had started drawing from
 			 * the first non-removed point...
 			 */
@@ -1020,7 +1020,7 @@ static int gp_snap_poll(bContext *C)
 
 /* --------------------------------- */
 
-static int gp_snap_to_grid(bContext *C, wmOperator *op)
+static int gp_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
 {
 	RegionView3D *rv3d = CTX_wm_region_data(C);
 	float gridf = rv3d->gridview;
@@ -1129,7 +1129,7 @@ void GPENCIL_OT_snap_to_cursor(wmOperatorType *ot)
 
 /* ------------------------------- */
 
-static int gp_snap_cursor_to_sel(bContext *C, wmOperator *op)
+static int gp_snap_cursor_to_sel(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene = CTX_data_scene(C);
 	View3D *v3d = CTX_wm_view3d(C);
@@ -1161,7 +1161,7 @@ static int gp_snap_cursor_to_sel(bContext *C, wmOperator *op)
 	}
 	CTX_DATA_END;
 	
-	if (v3d->around == V3D_AROUND_CENTER_MEAN) {
+	if (v3d->around == V3D_AROUND_CENTER_MEAN && count) {
 		mul_v3_fl(centroid, 1.0f / (float)count);
 		copy_v3_v3(cursor, centroid);
 	}

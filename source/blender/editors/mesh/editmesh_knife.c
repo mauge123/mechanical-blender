@@ -169,10 +169,14 @@ typedef struct KnifeTool_OpData {
 
 	MemArena *arena;
 
+	/* reused for edge-net filling */
+	struct {
+		/* cleared each use */
+		GSet *edge_visit;
 #ifdef USE_NET_ISLAND_CONNECT
-	/* cleared each use */
-	MemArena *arena_edgenet;
+		MemArena *arena;
 #endif
+	} edgenet;
 
 	GHash *origvertmap;
 	GHash *origedgemap;
@@ -1046,8 +1050,6 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 		glVertex3fv(kcd->prev.cage);
 		glVertex3fv(kcd->curr.cage);
 		glEnd();
-
-		glLineWidth(1.0);
 	}
 
 	if (kcd->prev.vert) {
@@ -1076,8 +1078,6 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 		glVertex3fv(kcd->curr.edge->v1->cageco);
 		glVertex3fv(kcd->curr.edge->v2->cageco);
 		glEnd();
-
-		glLineWidth(1.0);
 	}
 	else if (kcd->curr.vert) {
 		glColor3ubv(kcd->colors.point);
@@ -1147,7 +1147,6 @@ static void knifetool_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 		}
 
 		glEnd();
-		glLineWidth(1.0);
 	}
 
 	if (kcd->totkvert > 0) {
@@ -1435,7 +1434,10 @@ static bool point_is_visible(
 			copy_v3_v3(view_clip[0], p_ofs);
 			madd_v3_v3v3fl(view_clip[1], p_ofs, view, dist);
 
-			if (clip_segment_v3_plane_n(view_clip[0], view_clip[1], kcd->vc.rv3d->clip_local, 6)) {
+			if (clip_segment_v3_plane_n(
+			        view_clip[0], view_clip[1], kcd->vc.rv3d->clip_local, 6,
+			        view_clip[0], view_clip[1]))
+			{
 				dist = len_v3v3(p_ofs, view_clip[1]);
 			}
 		}
@@ -1617,9 +1619,14 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
 	/* Now go through the candidates and find intersections */
 	/* These tolerances, in screen space, are for intermediate hits, as ends are already snapped to screen */
 
-	vert_tol = KNIFE_FLT_EPS_PX_VERT;
-	line_tol = KNIFE_FLT_EPS_PX_EDGE;
-	face_tol = KNIFE_FLT_EPS_PX_FACE;
+	if (kcd->is_interactive) {
+		vert_tol = KNIFE_FLT_EPS_PX_VERT;
+		line_tol = KNIFE_FLT_EPS_PX_EDGE;
+		face_tol = KNIFE_FLT_EPS_PX_FACE;
+	}
+	else {
+		vert_tol = line_tol = face_tol = 0.001f;
+	}
 
 	vert_tol_sq = vert_tol * vert_tol;
 	line_tol_sq = line_tol * line_tol;
@@ -1642,8 +1649,8 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
 			hit.v = v;
 
 			/* If this isn't from an existing BMVert, it may have been added to a BMEdge originally.
-				 * knowing if the hit comes from an edge is important for edge-in-face checks later on
-				 * see: #knife_add_single_cut -> #knife_verts_edge_in_face, T42611 */
+			 * knowing if the hit comes from an edge is important for edge-in-face checks later on
+			 * see: #knife_add_single_cut -> #knife_verts_edge_in_face, T42611 */
 			if (kfe_hit) {
 				hit.kfe = kfe_hit;
 			}
@@ -1880,17 +1887,7 @@ static int knife_sample_screen_density(KnifeTool_OpData *kcd, const float radius
  * surrounding mesh (in screen space)*/
 static float knife_snap_size(KnifeTool_OpData *kcd, float maxsize)
 {
-	float density;
-
-	if (kcd->is_interactive) {
-		density = (float)knife_sample_screen_density(kcd, maxsize * 2.0f);
-	}
-	else {
-		density = 1.0f;
-	}
-
-	if (density < 1.0f)
-		density = 1.0f;
+	float density = (float)knife_sample_screen_density(kcd, maxsize * 2.0f);
 
 	return min_ff(maxsize / (density * 0.5f), maxsize);
 }
@@ -1901,10 +1898,18 @@ static KnifeEdge *knife_find_closest_edge(KnifeTool_OpData *kcd, float p[3], flo
 {
 	BMFace *f;
 	float co[3], cageco[3], sco[2];
-	float maxdist = knife_snap_size(kcd, kcd->ethresh);
+	float maxdist;
 
-	if (kcd->ignore_vert_snapping)
-		maxdist *= 0.5f;
+	if (kcd->is_interactive) {
+		maxdist = knife_snap_size(kcd, kcd->ethresh);
+
+		if (kcd->ignore_vert_snapping) {
+			maxdist *= 0.5f;
+		}
+	}
+	else {
+		maxdist = KNIFE_FLT_EPS;
+	}
 
 	f = knife_find_closest_face(kcd, co, cageco, NULL);
 	*is_space = !f;
@@ -2024,10 +2029,18 @@ static KnifeVert *knife_find_closest_vert(KnifeTool_OpData *kcd, float p[3], flo
                                           bool *is_space)
 {
 	BMFace *f;
-	float co[3], cageco[3], sco[2], maxdist = knife_snap_size(kcd, kcd->vthresh);
+	float co[3], cageco[3], sco[2];
+	float maxdist;
 
-	if (kcd->ignore_vert_snapping)
-		maxdist *= 0.5f;
+	if (kcd->is_interactive) {
+		maxdist = knife_snap_size(kcd, kcd->vthresh);
+		if (kcd->ignore_vert_snapping) {
+			maxdist *= 0.5f;
+		}
+	}
+	else {
+		maxdist = KNIFE_FLT_EPS;
+	}
 
 	f = knife_find_closest_face(kcd, co, cageco, is_space);
 
@@ -2273,6 +2286,8 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd, BMFace *f, ListBase *kfe
 	 /* point to knife edges we've created edges in, edge_array aligned */
 	KnifeEdge **kfe_array = BLI_array_alloca(kfe_array, edge_array_len);
 
+	BLI_assert(BLI_gset_size(kcd->edgenet.edge_visit) == 0);
+
 	i = 0;
 	for (ref = kfedges->first; ref; ref = ref->next) {
 		bool is_new_edge = false;
@@ -2309,9 +2324,11 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd, BMFace *f, ListBase *kfe
 
 		BLI_assert(kfe->e);
 
-		kfe_array[i] = is_new_edge ? kfe : 0;
-		edge_array[i] = kfe->e;
-		i += 1;
+		if (BLI_gset_add(kcd->edgenet.edge_visit, kfe->e)) {
+			kfe_array[i] = is_new_edge ? kfe : 0;
+			edge_array[i] = kfe->e;
+			i += 1;
+		}
 	}
 
 	if (i) {
@@ -2324,7 +2341,8 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd, BMFace *f, ListBase *kfe
 		if (BM_face_split_edgenet_connect_islands(
 		        bm, f,
 		        edge_array, edge_array_len,
-		        kcd->arena_edgenet,
+		        true,
+		        kcd->edgenet.arena,
 		        &edge_array_holes, &edge_array_holes_len))
 		{
 			if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {
@@ -2358,9 +2376,11 @@ static void knife_make_face_cuts(KnifeTool_OpData *kcd, BMFace *f, ListBase *kfe
 
 
 #ifdef USE_NET_ISLAND_CONNECT
-		BLI_memarena_clear(kcd->arena_edgenet);
+		BLI_memarena_clear(kcd->edgenet.arena);
 #endif
 	}
+
+	BLI_gset_clear(kcd->edgenet.edge_visit, NULL);
 }
 
 /* Use the network of KnifeEdges and KnifeVerts accumulated to make real BMVerts and BMEdedges */
@@ -2509,8 +2529,9 @@ static void knifetool_exit_ex(bContext *C, KnifeTool_OpData *kcd)
 
 	BLI_memarena_free(kcd->arena);
 #ifdef USE_NET_ISLAND_CONNECT
-	BLI_memarena_free(kcd->arena_edgenet);
+	BLI_memarena_free(kcd->edgenet.arena);
 #endif
+	BLI_gset_free(kcd->edgenet.edge_visit, NULL);
 
 	/* tag for redraw */
 	ED_region_tag_redraw(kcd->ar);
@@ -2597,8 +2618,10 @@ static void knifetool_init(bContext *C, KnifeTool_OpData *kcd,
 
 	kcd->arena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), "knife");
 #ifdef USE_NET_ISLAND_CONNECT
-	kcd->arena_edgenet = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), __func__);
+	kcd->edgenet.arena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), __func__);
 #endif
+	kcd->edgenet.edge_visit = BLI_gset_ptr_new(__func__);
+
 	kcd->vthresh = KMAXDIST - 1;
 	kcd->ethresh = KMAXDIST;
 

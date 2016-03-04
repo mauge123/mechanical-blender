@@ -109,6 +109,7 @@ struct TransInfo;
 struct Base;
 struct Scene;
 struct Object;
+struct wmOperator;
 
 /* UNUSED */
 // int BIF_snappingSupported(struct Object *obedit);
@@ -175,7 +176,6 @@ typedef enum SnapSelect {
 } SnapSelect;
 
 #define SNAP_MIN_DISTANCE 30
-#define TRANSFORM_DIST_MAX_RAY (FLT_MAX / 2.0f)
 
 bool peelObjectsTransForm(
         struct TransInfo *t, const float mval[2], SnapSelect snap_select,
@@ -196,13 +196,13 @@ bool snapObjectsContext(
 /* taks args for all settings */
 bool snapObjectsEx(
         struct Scene *scene, struct View3D *v3d, struct ARegion *ar, struct Base *base_act, struct Object *obedit,
-        const float mval[2], SnapSelect snap_select, short snap_mode,
+        const float mval[2], SnapSelect snap_select, const short snap_mode,
         float *ray_depth,
         /* return args */
         float r_loc[3], float r_no[3], float *r_dist_px);
 bool snapObjectsRayEx(
         struct Scene *scene, struct View3D *v3d, struct ARegion *ar, struct Base *base_act, struct Object *obedit,
-        const float mval[2], SnapSelect snap_select, short snap_mode,
+        const float mval[2], SnapSelect snap_select, const short snap_mode,
         const float ray_start[3], const float ray_normal[3], float *ray_depth,
         /* return args */
         float r_loc[3], float r_no[3], float *r_dist_px, int *r_index,

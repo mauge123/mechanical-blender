@@ -803,29 +803,19 @@ static void ApplySnapTranslation(TransInfo *t, float vec[3])
 
 static void ApplySnapRotation(TransInfo *t, float *value)
 {
-	if (t->tsnap.target == SCE_SNAP_TARGET_CLOSEST) {
-		*value = t->tsnap.dist;
-	}
-	else {
-		float point[3];
-		getSnapPoint(t, point);
-		*value = RotationBetween(t, t->tsnap.snapTarget, point);
-	}
+	float point[3];
+	getSnapPoint(t, point);
+
+	float dist = RotationBetween(t, t->tsnap.snapTarget, point);
+	*value = dist;
 }
 
 static void ApplySnapResize(TransInfo *t, float vec[3])
 {
-	float dist;
+	float point[3];
+	getSnapPoint(t, point);
 
-	if (t->tsnap.target == SCE_SNAP_TARGET_CLOSEST) {
-		dist = t->tsnap.dist;
-	}
-	else {
-		float point[3];
-		getSnapPoint(t, point);
-		dist = ResizeBetween(t, t->tsnap.snapTarget, point);
-	}
-
+	float dist = ResizeBetween(t, t->tsnap.snapTarget, point);
 	copy_v3_fl(vec, dist);
 }
 
@@ -833,7 +823,7 @@ static void ApplySnapResize(TransInfo *t, float vec[3])
 
 static float TranslationBetween(TransInfo *UNUSED(t), const float p1[3], const float p2[3])
 {
-	return len_v3v3(p1, p2);
+	return len_squared_v3v3(p1, p2);
 }
 
 static float RotationBetween(TransInfo *t, const float p1[3], const float p2[3])
@@ -1167,6 +1157,7 @@ static void TargetSnapClosest(TransInfo *t)
 {
 	// Only valid if a snap point has been selected
 	if (t->tsnap.status & POINT_INIT) {
+		float dist_closest = 0.0f;
 		TransData *closest = NULL, *td = NULL;
 		
 		/* Object mode */
@@ -1189,11 +1180,11 @@ static void TargetSnapClosest(TransInfo *t)
 						dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 
 						if ((dist != TRANSFORM_DIST_INVALID) &&
-						    (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)))
+						    (closest == NULL || fabsf(dist) < fabsf(dist_closest)))
 						{
 							copy_v3_v3(t->tsnap.snapTarget, loc);
 							closest = td;
-							t->tsnap.dist = dist; 
+							dist_closest = dist;
 						}
 					}
 				}
@@ -1207,11 +1198,10 @@ static void TargetSnapClosest(TransInfo *t)
 					dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 
 					if ((dist != TRANSFORM_DIST_INVALID) &&
-					    (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)))
+					    (closest == NULL || fabsf(dist) < fabsf(dist_closest)))
 					{
 						copy_v3_v3(t->tsnap.snapTarget, loc);
 						closest = td;
-						t->tsnap.dist = dist; 
 					}
 				}
 			}
@@ -1232,11 +1222,11 @@ static void TargetSnapClosest(TransInfo *t)
 				dist = t->tsnap.distance(t, loc, t->tsnap.snapPoint);
 				
 				if ((dist != TRANSFORM_DIST_INVALID) &&
-				    (closest == NULL || fabsf(dist) < fabsf(t->tsnap.dist)))
+				    (closest == NULL || fabsf(dist) < fabsf(dist_closest)))
 				{
 					copy_v3_v3(t->tsnap.snapTarget, loc);
 					closest = td;
-					t->tsnap.dist = dist; 
+					dist_closest = dist;
 				}
 			}
 		}
@@ -1536,15 +1526,20 @@ static bool snapDerivedMesh(
         float r_loc[3], float r_no[3], float *r_dist_px, int *r_index)
 {
 	bool retval = false;
-	const bool do_ray_start_correction = (
-	        (snap_to == SCE_SNAP_MODE_FACE) &&
-	         (ar && !((RegionView3D *)ar->regiondata)->is_persp));
 	int totvert = dm->getNumVerts(dm);
 
 	if (totvert > 0) {
+		const bool do_ray_start_correction = (
+		         ELEM(snap_to, SCE_SNAP_MODE_FACE, SCE_SNAP_MODE_VERTEX) &&
+		         (ar && !((RegionView3D *)ar->regiondata)->is_persp));
+		bool need_ray_start_correction_init = do_ray_start_correction;
+
 		float imat[4][4];
 		float timat[3][3]; /* transpose inverse matrix for normals */
-		float ray_start_local[3], ray_normal_local[3], local_scale, len_diff = TRANSFORM_DIST_MAX_RAY;
+		float ray_start_local[3], ray_normal_local[3];
+		float local_scale, local_depth, len_diff;
+
+		BVHTreeFromMesh treedata = {0};
 
 		invert_m4_m4(imat, obmat);
 		transpose_m3_m4(timat, imat);
@@ -1557,6 +1552,10 @@ static bool snapDerivedMesh(
 
 		/* local scale in normal direction */
 		local_scale = normalize_v3(ray_normal_local);
+		local_depth = *ray_depth;
+		if (local_depth != BVH_RAYCAST_DIST_MAX) {
+			local_depth *= local_scale;
+		}
 
 		if (do_bb) {
 			BoundBox *bb = BKE_object_boundbox_get(ob);
@@ -1575,76 +1574,75 @@ static bool snapDerivedMesh(
 					bb = &bb_temp;
 				}
 
+				len_diff = local_depth;
 				if (!BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, &len_diff)) {
 					return retval;
 				}
+				need_ray_start_correction_init = false;
 			}
 		}
-		else if (do_ray_start_correction) {
+
+		treedata.em_evil = em;
+		treedata.em_evil_all = false;
+		switch (snap_to) {
+			case SCE_SNAP_MODE_FACE:
+				bvhtree_from_mesh_looptri(&treedata, dm, 0.0f, 4, 6);
+				break;
+			case SCE_SNAP_MODE_VERTEX:
+				bvhtree_from_mesh_verts(&treedata, dm, 0.0f, 2, 6);
+				break;
+		}
+
+		if (need_ray_start_correction_init) {
 			/* We *need* a reasonably valid len_diff in this case.
 			 * Use BHVTree to find the closest face from ray_start_local.
 			 */
-			BVHTreeFromMesh treeData;
 			BVHTreeNearest nearest;
-			len_diff = 0.0f;  /* In case BVHTree would fail for some reason... */
 
-			treeData.em_evil = em;
-			treeData.em_evil_all = false;
-			bvhtree_from_mesh_looptri(&treeData, dm, 0.0f, 2, 6);
-			if (treeData.tree != NULL) {
+			if (treedata.tree != NULL) {
 				nearest.index = -1;
 				nearest.dist_sq = FLT_MAX;
 				/* Compute and store result. */
-				BLI_bvhtree_find_nearest(treeData.tree, ray_start_local, &nearest,
-				                         treeData.nearest_callback, &treeData);
+				BLI_bvhtree_find_nearest(
+				            treedata.tree, ray_start_local, &nearest, treedata.nearest_callback, &treedata);
 				if (nearest.index != -1) {
 					len_diff = sqrtf(nearest.dist_sq);
 				}
 			}
-			free_bvhtree_from_mesh(&treeData);
+		}
+		/* Only use closer ray_start in case of ortho view! In perspective one, ray_start may already
+		 * been *inside* boundbox, leading to snap failures (see T38409).
+		 * Note also ar might be null (see T38435), in this case we assume ray_start is ok!
+		 */
+		if (do_ray_start_correction) {
+			float ray_org_local[3];
+
+			copy_v3_v3(ray_org_local, ray_origin);
+			mul_m4_v3(imat, ray_org_local);
+
+			/* We pass a temp ray_start, set from object's boundbox, to avoid precision issues with very far
+			 * away ray_start values (as returned in case of ortho view3d), see T38358.
+			 */
+			len_diff -= local_scale;  /* make temp start point a bit away from bbox hit point. */
+			madd_v3_v3v3fl(ray_start_local, ray_org_local, ray_normal_local,
+			               len_diff - len_v3v3(ray_start_local, ray_org_local));
+			local_depth -= len_diff;
+		}
+		else {
+			len_diff = 0.0f;
 		}
 
 		switch (snap_to) {
 			case SCE_SNAP_MODE_FACE:
 			{
 				BVHTreeRayHit hit;
-				BVHTreeFromMesh treeData;
-
-				/* Only use closer ray_start in case of ortho view! In perspective one, ray_start may already
-				 * been *inside* boundbox, leading to snap failures (see T38409).
-				 * Note also ar might be null (see T38435), in this case we assume ray_start is ok!
-				 */
-				if (do_ray_start_correction) {
-					float ray_org_local[3];
-
-					copy_v3_v3(ray_org_local, ray_origin);
-					mul_m4_v3(imat, ray_org_local);
-
-					/* We pass a temp ray_start, set from object's boundbox, to avoid precision issues with very far
-					 * away ray_start values (as returned in case of ortho view3d), see T38358.
-					 */
-					len_diff -= local_scale;  /* make temp start point a bit away from bbox hit point. */
-					madd_v3_v3v3fl(ray_start_local, ray_org_local, ray_normal_local,
-					               len_diff - len_v3v3(ray_start_local, ray_org_local));
-				}
-				else {
-					len_diff = 0.0f;
-				}
-
-				treeData.em_evil = em;
-				treeData.em_evil_all = false;
-				bvhtree_from_mesh_looptri(&treeData, dm, 0.0f, 4, 6);
 
 				hit.index = -1;
-				hit.dist = *ray_depth;
-				if (hit.dist != TRANSFORM_DIST_MAX_RAY) {
-					hit.dist *= local_scale;
-					hit.dist -= len_diff;
-				}
+				hit.dist = local_depth;
 
-				if (treeData.tree &&
-				    BLI_bvhtree_ray_cast(treeData.tree, ray_start_local, ray_normal_local, 0.0f,
-				                         &hit, treeData.raycast_callback, &treeData) != -1)
+				if (treedata.tree &&
+				    BLI_bvhtree_ray_cast(treedata.tree, ray_start_local, ray_normal_local, 0.0f,
+				                         &hit, treedata.raycast_callback, &treedata) != -1)
 				{
 					hit.dist += len_diff;
 					hit.dist /= local_scale;
@@ -1661,60 +1659,29 @@ static bool snapDerivedMesh(
 						retval = true;
 
 						if (r_index) {
-							*r_index = dm_looptri_to_poly_index(dm, &treeData.looptri[hit.index]);
+							*r_index = dm_looptri_to_poly_index(dm, &treedata.looptri[hit.index]);
 						}
 					}
 				}
-				free_bvhtree_from_mesh(&treeData);
 				break;
 			}
 			case SCE_SNAP_MODE_VERTEX:
 			{
-				MVert *verts = dm->getVertArray(dm);
-				const int *index_array = NULL;
-				int index = 0;
-				int i;
+				BVHTreeNearest nearest;
 
-				if (em != NULL) {
-					index_array = dm->getVertDataArray(dm, CD_ORIGINDEX);
-					BM_mesh_elem_table_ensure(em->bm, BM_VERT);
+				nearest.index = -1;
+				nearest.dist_sq = local_depth * local_depth;
+				if (treedata.tree &&
+				    BLI_bvhtree_find_nearest_to_ray(
+				        treedata.tree, ray_start_local, ray_normal_local,
+				        &nearest, NULL, NULL) != -1)
+				{
+					const MVert *v = &treedata.vert[nearest.index];
+					retval = snapVertex(
+					             ar, v->co, v->no, obmat, timat, mval,
+					             ray_start, ray_start_local, ray_normal_local, ray_depth,
+					             r_loc, r_no, r_dist_px);
 				}
-
-				for (i = 0; i < totvert; i++) {
-					BMVert *eve = NULL;
-					MVert *v = verts + i;
-					bool test = true;
-
-					if (em != NULL) {
-						if (index_array) {
-							index = index_array[i];
-						}
-						else {
-							index = i;
-						}
-						
-						if (index == ORIGINDEX_NONE) {
-							test = false;
-						}
-						else {
-							eve = BM_vert_at_index(em->bm, index);
-							
-							if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
-							    BM_elem_flag_test(eve, BM_ELEM_SELECT))
-							{
-								test = false;
-							}
-						}
-					}
-
-					if (test) {
-						retval |= snapVertex(
-						        ar, v->co, v->no, obmat, timat, mval,
-						        ray_start, ray_start_local, ray_normal_local, ray_depth,
-						        r_loc, r_no, r_dist_px);
-					}
-				}
-
 				break;
 			}
 			case SCE_SNAP_MODE_EDGE:
@@ -1769,6 +1736,8 @@ static bool snapDerivedMesh(
 				break;
 			}
 		}
+
+		free_bvhtree_from_mesh(&treedata);
 	}
 
 	return retval;
@@ -2081,7 +2050,7 @@ bool snapObjectsTransform(
         TransInfo *t, const float mval[2], SnapSelect snap_select,
         float r_loc[3], float r_no[3], float *r_dist_px)
 {
-	float ray_dist = TRANSFORM_DIST_MAX_RAY;
+	float ray_dist = BVH_RAYCAST_DIST_MAX;
 	Object *obedit = NULL;
 	Base *base_act = NULL;
 
@@ -2109,7 +2078,7 @@ bool snapObjectsContext(
 	Scene *scene = CTX_data_scene(C);
 	ARegion *ar = CTX_wm_region(C);
 	Object *obedit = CTX_data_edit_object(C);
-	float ray_dist = TRANSFORM_DIST_MAX_RAY;
+	float ray_dist = BVH_RAYCAST_DIST_MAX;
 
 	return snapObjects(
 	        scene, v3d, ar, scene->basact, obedit,
@@ -2562,7 +2531,7 @@ void snapSequenceBounds(TransInfo *t, const int mval[2])
 	float xmouse, ymouse;
 	int frame;
 	int mframe;
-	TransSeq *ts = t->customData;
+	TransSeq *ts = t->custom.type.data;
 	/* reuse increment, strictly speaking could be another snap mode, but leave as is */
 	if (!(t->modifiers & MOD_SNAP_INVERT))
 		return;

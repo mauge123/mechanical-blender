@@ -25,13 +25,16 @@
 ARGS=$( \
 getopt \
 -o s:i:t:h \
---long source:,install:,tmp:,info:,threads:,help,show-deps,no-sudo,with-all,with-opencollada,\
-ver-ocio:,ver-oiio:,ver-llvm:,ver-osl:,ver-osd:,\
-force-all,force-python,force-numpy,force-boost,force-ocio,force-openexr,force-oiio,force-llvm,force-osl,force-osd,\
+--long source:,install:,tmp:,info:,threads:,help,show-deps,no-sudo,no-confirm,with-all,with-opencollada,\
+ver-ocio:,ver-oiio:,ver-llvm:,ver-osl:,ver-osd:,ver-openvdb:,\
+force-all,force-python,force-numpy,force-boost,\
+force-ocio,force-openexr,force-oiio,force-llvm,force-osl,force-osd,force-openvdb,\
 force-ffmpeg,force-opencollada,\
-build-all,build-python,build-numpy,build-boost,build-ocio,build-openexr,build-oiio,build-llvm,build-osl,build-osd,\
+build-all,build-python,build-numpy,build-boost,\
+build-ocio,build-openexr,build-oiio,build-llvm,build-osl,build-osd,build-openvdb,\
 build-ffmpeg,build-opencollada,\
-skip-python,skip-numpy,skip-boost,skip-ocio,skip-openexr,skip-oiio,skip-llvm,skip-osl,skip-osd,\
+skip-python,skip-numpy,skip-boost,\
+skip-ocio,skip-openexr,skip-oiio,skip-llvm,skip-osl,skip-osd,skip-openvdb,\
 skip-ffmpeg,skip-opencollada \
 -- "$@" \
 )
@@ -94,6 +97,9 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
     --no-sudo
         Disable use of sudo (this script won't be able to do much though, will just print needed packages...).
 
+    --no-confirm
+        Disable any interaction with user (suitable for automated run).
+
     --with-all
         By default, a number of optional and not-so-often needed libraries are not installed.
         This option will try to install them, at the cost of potential conflicts (depending on
@@ -117,6 +123,9 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
 
     --ver-osd=<ver>
         Force version of OSD library.
+
+    --ver-openvdb=<ver>
+        Force version of OpenVDB library.
 
     Note about the --ver-foo options:
         It may not always work as expected (some libs are actually checked out from a git rev...), yet it might help
@@ -151,6 +160,9 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
 
     --build-osd
         Force the build of OpenSubdiv.
+
+    --build-openvdb
+        Force the build of OpenVDB.
 
     --build-opencollada
         Force the build of OpenCOLLADA.
@@ -198,6 +210,9 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
     --force-osd
         Force the rebuild of OpenSubdiv.
 
+    --force-openvdb
+        Force the rebuild of OpenVDB.
+
     --force-opencollada
         Force the rebuild of OpenCOLLADA.
 
@@ -237,6 +252,9 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
     --skip-osd
         Unconditionally skip OpenSubdiv installation/building.
 
+    --skip-openvdb
+        Unconditionally skip OpenVDB installation/building.
+
     --skip-opencollada
         Unconditionally skip OpenCOLLADA installation/building.
 
@@ -248,6 +266,8 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
 DO_SHOW_DEPS=false
 
 SUDO="sudo"
+
+NO_CONFIRM=false
 
 PYTHON_VERSION="3.5.1"
 PYTHON_VERSION_MIN="3.5"
@@ -261,7 +281,7 @@ NUMPY_FORCE_BUILD=false
 NUMPY_FORCE_REBUILD=false
 NUMPY_SKIP=false
 
-BOOST_VERSION="1.55.0"
+BOOST_VERSION="1.60.0"
 BOOST_VERSION_MIN="1.49"
 BOOST_FORCE_BUILD=false
 BOOST_FORCE_REBUILD=false
@@ -282,9 +302,9 @@ OPENEXR_FORCE_REBUILD=false
 OPENEXR_SKIP=false
 _with_built_openexr=false
 
-OIIO_VERSION="1.4.16"
-OIIO_VERSION_MIN="1.4.0"
-OIIO_VERSION_MAX="1.5.0"  # Not supported by current OSL...
+OIIO_VERSION="1.6.9"
+OIIO_VERSION_MIN="1.6.0"
+OIIO_VERSION_MAX="1.9.0"  # UNKNOWN currently # Not supported by current OSL...
 OIIO_FORCE_BUILD=false
 OIIO_FORCE_REBUILD=false
 OIIO_SKIP=false
@@ -297,7 +317,7 @@ LLVM_FORCE_REBUILD=false
 LLVM_SKIP=false
 
 # OSL needs to be compiled for now!
-OSL_VERSION="1.5.11"
+OSL_VERSION="1.7.1"
 OSL_VERSION_MIN=$OSL_VERSION
 OSL_FORCE_BUILD=false
 OSL_FORCE_REBUILD=false
@@ -310,14 +330,23 @@ OSD_FORCE_BUILD=false
 OSD_FORCE_REBUILD=false
 OSD_SKIP=false
 
+# OpenVDB needs to be compiled for now
+OPENVDB_BLOSC_VERSION="1.7.0"
+
+OPENVDB_VERSION="3.1.0"
+OPENVDB_VERSION_MIN=$OPENVDB_VERSION
+OPENVDB_FORCE_BUILD=false
+OPENVDB_FORCE_REBUILD=false
+OPENVDB_SKIP=false
+
 # Version??
 OPENCOLLADA_VERSION="1.3"
 OPENCOLLADA_FORCE_BUILD=true  # no package!
 OPENCOLLADA_FORCE_REBUILD=false
 OPENCOLLADA_SKIP=false
 
-FFMPEG_VERSION="2.1.5"
-FFMPEG_VERSION_MIN="2.1.5"
+FFMPEG_VERSION="2.8.4"
+FFMPEG_VERSION_MIN="2.8.4"
 FFMPEG_FORCE_BUILD=false
 FFMPEG_FORCE_REBUILD=false
 FFMPEG_SKIP=false
@@ -431,6 +460,9 @@ while true; do
       PRINT ""
       SUDO=""; shift; continue
     ;;
+    --no-confirm)
+      NO_CONFIRM=true; shift; continue
+    ;;
     --with-all)
       WITH_ALL=true; shift; continue
     ;;
@@ -462,6 +494,11 @@ while true; do
       OSD_VERSION_MIN=$OSD_VERSION
       shift; shift; continue
     ;;
+    --ver-openvdb)
+      OPENVDB_VERSION="$2"
+      OPENVDB_VERSION_MIN=$OPENVDB_VERSION
+      shift; shift; continue
+    ;;
     --build-all)
       PYTHON_FORCE_BUILD=true
       NUMPY_FORCE_BUILD=true
@@ -472,6 +509,7 @@ while true; do
       LLVM_FORCE_BUILD=true
       OSL_FORCE_BUILD=true
       OSD_FORCE_BUILD=true
+      OPENVDB_FORCE_BUILD=true
       OPENCOLLADA_FORCE_BUILD=true
       FFMPEG_FORCE_BUILD=true
       shift; continue
@@ -507,6 +545,9 @@ while true; do
     --build-osd)
       OSD_FORCE_BUILD=true; shift; continue
     ;;
+    --build-openvdb)
+      OPENVDB_FORCE_BUILD=true; shift; continue
+    ;;
     --build-opencollada)
       OPENCOLLADA_FORCE_BUILD=true; shift; continue
     ;;
@@ -523,6 +564,7 @@ while true; do
       LLVM_FORCE_REBUILD=true
       OSL_FORCE_REBUILD=true
       OSD_FORCE_REBUILD=true
+      OPENVDB_FORCE_REBUILD=true
       OPENCOLLADA_FORCE_REBUILD=true
       FFMPEG_FORCE_REBUILD=true
       shift; continue
@@ -556,6 +598,9 @@ while true; do
     --force-osd)
       OSD_FORCE_REBUILD=true; shift; continue
     ;;
+    --force-openvdb)
+      OPENVDB_FORCE_REBUILD=true; shift; continue
+    ;;
     --force-opencollada)
       OPENCOLLADA_FORCE_REBUILD=true; shift; continue
     ;;
@@ -588,7 +633,10 @@ while true; do
     ;;
     --skip-osd)
       OSD_SKIP=true; shift; continue
-    ;;    
+    ;;
+    --skip-openvdb)
+      OPENVDB_SKIP=true; shift; continue
+    ;;
     --skip-opencollada)
       OPENCOLLADA_SKIP=true; shift; continue
     ;;
@@ -622,7 +670,7 @@ NUMPY_SOURCE=( "http://sourceforge.net/projects/numpy/files/NumPy/$NUMPY_VERSION
 
 _boost_version_nodots=`echo "$BOOST_VERSION" | sed -r 's/\./_/g'`
 BOOST_SOURCE=( "http://sourceforge.net/projects/boost/files/boost/$BOOST_VERSION/boost_$_boost_version_nodots.tar.bz2/download" )
-BOOST_BUILD_MODULES="--with-system --with-filesystem --with-thread --with-regex --with-locale --with-date_time"
+BOOST_BUILD_MODULES="--with-system --with-filesystem --with-thread --with-regex --with-locale --with-date_time --with-wave"
 
 OCIO_SOURCE=( "https://github.com/imageworks/OpenColorIO/tarball/v$OCIO_VERSION" )
 
@@ -640,9 +688,9 @@ OIIO_SOURCE_REPO_UID="c9e67275a0b248ead96152f6d2221cc0c0f278a4"
 LLVM_SOURCE=( "http://llvm.org/releases/$LLVM_VERSION/llvm-$LLVM_VERSION.src.tar.gz" )
 LLVM_CLANG_SOURCE=( "http://llvm.org/releases/$LLVM_VERSION/clang-$LLVM_VERSION.src.tar.gz" "http://llvm.org/releases/$LLVM_VERSION/cfe-$LLVM_VERSION.src.tar.gz" )
 
-OSL_USE_REPO=true
-#~ OSL_SOURCE=( "https://github.com/imageworks/OpenShadingLanguage/archive/Release-$OSL_VERSION.tar.gz" )
-OSL_SOURCE=( "https://github.com/Nazg-Gul/OpenShadingLanguage/archive/Release-1.5.11.tar.gz" )
+OSL_USE_REPO=false
+OSL_SOURCE=( "https://github.com/imageworks/OpenShadingLanguage/archive/Release-$OSL_VERSION.tar.gz" )
+#~ OSL_SOURCE=( "https://github.com/Nazg-Gul/OpenShadingLanguage/archive/Release-1.5.11.tar.gz" )
 #~ OSL_SOURCE_REPO=( "https://github.com/imageworks/OpenShadingLanguage.git" )
 #~ OSL_SOURCE_REPO=( "https://github.com/mont29/OpenShadingLanguage.git" )
 #~ OSL_SOURCE_REPO_UID="85179714e1bc69cd25ecb6bb711c1a156685d395"
@@ -652,12 +700,19 @@ OSL_SOURCE_REPO_UID="7d40ff5fe8e47b030042afb92d0e955f5aa96f48"
 OSL_SOURCE_REPO_BRANCH="blender-fixes"
 
 OSD_USE_REPO=true
-# Script foo to make the version string compliant with the archive name: 
+# Script foo to make the version string compliant with the archive name:
 # ${Varname//SearchForThisChar/ReplaceWithThisChar}
 OSD_SOURCE=( "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v${OSD_VERSION//./_}.tar.gz" )
 OSD_SOURCE_REPO=( "https://github.com/PixarAnimationStudios/OpenSubdiv.git" )
 OSD_SOURCE_REPO_UID="404659fffa659da075d1c9416e4fc939139a84ee"
 OSD_SOURCE_REPO_BRANCH="dev"
+
+OPENVDB_USE_REPO=false
+OPENVDB_BLOSC_SOURCE=( "https://github.com/Blosc/c-blosc/archive/v${OPENVDB_BLOSC_VERSION}.tar.gz" )
+OPENVDB_SOURCE=( "https://github.com/dreamworksanimation/openvdb/archive/v${OPENVDB_VERSION}.tar.gz" )
+#~ OPENVDB_SOURCE_REPO=( "https:///dreamworksanimation/openvdb.git" )
+#~ OPENVDB_SOURCE_REPO_UID="404659fffa659da075d1c9416e4fc939139a84ee"
+#~ OPENVDB_SOURCE_REPO_BRANCH="dev"
 
 OPENCOLLADA_SOURCE=( "https://github.com/KhronosGroup/OpenCOLLADA.git" )
 OPENCOLLADA_REPO_UID="3335ac164e68b2512a40914b14c74db260e6ff7d"
@@ -674,7 +729,7 @@ DEPS_COMMON_INFO="\"COMMON DEPENDENCIES:
 
 Those libraries should be available as packages in all recent distributions (optional ones are [between brackets]):
 
-    * Basics of dev environment (cmake or scons, gcc, svn , git, ...).
+    * Basics of dev environment (cmake, gcc, svn , git, ...).
     * libjpeg, libpng, libtiff, [libopenjpeg], [libopenal].
     * libx11, libxcursor, libxi, libxrandr, libxinerama (and other libx... as needed).
     * libsqlite3, libbz2, libssl, libfftw3, libxml2, libtinyxml, yasm, libyaml-cpp.
@@ -698,6 +753,7 @@ You may also want to build them yourself (optional ones are [between brackets]):
     * [LLVM $LLVM_VERSION_MIN (with clang)] (from $LLVM_SOURCE, and $LLVM_CLANG_SOURCE).
     * [OpenShadingLanguage $OSL_VERSION_MIN] (from $OSL_SOURCE_REPO, branch $OSL_SOURCE_REPO_BRANCH, commit $OSL_SOURCE_REPO_UID).
     * [OpenSubDiv $OSD_VERSION_MIN] (from $OSD_SOURCE_REPO, branch $OSD_SOURCE_REPO_BRANCH, commit $OSD_SOURCE_REPO_UID).
+    * [OpenVDB $OPENVDB_VERSION_MIN] (from $OPENVDB_SOURCE), [Blosc $OPENVDB_BLOSC_VERSION] (from $OPENVDB_BLOSC_SOURCE).
     * [OpenCollada] (from $OPENCOLLADA_SOURCE, branch $OPENCOLLADA_REPO_BRANCH, commit $OPENCOLLADA_REPO_UID).\""
 
 if [ "$DO_SHOW_DEPS" = true ]; then
@@ -1034,7 +1090,7 @@ clean_Boost() {
 
 compile_Boost() {
   # To be changed each time we make edits that would modify the compiled result!
-  boost_magic=7
+  boost_magic=9
 
   _init_boost
 
@@ -1133,7 +1189,7 @@ compile_OCIO() {
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
-    fi    
+    fi
     mkdir build
     cd build
 
@@ -1229,7 +1285,7 @@ compile_ILMBASE() {
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
-    fi    
+    fi
     mkdir build
     cd build
 
@@ -1336,7 +1392,7 @@ compile_OPENEXR() {
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
-    fi    
+    fi
     mkdir build
     cd build
 
@@ -1398,7 +1454,7 @@ clean_OIIO() {
 
 compile_OIIO() {
   # To be changed each time we make edits that would modify the compiled result!
-  oiio_magic=14
+  oiio_magic=16
   _init_oiio
 
   # Clean install if needed!
@@ -1441,7 +1497,7 @@ compile_OIIO() {
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
-    fi    
+    fi
     mkdir build
     cd build
 
@@ -1451,6 +1507,7 @@ compile_OIIO() {
     cmake_d="$cmake_d -D STOP_ON_WARNING=OFF"
     cmake_d="$cmake_d -D BUILDSTATIC=OFF"
     cmake_d="$cmake_d -D LINKSTATIC=OFF"
+    cmake_d="$cmake_d -D USE_SIMD=sse2"
 
     cmake_d="$cmake_d -D ILMBASE_VERSION=$ILMBASE_VERSION"
     cmake_d="$cmake_d -D OPENEXR_VERSION=$OPENEXR_VERSION"
@@ -1464,6 +1521,7 @@ compile_OIIO() {
     # Optional tests and cmd tools
     cmake_d="$cmake_d -D USE_QT=OFF"
     cmake_d="$cmake_d -D USE_PYTHON=OFF"
+    cmake_d="$cmake_d -D USE_FFMPEG=OFF"
     cmake_d="$cmake_d -D BUILD_TESTING=OFF"
     cmake_d="$cmake_d -D OIIO_BUILD_TESTS=OFF"
     cmake_d="$cmake_d -D OIIO_BUILD_TOOLS=OFF"
@@ -1624,7 +1682,7 @@ clean_OSL() {
 
 compile_OSL() {
   # To be changed each time we make edits that would modify the compiled result!
-  osl_magic=17
+  osl_magic=20
   _init_osl
 
   # Clean install if needed!
@@ -1669,7 +1727,7 @@ compile_OSL() {
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
-    fi    
+    fi
     mkdir build
     cd build
 
@@ -1678,6 +1736,9 @@ compile_OSL() {
     cmake_d="$cmake_d -D BUILD_TESTING=OFF"
     cmake_d="$cmake_d -D STOP_ON_WARNING=OFF"
     cmake_d="$cmake_d -D BUILDSTATIC=OFF"
+    cmake_d="$cmake_d -D OSL_BUILD_PLUGINS=OFF"
+    cmake_d="$cmake_d -D OSL_BUILD_TESTS=OFF"
+    cmake_d="$cmake_d -D USE_SIMD=sse2"
 
     #~ cmake_d="$cmake_d -D ILMBASE_VERSION=$ILMBASE_VERSION"
 
@@ -1747,7 +1808,7 @@ clean_OSD() {
 
 compile_OSD() {
   # To be changed each time we make edits that would modify the compiled result!
-  osd_magic=0
+  osd_magic=1
   _init_osd
 
   # Clean install if needed!
@@ -1788,7 +1849,7 @@ compile_OSD() {
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
-    fi    
+    fi
     mkdir build
     cd build
 
@@ -1796,7 +1857,7 @@ compile_OSD() {
     cmake_d="$cmake_d -D CMAKE_INSTALL_PREFIX=$_inst"
     # ptex is only needed when nicholas bishop is ready
     cmake_d="$cmake_d -D NO_PTEX=1"
-    cmake_d="$cmake_d -D NO_CLEW=1"
+    cmake_d="$cmake_d -D NO_CLEW=1 -D NO_CUDA=1 -D NO_OPENCL=1"
     # maya plugin, docs, tutorials, regression tests and examples are not needed
     cmake_d="$cmake_d -D NO_MAYA=1 -D NO_DOC=1 -D NO_TUTORIALS=1 -D NO_REGRESSION=1 -DNO_EXAMPLES=1"
 
@@ -1824,6 +1885,193 @@ compile_OSD() {
   run_ldconfig "osd"
 }
 
+#### Build Blosc ####
+_init_blosc() {
+  _src=$SRC/c-blosc-$OPENVDB_BLOSC_VERSION
+  _git=false
+  _inst=$INST/blosc-$OPENVDB_BLOSC_VERSION
+  _inst_shortcut=$INST/blosc
+}
+
+clean_BLOSC() {
+  _init_blosc
+  _clean
+}
+
+compile_BLOSC() {
+  # To be changed each time we make edits that would modify the compiled result!
+  blosc_magic=0
+  _init_blosc
+
+  # Clean install if needed!
+  magic_compile_check blosc-$OPENVDB_BLOSC_VERSION $blosc_magic
+  if [ $? -eq 1 -o "$OPENVDB_FORCE_REBUILD" = true ]; then
+    clean_BLOSC
+    rm -rf $_inst
+  fi
+
+  if [ ! -d $_inst ]; then
+    INFO "Building Blosc-$OPENVDB_BLOSC_VERSION"
+
+    # Rebuild dependecies as well!
+    OPENVDB_FORCE_BUILD=true
+    OPENVDB_FORCE_REBUILD=true
+
+    prepare_opt
+
+    if [ ! -d $_src ]; then
+      INFO "Downloading Blosc-$OPENVDB_BLOSC_VERSION"
+      mkdir -p $SRC
+      download OPENVDB_BLOSC_SOURCE[@] $_src.tar.gz
+
+      INFO "Unpacking Blosc-$OPENVDB_BLOSC_VERSION"
+      tar -C $SRC -xf $_src.tar.gz
+    fi
+
+    cd $_src
+    # Always refresh the whole build!
+    if [ -d build ]; then
+      rm -rf build
+    fi
+    mkdir build
+    cd build
+
+    cmake_d="-D CMAKE_BUILD_TYPE=Release"
+    cmake_d="$cmake_d -D CMAKE_INSTALL_PREFIX=$_inst"
+    cmake_d="$cmake_d -D BUILD_STATIC=OFF"
+    cmake_d="$cmake_d -D BUILD_TESTS=OFF"
+    cmake_d="$cmake_d -D BUILD_BENCHMARKS=OFF"
+    INFO "$cmake_d"
+
+    cmake $cmake_d ..
+
+    make -j$THREADS && make install
+
+    make clean
+
+    if [ -d $_inst ]; then
+      _create_inst_shortcut
+    else
+      ERROR "Blosc-$OPENVDB_BLOSC_VERSION failed to compile, exiting"
+      exit 1
+    fi
+    cd $CWD
+    INFO "Done compiling Blosc-$OPENVDB_BLOSC_VERSION!"
+  else
+    INFO "Own Blosc-$OPENVDB_BLOSC_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib (and openexr), use the --force-openvdb option."
+  fi
+
+  magic_compile_set blosc-$OPENVDB_BLOSC_VERSION $blosc_magic
+
+  run_ldconfig "blosc"
+}
+
+#### Build OpenVDB ####
+_init_openvdb() {
+  _src=$SRC/openvdb-$OPENVDB_VERSION
+  _git=false
+  _inst=$INST/openvdb-$OPENVDB_VERSION
+  _inst_shortcut=$INST/openvdb
+}
+
+clean_OPENVDB() {
+  _init_openvdb
+  _clean
+}
+
+compile_OPENVDB() {
+  compile_BLOSC
+  PRINT ""
+
+  # To be changed each time we make edits that would modify the compiled result!
+  openvdb_magic=0
+  _init_openvdb
+
+  # Clean install if needed!
+  magic_compile_check openvdb-$OPENVDB_VERSION $openvdb_magic
+  if [ $? -eq 1 -o "$OPENVDB_FORCE_REBUILD" = true ]; then
+    clean_OPENVDB
+  fi
+
+  if [ ! -d $_inst ]; then
+    INFO "Building OpenVDB-$OPENVDB_VERSION"
+
+    prepare_opt
+
+    if [ ! -d $_src -o true ]; then
+      mkdir -p $SRC
+      download OPENVDB_SOURCE[@] "$_src.tar.gz"
+
+      INFO "Unpacking OpenVDB-$OPENVDB_VERSION"
+      #~ tar -C $SRC --transform "s,(.*/?)OpenShadingLanguage-[^/]*(.*),\1OpenShadingLanguage-$OPENVDB_VERSION\2,x" \
+          #~ -xf $_src.tar.gz
+      tar -C $SRC -xf $_src.tar.gz
+    fi
+
+    cd $_src
+
+    #~ if [ "$OPENVDB_USE_REPO" = true ]; then
+      #~ git remote set-url origin ${OPENVDB_SOURCE_REPO[0]}
+      #~ # XXX For now, always update from latest repo...
+      #~ git pull --no-edit -X theirs origin $OPENVDB_SOURCE_REPO_BRANCH
+      #~ # Stick to same rev as windows' libs...
+      #~ git checkout $OPENVDB_SOURCE_REPO_UID
+      #~ git reset --hard
+    #~ fi
+
+    cd openvdb  # Grrrrrr...
+
+    # Always refresh the whole build!
+    if [ -d build ]; then
+      rm -rf build
+    fi
+    mkdir build
+    cd build
+
+    make_d="DESTDIR=$_inst"
+
+    if [ -d $INST/boost ]; then
+      make_d="$make_d -D BOOST_ROOT=$INST/boost -D Boost_NO_SYSTEM_PATHS=ON"
+    fi
+
+    #~ if [ "$_with_built_openexr" = true ]; then
+      #~ cmake_d="$cmake_d -D ILMBASE_HOME=$INST/openexr"
+      #~ cmake_d="$cmake_d -D OPENEXR_HOME=$INST/openexr"
+      #~ INFO "ILMBASE_HOME=$INST/openexr"
+    #~ fi
+
+    #~ cmake_d="-D CMAKE_BUILD_TYPE=Release"
+    #~ cmake_d="$cmake_d -D CMAKE_INSTALL_PREFIX=$_inst"
+    #~ # ptex is only needed when nicholas bishop is ready
+    #~ cmake_d="$cmake_d -D NO_PTEX=1"
+    #~ cmake_d="$cmake_d -D NO_CLEW=1"
+    #~ # maya plugin, docs, tutorials, regression tests and examples are not needed
+    #~ cmake_d="$cmake_d -D NO_MAYA=1 -D NO_DOC=1 -D NO_TUTORIALS=1 -D NO_REGRESSION=1 -DNO_EXAMPLES=1"
+
+    #~ cmake $cmake_d ..
+
+    #~ make -j$THREADS && make install
+    #~ make clean
+
+    #~ if [ -d $_inst ]; then
+      #~ _create_inst_shortcut
+    #~ else
+      #~ ERROR "OpenSubdiv-$OSD_VERSION failed to compile, exiting"
+      #~ exit 1
+    #~ fi
+
+    #~ magic_compile_set osd-$OSD_VERSION $osd_magic
+
+    cd $CWD
+    INFO "Done compiling OpenVDB-$OPENVDB_VERSION!"
+  else
+    INFO "Own OpenVDB-$OPENVDB_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, use the --force-openvdb option."
+  fi
+
+  run_ldconfig "openvdb"
+}
 
 #### Build OpenCOLLADA ####
 _init_opencollada() {
@@ -1919,7 +2167,7 @@ clean_FFmpeg() {
 
 compile_FFmpeg() {
   # To be changed each time we make edits that would modify the compiled result!
-  ffmpeg_magic=3
+  ffmpeg_magic=4
   _init_ffmpeg
 
   # Clean install if needed!
@@ -1985,6 +2233,7 @@ compile_FFmpeg() {
         --disable-vaapi --disable-libfaac --disable-nonfree --enable-gpl \
         --disable-postproc --disable-librtmp --disable-libopencore-amrnb \
         --disable-libopencore-amrwb --disable-libdc1394 --disable-version3 --disable-outdev=sdl \
+        --disable-libxcb \
         --disable-outdev=xv \
         --disable-outdev=alsa --disable-indev=sdl --disable-indev=alsa --disable-indev=jack \
         --disable-indev=lavfi $extra
@@ -2087,8 +2336,10 @@ install_DEB() {
   PRINT "`eval _echo "$COMMON_INFO"`"
   PRINT ""
 
-  read -p "Do you want to continue (Y/n)?"
-  [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  if [ "$NO_CONFIRM" = false ]; then
+    read -p "Do you want to continue (Y/n)?"
+    [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  fi
 
   if [ ! -z "`cat /etc/debian_version | grep ^6`"  ]; then
     if [ -z "`cat /etc/apt/sources.list | grep backports.debian.org`"  ]; then
@@ -2126,7 +2377,7 @@ install_DEB() {
   OGG_DEV="libogg-dev"
   THEORA_DEV="libtheora-dev"
 
-  _packages="gawk cmake cmake-curses-gui scons build-essential libjpeg-dev libpng-dev \
+  _packages="gawk cmake cmake-curses-gui build-essential libjpeg-dev libpng-dev \
              libfreetype6-dev libx11-dev \
              libxcursor-dev libxi-dev wget libsqlite3-dev libxrandr-dev libxinerama-dev \
              libbz2-dev libncurses5-dev libssl-dev liblzma-dev libreadline-dev $OPENJPEG_DEV \
@@ -2534,7 +2785,7 @@ get_package_version_RPM() {
     yum info $1 | grep Version | tail -n 1 | sed -r 's/.*:\s+(([0-9]+\.?)+).*/\1/'
   elif [ "$RPM" = "SUSE" ]; then
     zypper info $1 | grep Version | tail -n 1 | sed -r 's/.*:\s+(([0-9]+\.?)+).*/\1/'
-  fi  
+  fi
 }
 
 check_package_RPM() {
@@ -2618,8 +2869,10 @@ install_RPM() {
   PRINT "`eval _echo "$COMMON_INFO"`"
   PRINT ""
 
-  read -p "Do you want to continue (Y/n)?"
-  [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  if [ "$NO_CONFIRM" = false ]; then
+    read -p "Do you want to continue (Y/n)?"
+    [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  fi
 
   # Enable non-free repositories for all flavours
   if [ ! $SUDO ]; then
@@ -2685,7 +2938,7 @@ install_RPM() {
   OGG_DEV="libogg-devel"
   THEORA_DEV="libtheora-devel"
 
-  _packages="gcc gcc-c++ git make cmake scons libtiff-devel libjpeg-devel\
+  _packages="gcc gcc-c++ git make cmake libtiff-devel libjpeg-devel\
              libpng-devel libX11-devel libXi-devel libXcursor-devel libXrandr-devel libXinerama-devel \
              wget ncurses-devel readline-devel $OPENJPEG_DEV openal-soft-devel \
              glew-devel yasm $THEORA_DEV $VORBIS_DEV $OGG_DEV patch \
@@ -2773,7 +3026,7 @@ install_RPM() {
   SNDFILE_DEV="libsndfile-devel"
   check_package_RPM $SNDFILE_DEV
   if [ $? -eq 0 ]; then
-    install_packages_RMP $SNDFILE_DEV
+    install_packages_RPM $SNDFILE_DEV
   fi
 
   if [ "$WITH_ALL" = true ]; then
@@ -2836,7 +3089,7 @@ install_RPM() {
     INFO "Forced Boost building, as requested..."
     compile_Boost
   else
-    check_package_version_ge_RPM boost-devel $BOOST_VERSION
+    check_package_version_ge_RPM boost-devel $BOOST_VERSION_MIN
     if [ $? -eq 0 ]; then
       install_packages_RPM boost-devel
       clean_Boost
@@ -3093,8 +3346,10 @@ install_ARCH() {
   PRINT "`eval _echo "$COMMON_INFO"`"
   PRINT ""
 
-  read -p "Do you want to continue (Y/n)?"
-  [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  if [ "$NO_CONFIRM" = false ]; then
+    read -p "Do you want to continue (Y/n)?"
+    [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  fi
 
   # Check for sudo...
   if [ $SUDO ]; then
@@ -3121,7 +3376,7 @@ install_ARCH() {
   OGG_DEV="libogg"
   THEORA_DEV="libtheora"
 
-  _packages="base-devel git scons cmake \
+  _packages="base-devel git cmake \
              libxi libxcursor libxrandr libxinerama glew libpng libtiff wget openal \
              $OPENJPEG_DEV $VORBIS_DEV $OGG_DEV $THEORA_DEV yasm sdl fftw \
              libxml2 yaml-cpp tinyxml"
@@ -3352,7 +3607,7 @@ install_ARCH() {
 
   if [ "$_do_compile_osl" = true ]; then
     if [ "$have_llvm" = true ]; then
-      #XXX Note: will fail to build with LLVM 3.2! 
+      #XXX Note: will fail to build with LLVM 3.2!
       install_packages_ARCH intel-tbb
       PRINT ""
       compile_OSL
@@ -3450,8 +3705,10 @@ install_OTHER() {
   PRINT "`eval _echo "$DEPS_SPECIFIC_INFO"`"
   PRINT ""
 
-  read -p "Do you want to continue (Y/n)?"
-  [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  if [ "$NO_CONFIRM" = false ]; then
+    read -p "Do you want to continue (Y/n)?"
+    [ "$(echo ${REPLY:=Y} | tr [:upper:] [:lower:])" != "y" ] && exit
+  fi
 
   PRINT ""
   _do_compile_python=false
@@ -3683,15 +3940,17 @@ print_info() {
   PRINT ""
   PRINT "If you're using CMake add this to your configuration flags:"
 
-  _buildargs=""
+  _buildargs="-U *SNDFILE* -U *PYTHON* -U *BOOST* -U *Boost*"
+  _buildargs="$_buildargs -U *OPENCOLORIO* -U *OPENEXR* -U *OPENIMAGEIO* -U *LLVM* -U *CYCLES*"
+  _buildargs="$_buildargs -U *OPENSUBDIV* -U *COLLADA* -U *FFMPEG*"
 
   _1="-D WITH_CODEC_SNDFILE=ON"
   PRINT "  $_1"
-  _buildargs="$_buildargs -U *SNDFILE* $_1"
+  _buildargs="$_buildargs $_1"
 
   _1="-D PYTHON_VERSION=$PYTHON_VERSION_MIN"
   PRINT "  $_1"
-  _buildargs="$_buildargs -U *PYTHON* $_1"
+  _buildargs="$_buildargs $_1"
   if [ -d $INST/python-$PYTHON_VERSION_MIN ]; then
     _1="-D PYTHON_ROOT_DIR=$INST/python-$PYTHON_VERSION_MIN"
     PRINT "  $_1"
@@ -3703,25 +3962,29 @@ print_info() {
     _2="-D Boost_NO_SYSTEM_PATHS=ON"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *BOOST* -U *Boost* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ -d $INST/ocio ]; then
-    _1="-D OPENCOLORIO_ROOT_DIR=$INST/ocio"
+    _1="-D WITH_OPENCOLORIO=ON"
+    _2="-D OPENCOLORIO_ROOT_DIR=$INST/ocio"
     PRINT "  $_1"
-    _buildargs="$_buildargs -U *OPENCOLORIO* $_1"
+    PRINT "  $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ -d $INST/openexr ]; then
     _1="-D OPENEXR_ROOT_DIR=$INST/openexr"
     PRINT "  $_1"
-    _buildargs="$_buildargs -U *OPENEXR* $_1"
+    _buildargs="$_buildargs $_1"
   fi
 
   if [ -d $INST/oiio ]; then
-    _1="-D OPENIMAGEIO_ROOT_DIR=$INST/oiio"
+    _1="-D WITH_OPENIMAGEIO=ON"
+    _2="-D OPENIMAGEIO_ROOT_DIR=$INST/oiio"
     PRINT "  $_1"
-    _buildargs="$_buildargs -U *OPENIMAGEIO* $_1"
+    PRINT "  $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ "$OSL_SKIP" = false ]; then
@@ -3731,7 +3994,7 @@ print_info() {
     PRINT "  $_1"
     PRINT "  $_2"
     PRINT "  $_3"
-    _buildargs="$_buildargs -U *LLVM* -U *CYCLES* $_1 $_2 $_3"
+    _buildargs="$_buildargs $_1 $_2 $_3"
     if [ -d $INST/osl ]; then
       _1="-D CYCLES_OSL=$INST/osl"
       PRINT "  $_1"
@@ -3757,21 +4020,21 @@ print_info() {
     _2="-D OPENSUBDIV_ROOT_DIR=$INST/osd"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *OPENSUBDIV* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ "$WITH_OPENCOLLADA" = true ]; then
     _1="-D WITH_OPENCOLLADA=ON"
     PRINT "  $_1"
-    _buildargs="$_buildargs -U *COLLADA* $_1"
+    _buildargs="$_buildargs $_1"
   fi
 
   if [ "$FFMPEG_SKIP" = false ]; then
     _1="-D WITH_CODEC_FFMPEG=ON"
-    _2="-D FFMPEG_LIBRARIES='avformat;avcodec;avutil;avdevice;swscale;rt;`print_info_ffmpeglink`'"
+    _2="-D FFMPEG_LIBRARIES='avformat;avcodec;avutil;avdevice;swscale;swresample;lzma;rt;`print_info_ffmpeglink`'"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *FFMPEG* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
     if [ -d $INST/ffmpeg ]; then
       _1="-D FFMPEG=$INST/ffmpeg"
       PRINT "  $_1"
@@ -3782,92 +4045,6 @@ print_info() {
   PRINT ""
   PRINT "Or even simpler, just run (in your blender-source dir):"
   PRINT "  make -j$THREADS BUILD_CMAKE_ARGS=\"$_buildargs\""
-
-  PRINT ""
-  PRINT "If you're using SCons add this to your user-config:"
-
-  PRINT "WITH_BF_SNDFILE = True"
-
-  PRINT "BF_PYTHON_VERSION = '$PYTHON_VERSION_MIN'"
-  if [ -d $INST/python-$PYTHON_VERSION_MIN ]; then
-    PRINT "BF_PYTHON = '$INST/python-$PYTHON_VERSION_MIN'"
-    PRINT "BF_PYTHON_ABI_FLAGS = 'm'"
-  fi
-
-  if [ "$OCIO_SKIP" = false ]; then
-    PRINT "WITH_BF_OCIO = True"
-    if [ -d $INST/ocio ]; then
-      PRINT "BF_OCIO = '$INST/ocio'"
-    fi
-  fi
-
-  if [ -d $INST/openexr ]; then
-    PRINT "BF_OPENEXR = '$INST/openexr'"
-
-    _ilm_libs_ext=""
-    #~ version_ge $OPENEXR_VERSION "2.1.0"
-    #~ if [ $? -eq 0 ]; then
-      #~ _ilm_libs_ext=`echo $OPENEXR_VERSION | sed -r 's/([0-9]+)\.([0-9]+).*/-\1_\2/'`
-    #~ fi
-    PRINT "BF_OPENEXR_LIB = 'Half IlmImf$_ilm_libs_ext Iex$_ilm_libs_ext Imath$_ilm_libs_ext '"
-    # BF_OPENEXR_LIB does not work, things like '-lIlmImf-2_1' do not suit ld.
-    # For now, hack around!!!
-    PRINT "BF_OPENEXR_LIB_STATIC = '\${BF_OPENEXR}/lib/libHalf.so \${BF_OPENEXR}/lib/libIlmImf$_ilm_libs_ext.so \${BF_OPENEXR}/lib/libIex$_ilm_libs_ext.so \${BF_OPENEXR}/lib/libImath$_ilm_libs_ext.so \${BF_OPENEXR}/lib/libIlmThread$_ilm_libs_ext.so'"
-    PRINT "WITH_BF_STATICOPENEXR = True"
-  fi
-
-  if [ "$OIIO_SKIP" = false ]; then
-    PRINT "WITH_BF_OIIO = True"
-    if [ -d $INST/oiio ]; then
-      PRINT "BF_OIIO = '$INST/oiio'"
-    fi
-  fi
-
-  PRINT "WITH_BF_CYCLES = True"
-
-  if [ -d $INST/osl ]; then
-    PRINT "BF_OSL = '$INST/osl'"
-  fi
-
-  if [ "$OSD_SKIP" = false ]; then
-    PRINT "WITH_BF_OPENSUBDIV = True"
-    if [ -d $INST/osd ]; then
-      PRINT "BF_OPENSUBDIV = '$INST/osd'"
-    fi
-  fi
-
-  if [ "$BOOST_SKIP" = false ]; then
-    PRINT "WITH_BF_BOOST = True"
-    if [ -d $INST/boost ]; then
-      PRINT "BF_BOOST = '$INST/boost'"
-    fi
-  fi
-
-  if [ "$WITH_OPENCOLLADA" = true ]; then
-    PRINT "WITH_BF_COLLADA = True"
-    if [ -d $INST/opencollada ]; then
-      PRINT "BF_OPENCOLLADA = '$INST/opencollada'"
-    fi
-  fi
-
-  if [ "$FFMPEG_SKIP" = false ]; then
-    _ffmpeg_list_sep=" "
-    if [ -d $INST/ffmpeg ]; then
-      PRINT "BF_FFMPEG = '$INST/ffmpeg'"
-    fi
-    PRINT "BF_FFMPEG_LIB = 'avformat avcodec swscale avutil avdevice `print_info_ffmpeglink`'"
-  fi
-
-  if [ "$WITH_ALL" = false ]; then
-    PRINT "WITH_BF_3DMOUSE = False"
-  # No libspacenav in official arch repos...
-  elif [ "$DISTRO" = "ARCH" ]; then
-    PRINT "WITH_BF_3DMOUSE = False"
-  fi
-
-  if [ "$WITH_OPENCOLLADA" = true ]; then
-    PRINT "LLIBS = [\""xml2"\", \""expat"\"] + LLIBS"
-  fi
 }
 
 #### "Main" ####

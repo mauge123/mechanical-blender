@@ -264,14 +264,10 @@ static void face_edges_split(
 		if (BM_face_split_edgenet_connect_islands(
 		        bm, f,
 		        edge_arr, edge_arr_len,
+		        false,
 		        mem_arena_edgenet,
 		        &edge_arr_holes, &edge_arr_holes_len))
 		{
-			/* newly created wire edges need to be tagged */
-			for (i = edge_arr_len; i < edge_arr_holes_len; i++) {
-				BM_elem_flag_enable(edge_arr_holes[i], BM_ELEM_TAG);
-			}
-
 			edge_arr_len = edge_arr_holes_len;
 			edge_arr = edge_arr_holes;  /* owned by the arena */
 		}
@@ -349,7 +345,7 @@ static enum ISectType intersect_line_tri(
 
 	/* check ray isn't planar with tri */
 	if (fabsf(dot_v3v3(p_dir, t_nor)) >= e->eps) {
-		if (isect_line_tri_epsilon_v3(p0, p1, t_cos[0], t_cos[1], t_cos[2], &fac, NULL, 0.0f)) {
+		if (isect_line_segment_tri_epsilon_v3(p0, p1, t_cos[0], t_cos[1], t_cos[2], &fac, NULL, 0.0f)) {
 			if ((fac >= e->eps_margin) && (fac <= 1.0f - e->eps_margin)) {
 				interp_v3_v3v3(r_ix, p0, p1, fac);
 				if (min_fff(len_squared_v3v3(t_cos[0], r_ix),
@@ -903,7 +899,7 @@ static int isect_bvhtree_point_v3(
 	 * keeps calling the intersect callback.
 	 */
 	hit.index = -1;
-	hit.dist = FLT_MAX;
+	hit.dist = BVH_RAYCAST_DIST_MAX;
 
 	BLI_bvhtree_ray_cast(tree,
 	                     co, dir,
@@ -968,8 +964,10 @@ bool BM_mesh_intersect(
         const float eps)
 {
 	struct ISectState s;
-	bool has_isect;
 	const int totface_orig = bm->totface;
+
+	/* use to check if we made any changes */
+	bool has_edit_isect = false, has_edit_boolean = false;
 
 	/* needed for boolean, since cutting up faces moves the loops within the face */
 	const float **looptri_coords = NULL;
@@ -1608,6 +1606,8 @@ bool BM_mesh_intersect(
 					BM_face_normal_flip(bm, ftable[groups_array[fg]]);
 				}
 			}
+
+			has_edit_boolean |= (do_flip || do_remove);
 		}
 
 		MEM_freeN(groups_array);
@@ -1664,7 +1664,7 @@ bool BM_mesh_intersect(
 		}
 	}
 
-	has_isect = (BLI_ghash_size(s.face_edges) != 0);
+	has_edit_isect = (BLI_ghash_size(s.face_edges) != 0);
 
 	/* cleanup */
 	BLI_ghash_free(s.edgetri_cache, NULL, NULL);
@@ -1675,5 +1675,5 @@ bool BM_mesh_intersect(
 
 	BLI_memarena_free(s.mem_arena);
 
-	return has_isect || (totface_orig != bm->totface);
+	return (has_edit_isect || has_edit_boolean);
 }

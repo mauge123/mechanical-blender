@@ -500,7 +500,7 @@ void BKE_mesh_init(Mesh *me)
 	BLI_assert(MEMCMP_STRUCT_OFS_IS_ZERO(me, id));
 
 	me->size[0] = me->size[1] = me->size[2] = 1.0;
-	me->smoothresh = 30;
+	me->smoothresh = DEG2RADF(30);
 	me->texflag = ME_AUTOSPACE;
 
 	/* disable because its slow on many GPU's, see [#37518] */
@@ -999,7 +999,7 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 			SWAP(unsigned int, mface->v2, mface->v3);
 
 			if (fdata)
-				CustomData_swap(fdata, mfindex, corner_indices);
+				CustomData_swap_corners(fdata, mfindex, corner_indices);
 		}
 	}
 	else if (nr == 4) {
@@ -1010,7 +1010,7 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 			SWAP(unsigned int, mface->v2, mface->v4);
 
 			if (fdata)
-				CustomData_swap(fdata, mfindex, corner_indices);
+				CustomData_swap_corners(fdata, mfindex, corner_indices);
 		}
 	}
 

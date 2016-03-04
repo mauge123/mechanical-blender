@@ -503,7 +503,8 @@ enum {
 };
 
 enum {
-	CMP_NODEFLAG_BLUR_VARIABLE_SIZE = (1 << 0)
+	CMP_NODEFLAG_BLUR_VARIABLE_SIZE = (1 << 0),
+	CMP_NODEFLAG_BLUR_EXTEND_BOUNDS = (1 << 1),
 };
 
 typedef struct NodeFrame {
@@ -778,7 +779,7 @@ typedef struct NodeTexMusgrave {
 typedef struct NodeTexWave {
 	NodeTexBase base;
 	int wave_type;
-	int pad;
+	int wave_profile;
 } NodeTexWave;
 
 typedef struct NodeTexMagic {
@@ -972,6 +973,9 @@ typedef struct NodeSunBeams {
 #define SHD_WAVE_BANDS		0
 #define SHD_WAVE_RINGS		1
 
+#define SHD_WAVE_PROFILE_SIN	0
+#define SHD_WAVE_PROFILE_SAW	1
+
 /* sky texture */
 #define SHD_SKY_OLD		0
 #define SHD_SKY_NEW		1
@@ -1053,6 +1057,7 @@ enum {
 #endif
 	SHD_SUBSURFACE_CUBIC			= 1,
 	SHD_SUBSURFACE_GAUSSIAN			= 2,
+	SHD_SUBSURFACE_BURLEY			= 3,
 };
 
 /* blur node */

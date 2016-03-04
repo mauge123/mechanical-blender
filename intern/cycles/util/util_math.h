@@ -24,10 +24,6 @@
 
 #ifndef __KERNEL_OPENCL__
 
-#ifdef _MSC_VER
-#  define _USE_MATH_DEFINES
-#endif
-
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -935,6 +931,37 @@ ccl_device_inline float4 reduce_add(const float4& a)
 ccl_device_inline void print_float4(const char *label, const float4& a)
 {
 	printf("%s: %.8f %.8f %.8f %.8f\n", label, (double)a.x, (double)a.y, (double)a.z, (double)a.w);
+}
+
+#endif
+
+/* Int2 */
+
+#ifndef __KERNEL_OPENCL__
+
+ccl_device_inline int2 operator+(const int2 &a, const int2 &b)
+{
+	return make_int2(a.x + b.x, a.y + b.y);
+}
+
+ccl_device_inline int2 operator+=(int2 &a, const int2 &b)
+{
+	return a = a + b;
+}
+
+ccl_device_inline int2 operator-(const int2 &a, const int2 &b)
+{
+	return make_int2(a.x - b.x, a.y - b.y);
+}
+
+ccl_device_inline int2 operator*(const int2 &a, const int2 &b)
+{
+	return make_int2(a.x * b.x, a.y * b.y);
+}
+
+ccl_device_inline int2 operator/(const int2 &a, const int2 &b)
+{
+	return make_int2(a.x / b.x, a.y / b.y);
 }
 
 #endif

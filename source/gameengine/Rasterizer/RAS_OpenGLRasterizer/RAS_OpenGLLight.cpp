@@ -177,6 +177,26 @@ bool RAS_OpenGLLight::HasShadowBuffer()
 		return false;
 }
 
+int RAS_OpenGLLight::GetShadowBindCode()
+{
+	GPULamp *lamp;
+	
+	if ((lamp = GetGPULamp()))
+		return GPU_lamp_shadow_bind_code(lamp);
+	return -1;
+}
+
+MT_Matrix4x4 RAS_OpenGLLight::GetShadowMatrix()
+{
+	GPULamp *lamp;
+
+	if ((lamp = GetGPULamp()))
+		return MT_Matrix4x4(GPU_lamp_dynpersmat(lamp));
+	MT_Matrix4x4 mat;
+	mat.setIdentity();
+	return mat;
+}
+
 int RAS_OpenGLLight::GetShadowLayer()
 {
 	GPULamp *lamp;
@@ -267,8 +287,8 @@ void RAS_OpenGLLight::Update()
 		for (int i=0; i<4; i++)
 			for (int j=0; j<4; j++, dobmat++)
 				obmat[i][j] = (float)*dobmat;
-
-		GPU_lamp_update(lamp, m_layer, 0, obmat);
+		int hide = kxlight->GetVisible() ? 0 : 1;
+		GPU_lamp_update(lamp, m_layer, hide, obmat);
 		GPU_lamp_update_colors(lamp, m_color[0], m_color[1],
 			m_color[2], m_energy);
 		GPU_lamp_update_distance(lamp, m_distance, m_att1, m_att2);

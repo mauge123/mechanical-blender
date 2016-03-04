@@ -29,6 +29,13 @@ Example linux usage
 Windows not supported so far
 """
 
+import sys
+
+# until we have arg parsing
+import project_info
+if not project_info.init(sys.argv[-1]):
+    sys.exit(1)
+
 from project_info import (
         SIMPLE_PROJECTFILE,
         SOURCE_DIR,
@@ -73,7 +80,6 @@ def create_nb_project_main():
         else:
             # be tricky, get the project name from git if we can!
             PROJECT_NAME = project_name_get()
-
 
         make_exe = cmake_cache_var("CMAKE_MAKE_PROGRAM")
         make_exe_basename = os.path.basename(make_exe)

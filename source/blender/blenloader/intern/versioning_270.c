@@ -55,6 +55,7 @@
 #include "DNA_genfile.h"
 
 #include "BKE_colortools.h"
+#include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
 #include "BKE_node.h"
@@ -974,7 +975,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 				brush->strength = 0.5f; // XXX?
 				brush->flag = GP_EDITBRUSH_FLAG_USE_FALLOFF;
 				
-				brush = &gset->brush[GP_EDITBRUSH_TYPE_RANDOMISE];
+				brush = &gset->brush[GP_EDITBRUSH_TYPE_RANDOMIZE];
 				brush->size = 25;
 				brush->strength = 0.5f;
 				brush->flag = GP_EDITBRUSH_FLAG_USE_FALLOFF;
@@ -1028,6 +1029,43 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 				gpd->flag |= GP_DATA_SHOW_ONIONSKINS;
 			else
 				gpd->flag &= ~GP_DATA_SHOW_ONIONSKINS;
+		}
+
+		if (!DNA_struct_elem_find(fd->filesdna, "Object", "unsigned char", "max_jumps")) {
+			for (Object *ob = main->object.first; ob; ob = ob->id.next) {
+				ob->max_jumps = 1;
+			}
+		}
+	}
+	if (!MAIN_VERSION_ATLEAST(main, 276, 5)) {
+		ListBase *lbarray[MAX_LIBARRAY];
+		int a;
+
+		/* Important to clear all non-persistent flags from older versions here, otherwise they could collide
+		 * with any new persistent flag we may add in the future. */
+		a = set_listbasepointers(main, lbarray);
+		while (a--) {
+			for (ID *id = lbarray[a]->first; id; id = id->next) {
+				id->flag &= LIB_FAKEUSER;
+			}
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 276, 7)) {
+		Scene *scene;
+		for (scene = main->scene.first; scene != NULL; scene = scene->id.next) {
+			scene->r.bake.pass_filter = R_BAKE_PASS_FILTER_ALL;
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 277, 1)) {
+		for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
+			ParticleEditSettings *pset = &scene->toolsettings->particle;
+			for (int a = 0; a < PE_TOT_BRUSH; a++) {
+				if (pset->brush[a].strength > 1.0f) {
+					pset->brush[a].strength *= 0.01f;
+				}
+			}
 		}
 	}
 }

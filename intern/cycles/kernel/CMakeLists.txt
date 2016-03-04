@@ -29,7 +29,6 @@ set(SRC
 )
 
 set(SRC_HEADERS
-	kernel.h
 	kernel_accumulate.h
 	kernel_bake.h
 	kernel_camera.h
@@ -56,13 +55,18 @@ set(SRC_HEADERS
 	kernel_queues.h
 	kernel_random.h
 	kernel_shader.h
-	kernel_shaderdata_vars.h
 	kernel_shadow.h
 	kernel_subsurface.h
 	kernel_textures.h
 	kernel_types.h
 	kernel_volume.h
 	kernel_work_stealing.h
+)
+
+set(SRC_KERNELS_CPU_HEADERS
+	kernel.h
+	kernels/cpu/kernel_cpu.h
+	kernels/cpu/kernel_cpu_impl.h
 )
 
 set(SRC_CLOSURE_HEADERS
@@ -182,7 +186,7 @@ set(SRC_SPLIT_HEADERS
 
 if(WITH_CYCLES_CUDA_BINARIES)
 	# 32 bit or 64 bit
-	if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
+	if(CUDA_64_BIT_DEVICE_CODE)
 		set(CUDA_BITS 64)
 	else()
 		set(CUDA_BITS 32)
@@ -195,11 +199,11 @@ if(WITH_CYCLES_CUDA_BINARIES)
 	set(CUDA_VERSION "${CUDA_VERSION_MAJOR}${CUDA_VERSION_MINOR}")
 
 	# warn for other versions
-	if(CUDA_VERSION MATCHES "65")
+	if(CUDA_VERSION MATCHES "75")
 	else()
 		message(WARNING
 			"CUDA version ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} detected, "
-			"build may succeed but only CUDA 6.5 is officially supported")
+			"build may succeed but only CUDA 7.5 is officially supported")
 	endif()
 
 	# build for each arch
@@ -255,9 +259,6 @@ if(WITH_CYCLES_CUDA_BINARIES)
 	foreach(arch ${CYCLES_CUDA_BINARIES_ARCH})
 		# Compile regular kernel
 		CYCLES_CUDA_KERNEL_ADD(${arch} FALSE)
-
-		# Compile experimental kernel
-		CYCLES_CUDA_KERNEL_ADD(${arch} TRUE)
 	endforeach()
 
 	add_custom_target(cycles_kernel_cuda ALL DEPENDS ${cuda_cubins})
@@ -301,7 +302,15 @@ if(CXX_HAS_AVX2)
 	set_source_files_properties(kernels/cpu/kernel_avx2.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_AVX2_KERNEL_FLAGS}")
 endif()
 
-add_library(cycles_kernel ${SRC} ${SRC_HEADERS} ${SRC_CLOSURE_HEADERS} ${SRC_SVM_HEADERS} ${SRC_GEOM_HEADERS} ${SRC_SPLIT_HEADERS})
+add_library(cycles_kernel
+	${SRC}
+	${SRC_HEADERS}
+	${SRC_KERNELS_CPU_HEADERS}
+	${SRC_CLOSURE_HEADERS}
+	${SRC_SVM_HEADERS}
+	${SRC_GEOM_HEADERS}
+	${SRC_SPLIT_HEADERS}
+)
 
 if(WITH_CYCLES_CUDA)
 	add_dependencies(cycles_kernel cycles_kernel_cuda)

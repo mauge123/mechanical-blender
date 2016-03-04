@@ -441,9 +441,14 @@ static void node_draw_frame_label(bNodeTree *ntree, bNode *node, const float asp
 
 		for (line = text->lines.first; line; line = line->next) {
 			struct ResultBLF info;
-			BLF_position(fontid, x, y, 0);
-			BLF_draw_ex(fontid, line->line, line->len, &info);
-			y -= line_spacing * info.lines;
+			if (line->line[0]) {
+				BLF_position(fontid, x, y, 0);
+				BLF_draw_ex(fontid, line->line, line->len, &info);
+				y -= line_spacing * info.lines;
+			}
+			else {
+				y -= line_spacing;
+			}
 			if (y < y_min) {
 				break;
 			}
@@ -939,6 +944,7 @@ static void node_shader_buts_tex_brick(uiLayout *layout, bContext *UNUSED(C), Po
 static void node_shader_buts_tex_wave(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
 	uiItemR(layout, ptr, "wave_type", 0, "", ICON_NONE);
+	uiItemR(layout, ptr, "wave_profile", 0, "", ICON_NONE);
 }
 
 static void node_shader_buts_tex_musgrave(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -1054,21 +1060,8 @@ static void node_shader_buts_anisotropic(uiLayout *layout, bContext *UNUSED(C), 
 	uiItemR(layout, ptr, "distribution", 0, "", ICON_NONE);
 }
 
-static void node_shader_buts_subsurface(uiLayout *layout, bContext *C, PointerRNA *ptr)
+static void node_shader_buts_subsurface(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-	/* SSS only enabled in Experimental Kernel */
-	PointerRNA scene = CTX_data_pointer_get(C, "scene");
-	if (scene.data) {
-		PointerRNA cscene = RNA_pointer_get(&scene, "cycles");
-		if (cscene.data &&
-		    ((U.compute_device_type != USER_COMPUTE_DEVICE_NONE) &&
-		     (RNA_enum_get(&cscene, "device") == 1) &&
-		     (RNA_enum_get(&cscene, "feature_set") == 0)))
-		{
-			uiItemL(layout, IFACE_("Only enabled in experimental GPU kernel"), ICON_ERROR);
-		}
-	}
-
 	uiItemR(layout, ptr, "falloff", 0, "", ICON_NONE);
 }
 
@@ -1373,6 +1366,7 @@ static void node_composit_buts_blur(uiLayout *layout, bContext *UNUSED(C), Point
 		uiItemR(col, ptr, "size_x", 0, IFACE_("X"), ICON_NONE);
 		uiItemR(col, ptr, "size_y", 0, IFACE_("Y"), ICON_NONE);
 	}
+	uiItemR(col, ptr, "use_extended_bounds", 0, NULL, ICON_NONE);
 }
 
 static void node_composit_buts_dblur(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -2206,6 +2200,7 @@ static void node_composit_buts_bokehblur(uiLayout *layout, bContext *UNUSED(C), 
 	uiItemR(layout, ptr, "use_variable_size", 0, NULL, ICON_NONE);
 	// uiItemR(layout, ptr, "f_stop", 0, NULL, ICON_NONE);  // UNUSED
 	uiItemR(layout, ptr, "blur_max", 0, NULL, ICON_NONE);
+	uiItemR(layout, ptr, "use_extended_bounds", 0, NULL, ICON_NONE);
 }
 
 static void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
@@ -2889,7 +2884,8 @@ static void node_texture_set_butfunc(bNodeType *ntype)
 static void node_property_update_default(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bNodeTree *ntree = ptr->id.data;
-	ED_node_tag_update_nodetree(bmain, ntree);
+	bNode *node = ptr->data;
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
 static void node_socket_template_properties_update(bNodeType *ntype, bNodeSocketTemplate *stemp)
@@ -3475,7 +3471,6 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 				glBegin(GL_LINE_STRIP);
 				glVertex2fv(arrow1);
 				glVertex2fv(arrow);
-				glVertex2fv(arrow);
 				glVertex2fv(arrow2);
 				glEnd();
 			}
@@ -3512,15 +3507,11 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 			glBegin(GL_LINE_STRIP);
 			glVertex2fv(arrow1);
 			glVertex2fv(arrow);
-			glVertex2fv(arrow);
 			glVertex2fv(arrow2);
 			glEnd();
 		}
 		
 		glDisable(GL_LINE_SMOOTH);
-		
-		/* restore previuos linewidth */
-		glLineWidth(1.0f);
 	}
 }
 
@@ -3551,13 +3542,9 @@ void node_draw_link_straight(View2D *v2d, SpaceNode *snode, bNodeLink *link,
                              int th_col1, int do_shaded, int th_col2, int do_triple, int th_col3)
 {
 	float coord_array[2][2];
-	float linew;
 	int i;
 	
 	node_link_straight_points(v2d, snode, link, coord_array);
-	
-	/* store current linewidth */
-	glGetFloatv(GL_LINE_WIDTH, &linew);
 	
 	glEnable(GL_LINE_SMOOTH);
 	
@@ -3604,9 +3591,6 @@ void node_draw_link_straight(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 	}
 	
 	glDisable(GL_LINE_SMOOTH);
-	
-	/* restore previuos linewidth */
-	glLineWidth(1.0f);
 }
 #endif
 

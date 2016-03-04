@@ -75,7 +75,6 @@
 #include "AUD_MutexLock.h"
 
 #ifdef WITH_SDL
-#include <SDL.h>
 #include "AUD_SDLDevice.h"
 #endif
 
@@ -918,7 +917,7 @@ AUD_Sound *AUD_Sequence_create(float fps, int muted)
 	// specs are changed at a later point!
 	AUD_Specs specs;
 	specs.channels = AUD_CHANNELS_STEREO;
-	specs.rate = AUD_RATE_44100;
+	specs.rate = AUD_RATE_48000;
 	AUD_Sound *sequencer = new AUD_Sound(boost::shared_ptr<AUD_SequencerFactory>(new AUD_SequencerFactory(specs, fps, muted)));
 	return sequencer;
 }

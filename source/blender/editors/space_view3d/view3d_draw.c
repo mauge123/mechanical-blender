@@ -99,6 +99,7 @@
 #include "GPU_framebuffer.h"
 #include "GPU_material.h"
 #include "GPU_compositing.h"
+#include "GPU_extensions.h"
 
 #include "view3d_intern.h"  /* own include */
 
@@ -304,6 +305,8 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 	dx = fabs(x - (wx) * fx / fw);
 	if (dx == 0) dx = fabs(y - (wy) * fy / fw);
 	
+	glLineWidth(1.0f);
+
 	glDepthMask(GL_FALSE);     /* disable write in zbuffer */
 
 	/* check zoom out */
@@ -490,6 +493,8 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 
 	UI_GetThemeColor3ubv(TH_GRID, col_grid);
 
+	glLineWidth(1);
+
 	/* draw the Y axis and/or grid lines */
 	if (v3d->gridflag & V3D_SHOW_FLOOR) {
 		const int sublines = v3d->gridsubdiv;
@@ -535,6 +540,7 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 	/* draw the Z axis line */
 	/* check for the 'show Z axis' preference */
 	if (v3d->gridflag & (V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_Z)) {
+		glBegin(GL_LINES);
 		int axis;
 		for (axis = 0; axis < 3; axis++) {
 			if (v3d->gridflag & (V3D_SHOW_X << axis)) {
@@ -544,15 +550,14 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 				UI_make_axis_color(col_grid, tcol, 'X' + axis);
 				glColor3ubv(tcol);
 
-				glBegin(GL_LINE_STRIP);
 				zero_v3(vert);
 				vert[axis] = grid;
 				glVertex3fv(vert);
 				vert[axis] = -grid;
 				glVertex3fv(vert);
-				glEnd();
 			}
 		}
+		glEnd();
 	}
 	
 	glDepthMask(GL_TRUE);
@@ -569,6 +574,7 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 		const float f10 = 0.5f * U.widget_unit;
 		const float f20 = U.widget_unit;
 		
+		glLineWidth(1);
 		setlinestyle(0); 
 		cpack(0xFF);
 		circ((float)co[0], (float)co[1], f10);
@@ -630,15 +636,12 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 
 		if (fabsf(dx) > toll || fabsf(dy) > toll) {
 			BLF_draw_default_ascii(startx + dx + 2, starty + dy + ydisp + 2, 0.0f, axis_text, 1);
-		}
 
-		/* BLF_draw_default disables blending */
-		glEnable(GL_BLEND);
+			/* BLF_draw_default disables blending */
+			glEnable(GL_BLEND);
+		}
 	}
 
-	/* restore line-width */
-	
-	glLineWidth(1.0);
 	glDisable(GL_BLEND);
 }
 
@@ -940,9 +943,9 @@ static void draw_selected_name(Scene *scene, Object *ob, rcti *rect)
 		
 		/* color depends on whether there is a keyframe */
 		if (id_frame_has_keyframe((ID *)ob, /* BKE_scene_frame_get(scene) */ (float)cfra, ANIMFILTER_KEYS_LOCAL))
-			UI_ThemeColor(TH_VERTEX_SELECT);
+			UI_ThemeColor(TH_TIME_KEYFRAME);
 		else if (ED_gpencil_has_keyframe_v3d(scene, ob, cfra))
-			UI_ThemeColor(TH_CFRAME); // XXX
+			UI_ThemeColor(TH_TIME_GP_KEYFRAME);
 		else
 			UI_ThemeColor(TH_TEXT_HI);
 	}
@@ -1132,6 +1135,8 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 			glEnable(GL_BLEND);
 			glColor4f(0, 0, 0, ca->passepartalpha);
 		}
+		glLineWidth(1.0f);
+
 		if (x1i > 0.0f)
 			glRectf(0.0, winy, x1i, 0.0);
 		if (x2i < winx)
@@ -1144,19 +1149,16 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		glDisable(GL_BLEND);
 	}
 
-	/* edge */
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
 	setlinestyle(0);
 
 	UI_ThemeColor(TH_BACK);
 		
-	glRectf(x1i, y1i, x2i, y2i);
+	fdrawbox(x1i, y1i, x2i, y2i);
 
 #ifdef VIEW3D_CAMERA_BORDER_HACK
 	if (view3d_camera_border_hack_test == true) {
 		glColor3ubv(view3d_camera_border_hack_col);
-		glRectf(x1i + 1, y1i + 1, x2i - 1, y2i - 1);
+		fdrawbox(x1i + 1, y1i + 1, x2i - 1, y2i - 1);
 		view3d_camera_border_hack_test = false;
 	}
 #endif
@@ -1166,11 +1168,11 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 	/* outer line not to confuse with object selecton */
 	if (v3d->flag2 & V3D_LOCK_CAMERA) {
 		UI_ThemeColor(TH_REDALERT);
-		glRectf(x1i - 1, y1i - 1, x2i + 1, y2i + 1);
+		fdrawbox(x1i - 1, y1i - 1, x2i + 1, y2i + 1);
 	}
 
 	UI_ThemeColor(TH_VIEW_OVERLAY);
-	glRectf(x1i, y1i, x2i, y2i);
+	fdrawbox(x1i, y1i, x2i, y2i);
 
 	/* border */
 	if (scene->r.mode & R_BORDER) {
@@ -1182,7 +1184,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		y4 = y1i + 1 + roundf(scene->r.border.ymax * (y2 - y1));
 
 		cpack(0x4040FF);
-		glRecti(x3,  y3,  x4,  y4);
+		sdrawbox(x3,  y3,  x4,  y4);
 	}
 
 	/* safety border */
@@ -1298,7 +1300,6 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 	}
 
 	setlinestyle(0);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	/* camera name - draw in highlighted text color */
 	if (ca && (ca->flag & CAM_SHOWNAME)) {
@@ -1311,7 +1312,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 
 /* *********************** backdraw for selection *************** */
 
-static void backdrawview3d(Scene *scene, ARegion *ar, View3D *v3d)
+static void backdrawview3d(Scene *scene, wmWindow *win, ARegion *ar, View3D *v3d)
 {
 	RegionView3D *rv3d = ar->regiondata;
 	struct Base *base = scene->basact;
@@ -1366,7 +1367,7 @@ static void backdrawview3d(Scene *scene, ARegion *ar, View3D *v3d)
 	if (multisample_enabled)
 		glDisable(GL_MULTISAMPLE);
 
-	if (U.ogl_multisamples != USER_MULTISAMPLE_NONE) {
+	if (win->multisamples != USER_MULTISAMPLE_NONE) {
 		/* for multisample we use an offscreen FBO. multisample drawing can fail
 		 * with color coded selection drawing, and reading back depths from such
 		 * a buffer can also cause a few seconds freeze on OS X / NVidia. */
@@ -1457,7 +1458,7 @@ static void view3d_opengl_read_Z_pixels(ARegion *ar, int x, int y, int w, int h,
 void ED_view3d_backbuf_validate(ViewContext *vc)
 {
 	if (vc->v3d->flag & V3D_INVALID_BACKBUF)
-		backdrawview3d(vc->scene, vc->ar, vc->v3d);
+		backdrawview3d(vc->scene, vc->win, vc->ar, vc->v3d);
 }
 
 /**
@@ -2062,7 +2063,6 @@ static void draw_dupli_objects_color(
 	short transflag;
 	bool use_displist = false;  /* -1 is initialize */
 	char dt;
-	bool testbb = false;
 	short dtx;
 	DupliApplyData *apply_data;
 
@@ -2086,10 +2086,11 @@ static void draw_dupli_objects_color(
 	if (dob) dob_next = dupli_step(dob->next);
 
 	for (; dob; dob_prev = dob, dob = dob_next, dob_next = dob_next ? dupli_step(dob_next->next) : NULL) {
+		bool testbb = false;
+
 		tbase.object = dob->ob;
 
 		/* Make sure lod is updated from dupli's position */
-
 		savedlod = dob->ob->currentlod;
 
 #ifdef WITH_GAMEENGINE
@@ -2973,8 +2974,7 @@ void ED_view3d_draw_offscreen_init(Scene *scene, View3D *v3d)
 static void view3d_main_region_clear(Scene *scene, View3D *v3d, ARegion *ar)
 {
 	if (scene->world && (v3d->flag3 & V3D_SHOW_WORLD)) {
-		bool glsl = BKE_scene_use_new_shading_nodes(scene) && scene->world->nodetree && scene->world->use_nodes;
-		
+		bool glsl = GPU_glsl_support();
 		if (glsl) {
 			RegionView3D *rv3d = ar->regiondata;
 			GPUMaterial *gpumat = GPU_material_world(scene, scene->world);
@@ -3316,7 +3316,6 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(
 		/* bind */
 		ofs = GPU_offscreen_create(sizex, sizey, full_samples ? 0 : samples, err_out);
 		if (ofs == NULL) {
-			glPopAttrib();
 			return NULL;
 		}
 	}
@@ -3385,7 +3384,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(
 		unsigned int i;
 		int j;
 
-		BLI_jitter_init(jit_ofs, scene->r.osa);
+		BLI_jitter_init(jit_ofs, samples);
 
 		/* first sample buffer, also initializes 'rv3d->persmat' */
 		ED_view3d_draw_offscreen(
@@ -3442,8 +3441,6 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(
 
 	if (own_ofs) {
 		GPU_offscreen_free(ofs);
-
-		glPopAttrib();
 	}
 
 	if (ibuf->rect_float && ibuf->rect)
@@ -3835,6 +3832,7 @@ static void update_lods(Scene *scene, float camera_pos[3])
 static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, View3D *v3d,
                                           ARegion *ar, const char **grid_unit)
 {
+	wmWindow *win = CTX_wm_window(C);
 	RegionView3D *rv3d = ar->regiondata;
 	unsigned int lay_used = v3d->lay_used;
 	
@@ -3888,7 +3886,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	view3d_main_region_clear(scene, v3d, ar);
 
 	/* enables anti-aliasing for 3D view drawing */
-	if (U.ogl_multisamples != USER_MULTISAMPLE_NONE) {
+	if (win->multisamples != USER_MULTISAMPLE_NONE) {
 		glEnable(GL_MULTISAMPLE);
 	}
 
@@ -3901,7 +3899,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	}
 
 	/* Disable back anti-aliasing */
-	if (U.ogl_multisamples != USER_MULTISAMPLE_NONE) {
+	if (win->multisamples != USER_MULTISAMPLE_NONE) {
 		glDisable(GL_MULTISAMPLE);
 	}
 
@@ -3967,15 +3965,13 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 		drawviewborder(scene, ar, v3d);
 	}
 	else if (v3d->flag2 & V3D_RENDER_BORDER) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		setlinestyle(3);
 		cpack(0x4040FF);
 
-		glRecti(v3d->render_border.xmin * ar->winx, v3d->render_border.ymin * ar->winy,
-		        v3d->render_border.xmax * ar->winx, v3d->render_border.ymax * ar->winy);
+		sdrawbox(v3d->render_border.xmin * ar->winx, v3d->render_border.ymin * ar->winy,
+		         v3d->render_border.xmax * ar->winx, v3d->render_border.ymax * ar->winy);
 
 		setlinestyle(0);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
 
 	if (v3d->flag2 & V3D_SHOW_GPENCIL) {

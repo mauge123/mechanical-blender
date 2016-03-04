@@ -33,7 +33,7 @@
  */
 
 // #ifdef DEBUG_TIME
-#define USE_BMESH
+// #define USE_BMESH
 #ifdef WITH_MOD_BOOLEAN
 #  define USE_CARVE WITH_MOD_BOOLEAN
 #endif
@@ -43,6 +43,7 @@
 #include "DNA_object_types.h"
 
 #include "BLI_utildefines.h"
+#include "BLI_math_matrix.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_library_query.h"
@@ -52,6 +53,7 @@
 
 #include "MOD_boolean_util.h"
 #include "MOD_util.h"
+
 
 #ifdef USE_BMESH
 #include "BLI_alloca.h"
@@ -127,24 +129,46 @@ static void updateDepsgraph(ModifierData *md,
 
 #if defined(USE_CARVE) || defined(USE_BMESH)
 
-static DerivedMesh *get_quick_derivedMesh(DerivedMesh *derivedData, DerivedMesh *dm, int operation)
+static DerivedMesh *get_quick_derivedMesh(
+        Object *ob_self,  DerivedMesh *dm_self,
+        Object *ob_other, DerivedMesh *dm_other,
+        int operation)
 {
 	DerivedMesh *result = NULL;
 
-	if (derivedData->getNumPolys(derivedData) == 0 || dm->getNumPolys(dm) == 0) {
+	if (dm_self->getNumPolys(dm_self) == 0 || dm_other->getNumPolys(dm_other) == 0) {
 		switch (operation) {
 			case eBooleanModifierOp_Intersect:
 				result = CDDM_new(0, 0, 0, 0, 0);
 				break;
 
 			case eBooleanModifierOp_Union:
-				if (derivedData->getNumPolys(derivedData)) result = derivedData;
-				else result = CDDM_copy(dm);
+				if (dm_self->getNumPolys(dm_self) != 0) {
+					result = dm_self;
+				}
+				else {
+					result = CDDM_copy(dm_other);
+
+					float imat[4][4];
+					float omat[4][4];
+
+					invert_m4_m4(imat, ob_self->obmat);
+					mul_m4_m4m4(omat, imat, ob_other->obmat);
+
+					const int mverts_len = result->getNumVerts(result);
+					MVert *mv = CDDM_get_verts(result);
+
+					for (int i = 0; i < mverts_len; i++, mv++) {
+						mul_m4_v3(omat, mv->co);
+					}
+
+					result->dirty |= DM_DIRTY_NORMALS;
+				}
 
 				break;
 
 			case eBooleanModifierOp_Difference:
-				result = derivedData;
+				result = dm_self;
 				break;
 		}
 	}
@@ -189,7 +213,7 @@ static DerivedMesh *applyModifier_bmesh(
 		/* when one of objects is empty (has got no faces) we could speed up
 		 * calculation a bit returning one of objects' derived meshes (or empty one)
 		 * Returning mesh is depended on modifiers operation (sergey) */
-		result = get_quick_derivedMesh(dm, dm_other, bmd->operation);
+		result = get_quick_derivedMesh(ob, dm, bmd->object, dm_other, bmd->operation);
 
 		if (result == NULL) {
 			BMesh *bm;
@@ -212,7 +236,7 @@ static DerivedMesh *applyModifier_bmesh(
 
 				looptris = MEM_mallocN(sizeof(*looptris) * looptris_tot, __func__);
 
-				BM_bmesh_calc_tessellation(bm, looptris, &tottri);
+				BM_mesh_calc_tessellation(bm, looptris, &tottri);
 
 				/* postpone this until after tessellating
 				 * so we can use the original normals before the vertex are moved */
@@ -335,7 +359,7 @@ static DerivedMesh *applyModifier_carve(
 		/* when one of objects is empty (has got no faces) we could speed up
 		 * calculation a bit returning one of objects' derived meshes (or empty one)
 		 * Returning mesh is depended on modifiers operation (sergey) */
-		result = get_quick_derivedMesh(derivedData, dm, bmd->operation);
+		result = get_quick_derivedMesh(ob, derivedData, bmd->object, dm, bmd->operation);
 
 		if (result == NULL) {
 #ifdef DEBUG_TIME

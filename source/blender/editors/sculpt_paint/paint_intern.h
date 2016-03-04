@@ -234,6 +234,7 @@ int paint_curve_poll(struct bContext *C);
 
 int facemask_paint_poll(struct bContext *C);
 void flip_v3_v3(float out[3], const float in[3], const char symm);
+void flip_qt_qt(float out[3], const float in[3], const char symm);
 
 /* stroke operator */
 typedef enum BrushStrokeMode {
@@ -248,7 +249,8 @@ typedef enum {
 	RC_ROTATION = 2,
 	RC_ZOOM     = 4,
 	RC_WEIGHT   = 8,
-	RC_SECONDARY_ROTATION = 16
+	RC_SECONDARY_ROTATION = 16,
+	RC_COLOR_OVERRIDE = 32,
 } RCFlags;
 
 void set_brush_rc_props(struct PointerRNA *ptr, const char *paint, const char *prop, const char *secondary_prop,

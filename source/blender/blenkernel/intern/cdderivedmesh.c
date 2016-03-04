@@ -59,14 +59,13 @@
 #include "GPU_draw.h"
 #include "GPU_glew.h"
 #include "GPU_shader.h"
+#include "GPU_basic_shader.h"
 
 #include "WM_api.h"
 
 #include <string.h>
 #include <limits.h>
 #include <math.h>
-
-extern GLubyte stipple_quarttone[128]; /* glutil.c, bad level data */
 
 typedef struct {
 	DerivedMesh dm;
@@ -344,6 +343,22 @@ static void cdDM_update_normals_from_pbvh(DerivedMesh *dm)
 	CDDerivedMesh *cddm = (CDDerivedMesh *) dm;
 	float (*face_nors)[3];
 
+	/* Some callbacks do not use optimal PBVH draw, so needs all the
+	 * possible data (like normals) to be copied from PBVH back to DM.
+	 *
+	 * This is safe to do if PBVH and DM are representing the same mesh,
+	 * which could be wrong when modifiers are enabled for sculpt.
+	 * So here we only doing update when there's no modifiers applied
+	 * during sculpt.
+	 *
+	 * It's safe to do nothing if there are modifiers, because in this
+	 * case modifier stack is re-constructed from scratch on every
+	 * update.
+	 */
+	if (!cddm->pbvh_draw) {
+		return;
+	}
+
 	face_nors = CustomData_get_layer(&dm->polyData, CD_NORMAL);
 
 	BKE_pbvh_update(cddm->pbvh, PBVH_UpdateNormals, face_nors);
@@ -452,9 +467,6 @@ static void cdDM_drawFacesSolid(
 			glShadeModel(GL_FLAT);
 			return;
 		}
-		else {
-			cdDM_update_normals_from_pbvh(dm);
-		}
 	}
 	
 	GPU_vertex_setup(dm);
@@ -478,7 +490,7 @@ static void cdDM_drawFacesTex_common(
         DMSetDrawOptionsTex drawParams,
         DMSetDrawOptionsMappedTex drawParamsMapped,
         DMCompareDrawOptions compareDrawOptions,
-        void *userData, DMDrawFlag uvflag)
+        void *userData, DMDrawFlag flag)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh *) dm;
 	const MPoly *mpoly = cddm->mpoly;
@@ -486,7 +498,8 @@ static void cdDM_drawFacesTex_common(
 	const  MLoopCol *mloopcol;
 	int i;
 	int colType, start_element, tot_drawn;
-	bool use_tface = (uvflag & DM_DRAW_USE_ACTIVE_UV) != 0;
+	const bool use_hide = (flag & DM_DRAW_SKIP_HIDDEN) != 0;
+	const bool use_tface = (flag & DM_DRAW_USE_ACTIVE_UV) != 0;
 	int totpoly;
 	int next_actualFace;
 	int mat_index;
@@ -530,7 +543,7 @@ static void cdDM_drawFacesTex_common(
 	GPU_vertex_setup(dm);
 	GPU_normal_setup(dm);
 	GPU_triangle_setup(dm);
-	if (uvflag & DM_DRAW_USE_TEXPAINT_UV)
+	if (flag & DM_DRAW_USE_TEXPAINT_UV)
 		GPU_texpaint_uv_setup(dm);
 	else
 		GPU_uv_setup(dm);
@@ -558,7 +571,10 @@ static void cdDM_drawFacesTex_common(
 			if (i != totpoly - 1)
 				next_actualFace = bufmat->polys[i + 1];
 
-			if (drawParams) {
+			if (use_hide && (mpoly[actualFace].flag & ME_HIDE)) {
+				draw_option = DM_DRAW_OPTION_SKIP;
+			}
+			else if (drawParams) {
 				MTexPoly *tp = use_tface && mtexpoly ? &mtexpoly[actualFace] : NULL;
 				draw_option = drawParams(tp, (mloopcol != NULL), mpoly[actualFace].mat_nr);
 			}
@@ -622,9 +638,9 @@ static void cdDM_drawFacesTex(
         DerivedMesh *dm,
         DMSetDrawOptionsTex setDrawOptions,
         DMCompareDrawOptions compareDrawOptions,
-        void *userData, DMDrawFlag uvflag)
+        void *userData, DMDrawFlag flag)
 {
-	cdDM_drawFacesTex_common(dm, setDrawOptions, NULL, compareDrawOptions, userData, uvflag);
+	cdDM_drawFacesTex_common(dm, setDrawOptions, NULL, compareDrawOptions, userData, flag);
 }
 
 static void cdDM_drawMappedFaces(
@@ -637,7 +653,9 @@ static void cdDM_drawMappedFaces(
 	CDDerivedMesh *cddm = (CDDerivedMesh *) dm;
 	const MPoly *mpoly = cddm->mpoly;
 	const MLoopCol *mloopcol = NULL;
-	int colType, useColors = flag & DM_DRAW_USE_COLORS, useHide = flag & DM_DRAW_SKIP_HIDDEN;
+	const bool use_colors = (flag & DM_DRAW_USE_COLORS) != 0;
+	const bool use_hide = (flag & DM_DRAW_SKIP_HIDDEN) != 0;
+	int colType;
 	int i, j;
 	int start_element = 0, tot_element, tot_drawn;
 	int totpoly;
@@ -674,7 +692,7 @@ static void cdDM_drawMappedFaces(
 					const int orig = (index_mp_to_orig) ? index_mp_to_orig[i] : i;
 					bool is_hidden;
 
-					if (useHide) {
+					if (use_hide) {
 						if (flag & DM_DRAW_SELECT_USE_EDITMODE) {
 							BMFace *efa = BM_face_at_index(bm, orig);
 							is_hidden = BM_elem_flag_test(efa, BM_ELEM_HIDDEN) != 0;
@@ -704,7 +722,7 @@ static void cdDM_drawMappedFaces(
 	else {
 		GPU_normal_setup(dm);
 
-		if (useColors) {
+		if (use_colors) {
 			colType = CD_TEXTURE_MLOOPCOL;
 			mloopcol = DM_get_loop_data_layer(dm, colType);
 			if (!mloopcol) {
@@ -716,7 +734,7 @@ static void cdDM_drawMappedFaces(
 				mloopcol = DM_get_loop_data_layer(dm, colType);
 			}
 
-			if (useColors && mloopcol) {
+			if (use_colors && mloopcol) {
 				GPU_color_setup(dm, colType);
 			}
 		}
@@ -739,7 +757,7 @@ static void cdDM_drawMappedFaces(
 			GPUBufferMaterial *bufmat = dm->drawObject->materials + mat_index;
 			DMDrawOption draw_option = DM_DRAW_OPTION_NORMAL;
 			int next_actualFace = bufmat->polys[0];
-			totpoly = useHide ? bufmat->totvisiblepolys : bufmat->totpolys;
+			totpoly = use_hide ? bufmat->totvisiblepolys : bufmat->totpolys;
 
 			tot_element = 0;
 			start_element = 0;
@@ -749,6 +767,8 @@ static void cdDM_drawMappedFaces(
 				draw_option = setMaterial(bufmat->mat_nr + 1, NULL);
 
 			if (draw_option != DM_DRAW_OPTION_SKIP) {
+				DMDrawOption last_draw_option = DM_DRAW_OPTION_NORMAL;
+
 				for (i = 0; i < totpoly; i++) {
 					int actualFace = next_actualFace;
 					int flush = 0;
@@ -767,17 +787,12 @@ static void cdDM_drawMappedFaces(
 						}
 					}
 
-					if (draw_option == DM_DRAW_OPTION_STIPPLE) {
-						glEnable(GL_POLYGON_STIPPLE);
-						glPolygonStipple(stipple_quarttone);
-					}
-
 					/* Goal is to draw as long of a contiguous triangle
 					 * array as possible, so draw when we hit either an
 					 * invisible triangle or at the end of the array */
 
 					/* flush buffer if current triangle isn't drawable or it's last triangle... */
-					flush = (ELEM(draw_option, DM_DRAW_OPTION_SKIP, DM_DRAW_OPTION_STIPPLE)) || (i == totpoly - 1);
+					flush = (draw_option != last_draw_option) || (i == totpoly - 1);
 
 					if (!flush && compareDrawOptions) {
 						flush |= compareDrawOptions(userData, actualFace, next_actualFace) == 0;
@@ -787,27 +802,42 @@ static void cdDM_drawMappedFaces(
 					tot_element += tot_tri_verts;
 
 					if (flush) {
-						if (!ELEM(draw_option, DM_DRAW_OPTION_SKIP, DM_DRAW_OPTION_STIPPLE))
+						if (draw_option != DM_DRAW_OPTION_SKIP) {
 							tot_drawn += tot_tri_verts;
+
+							if (last_draw_option != draw_option) {
+								if (draw_option == DM_DRAW_OPTION_STIPPLE) {
+									GPU_basic_shader_bind(GPU_SHADER_STIPPLE | GPU_SHADER_USE_COLOR);
+									GPU_basic_shader_stipple(GPU_SHADER_STIPPLE_QUARTTONE);
+								}
+								else {
+									GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+								}
+							}
+						}
 
 						if (tot_drawn) {
 							GPU_buffer_draw_elements(dm->drawObject->triangles, GL_TRIANGLES, bufmat->start + start_element, tot_drawn);
 							tot_drawn = 0;
 						}
 
+						last_draw_option = draw_option;
 						start_element = tot_element;
-
-						if (draw_option == DM_DRAW_OPTION_STIPPLE)
-							glDisable(GL_POLYGON_STIPPLE);
 					}
 					else {
-						tot_drawn += tot_tri_verts;
+						if (draw_option != DM_DRAW_OPTION_SKIP) {
+							tot_drawn += tot_tri_verts;
+						}
+						else {
+							start_element = tot_element;
+						}
 					}
 				}
 			}
 		}
 	}
 
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glShadeModel(GL_FLAT);
 
 	GPU_buffers_unbind();
@@ -927,7 +957,7 @@ static void cdDM_drawMappedFacesGLSL(
 			if (!do_draw) {
 				continue;
 			}
-			else if (setDrawOptions) {
+			else /* if (setDrawOptions) */ {
 				orig = (index_mp_to_orig) ? index_mp_to_orig[lt->poly] : lt->poly;
 
 				if (orig == ORIGINDEX_NONE) {
@@ -1470,7 +1500,7 @@ static void cdDM_buffer_copy_uv_texpaint(
 		}
 	}
 
-	MEM_freeN(uv_base);
+	MEM_freeN((void *)uv_base);
 }
 
 /* treat varray_ as an array of MCol, four MCol's per face */
@@ -2894,6 +2924,8 @@ static bool poly_gset_compare_fn(const void *k1, const void *k2)
  * \param vtargetmap  The table that maps vertices to target vertices.  a value of -1
  * indicates a vertex is a target, and is to be kept.
  * This array is aligned with 'dm->numVertData'
+ * \warning \a vtergatmap must **not** contain any chained mapping (v1 -> v2 -> v3 etc.), this is not supported
+ * and will likely generate corrupted geometry.
  *
  * \param tot_vtargetmap  The number of non '-1' values in vtargetmap. (not the size)
  *
@@ -3202,7 +3234,10 @@ DerivedMesh *CDDM_merge_verts(DerivedMesh *dm, const int *vtargetmap, const int 
 			med->v1 = newv[med->v1];
 		if (newv[med->v2] != -1)
 			med->v2 = newv[med->v2];
-		
+
+		/* Can happen in case vtargetmap contains some double chains, we do not support that. */
+		BLI_assert(med->v1 != med->v2);
+
 		CustomData_copy_data(&dm->edgeData, &cddm2->dm.edgeData, olde[i], i, 1);
 	}
 	

@@ -49,25 +49,12 @@ typedef struct IsectPrecalc {
 	float Sx, Sy, Sz;
 } IsectPrecalc;
 
-#if defined(__KERNEL_CUDA__)
-#  if (defined(i386) || defined(_M_IX86))
-#    if __CUDA_ARCH__ > 500
+#if (defined(__KERNEL_OPENCL_APPLE__)) || \
+    (defined(__KERNEL_CUDA__) && (defined(i386) || defined(_M_IX86)))
 ccl_device_noinline
-#    else  /* __CUDA_ARCH__ > 500 */
+#else
 ccl_device_inline
-#    endif  /* __CUDA_ARCH__ > 500 */
-#  else  /* (defined(i386) || defined(_M_IX86)) */
-#    if defined(__KERNEL_EXPERIMENTAL__) && (__CUDA_ARCH__ >= 500)
-ccl_device_noinline
-#    else
-ccl_device_inline
-#    endif
-#  endif  /* (defined(i386) || defined(_M_IX86)) */
-#elif defined(__KERNEL_OPENCL_APPLE__)
-ccl_device_noinline
-#else  /* defined(__KERNEL_OPENCL_APPLE__) */
-ccl_device_inline
-#endif  /* defined(__KERNEL_OPENCL_APPLE__) */
+#endif
 void triangle_intersect_precalc(float3 dir,
                                 IsectPrecalc *isect_precalc)
 {

@@ -3236,6 +3236,7 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 		char err_out[256] = "unknown";
 		int width = (scene->r.xsch * scene->r.size) / 100;
 		int height = (scene->r.ysch * scene->r.size) / 100;
+		const bool use_background = (scene->r.alphamode == R_ADDSKY);
 		const char *viewname = BKE_scene_multiview_render_view_name_get(&scene->r, context->view_id);
 
 		/* for old scene this can be uninitialized,
@@ -3250,7 +3251,7 @@ static ImBuf *seq_render_scene_strip(const SeqRenderData *context, Sequence *seq
 		        scene, camera, width, height, IB_rect,
 		        context->scene->r.seq_prev_type,
 		        (context->scene->r.seq_flag & R_SEQ_SOLID_TEX) != 0,
-		        use_gpencil, true, scene->r.alphamode,
+		        use_gpencil, use_background, scene->r.alphamode,
 		        context->gpu_samples, context->gpu_full_samples, viewname,
 		        context->gpu_fx, context->gpu_offscreen, err_out);
 		if (ibuf == NULL) {
@@ -3402,16 +3403,16 @@ static ImBuf *do_render_strip_uncached(const SeqRenderData *context, Sequence *s
 				if (seq->scene && (context->scene != seq->scene)) {
 #ifdef USE_SCENE_RECURSIVE_HACK
 					/* weak recusrive check, same as T32017 */
-					if (seq->scene->id.flag & LIB_DOIT) {
+					if (seq->scene->id.tag & LIB_TAG_DOIT) {
 						break;
 					}
-					seq->scene->id.flag |= LIB_DOIT;
+					seq->scene->id.tag |= LIB_TAG_DOIT;
 #endif
 
 					ibuf = do_render_strip_seqbase(context, seq, nr, use_preprocess);
 
 #ifdef USE_SCENE_RECURSIVE_HACK
-					seq->scene->id.flag &= ~LIB_DOIT;
+					seq->scene->id.tag &= ~LIB_TAG_DOIT;
 #endif
 				}
 			}
@@ -3799,7 +3800,7 @@ ImBuf *BKE_sequencer_give_ibuf(const SeqRenderData *context, float cfra, int cha
 	}
 
 #ifdef USE_SCENE_RECURSIVE_HACK
-	BKE_main_id_tag_idcode(context->bmain, ID_SCE, false);
+	BKE_main_id_tag_idcode(context->bmain, ID_SCE, LIB_TAG_DOIT, false);
 #endif
 
 	return seq_render_strip_stack(context, seqbasep, cfra, chanshown);
@@ -4968,7 +4969,7 @@ Mask *BKE_sequencer_mask_get(Scene *scene)
 
 /* api like funcs for adding */
 
-static void seq_load_apply(Scene *scene, Sequence *seq, SeqLoadInfo *seq_load)
+static void seq_load_apply(Main *bmain, Scene *scene, Sequence *seq, SeqLoadInfo *seq_load)
 {
 	if (seq) {
 		BLI_strncpy_utf8(seq->name + 2, seq_load->name, sizeof(seq->name) - 2);
@@ -4982,6 +4983,11 @@ static void seq_load_apply(Scene *scene, Sequence *seq, SeqLoadInfo *seq_load)
 		if (seq_load->flag & SEQ_LOAD_REPLACE_SEL) {
 			seq_load->flag |= SELECT;
 			BKE_sequencer_active_set(scene, seq);
+		}
+
+		if (seq_load->flag & SEQ_LOAD_SOUND_MONO) {
+			seq->sound->flags |= SOUND_FLAGS_MONO;
+			BKE_sound_load(bmain, seq->sound);
 		}
 
 		if (seq_load->flag & SEQ_LOAD_SOUND_CACHE) {
@@ -5081,7 +5087,7 @@ Sequence *BKE_sequencer_add_image_strip(bContext *C, ListBase *seqbasep, SeqLoad
 	seq->views_format = seq_load->views_format;
 	seq->flag |= seq_load->flag & SEQ_USE_VIEWS;
 
-	seq_load_apply(scene, seq, seq_load);
+	seq_load_apply(CTX_data_main(C), scene, seq, seq_load);
 
 	return seq;
 }
@@ -5131,7 +5137,8 @@ Sequence *BKE_sequencer_add_sound_strip(bContext *C, ListBase *seqbasep, SeqLoad
 
 	/* basic defaults */
 	seq->strip = strip = MEM_callocN(sizeof(Strip), "strip");
-	seq->len = (int)ceil((double)info.length * FPS);
+	/* We add a very small negative offset here, because ceil(132.0) == 133.0, not nice with videos, see T47135. */
+	seq->len = (int)ceil((double)info.length * FPS - 1e-4);
 	strip->us = 1;
 
 	/* we only need 1 element to store the filename */
@@ -5146,7 +5153,7 @@ Sequence *BKE_sequencer_add_sound_strip(bContext *C, ListBase *seqbasep, SeqLoad
 	/* last active name */
 	BLI_strncpy(ed->act_sounddir, strip->dir, FILE_MAXDIR);
 
-	seq_load_apply(scene, seq, seq_load);
+	seq_load_apply(bmain, scene, seq, seq_load);
 
 	return seq;
 }
@@ -5249,6 +5256,11 @@ Sequence *BKE_sequencer_add_movie_strip(bContext *C, ListBase *seqbasep, SeqLoad
 	seq->anim_preseek = IMB_anim_get_preseek(anim_arr[0]);
 	BLI_strncpy(seq->name + 2, "Movie", SEQ_NAME_MAXSTR - 2);
 	BKE_sequence_base_unique_name_recursive(&scene->ed->seqbase, seq);
+	
+	/* adjust scene's frame rate settings to match */
+	if (seq_load->flag & SEQ_LOAD_SYNC_FPS) {
+		IMB_anim_get_fps(anim_arr[0], &scene->r.frs_sec, &scene->r.frs_sec_base, true);
+	}
 
 	/* basic defaults */
 	seq->strip = strip = MEM_callocN(sizeof(Strip), "strip");
@@ -5278,7 +5290,7 @@ Sequence *BKE_sequencer_add_movie_strip(bContext *C, ListBase *seqbasep, SeqLoad
 	}
 
 	/* can be NULL */
-	seq_load_apply(scene, seq, seq_load);
+	seq_load_apply(CTX_data_main(C), scene, seq, seq_load);
 
 	MEM_freeN(anim_arr);
 	return seq;

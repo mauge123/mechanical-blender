@@ -25,7 +25,7 @@
  * Brush based operators for editing Grease Pencil strokes
  */
 
-/** \file blender/editors/gpencil/gpencil_edit.c
+/** \file blender/editors/gpencil/gpencil_brush.c
  *  \ingroup edgpencil
  */
 
@@ -575,8 +575,6 @@ static bool gp_brush_twist_apply(tGP_BrushEditData *gso, bGPDstroke *gps, int i,
                                  const int radius, const int co[2])
 {
 	bGPDspoint *pt = gps->points + i;
-	float tco[2], rco[2], nco[2];
-	float rmat[2][2];
 	float angle, inf;
 	
 	/* Angle to rotate by */
@@ -588,42 +586,52 @@ static bool gp_brush_twist_apply(tGP_BrushEditData *gso, bGPDstroke *gps, int i,
 		angle *= -1;
 	}
 	
-	/* Express position of point relative to cursor, ready to rotate */
-	tco[0] = (float)(co[0] - gso->mval[0]);
-	tco[1] = (float)(co[1] - gso->mval[1]);
-	
-	/* Rotate point in 2D */
-	angle_to_mat2(rmat, angle);
-	mul_v2_m2v2(rco, rmat, tco);
-	
-	/* Convert back to screen-coordinates */
-	nco[0] = rco[0] + (float)gso->mval[0];
-	nco[1] = rco[1] + (float)gso->mval[1];
-	
-#if 0
-	printf("C: %d %d | P: %d %d -> t: %f %f -> r: %f %f x %f -> %f %f\n",
-			gso->mval[0], gso->mval[1], co[0], co[1],
-			tco[0], tco[1],
-			rco[0], rco[1], angle,
-			nco[0], nco[1]);
-#endif
-	
-	/* convert to dataspace */
+	/* Rotate in 2D or 3D space? */
 	if (gps->flag & GP_STROKE_3DSPACE) {
-		/* 3D: Project to 3D space */
-		if (gso->sa->spacetype == SPACE_VIEW3D) {
-			// XXX: this conversion process sometimes introduces noise to the data -> some parts don't seem to move at all, while others get random offsets
-			gp_point_xy_to_3d(&gso->gsc, gso->scene, nco, &pt->x);
-		}
-		else {
-			/* ERROR */
-			BLI_assert("3D stroke being sculpted in non-3D view");
-		}
+		/* Perform rotation in 3D space... */
+		RegionView3D *rv3d = gso->ar->regiondata;
+		float rmat[3][3];
+		float axis[3];
+		float vec[3];
+		
+		/* Compute rotation matrix - rotate around view vector by angle */
+		negate_v3_v3(axis, rv3d->persinv[2]);
+		normalize_v3(axis);
+		
+		axis_angle_normalized_to_mat3(rmat, axis, angle);
+		
+		/* Rotate point (no matrix-space transforms needed, as GP points are in world space) */
+		sub_v3_v3v3(vec, &pt->x, gso->dvec); /* make relative to center (center is stored in dvec) */
+		mul_m3_v3(rmat, vec);
+		add_v3_v3v3(&pt->x, vec, gso->dvec); /* restore */
 	}
 	else {
-		/* 2D: As-is */
-		// XXX: v2d scaling/offset?
-		copy_v2_v2(&pt->x, nco);
+		const float axis[3] = {0.0f, 0.0f, 1.0f};
+		float vec[3] = {0.0f};
+		float rmat[3][3];
+		
+		/* Express position of point relative to cursor, ready to rotate */
+		// XXX: There is still some offset here, but it's close to working as expected...
+		vec[0] = (float)(co[0] - gso->mval[0]);
+		vec[1] = (float)(co[1] - gso->mval[1]);
+		
+		/* rotate point */
+		axis_angle_normalized_to_mat3(rmat, axis, angle);
+		mul_m3_v3(rmat, vec);
+		
+		/* Convert back to screen-coordinates */
+		vec[0] += (float)gso->mval[0];
+		vec[1] += (float)gso->mval[1];
+		
+		/* Map from screen-coordinates to final coordinate space */
+		if (gps->flag & GP_STROKE_2DSPACE) {
+			View2D *v2d = gso->gsc.v2d;
+			UI_view2d_region_to_view(v2d, vec[0], vec[1], &pt->x, &pt->y);
+		}
+		else {
+			// XXX
+			copy_v2_v2(&pt->x, vec);
+		}
 	}
 	
 	/* done */
@@ -632,10 +640,10 @@ static bool gp_brush_twist_apply(tGP_BrushEditData *gso, bGPDstroke *gps, int i,
 
 
 /* ----------------------------------------------- */
-/* Randomise Brush */
+/* Randomize Brush */
 
 /* Apply some random jitter to the point */
-static bool gp_brush_randomise_apply(tGP_BrushEditData *gso, bGPDstroke *gps, int i,
+static bool gp_brush_randomize_apply(tGP_BrushEditData *gso, bGPDstroke *gps, int i,
                                      const int radius, const int co[2])
 {
 	bGPDspoint *pt = gps->points + i;
@@ -706,7 +714,7 @@ static bool gp_brush_randomise_apply(tGP_BrushEditData *gso, bGPDstroke *gps, in
  *   by placing the midpoint of the buffer strokes under the cursor now
  *
  * - Otherwise, in:
- *   "Stamp Mode" - Move the newly pasted strokes so that their center
+ *   "Stamp Mode" - Move the newly pasted strokes so that their center follows the cursor
  *   "Continuous" - Repeatedly just paste new copies for where the brush is now
  */
 
@@ -833,7 +841,7 @@ static void gp_brush_clone_add(bContext *C, tGP_BrushEditData *gso)
 }
 
 /* Move newly-added strokes around - "Stamp" mode of the Clone brush */
-static void gp_brush_clone_adjust(bContext *C, tGP_BrushEditData *gso)
+static void gp_brush_clone_adjust(tGP_BrushEditData *gso)
 {
 	tGPSB_CloneBrushData *data = gso->customdata;
 	size_t snum;
@@ -885,7 +893,7 @@ static bool gpsculpt_brush_apply_clone(bContext *C, tGP_BrushEditData *gso)
 		/* Stamp or Continous Mode */
 		if (1 /*gso->brush->mode == GP_EDITBRUSH_CLONE_MODE_STAMP*/) {
 			/* Stamp - Proceed to translate the newly added strokes */
-			gp_brush_clone_adjust(C, gso);
+			gp_brush_clone_adjust(gso);
 		}
 		else {
 			/* Continuous - Just keep pasting everytime we move */
@@ -957,7 +965,7 @@ static void gpsculpt_brush_header_set(bContext *C, tGP_BrushEditData *gso)
 	BLI_snprintf(str, sizeof(str),
 	             IFACE_("GPencil Sculpt: %s Stroke  | LMB to paint | RMB/Escape to Exit"
 	                    " | Ctrl to Invert Action | Wheel Up/Down for Size "
-						" | Shift-Wheel Up/Down for Strength"),
+	                    " | Shift-Wheel Up/Down for Strength"),
 	             (brush_name) ? brush_name : "<?>");
 	
 	ED_area_headerprint(CTX_wm_area(C), str);
@@ -1118,9 +1126,7 @@ static void gpsculpt_brush_init_stroke(tGP_BrushEditData *gso)
 	/* go through each layer, and ensure that we've got a valid frame to use */
 	for (gpl = gpd->layers.first; gpl; gpl = gpl->next) {
 		/* only editable and visible layers are considered */
-		if ((gpl->flag & (GP_LAYER_HIDE | GP_LAYER_LOCKED)) == 0 &&
-			(gpl->actframe != NULL))
-		{
+		if (gpencil_layer_is_editable(gpl) && (gpl->actframe != NULL)) {
 			bGPDframe *gpf = gpl->actframe;
 			
 			/* Make a new frame to work on if the layer's frame and the current scene frame don't match up 
@@ -1191,7 +1197,7 @@ static bool gpsculpt_brush_do_stroke(tGP_BrushEditData *gso, bGPDstroke *gps, GP
 			    ((!ELEM(V2D_IS_CLIPPED, pc2[0], pc2[1])) && BLI_rcti_isect_pt(rect, pc2[0], pc2[1])))
 			{
 				/* Check if point segment of stroke had anything to do with
-				 * eraser region  (either within stroke painted, or on its lines)
+				 * brush region  (either within stroke painted, or on its lines)
 				 *  - this assumes that linewidth is irrelevant
 				 */
 				if (gp_stroke_inside_circle(gso->mval, gso->mval_prev, radius, pc1[0], pc1[1], pc2[0], pc2[1])) {
@@ -1250,14 +1256,14 @@ static bool gpsculpt_brush_apply_standard(bContext *C, tGP_BrushEditData *gso)
 		}
 		
 		case GP_EDITBRUSH_TYPE_PINCH: /* Pinch points */
-		//case GP_EDITBRUSH_TYPE_TWIST: /* Twist points around midpoint */
+		case GP_EDITBRUSH_TYPE_TWIST: /* Twist points around midpoint */
 		{
 			/* calculate midpoint of the brush (in data space) */
 			gp_brush_calc_midpoint(gso);
 			break;
 		}
 		
-		case GP_EDITBRUSH_TYPE_RANDOMISE: /* Random jitter */
+		case GP_EDITBRUSH_TYPE_RANDOMIZE: /* Random jitter */
 		{
 			/* compute the displacement vector for the cursor (in data space) */
 			gp_brush_grab_calc_dvec(gso);
@@ -1321,14 +1327,14 @@ static bool gpsculpt_brush_apply_standard(bContext *C, tGP_BrushEditData *gso)
 				break;
 			}
 			
-			case GP_EDITBRUSH_TYPE_RANDOMISE: /* Apply jitter */
+			case GP_EDITBRUSH_TYPE_RANDOMIZE: /* Apply jitter */
 			{
-				changed |= gpsculpt_brush_do_stroke(gso, gps, gp_brush_randomise_apply);
+				changed |= gpsculpt_brush_do_stroke(gso, gps, gp_brush_randomize_apply);
 				break;
 			}
 			
 			default:
-				printf("ERROR: Unknown type of GPencil Sculpt brush - %d\n", gso->brush_type);
+				printf("ERROR: Unknown type of GPencil Sculpt brush - %u\n", gso->brush_type);
 				break;
 		}
 	}
@@ -1545,6 +1551,40 @@ static int gpsculpt_brush_modal(bContext *C, wmOperator *op, const wmEvent *even
 					gpsculpt_brush_apply_event(C, op, event);
 					gso->timerTick = false;
 				}
+				break;
+				
+			/* Adjust brush settings */
+			/* FIXME: Step increments and modifier keys are hardcoded here! */
+			case WHEELUPMOUSE:
+			case PADPLUSKEY:
+				if (event->shift) {
+					/* increase strength */
+					gso->brush->strength += 0.05f;
+					CLAMP_MAX(gso->brush->strength, 1.0f);
+				}
+				else {
+					/* increase brush size */
+					gso->brush->size += 3;
+					CLAMP_MAX(gso->brush->size, 300);
+				}
+					
+				redraw_region = true;
+				break;
+			
+			case WHEELDOWNMOUSE: 
+			case PADMINUS:
+				if (event->shift) {
+					/* decrease strength */
+					gso->brush->strength -= 0.05f;
+					CLAMP_MIN(gso->brush->strength, 0.0f);
+				}
+				else {
+					/* decrease brush size */
+					gso->brush->size -= 3;
+					CLAMP_MIN(gso->brush->size, 1);
+				}
+					
+				redraw_region = true;
 				break;
 			
 			/* Painting mbut release = Stop painting (back to idle) */

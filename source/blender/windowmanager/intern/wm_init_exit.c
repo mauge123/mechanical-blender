@@ -64,6 +64,7 @@
 #include "BKE_mball_tessellate.h"
 #include "BKE_node.h"
 #include "BKE_report.h"
+#include "BKE_font.h"
 
 #include "BKE_addon.h"
 #include "BKE_appdir.h"
@@ -428,8 +429,9 @@ static void wait_for_console_key(void)
 }
 #endif
 
-/* called in creator.c even... tsk, split this! */
-/* note, doesnt run exit() call WM_exit() for that */
+/**
+ * \note doesn't run exit() call #WM_exit() for that.
+ */
 void WM_exit_ext(bContext *C, const bool do_python)
 {
 	wmWindowManager *wm = C ? CTX_wm_manager(C) : NULL;
@@ -503,6 +505,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	BKE_sequencer_free_clipboard(); /* sequencer.c */
 	BKE_tracking_clipboard_free();
 	BKE_mask_clipboard_free();
+	BKE_vfont_clipboard_free();
 		
 #ifdef WITH_COMPOSITOR
 	COM_deinitialize();

@@ -63,7 +63,7 @@ class USERPREF_HT_header(Header):
         elif userpref.active_section == 'ADDONS':
             layout.operator("wm.addon_install", icon='FILESEL')
             layout.operator("wm.addon_refresh", icon='FILE_REFRESH')
-            layout.menu("USERPREF_MT_addons_dev_guides")
+            layout.menu("USERPREF_MT_addons_online_resources")
         elif userpref.active_section == 'THEMES':
             layout.operator("ui.reset_default_theme")
             layout.operator("wm.theme_install")
@@ -559,8 +559,33 @@ class USERPREF_PT_theme(Panel):
     bl_region_type = 'WINDOW'
     bl_options = {'HIDE_HEADER'}
 
+    # not essential, hard-coded UI delimiters for the theme layout
+    ui_delimiters = {
+        'VIEW_3D': {
+            "text_grease_pencil",
+            "text_keyframe",
+            "speaker",
+            "freestyle_face_mark",
+            "split_normal",
+            "bone_solid",
+            "paint_curve_pivot",
+            },
+        'GRAPH_EDITOR': {
+            "handle_vertex_select",
+            },
+        'IMAGE_EDITOR': {
+            "paint_curve_pivot",
+            },
+        'NODE_EDITOR': {
+            "layout_node",
+            },
+        'CLIP_EDITOR': {
+            "handle_vertex_select",
+            }
+        }
+
     @staticmethod
-    def _theme_generic(split, themedata):
+    def _theme_generic(split, themedata, theme_area):
 
         col = split.column()
 
@@ -587,13 +612,30 @@ class USERPREF_PT_theme(Panel):
 
                 props_type.setdefault((prop.type, prop.subtype), []).append(prop)
 
+            th_delimiters = USERPREF_PT_theme.ui_delimiters.get(theme_area)
             for props_type, props_ls in sorted(props_type.items()):
                 if props_type[0] == 'POINTER':
                     for i, prop in enumerate(props_ls):
                         theme_generic_recurse(getattr(data, prop.identifier))
                 else:
-                    for i, prop in enumerate(props_ls):
-                        colsub_pair[i % 2].row().prop(data, prop.identifier)
+                    if th_delimiters is None:
+                        # simple, no delimiters
+                        for i, prop in enumerate(props_ls):
+                            colsub_pair[i % 2].row().prop(data, prop.identifier)
+                    else:
+                        # add hard coded delimiters
+                        i = 0
+                        for prop in props_ls:
+                            colsub = colsub_pair[i]
+                            colsub.row().prop(data, prop.identifier)
+                            i = (i + 1) % 2
+                            if prop.identifier in th_delimiters:
+                                if i:
+                                    colsub = colsub_pair[1]
+                                    colsub.row().label("")
+                                colsub_pair[0].row().label("")
+                                colsub_pair[1].row().label("")
+                                i = 0
 
         theme_generic_recurse(themedata)
 
@@ -864,7 +906,7 @@ class USERPREF_PT_theme(Panel):
             col.label(text="Widget Label:")
             self._ui_font_style(col, style.widget_label)
         else:
-            self._theme_generic(split, getattr(theme, theme.theme_area.lower()))
+            self._theme_generic(split, getattr(theme, theme.theme_area.lower()), theme.theme_area)
 
 
 class USERPREF_PT_file(Panel):
@@ -1171,16 +1213,30 @@ class USERPREF_PT_input(Panel):
         #print("runtime", time.time() - start)
 
 
-class USERPREF_MT_addons_dev_guides(Menu):
-    bl_label = "Development Guides"
+class USERPREF_MT_addons_online_resources(Menu):
+    bl_label = "Online Resources"
 
     # menu to open web-pages with addons development guides
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("wm.url_open", text="API Concepts", icon='URL').url = bpy.types.WM_OT_doc_view._prefix + "/info_quickstart.html"
-        layout.operator("wm.url_open", text="Addon Guidelines", icon='URL').url = "http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Guidelines/Addons"
-        layout.operator("wm.url_open", text="How to share your addon", icon='URL').url = "http://wiki.blender.org/index.php/Dev:Py/Sharing"
+        layout.operator(
+                "wm.url_open", text="Add-ons Catalog", icon='URL',
+                ).url = "http://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts"
+
+        layout.separator()
+
+        layout.operator(
+                "wm.url_open", text="How to share your add-on", icon='URL',
+                ).url = "http://wiki.blender.org/index.php/Dev:Py/Sharing"
+        layout.operator(
+                "wm.url_open", text="Add-on Guidelines", icon='URL',
+                ).url = "http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Guidelines/Addons"
+        layout.operator(
+                "wm.url_open", text="API Concepts", icon='URL',
+                ).url = bpy.types.WM_OT_doc_view._prefix + "/info_quickstart.html"
+        layout.operator("wm.url_open", text="Add-on Tutorial", icon='URL',
+                ).url = "http://www.blender.org/api/blender_python_api_current/info_tutorial_addon.html"
 
 
 class USERPREF_PT_addons(Panel):
@@ -1300,9 +1356,19 @@ class USERPREF_PT_addons(Panel):
                 col_box = col.column()
                 box = col_box.box()
                 colsub = box.column()
-                row = colsub.row()
+                row = colsub.row(align=True)
 
-                row.operator("wm.addon_expand", icon='TRIA_DOWN' if info["show_expanded"] else 'TRIA_RIGHT', emboss=False).module = module_name
+                row.operator(
+                        "wm.addon_expand",
+                        icon='TRIA_DOWN' if info["show_expanded"] else 'TRIA_RIGHT',
+                        emboss=False,
+                        ).module = module_name
+
+                row.operator(
+                        "wm.addon_disable" if is_enabled else "wm.addon_enable",
+                        icon='CHECKBOX_HLT' if is_enabled else 'CHECKBOX_DEHLT', text="",
+                        emboss=False,
+                        ).module = module_name
 
                 sub = row.row()
                 sub.active = is_enabled
@@ -1312,11 +1378,6 @@ class USERPREF_PT_addons(Panel):
 
                 # icon showing support level.
                 sub.label(icon=self._support_icon_mapping.get(info["support"], 'QUESTION'))
-
-                if is_enabled:
-                    row.operator("wm.addon_disable", icon='CHECKBOX_HLT', text="", emboss=False).module = module_name
-                else:
-                    row.operator("wm.addon_enable", icon='CHECKBOX_DEHLT', text="", emboss=False).module = module_name
 
                 # Expanded UI (only if additional info is available)
                 if info["show_expanded"]:
@@ -1395,12 +1456,15 @@ class USERPREF_PT_addons(Panel):
                 # Addon UI Code
                 box = col.column().box()
                 colsub = box.column()
-                row = colsub.row()
+                row = colsub.row(align=True)
 
-                row.label(text=module_name, translate=False, icon='ERROR')
+                row.label(text="", icon='ERROR')
 
                 if is_enabled:
                     row.operator("wm.addon_disable", icon='CHECKBOX_HLT', text="", emboss=False).module = module_name
+
+                row.label(text=module_name, translate=False)
+
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)
