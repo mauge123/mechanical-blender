@@ -3492,11 +3492,11 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 				col[3] = fcol[3] = 255;
 			}
 
-			if (ts->selectmode & SCE_SELECT_VERTEX) {
-				glPointSize(size);
-				glColor4ubv(col);
-				draw_dm_dims(ar, scene, em, cageDM, sel, edm_act, rv3d, obedit);
-			}
+
+			glPointSize(size);
+			glColor4ubv(col);
+			draw_dm_dims(ar, scene, em, cageDM, sel, edm_act, rv3d, obedit);
+
 
 			if (pass == 0) {
 				glDisable(GL_BLEND);

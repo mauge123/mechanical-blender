@@ -37,9 +37,9 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-#include "bmesh_dimensions.h"
-#endif
+BMDim* get_selected_dimension_BMesh(BMesh *bm);
+
+
 
 
 

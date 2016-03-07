@@ -120,26 +120,43 @@ float get_dimension_value(BMDim *edm){
 
 //Apply to the selected direction a dimension value
 
-void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value){
+void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res){
 	float vect [3];
+	float prev[3];
+	copy_v3_v3(prev,va->co);
 	sub_v3_v3v3(vect,va->co,vb->co);
 	normalize_v3(vect);
 	mul_v3_fl(vect,value);
 	add_v3_v3v3(va->co,vb->co, vect);
-
+	sub_v3_v3v3(res, va->co, prev);
 }
-void apply_dimension_value (BMDim *edm, float value) {
+
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value) {
 	float len=get_dimension_value(edm);
 	float len2=(value-len)/2;
+	float v[3];
+	BMIter iter;
+	BMVert *eve;
 
 	if(edm->dir==1){
-		apply_dimension_direction_value(edm->v2,edm->v1, value);
+		apply_dimension_direction_value(edm->v2,edm->v1, value, v);
 	}else if(edm->dir==-1){
-		apply_dimension_direction_value(edm->v1,edm->v2, value);
+		apply_dimension_direction_value(edm->v1,edm->v2, value,v);
 	}else{
-		apply_dimension_direction_value(edm->v2,edm->v1, (len+len2));
+		apply_dimension_direction_value(edm->v2,edm->v1, (len+len2), v);
+		apply_dimension_direction_value(edm->v1,edm->v2,value, v);
+	}
 
-		apply_dimension_direction_value(edm->v1,edm->v2,value);
+	if (edm->dir == 1 || edm->dir == -1) {
+		//Apply to selected verts
+		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+			if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+				if (eve != edm->v1 && eve != edm->v2) {
+					// vertex is not in dim
+					add_v3_v3(eve->co, v);
+				}
+			}
+		}
 	}
  }
 // text Position
@@ -152,6 +169,7 @@ void apply_txt_dimension_value(BMDim *edm, float value){
 
 
 }
+
 BMDim* get_selected_dimension_BMesh(BMesh *bm){
 	BMDim *edm = NULL;
 	BMIter iter;

@@ -651,7 +651,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			}
 
 			if (totdim == 1) {
-				apply_dimension_value (tfp->dim_sel, tfp->dimension_value);
+				apply_dimension_value (bm, tfp->dim_sel, tfp->dimension_value);
 				apply_txt_dimension_value(tfp->dim_sel, tfp->dim_txt_pos);
 
 			}
