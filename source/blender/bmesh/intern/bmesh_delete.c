@@ -37,7 +37,9 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 #include "bmesh_dimensions.h"
+#endif
 
 
 
@@ -131,6 +133,7 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 {
 	BMEdge *e;
 	BMFace *f;
+
 	BMIter eiter;
 	BMIter fiter;
 

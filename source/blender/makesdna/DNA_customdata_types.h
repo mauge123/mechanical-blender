@@ -66,7 +66,6 @@ typedef struct CustomData {
 	int typemap[43];              /* runtime only! - maps types to indices of first layer of that type,
 	                               * MUST be >= CD_NUMTYPES, but we cant use a define here.
 	                               * Correct size is ensured in CustomData_update_typemap assert() */
-	//int pad_i1;
 	int totlayer, maxlayer;       /* number of layers, size of layers array */
 	int totsize;                  /* in editmode, total size of all data layers */
 	struct BLI_mempool *pool;     /* (BMesh Only): Memory pool for allocation of blocks */
@@ -125,8 +124,8 @@ typedef enum CustomDataType {
 	CD_CUSTOMLOOPNORMAL = 41,
 
 	CD_MDIM				= 42,
-
 	CD_NUMTYPES         = 43
+
 } CustomDataType;
 
 /* Bits for CustomDataMask */

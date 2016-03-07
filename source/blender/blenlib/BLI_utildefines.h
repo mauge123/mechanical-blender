@@ -40,7 +40,6 @@ extern "C" {
 #include "BLI_sys_types.h"
 #include "BLI_compiler_compat.h"
 
-
 #ifndef NDEBUG /* for BLI_assert */
 #include <stdio.h>
 #endif

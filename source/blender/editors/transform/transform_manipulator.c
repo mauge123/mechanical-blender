@@ -276,7 +276,9 @@ static int calc_manipulator_stats(const bContext *C)
 	Base *base;
 	Object *ob = OBACT;
 	bGPdata *gpd = CTX_data_gpencil_data(C);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm;
+#endif
 	const bool is_gp_edit = ((gpd) && (gpd->flag & GP_DATA_STROKE_EDITMODE));
 	int a, totsel = 0;
 
@@ -321,7 +323,6 @@ static int calc_manipulator_stats(const bContext *C)
 			BMEditMesh *em = BKE_editmesh_from_object(obedit);
 			BMEditSelection ese;
 			float vec[3] = {0, 0, 0};
-			float mid[3];
 
 			/* USE LAST SELECTE WITH ACTIVE */
 			if ((v3d->around == V3D_AROUND_ACTIVE) && BM_select_history_active_get(em->bm, &ese)) {
@@ -329,17 +330,21 @@ static int calc_manipulator_stats(const bContext *C)
 				calc_tw_center(scene, vec);
 				totsel = 1;
 			}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			else if( edm=get_selected_dimension(em)){
+				float mid[3];
 				totsel++;
 				get_dimension_mid(mid, edm);
 				calc_tw_center(scene, mid);
 
-			}else{
-
+			}
+#endif
+			else {
 				BMesh *bm = em->bm;
 				BMVert *eve;
 
 				BMIter iter;
+
 				BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 					if (!BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
 						if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
