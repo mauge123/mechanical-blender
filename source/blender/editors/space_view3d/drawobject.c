@@ -148,6 +148,8 @@ typedef struct drawDMDims_userData {
 	BMDim *edm_act;
 	ARegion *ar;
 	char sel;
+	Object* obedit;
+	Scene* scene;
 
 	/* cached theme values */
 	unsigned char th_editmesh_active[4];
@@ -2662,6 +2664,14 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	BMEditMesh *em = data->em;
 	ARegion *ar = data->ar;
 	BMDim *edm = BM_dim_at_index(em->bm, index);
+	Object *obedit = data->obedit;
+	Scene *scene = data->scene;
+
+	if (scene->obedit != obedit) {
+		// Draw only on active element
+		return;
+	}
+
 
 	float end[3], start[3];
 	float txt_pos[3];
@@ -2781,14 +2791,16 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 }
 
 
-static void draw_dm_dims(ARegion *ar, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
-                          RegionView3D* UNUSED(rv3d))
+static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
+                          RegionView3D* UNUSED(rv3d), Object* obedit)
 {
 	drawDMDims_userData data;
 	data.sel = sel;
 	data.edm_act = edm_act;
 	data.em = em;
 	data.ar = ar;
+	data.obedit = obedit;
+	data.scene = scene;
 
 	/* Cache theme values */
 	UI_GetThemeColor4ubv(TH_EDITMESH_ACTIVE, data.th_editmesh_active);
@@ -3442,7 +3454,7 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* UNUSED(obedit),
+static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* obedit,
 								BMEditMesh *em, DerivedMesh *cageDM, BMDim *edm_act,
 								RegionView3D* rv3d)
 {
@@ -3483,7 +3495,7 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* U
 			if (ts->selectmode & SCE_SELECT_VERTEX) {
 				glPointSize(size);
 				glColor4ubv(col);
-				draw_dm_dims(ar, em, cageDM, sel, edm_act, rv3d);
+				draw_dm_dims(ar, scene, em, cageDM, sel, edm_act, rv3d, obedit);
 			}
 
 			if (pass == 0) {
