@@ -91,9 +91,11 @@ typedef struct {
 	float ob_dims[3];
 	short link_scale;
 	float ve_median[NBR_TRANSFORM_PROPERTIES];
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	float dimension_value;
 	float dim_txt_pos;
 	BMDim *dim_sel;
+#endif
 } TransformProperties;
 
 /* Helper function to compute a median changed value,
@@ -198,13 +200,20 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 	uiBlock *block = (layout) ? uiLayoutAbsoluteBlock(layout) : NULL;
 	TransformProperties *tfp;
 	float median[NBR_TRANSFORM_PROPERTIES], ve_median[NBR_TRANSFORM_PROPERTIES];
-	int tot, totedgedata, totcurvedata, totlattdata, totcurvebweight, totdim;
+	int tot, totedgedata, totcurvedata, totlattdata, totcurvebweight;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	int totdim;
+#endif
 	bool has_meshdata = false;
 	bool has_skinradius = false;
 	PointerRNA data_ptr;
 
 	copy_vn_fl(median, NBR_TRANSFORM_PROPERTIES, 0.0f);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	tot = totedgedata = totcurvedata = totlattdata = totcurvebweight = totdim = 0;
+#else
+	tot = totedgedata = totcurvedata = totlattdata = totcurvebweight = 0;
+#endif
 
 	/* make sure we got storage */
 	if (v3d->properties_storage == NULL)
@@ -218,7 +227,9 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		BMVert *eve;
 		BMEdge *eed;
 		BMIter iter;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		BMDim *edm;
+#endif
 
 		const int cd_vert_bweight_offset = CustomData_get_offset(&bm->vdata, CD_BWEIGHT);
 		const int cd_vert_skin_offset    = CustomData_get_offset(&bm->vdata, CD_MVERT_SKIN);
@@ -244,6 +255,8 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				}
 			}
 		}
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (bm->totdimsel) {
 		    BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
 			if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
@@ -253,6 +266,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			}
 		    }
 		}
+#endif
 
 		if ((cd_edge_bweight_offset != -1) || (cd_edge_crease_offset  != -1)) {
 			if (bm->totedgesel) {
@@ -424,6 +438,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			else /* Mesh or lattice */
 				c = IFACE_("Vertex:");
 		}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (totdim == 1) {
 			tfp->dimension_value = get_dimension_value(tfp->dim_sel);
 			//Add dimension info
@@ -443,7 +458,10 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 		} else if (totdim > 0) {
 			// Only allow modify value for one dimension.
-		}else {
+		}
+#endif
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		else {
 			c = IFACE_("Median:");
 			uiDefBut(block, UI_BTYPE_LABEL, 0, c, 0, yi -= buth, 200, buth, NULL, 0, 0, 0, 0, "");
 
@@ -451,13 +469,13 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 			/* Should be no need to translate these. */
 			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("X:"), 0, yi -= buth, 200, buth,
-					&(tfp->ve_median[LOC_X]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+				        &(tfp->ve_median[LOC_X]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
 			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Y:"), 0, yi -= buth, 200, buth,
-					&(tfp->ve_median[LOC_Y]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+				        &(tfp->ve_median[LOC_Y]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
 			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Z:"), 0, yi -= buth, 200, buth,
-					&(tfp->ve_median[LOC_Z]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+				        &(tfp->ve_median[LOC_Z]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
 			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 
 			if (totcurvebweight == tot) {
@@ -465,18 +483,51 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 					  &(tfp->ve_median[C_BWEIGHT]), 0.01, 100.0, 1, 3, "");
 			}
 
-
 			UI_block_align_begin(block);
 			uiDefButBitS(block, UI_BTYPE_TOGGLE, V3D_GLOBAL_STATS, B_REDR, IFACE_("Global"),
-				 0, yi -= buth + but_margin, 100, buth,
-				 &v3d->flag, 0, 0, 0, 0, TIP_("Displays global values"));
+				     0, yi -= buth + but_margin, 100, buth,
+				     &v3d->flag, 0, 0, 0, 0, TIP_("Displays global values"));
 			uiDefButBitS(block, UI_BTYPE_TOGGLE_N, V3D_GLOBAL_STATS, B_REDR, IFACE_("Local"),
-				 100, yi, 100, buth,
-				 &v3d->flag, 0, 0, 0, 0, TIP_("Displays local values"));
+				     100, yi, 100, buth,
+				     &v3d->flag, 0, 0, 0, 0, TIP_("Displays local values"));
 			UI_block_align_end(block);
 		}
+#else
+		else
+			c = IFACE_("Median:");
+		uiDefBut(block, UI_BTYPE_LABEL, 0, c, 0, yi -= buth, 200, buth, NULL, 0, 0, 0, 0, "");
+
+		UI_block_align_begin(block);
+
+		/* Should be no need to translate these. */
+		but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("X:"), 0, yi -= buth, 200, buth,
+		                &(tfp->ve_median[LOC_X]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+		UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+		but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Y:"), 0, yi -= buth, 200, buth,
+		                &(tfp->ve_median[LOC_Y]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+		UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+		but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Z:"), 0, yi -= buth, 200, buth,
+		                &(tfp->ve_median[LOC_Z]), -lim, lim, 10, RNA_TRANSLATION_PREC_DEFAULT, "");
+		UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+
+		if (totcurvebweight == tot) {
+			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("W:"), 0, yi -= buth, 200, buth,
+			          &(tfp->ve_median[C_BWEIGHT]), 0.01, 100.0, 1, 3, "");
+		}
+
+		UI_block_align_begin(block);
+		uiDefButBitS(block, UI_BTYPE_TOGGLE, V3D_GLOBAL_STATS, B_REDR, IFACE_("Global"),
+		             0, yi -= buth + but_margin, 100, buth,
+		             &v3d->flag, 0, 0, 0, 0, TIP_("Displays global values"));
+		uiDefButBitS(block, UI_BTYPE_TOGGLE_N, V3D_GLOBAL_STATS, B_REDR, IFACE_("Local"),
+		             100, yi, 100, buth,
+		             &v3d->flag, 0, 0, 0, 0, TIP_("Displays local values"));
+		UI_block_align_end(block);
+#endif
+
 		/* Meshes... */
 		if (has_meshdata) {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			if (tot && !totdim) {
 				uiDefBut(block, UI_BTYPE_LABEL, 0, tot == 1 ? IFACE_("Vertex Data:") : IFACE_("Vertices Data:"),
 				         0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
@@ -486,6 +537,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				          0, yi -= buth + but_margin, 200, buth,
 				          &(tfp->ve_median[M_BV_WEIGHT]), 0.0, 1.0, 1, 2, TIP_("Vertex weight used by Bevel modifier"));
 			}
+#endif
 			if (has_skinradius) {
 				UI_block_align_begin(block);
 				uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,
@@ -548,7 +600,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 		UI_block_align_end(block);
 	}
-    else { /* apply */
+	else { /* apply */
 		int i;
 		bool apply_vcos;
 
@@ -566,9 +618,15 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		/* Note with a single element selected, we always do. */
 		apply_vcos = (tot == 1) || (len_squared_v3(&median[LOC_X]) != 0.0f);
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if ((ob->type == OB_MESH) &&
 		    (apply_vcos || median[M_BV_WEIGHT] || median[M_SKIN_X] || median[M_SKIN_Y] ||
 		     median[M_BE_WEIGHT] || median[M_CREASE] || totdim == 1 ))
+#else
+		if ((ob->type == OB_MESH) &&
+		    (apply_vcos || median[M_BV_WEIGHT] || median[M_SKIN_X] || median[M_SKIN_Y] ||
+		     median[M_BE_WEIGHT] || median[M_CREASE]))
+#endif
 		{
 			Mesh *me = ob->data;
 			BMEditMesh *em = me->edit_btmesh;
@@ -649,13 +707,13 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			if (apply_vcos) {
 				EDBM_mesh_normals_update(em);
 			}
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			if (totdim == 1) {
 				apply_dimension_value (bm, tfp->dim_sel, tfp->dimension_value);
 				apply_txt_dimension_value(tfp->dim_sel, tfp->dim_txt_pos);
 
 			}
-
+#endif
 
 			/* Edges */
 
