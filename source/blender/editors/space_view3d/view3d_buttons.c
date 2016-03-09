@@ -94,6 +94,7 @@ typedef struct {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	float dimension_value;
 	float dim_txt_pos;
+	int constraints;
 	BMDim *dim_sel;
 #endif
 } TransformProperties;
@@ -174,7 +175,11 @@ static void apply_scale_factor_clamp(float *val, const int tot, const float ve_m
 }
 
 /* is used for both read and write... */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void v3d_editvertex_buts(Scene *scene, uiLayout *layout, View3D *v3d, Object *ob, float lim)
+#else
 static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float lim)
+#endif
 {
 /* Get rid of those ugly magic numbers, even in a single func they become confusing! */
 /* Location, common to all. */
@@ -203,6 +208,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 	int tot, totedgedata, totcurvedata, totlattdata, totcurvebweight;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	int totdim;
+	ToolSettings *ts = scene->toolsettings;
 #endif
 	bool has_meshdata = false;
 	bool has_skinradius = false;
@@ -258,11 +264,11 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (bm->totdimsel) {
-		    BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-			if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
-			    tot++;
-			    totdim++;
-			    tfp->dim_sel = edm;
+			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+				tot++;
+				totdim++;
+				tfp->dim_sel = edm;
 			}
 		    }
 		}
@@ -449,12 +455,15 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 
 			tfp->dim_txt_pos= tfp->dim_sel->dpos_fact;
 			//Add dimension position
-			uiDefBut(block, UI_BTYPE_LABEL, 0, totdim == 1 ? IFACE_("Dimension Text Position:") : IFACE_(" Dimension Position:"),
+			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("Dimension Text Position:"),
 				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
 
 			uiDefButF(block, UI_BTYPE_NUM_SLIDER, B_OBJECTPANELMEDIAN,IFACE_("Dimension:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_txt_pos,-2.0f,2.0f, 10, RNA_TRANSLATION_PREC_DEFAULT, TIP_("Position"));
 
+			tfp->constraints = ts->dimension_constraints;
+			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
+				&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
 
 		} else if (totdim > 0) {
 			// Only allow modify value for one dimension.
@@ -462,6 +471,8 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 #endif
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		else {
+			// This code is not changed, but enclosed on else
+
 			c = IFACE_("Median:");
 			uiDefBut(block, UI_BTYPE_LABEL, 0, c, 0, yi -= buth, 200, buth, NULL, 0, 0, 0, 0, "");
 
@@ -711,7 +722,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			if (totdim == 1) {
 				apply_dimension_value (bm, tfp->dim_sel, tfp->dimension_value);
 				apply_txt_dimension_value(tfp->dim_sel, tfp->dim_txt_pos);
-
+				ts->dimension_constraints = tfp->constraints;
 			}
 #endif
 
@@ -1217,7 +1228,7 @@ static void do_view3d_region_buttons(bContext *C, void *UNUSED(index), int event
 
 		case B_OBJECTPANELMEDIAN:
 			if (ob) {
-				v3d_editvertex_buts(NULL, v3d, ob, 1.0);
+				v3d_editvertex_buts(scene, NULL, v3d, ob, 1.0);
 				DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 			}
 			break;
@@ -1256,7 +1267,7 @@ static void view3d_panel_transform(const bContext *C, Panel *pa)
 		else {
 			View3D *v3d = CTX_wm_view3d(C);
 			const float lim = 10000.0f * max_ff(1.0f, ED_view3d_grid_scale(scene, v3d, NULL));
-			v3d_editvertex_buts(col, v3d, ob, lim);
+			v3d_editvertex_buts(scene, col, v3d, ob, lim);
 		}
 	}
 	else if (ob->mode & OB_MODE_POSE) {

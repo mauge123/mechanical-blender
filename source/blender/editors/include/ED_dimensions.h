@@ -2,6 +2,9 @@
 #define ED_DIMENSIONS_H
 
 
+#define DIM_PLANE_CONSTRAINT (1 << 0)
+
+
 void apply_dimension_value (BMesh *bm, BMDim *edm, float value);
 void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res);
 float get_dimension_value(BMDim *edm);

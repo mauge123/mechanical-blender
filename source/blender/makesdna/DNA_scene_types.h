@@ -1412,6 +1412,11 @@ typedef struct ToolSettings {
 	struct UnifiedPaintSettings unified_paint_settings;
 
 	struct MeshStatVis statvis;
+
+	/* WITH_MECHANICAL_MESH_DIMENSIONS */
+	int dimension_constraints;
+	char pad[4];
+
 } ToolSettings;
 
 /* *************************************************************** */
