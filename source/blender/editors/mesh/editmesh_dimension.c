@@ -113,13 +113,13 @@ void MESH_OT_mechanical_dimension_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 }
+
 //Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
 	return(len_v3v3(edm->v1->co, edm->v2->co));
 }
 
 //Apply to the selected direction a dimension value
-
 void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res){
 	float vect [3];
 	float prev[3];
@@ -131,33 +131,90 @@ void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float
 	sub_v3_v3v3(res, va->co, prev);
 }
 
-void apply_dimension_value (BMesh *bm, BMDim *edm, float value) {
-	float len=get_dimension_value(edm);
-	float len2=(value-len)/2;
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints) {
 	float v[3];
 	BMIter iter;
 	BMVert *eve;
 
+	if (edm->dir == 0){
+		// Both directions
+		float len=get_dimension_value(edm);
+		float len2=(value-len)/2;
+		edm->dir = 1;
+		apply_dimension_value (bm, edm,(len+len2), constraints);
+		edm->dir = -1;
+		apply_dimension_value (bm, edm,value,constraints);
+		edm->dir = 0;
+		return;
+	}
+
+	// Tag all elements to be affected by change
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(eve, BM_ELEM_TAG);
+		} else {
+			// Disable as default
+			BM_elem_flag_disable(eve, BM_ELEM_TAG);
+		}
+	}
+
+
+	if (constraints & DIM_PLANE_CONSTRAINT) {
+		BMFace *f;
+		BMIter viter;
+		float vec[3];
+		float d_dir[3], p[3];
+
+		sub_v3_v3v3(d_dir,edm->v2->co,edm->v1->co);
+		normalize_v3(d_dir);
+		BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+			float d = dot_v3v3(d_dir,f->no);
+			if (fabs(d*d -1) < FLT_EPSILON) {
+				// Coplanar?
+				BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
+					if (edm->v1 ==  eve || edm->v2 == eve) {
+						continue;
+					}
+					if (edm->dir == -1) {
+						sub_v3_v3v3(vec, edm->v1->co, eve->co);
+					} else if (edm->dir == 1) {
+						sub_v3_v3v3(vec, edm->v2->co, eve->co);
+					}
+					normalize_v3(vec);
+					break;
+				}
+				project_v3_v3v3(p,vec,d_dir);
+				if (len_squared_v3(p) < FLT_EPSILON) {
+					BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
+						BM_elem_flag_enable(eve, BM_ELEM_TAG);
+					}
+				}
+			}
+		}
+
+	}
+	// Untag dimensions vertex
+	BM_elem_flag_disable(edm->v1, BM_ELEM_TAG);
+	BM_elem_flag_disable(edm->v2, BM_ELEM_TAG);
+
+
+	// Update Dimension Verts
 	if(edm->dir==1){
 		apply_dimension_direction_value(edm->v2,edm->v1, value, v);
 	}else if(edm->dir==-1){
 		apply_dimension_direction_value(edm->v1,edm->v2, value,v);
-	}else{
-		apply_dimension_direction_value(edm->v2,edm->v1, (len+len2), v);
-		apply_dimension_direction_value(edm->v1,edm->v2,value, v);
 	}
 
-	if (edm->dir == 1 || edm->dir == -1) {
-		//Apply to selected verts
-		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-			if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-				if (eve != edm->v1 && eve != edm->v2) {
-					// vertex is not in dim
-					add_v3_v3(eve->co, v);
-				}
-			}
+	// Update related Verts
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
+			add_v3_v3(eve->co, v);
+			// Reset tag
+			BM_elem_flag_disable(eve, BM_ELEM_TAG);
 		}
 	}
+
+
  }
 // text Position
 void apply_txt_dimension_value(BMDim *edm, float value){
