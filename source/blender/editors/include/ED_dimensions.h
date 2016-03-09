@@ -1,6 +1,7 @@
 #ifndef ED_DIMENSIONS_H
 #define ED_DIMENSIONS_H
 
+#define DIM_CONSTRAINT_PRECISION 1.0e-3
 
 #define DIM_PLANE_CONSTRAINT (1 << 0)
 

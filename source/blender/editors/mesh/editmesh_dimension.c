@@ -169,7 +169,7 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints)
 		normalize_v3(d_dir);
 		BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
 			float d = dot_v3v3(d_dir,f->no);
-			if (fabs(d*d -1) < FLT_EPSILON) {
+			if (fabs(d*d -1) < DIM_CONSTRAINT_PRECISION) {
 				// Coplanar?
 				BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
 					if (edm->v1 ==  eve || edm->v2 == eve) {
@@ -184,7 +184,7 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints)
 					break;
 				}
 				project_v3_v3v3(p,vec,d_dir);
-				if (len_squared_v3(p) < FLT_EPSILON) {
+				if (len_squared_v3(p) < DIM_CONSTRAINT_PRECISION) {
 					BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
 						BM_elem_flag_enable(eve, BM_ELEM_TAG);
 					}
