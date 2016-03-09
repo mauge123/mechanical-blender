@@ -1085,13 +1085,20 @@ void BM_mesh_elem_hflag_disable_test(
         BMesh *bm, const char htype, const char hflag,
         const bool respecthide, const bool overwrite, const char hflag_test)
 {
-	const char iter_types[4] = {BM_DIMS_OF_MESH,
-								BM_VERTS_OF_MESH,
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	const char iter_types[4] = {    BM_DIMS_OF_MESH,
+									BM_VERTS_OF_MESH,
+									BM_EDGES_OF_MESH,
+									BM_FACES_OF_MESH};
+
+	const char flag_types[4] = {BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
+#else
+	const char iter_types[3] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 
-	const char flag_types[4] = {BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
-
+	const char flag_types[3] = {BM_VERT, BM_EDGE, BM_FACE};
+#endif
 	const char hflag_nosel = hflag & ~BM_ELEM_SELECT;
 
 	int i;
@@ -1101,17 +1108,31 @@ void BM_mesh_elem_hflag_disable_test(
 	if (hflag & BM_ELEM_SELECT) {
 		BM_select_history_clear(bm);
 	}
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if ((htype == (BM_DIM | BM_VERT | BM_EDGE | BM_FACE)) &&
 	    (hflag == BM_ELEM_SELECT) &&
 	    (respecthide == false) &&
 	    (hflag_test == 0))
+#else
+	if ((htype == (BM_VERT | BM_EDGE | BM_FACE)) &&
+	    (hflag == BM_ELEM_SELECT) &&
+	    (respecthide == false) &&
+	    (hflag_test == 0))
+#endif
 	{
 		/* fast path for deselect all, avoid topology loops
 		 * since we know all will be de-selected anyway. */
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 #pragma omp parallel for schedule(static) if (bm->totdim + bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
+#else
+#pragma omp parallel for schedule(static) if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		for (i = 0; i < 4; i++) {
+#else
 		for (i = 0; i < 3; i++) {
+#endif
 			BMIter iter;
 			BMElem *ele;
 
@@ -1124,7 +1145,11 @@ void BM_mesh_elem_hflag_disable_test(
 		bm->totvertsel = bm->totedgesel = bm->totfacesel= bm->totdimsel = 0;
 	}
 	else {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		for (i = 0; i < 4; i++) {
+#else
 		for (i = 0; i < 3; i++) {
+#endif
 			BMIter iter;
 			BMElem *ele;
 
