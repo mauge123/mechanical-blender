@@ -761,18 +761,6 @@ int bmesh_elem_check(void *element, const char htype)
  */
 static void bm_kill_only_vert(BMesh *bm, BMVert *v)
 {
-	BMDim *edm = NULL;
-	BMIter iter;
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	// Search if delete affects a dimension
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		if (v == edm->v1 || v == edm->v2) {
-			bm_kill_only_dim (bm,edm);
-		}
-	}
-#endif
-
 	bm->totvert--;
 	bm->elem_index_dirty |= BM_VERT;
 	bm->elem_table_dirty |= BM_VERT;
@@ -1027,6 +1015,11 @@ void BM_edge_kill(BMesh *bm, BMEdge *e)
  */
 void BM_vert_kill(BMesh *bm, BMVert *v)
 {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BMDim *edm = NULL;
+	BMIter iter;
+#endif
+
 	if (v->e) {
 		BMEdge *e, *e_next;
 		
@@ -1037,6 +1030,15 @@ void BM_vert_kill(BMesh *bm, BMVert *v)
 			e = e_next;
 		}
 	}
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	// Search if delete affects a dimension
+	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+		if (v == edm->v1 || v == edm->v2) {
+			bm_kill_only_dim (bm,edm);
+		}
+	}
+#endif
 
 	bm_kill_only_vert(bm, v);
 }
