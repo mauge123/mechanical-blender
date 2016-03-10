@@ -62,6 +62,10 @@ see https://developer.blender.org/D1501
 This branchs starts from mechanical-grab-w-basepoint.
 This branch is merged down to mechanical-grab-w-basepoint.
 
+### mechanical-dimensions
+
+* see https://vimeo.com/157582150
+
 ## Issues
 
 ## Related
