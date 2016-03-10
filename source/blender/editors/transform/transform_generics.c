@@ -1422,7 +1422,8 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 #endif
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	if (RNA_boolean_get(op->ptr,"uses_manipulator")) {
+	// Operator may be NULL when usign transform code from other parts or code
+	if (op && RNA_boolean_get(op->ptr,"uses_manipulator")) {
 		t->flag |= T_USES_MANIPULATOR;
 	}
 #endif
