@@ -1323,6 +1323,10 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
 	{sizeof(short[4][3]), "", 0, NULL, NULL, NULL, NULL, layerSwap_flnor, NULL},
 	/* 41: CD_CUSTOMLOOPNORMAL */
 	{sizeof(short[2]), "vec2s", 1, NULL, NULL, NULL, NULL, NULL, NULL},
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+    /* 42: CD_DIM */
+	{sizeof(MDim), "MDim", 1, NULL, NULL, NULL, NULL, NULL, NULL},
+#endif
 };
 
 

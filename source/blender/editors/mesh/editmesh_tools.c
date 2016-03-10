@@ -356,8 +356,6 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 			if (!EDBM_op_callf(em, op, "delete geom=%hf context=%i", BM_ELEM_SELECT, DEL_FACES))  /* Erase Faces */
 				return OPERATOR_CANCELLED;
 			break;
-
-
 		case MESH_DELETE_EDGE_FACE:
 			/* Edges and Faces */
 			if (!EDBM_op_callf(em, op, "delete geom=%hef context=%i", BM_ELEM_SELECT, DEL_EDGESFACES))
@@ -368,15 +366,12 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 			if (!EDBM_op_callf(em, op, "delete geom=%hf context=%i", BM_ELEM_SELECT, DEL_ONLYFACES))
 				return OPERATOR_CANCELLED;
 			break;
-	#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case MESH_DELETE_DIM:
 			if (!EDBM_op_callf(em, op, "delete geom=%hv context=%i", BM_ELEM_SELECT, DEL_DIM))  /* Erase DIM */
 				return OPERATOR_CANCELLED;
 			break;
-	#endif
-
-
-
+#endif
 		default:
 			BLI_assert(0);
 			break;

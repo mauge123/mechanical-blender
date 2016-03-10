@@ -4516,6 +4516,9 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	mesh->mloopuv = newdataadr(fd, mesh->mloopuv);
 	mesh->mtpoly = newdataadr(fd, mesh->mtpoly);
 	mesh->mselect = newdataadr(fd, mesh->mselect);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	mesh->mdim = newdataadr(fd, mesh->mdim);
+#endif
 	
 	/* animdata */
 	mesh->adt = newdataadr(fd, mesh->adt);

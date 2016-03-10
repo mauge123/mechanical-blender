@@ -2002,8 +2002,9 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 		CustomDataLayer *flayers = NULL, flayers_buff[CD_TEMP_CHUNK_SIZE];
 		CustomDataLayer *llayers = NULL, llayers_buff[CD_TEMP_CHUNK_SIZE];
 		CustomDataLayer *players = NULL, players_buff[CD_TEMP_CHUNK_SIZE];
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		CustomDataLayer *dlayers = NULL, dlayers_buff[CD_TEMP_CHUNK_SIZE];
-
+#endif
 		if (mesh->id.us>0 || wd->current) {
 			/* write LibData */
 			if (!save_for_old_blender) {

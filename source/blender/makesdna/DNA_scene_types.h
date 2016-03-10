@@ -1415,8 +1415,10 @@ typedef struct ToolSettings {
 	struct MeshStatVis statvis;
 
 	/* Duplicate multiple flag WITH_MECHANICAL_TRANSFORM_MULTIPLE*/
-	char transform_multiple;
-	char pad[7];
+	int transform_multiple;
+
+	/* WITH_MECHANICAL_MESH_DIMENSIONS */
+	int dimension_constraints;
 
 } ToolSettings;
 

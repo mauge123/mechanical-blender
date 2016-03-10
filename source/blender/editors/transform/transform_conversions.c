@@ -7980,10 +7980,13 @@ void createTransData(bContext *C, TransInfo *t)
 	else if (t->obedit) {
 		t->ext = NULL;
 		if (t->obedit->type == OB_MESH) {
-    		//Dim
-    		if (!createTransEditDim (t)) {
-       			createTransEditVerts(t);
-    		}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+    			if (!createTransEditDim (t)) {
+       				createTransEditVerts(t);
+    			}
+#else
+			createTransEditVerts(t);
+#endif
 		}
 		else if (ELEM(t->obedit->type, OB_CURVE, OB_SURF)) {
 			createTransCurveVerts(t);

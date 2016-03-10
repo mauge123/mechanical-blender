@@ -480,12 +480,20 @@ void EDBM_select_less(BMEditMesh *em, const bool use_face_step)
 
 void EDBM_flag_disable_all(BMEditMesh *em, const char hflag)
 {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_mesh_elem_hflag_disable_all(em->bm, BM_DIM | BM_VERT | BM_EDGE | BM_FACE, hflag, false);
+#else
+	BM_mesh_elem_hflag_disable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, hflag, false);
+#endif
 }
 
 void EDBM_flag_enable_all(BMEditMesh *em, const char hflag)
 {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_mesh_elem_hflag_enable_all(em->bm, BM_DIM | BM_VERT | BM_EDGE | BM_FACE, hflag, true);
+#else
+	BM_mesh_elem_hflag_enable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, hflag, true);
+#endif
 }
 
 /**************-------------- Undo ------------*****************/

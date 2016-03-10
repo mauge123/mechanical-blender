@@ -87,8 +87,6 @@
 #include "BLI_alloca.h"
 #include "BLI_math_vector.h"
 
-#include "bmesh_dimensions.h"
-
 #include "BKE_mesh.h"
 #include "BKE_customdata.h"
 #include "BKE_multires.h"

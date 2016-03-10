@@ -69,9 +69,11 @@ int BM_iter_mesh_count(const char itype, BMesh *bm)
 		case BM_FACES_OF_MESH:
 			count = bm->totface;
 			break;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case BM_DIMS_OF_MESH:
 			count=bm->totdim;
 			break;
+#endif
 		default:
 			count = 0;
 			BLI_assert(0);

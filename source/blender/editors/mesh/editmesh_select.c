@@ -1033,11 +1033,16 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	}
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	/* return only one of 4 pointers, for frontbuffer redraws */
 	if (edm) {
 		eve = NULL, efa = NULL; eed = NULL;
 	}
 	else if (eve) {
+#else
+	/* return only one of 3 pointers, for frontbuffer redraws */
+	if (eve) {
+#endif
 		efa = NULL; eed = NULL;
 	}
 	else if (eed) {
@@ -1046,7 +1051,11 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 
 	/* there may be a face under the cursor, who's center if too far away
 	 * use this if all else fails, it makes sense to select this */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if ((edm || eve || eed || efa) == 0) {
+#else
+	if ((eve || eed || efa) == 0) {
+#endif
 		if (eed_zbuf) {
 			eed = eed_zbuf;
 		}
@@ -1061,9 +1070,15 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	*r_eve = eve;
 	*r_eed = eed;
 	*r_efa = efa;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	*r_edm = edm;
+#endif
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	return (edm || eve || eed || efa);
+#else
+	return (eve || eed || efa);
+#endif
 }
 
 /** \} */
@@ -1921,6 +1936,7 @@ void MESH_OT_select_interior_faces(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void select_dimension_data (BMDim *edm, void *context) {
 	ViewContext *vc = (ViewContext*) context;
 	float screen_co_start[2];
@@ -1994,6 +2010,7 @@ void select_dimension_data (BMDim *edm, void *context) {
 
 	}
 }
+#endif
 
 
 /* ************************************************** */
@@ -2014,7 +2031,11 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 	vc.mval[0] = mval[0];
 	vc.mval[1] = mval[1];
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm)) {
+#else
+	if (unified_findnearest(&vc, &eve, &eed, &efa)) {
+#endif
 
 		/* Deselect everything */
 		if (extend == false && deselect == false && toggle == false)
@@ -3010,7 +3031,11 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 	vc.mval[1] = event->mval[1];
 
 	/* return warning! */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm) == 0) {
+#else
+	if (unified_findnearest(&vc, &eve, &eed, &efa) == 0) {
+#endif
 		WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit);
 
 		return OPERATOR_CANCELLED;

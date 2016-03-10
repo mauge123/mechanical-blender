@@ -75,9 +75,15 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 
 void BM_mesh_elem_toolflags_ensure(BMesh *bm)
 {
-	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool&&bm->dtoolflagpool) {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool && bm->dtoolflagpool) {
 		return;
 	}
+#else
+	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool) {
+		return;
+	}
+#endif
 
 	bm->vtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totvert, 512, BLI_MEMPOOL_NOP);
 	bm->etoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totedge, 512, BLI_MEMPOOL_NOP);
@@ -1263,12 +1269,18 @@ bool BM_mesh_elem_table_check(BMesh *bm)
 
 void BM_mesh_elem_table_ensure(BMesh *bm, const char htype)
 {
+#if defined WITH_MECHANICAL_MESH_DIMENSIONS
 	/* assume if the array is non-null then its valid and no need to recalc */
 	const char htype_needed = (((bm->vtable && ((bm->elem_table_dirty & BM_VERT) == 0)) ? 0 : BM_VERT) |
 	                           ((bm->etable && ((bm->elem_table_dirty & BM_EDGE) == 0)) ? 0 : BM_EDGE) |
 	                           ((bm->dtable && ((bm->elem_table_dirty & BM_DIM) == 0)) ? 0 : BM_DIM)  |
 	                           ((bm->ftable && ((bm->elem_table_dirty & BM_FACE) == 0)) ? 0 : BM_FACE)) & htype;
-
+#else
+	/* assume if the array is non-null then its valid and no need to recalc */
+	const char htype_needed = (((bm->vtable && ((bm->elem_table_dirty & BM_VERT) == 0)) ? 0 : BM_VERT) |
+	                           ((bm->etable && ((bm->elem_table_dirty & BM_EDGE) == 0)) ? 0 : BM_EDGE) |
+	                           ((bm->ftable && ((bm->elem_table_dirty & BM_FACE) == 0)) ? 0 : BM_FACE)) & htype;
+#endif
 	BLI_assert((htype & ~BM_ALL_NOLOOP) == 0);
 
 	/* in debug mode double check we didn't need to recalculate */
@@ -1436,10 +1448,12 @@ BMFace *BM_face_at_index_find(BMesh *bm, const int index)
 	return BLI_mempool_findelem(bm->fpool, index);
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_at_index_find(BMesh *bm, const int index)
 {
 	return BLI_mempool_findelem(bm->dpool, index);
 }
+#endif
 
 /**
  * Use lookup table when available, else use slower find functions.

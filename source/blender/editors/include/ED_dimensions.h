@@ -1,15 +1,20 @@
 #ifndef ED_DIMENSIONS_H
 #define ED_DIMENSIONS_H
 
+#define DIM_CONSTRAINT_PRECISION 1.0e-3
 
-void apply_dimension_value (BMDim *edm, float value);
-void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value);
+#define DIM_PLANE_CONSTRAINT (1 << 0)
+
+
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints);
+void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res);
 float get_dimension_value(BMDim *edm);
 
 //float get_txt_position(BMDim *edm);
 void apply_txt_dimension_value (BMDim *edm, float value);
 
 BMDim* get_selected_dimension(BMEditMesh *em);
+BMDim* get_selected_dimension_BMesh(BMesh *bm);
 
 void get_dimension_mid(float mid[3],BMDim *edm);
 

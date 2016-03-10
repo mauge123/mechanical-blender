@@ -273,7 +273,7 @@ BMOpSlot *BMO_slot_get(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *identif
 	}
 
 	return &slot_args[slot_code];
- }
+}
 
 /**
  * \brief BMESH OPSTACK COPY SLOT
@@ -1350,9 +1350,15 @@ static void bmo_flag_layer_free(BMesh *bm)
 	BLI_mempool_destroy(voldpool);
 	BLI_mempool_destroy(eoldpool);
 	BLI_mempool_destroy(foldpool);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BLI_mempool_destroy(doldpool);
+#endif
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE |BM_DIM);
+#else
+	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE);
+#endif
 }
 
 static void bmo_flag_layer_clear(BMesh *bm)
