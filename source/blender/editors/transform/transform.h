@@ -547,9 +547,6 @@ typedef struct TransInfo {
 #define T_TRANSFORM_MULTIPLE (1 << 26)
 #endif
 
-#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
-#define T_TRANSFORM_NO_MODAL (1 << 27)
-#endif
 
 
 /* TransInfo->modifiers */

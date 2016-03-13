@@ -44,23 +44,39 @@
 
 static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], float output[3])
 {
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (t->spacetype == SPACE_VIEW3D){
+		float p[3] = {0,0,0};
+		float fmval[3] = {(double) mval[0], (double) mval[1]};
+		float vec[3];
+		ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+		sub_v3_v3v3(output, vec, t->iloc);
+	} else {
+		convertViewVec(t, output, mval[0] - mi->imval[0], mval[1] - mi->imval[1]);
+	}
+#else
 	convertViewVec(t, output, mval[0] - mi->imval[0], mval[1] - mi->imval[1]);
-#ifdef REMOVED_WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
-		if (t->spacetype == SPACE_VIEW3D){
-			float p[3] = {0,0,0};
-			ED_view3d_win_to_3d_int(t->ar, p, mval, vec);
-			sub_v3_v3v3(output,vec,t->iloc);
-		}
 #endif
 }
 
-static void InputSpring(TransInfo *UNUSED(t), MouseInput *mi, const double mval[2], float output[3])
+static void InputSpring(TransInfo *t, MouseInput *mi, const double mval[2], float output[3])
 {
 	double dx, dy;
 	float ratio;
-
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	if (t->spacetype == SPACE_VIEW3D){
+		float center[2];
+		projectFloatView(t, t->center,center);
+		dx = ((double)center[0] - mval[0]);
+		dy = ((double)center[1] - mval[1]);
+	} else {
+		dx = ((double)mi->center[0] - mval[0]);
+		dy = ((double)mi->center[1] - mval[1]);
+	}
+#else
 	dx = ((double)mi->center[0] - mval[0]);
 	dy = ((double)mi->center[1] - mval[1]);
+#endif
 	ratio = hypot(dx, dy) / (double)mi->factor;
 
 	output[0] = ratio;
@@ -271,7 +287,13 @@ void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode)
 	/* incase we allocate a new value */
 	void *mi_data_prev = mi->data;
 
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	// Virtual Code is based on imval
+	// On exit transform_modal we are based on real 3D loc
+	mi->use_virtual_mval = false;
+#else
 	mi->use_virtual_mval = true;
+#endif
 	mi->precision_factor = 1.0f / 10.0f;
 
 	switch (mode) {

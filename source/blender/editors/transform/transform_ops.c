@@ -723,11 +723,6 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 	RNA_def_boolean(ot->srna, "transform_multiple", 0, "Multiple", "Apply Multiple times");
 #endif
 
-#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
-	RNA_def_boolean(ot->srna, "transform_no_modal", 0, "No Modal", "No Modal Transform");
-#endif
-
-
 }
 
 static void TRANSFORM_OT_translate(struct wmOperatorType *ot)
