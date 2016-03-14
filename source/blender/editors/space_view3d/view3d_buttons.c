@@ -95,7 +95,6 @@ typedef struct {
 	float dimension_value;
 	float dim_txt_pos;
 	int constraints;
-	BMDim *dim_sel;
 #endif
 } TransformProperties;
 
@@ -209,6 +208,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	int totdim;
 	ToolSettings *ts = scene->toolsettings;
+	BMDim *edm_sel;
 #endif
 	bool has_meshdata = false;
 	bool has_skinradius = false;
@@ -266,10 +266,10 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		if (bm->totdimsel) {
 			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
-				tot++;
-				totdim++;
-				tfp->dim_sel = edm;
-			}
+					tot++;
+					totdim++;
+					edm_sel = edm;
+				}
 		    }
 		}
 #endif
@@ -445,16 +445,17 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				c = IFACE_("Vertex:");
 		}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		if (totdim == 1) {
-			tfp->dimension_value = get_dimension_value(tfp->dim_sel);
-			//Add dimension info
+		if (totdim) {
+			// At least one dimension
+			tfp->dimension_value = get_dimension_value(edm_sel);
+			// Add dimension info
 			uiDefBut(block, UI_BTYPE_LABEL, 0, totdim == 1 ? IFACE_("Dimension Value:") : IFACE_("Height Dimension:"),
 				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Dimension:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
 
-			tfp->dim_txt_pos= tfp->dim_sel->dpos_fact;
-			//Add dimension position
+			tfp->dim_txt_pos= edm_sel->dpos_fact;
+			// Add dimension position
 			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("Dimension Text Position:"),
 				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
 
@@ -465,8 +466,6 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
 
-		} else if (totdim > 0) {
-			// Only allow modify value for one dimension.
 		}
 #endif
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
@@ -632,7 +631,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if ((ob->type == OB_MESH) &&
 		    (apply_vcos || median[M_BV_WEIGHT] || median[M_SKIN_X] || median[M_SKIN_Y] ||
-		     median[M_BE_WEIGHT] || median[M_CREASE] || totdim == 1 ))
+		     median[M_BE_WEIGHT] || median[M_CREASE] || totdim ))
 #else
 		if ((ob->type == OB_MESH) &&
 		    (apply_vcos || median[M_BV_WEIGHT] || median[M_SKIN_X] || median[M_SKIN_Y] ||
@@ -645,6 +644,9 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			BMIter iter;
 			BMVert *eve;
 			BMEdge *eed;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			BMDim *edm;
+#endif
 
 			int cd_vert_bweight_offset = -1;
 			int cd_vert_skin_offset = -1;
@@ -719,10 +721,14 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				EDBM_mesh_normals_update(em);
 			}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-			if (totdim == 1) {
-				apply_dimension_value (bm, tfp->dim_sel, tfp->dimension_value, tfp->constraints);
-				apply_txt_dimension_value(tfp->dim_sel, tfp->dim_txt_pos);
-				ts->dimension_constraints = tfp->constraints;
+			if (totdim) {
+				BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+					if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+						apply_dimension_value (bm, edm, tfp->dimension_value, tfp->constraints);
+						apply_txt_dimension_value(edm, tfp->dim_txt_pos);
+						ts->dimension_constraints = tfp->constraints;
+					}
+				}
 			}
 #endif
 
