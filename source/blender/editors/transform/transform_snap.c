@@ -998,7 +998,7 @@ static void UNUSED_FUNCTION(CalcSnapGrid) (TransInfo *t, float *UNUSED(vec))
 
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
 static int snap_3d_point (TransInfo *t, const float *mval, const float *point, float dist_px){
-	float pos [2] = {};
+	float pos [2] = {0};
 	RegionView3D *rv3d = t->ar->regiondata;
 
 	//Get 2D cordinates of target
