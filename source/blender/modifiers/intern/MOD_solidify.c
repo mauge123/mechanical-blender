@@ -370,12 +370,19 @@ static DerivedMesh *applyModifier(
 		dm_calc_normal(dm, face_nors, vert_nors);
 	}
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	result = CDDM_from_template(dm,
+	                            (int)((numVerts * stride) + newVerts),
+	                            (int)((numEdges * stride) + newEdges + rimVerts), 0,
+	                            (int)((numLoops * stride) + newLoops),
+	                            (int)((numFaces * stride) + newFaces), 0 );
+#else
 	result = CDDM_from_template(dm,
 	                            (int)((numVerts * stride) + newVerts),
 	                            (int)((numEdges * stride) + newEdges + rimVerts), 0,
 	                            (int)((numLoops * stride) + newLoops),
 	                            (int)((numFaces * stride) + newFaces));
-
+#endif
 	mpoly = CDDM_get_polys(result);
 	mloop = CDDM_get_loops(result);
 	medge = CDDM_get_edges(result);

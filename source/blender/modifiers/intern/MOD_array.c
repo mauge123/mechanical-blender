@@ -540,7 +540,11 @@ static DerivedMesh *arrayModifier_doArray(
 	result_npolys = chunk_npolys * count + start_cap_npolys + end_cap_npolys;
 
 	/* Initialize a result dm */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	result = CDDM_from_template(dm, result_nverts, result_nedges, 0, result_nloops, result_npolys, 0);
+#else
 	result = CDDM_from_template(dm, result_nverts, result_nedges, 0, result_nloops, result_npolys);
+#endif
 	result_dm_verts = CDDM_get_verts(result);
 
 	if (use_merge) {

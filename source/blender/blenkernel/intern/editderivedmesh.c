@@ -2197,9 +2197,13 @@ DerivedMesh *getEditDerivedBMesh(
 
 	bmdm->em = em;
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	DM_init((DerivedMesh *)bmdm, DM_TYPE_EDITBMESH, bm->totvert,
+	        bm->totedge, em->tottri, bm->totloop, bm->totface, bm->totdim);
+#else
 	DM_init((DerivedMesh *)bmdm, DM_TYPE_EDITBMESH, bm->totvert,
 	        bm->totedge, em->tottri, bm->totloop, bm->totface);
-
+#endif
 	/* could also get from the objects mesh directly */
 	bmdm->dm.cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 

@@ -139,7 +139,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
 	if (dvert == NULL) {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		return found_test ? CDDM_from_template(dm, 0, 0, 0, 0, 0,0 ) : dm;
+#else
 		return found_test ? CDDM_from_template(dm, 0, 0, 0, 0, 0) : dm;
+#endif
 	}
 
 	/* Overview of Method:
@@ -305,7 +309,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	/* now we know the number of verts, edges and faces, 
 	 * we can create the new (reduced) mesh
 	 */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	result = CDDM_from_template(dm, numVerts, numEdges, 0, numLoops, numPolys, 0);
+#else
 	result = CDDM_from_template(dm, numVerts, numEdges, 0, numLoops, numPolys);
+#endif
 	
 	mpoly_dst = CDDM_get_polys(result);
 	mloop_dst = CDDM_get_loops(result);

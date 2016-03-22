@@ -176,6 +176,22 @@ static MPoly *dm_getPolyArray(DerivedMesh *dm)
 	return mpoly;
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static MVert *dm_getDimArray(DerivedMesh *dm)
+{
+	MDim *mdim = CustomData_get_layer(&dm->dimData, CD_MDIM);
+
+	if (!mdim) {
+		mdim = CustomData_add_layer(&dm->dimData, CD_MDIM, CD_CALLOC, NULL,
+		                             dm->getNumDims(dm));
+		CustomData_set_layer_flag(&dm->dimData, CD_MVERT, CD_FLAG_TEMPORARY);
+		dm->copyDimArray(dm, mdim);
+	}
+
+	return mdim;
+}
+#endif
+
 static MVert *dm_dupVertArray(DerivedMesh *dm)
 {
 	MVert *tmp = MEM_mallocN(sizeof(*tmp) * dm->getNumVerts(dm),
@@ -268,6 +284,9 @@ void DM_init_funcs(DerivedMesh *dm)
 	dm->getTessFaceArray = dm_getTessFaceArray;
 	dm->getLoopArray = dm_getLoopArray;
 	dm->getPolyArray = dm_getPolyArray;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	dm->getDimArray = dm_getDimArray;
+#endif
 	dm->dupVertArray = dm_dupVertArray;
 	dm->dupEdgeArray = dm_dupEdgeArray;
 	dm->dupTessFaceArray = dm_dupFaceArray;
@@ -292,6 +311,9 @@ void DM_init_funcs(DerivedMesh *dm)
 	dm->getTessFaceDataArray = DM_get_tessface_data_layer;
 	dm->getPolyDataArray = DM_get_poly_data_layer;
 	dm->getLoopDataArray = DM_get_loop_data_layer;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	dm->getDimDataArray = DM_get_dim_data_layer;
+#endif
 
 	bvhcache_init(&dm->bvhCache);
 }
@@ -301,9 +323,15 @@ void DM_init_funcs(DerivedMesh *dm)
  * of vertices, edges and faces (doesn't allocate memory for them, just
  * sets up the custom data layers)
  */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_init(
+        DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
+        int numTessFaces, int numLoops, int numPolys, int numDims)
+#else
 void DM_init(
         DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
         int numTessFaces, int numLoops, int numPolys)
+#endif
 {
 	dm->type = type;
 	dm->numVertData = numVerts;
@@ -311,6 +339,9 @@ void DM_init(
 	dm->numTessFaceData = numTessFaces;
 	dm->numLoopData = numLoops;
 	dm->numPolyData = numPolys;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	dm->numDimData = numDims;
+#endif
 
 	DM_init_funcs(dm);
 	
@@ -324,17 +355,28 @@ void DM_init(
 	copy_vn_i(dm->faceData.typemap, CD_NUMTYPES, -1);
 	copy_vn_i(dm->loopData.typemap, CD_NUMTYPES, -1);
 	copy_vn_i(dm->polyData.typemap, CD_NUMTYPES, -1);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	copy_vn_i(dm->dimData.typemap, CD_NUMTYPES, -1);
+#endif
 }
 
 /**
  * Utility function to initialize a DerivedMesh for the desired number
  * of vertices, edges and faces, with a layer setup copied from source
  */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_from_template_ex(
+        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
+        int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys, int numDims,
+        CustomDataMask mask)
+#else
 void DM_from_template_ex(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys,
         CustomDataMask mask)
+#endif
 {
 	CustomData_copy(&source->vertData, &dm->vertData, mask, CD_CALLOC, numVerts);
 	CustomData_copy(&source->edgeData, &dm->edgeData, mask, CD_CALLOC, numEdges);
@@ -350,12 +392,28 @@ void DM_from_template_ex(
 	dm->numTessFaceData = numTessFaces;
 	dm->numLoopData = numLoops;
 	dm->numPolyData = numPolys;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	dm->numDimData = numDims;
+#endif
 
 	DM_init_funcs(dm);
 
 	dm->needsFree = 1;
 	dm->dirty = 0;
 }
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_from_template(
+        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
+        int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys, int numDims)
+{
+	DM_from_template_ex(
+	        dm, source, type,
+	        numVerts, numEdges, numTessFaces,
+	        numLoops, numPolys, numDims,
+	        CD_MASK_DERIVEDMESH);
+}
+#else
 void DM_from_template(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
@@ -367,6 +425,7 @@ void DM_from_template(
 	        numLoops, numPolys,
 	        CD_MASK_DERIVEDMESH);
 }
+#endif
 
 int DM_release(DerivedMesh *dm)
 {
@@ -378,6 +437,9 @@ int DM_release(DerivedMesh *dm)
 		CustomData_free(&dm->faceData, dm->numTessFaceData);
 		CustomData_free(&dm->loopData, dm->numLoopData);
 		CustomData_free(&dm->polyData, dm->numPolyData);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		CustomData_free(&dm->dimData, dm->numDimData);
+#endif
 
 		if (dm->mat) {
 			MEM_freeN(dm->mat);
@@ -397,6 +459,9 @@ int DM_release(DerivedMesh *dm)
 		CustomData_free_temporary(&dm->faceData, dm->numTessFaceData);
 		CustomData_free_temporary(&dm->loopData, dm->numLoopData);
 		CustomData_free_temporary(&dm->polyData, dm->numPolyData);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		CustomData_free_temporary(&dm->dimData, dm->numDimData);
+#endif
 
 		return 0;
 	}
@@ -828,6 +893,9 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 			CustomData_free_typemask(&dm->edgeData, dm->numEdgeData, ~mask);
 			CustomData_free_typemask(&dm->loopData, dm->numLoopData, ~mask);
 			CustomData_free_typemask(&dm->polyData, dm->numPolyData, ~mask);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			CustomData_free_typemask(&dm->dimData, dm->numDimData, ~mask);
+#endif
 		}
 		dm->release(dm);
 	}
@@ -899,6 +967,13 @@ void DM_add_poly_layer(DerivedMesh *dm, int type, int alloctype, void *layer)
 	CustomData_add_layer(&dm->polyData, type, alloctype, layer, dm->numPolyData);
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_add_dim_layer(DerivedMesh *dm, int type, int alloctype, void *layer)
+{
+	CustomData_add_layer(&dm->dimData, type, alloctype, layer, dm->numDimData);
+}
+#endif
+
 void *DM_get_vert_data(DerivedMesh *dm, int index, int type)
 {
 	BLI_assert(index >= 0 && index < dm->getNumVerts(dm));
@@ -957,6 +1032,16 @@ void *DM_get_loop_data_layer(DerivedMesh *dm, int type)
 {
 	return CustomData_get_layer(&dm->loopData, type);
 }
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void *DM_get_dim_data_layer(DerivedMesh *dm, int type)
+{
+	if (type == CD_MDIM)
+		return dm->getDimArray(dm);
+
+	return CustomData_get_layer(&dm->dimData, type);
+}
+#endif
 
 void DM_set_vert_data(DerivedMesh *dm, int index, int type, void *data)
 {

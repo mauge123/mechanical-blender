@@ -281,7 +281,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		max_co = max[track];
 	}
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	result = CDDM_from_template(dm, maxvert, 0, 0, maxloop, maxpoly, 0);
+#else
 	result = CDDM_from_template(dm, maxvert, 0, 0, maxloop, maxpoly);
+#endif
 
 	mvert = result->getVertArray(result);
 	orig_mvert = dm->getVertArray(dm);

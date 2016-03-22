@@ -176,8 +176,13 @@ typedef enum DMDirtyFlag {
 typedef struct DerivedMesh DerivedMesh;
 struct DerivedMesh {
 	/** Private DerivedMesh data, only for internal DerivedMesh use */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData vertData, edgeData, faceData, loopData, polyData, dimData;
+	int numVertData, numEdgeData, numTessFaceData, numLoopData, numPolyData, numDimData;
+#else
 	CustomData vertData, edgeData, faceData, loopData, polyData;
 	int numVertData, numEdgeData, numTessFaceData, numLoopData, numPolyData;
+#endif
 	int needsFree; /* checked on ->release, is set to 0 for cached results */
 	int deformedOnly; /* set by modifier stack if only deformed from original */
 	BVHCache bvhCache;
@@ -229,7 +234,9 @@ struct DerivedMesh {
 	int (*getNumTessFaces)(DerivedMesh *dm);
 	int (*getNumLoops)(DerivedMesh *dm);
 	int (*getNumPolys)(DerivedMesh *dm);
-
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	int (*getNumDims)(DerivedMesh *dm);
+#endif
 	/** Copy a single vert/edge/tessellated face from the derived mesh into
 	 * ``*r_{vert/edge/face}``. note that the current implementation
 	 * of this function can be quite slow, iterating over all
@@ -249,6 +256,9 @@ struct DerivedMesh {
 	struct MFace *(*getTessFaceArray)(DerivedMesh * dm);
 	struct MLoop *(*getLoopArray)(DerivedMesh * dm);
 	struct MPoly *(*getPolyArray)(DerivedMesh * dm);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	struct MPoly *(*getDimArray)(DerivedMesh * dm);
+#endif
 
 	/** Copy all verts/edges/faces from the derived mesh into
 	 * *{vert/edge/face}_r (must point to a buffer large enough)
@@ -258,6 +268,9 @@ struct DerivedMesh {
 	void (*copyTessFaceArray)(DerivedMesh *dm, struct MFace *r_face);
 	void (*copyLoopArray)(DerivedMesh *dm, struct MLoop *r_loop);
 	void (*copyPolyArray)(DerivedMesh *dm, struct MPoly *r_poly);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	void (*copyDimArray)(DerivedMesh *dm, struct MDim *r_dim);
+#endif
 
 	/** Return a copy of all verts/edges/faces from the derived mesh
 	 * it is the caller's responsibility to free the returned pointer
@@ -286,6 +299,9 @@ struct DerivedMesh {
 	void *(*getTessFaceDataArray)(DerivedMesh *dm, int type);
 	void *(*getLoopDataArray)(DerivedMesh *dm, int type);
 	void *(*getPolyDataArray)(DerivedMesh *dm, int type);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	void *(*getDimDataArray)(DerivedMesh *dm, int type);
+#endif
 
 	/** Retrieves the base CustomData structures for
 	 * verts/edges/tessfaces/loops/facdes*/
@@ -502,20 +518,44 @@ struct DerivedMesh {
 
 void DM_init_funcs(DerivedMesh *dm);
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_init(
+        DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
+        int numFaces, int numLoops, int numPolys, int numDims);
+#else
 void DM_init(
         DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
         int numFaces, int numLoops, int numPolys);
+#endif
 
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_from_template_ex(
+        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
+        int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys, int numDims,
+        CustomDataMask mask);
+#else
 void DM_from_template_ex(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys,
         CustomDataMask mask);
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void DM_from_template(
+        DerivedMesh *dm, DerivedMesh *source,
+        DerivedMeshType type,
+        int numVerts, int numEdges, int numFaces,
+        int numLoops, int numPolys, int numDims);
+#else
 void DM_from_template(
         DerivedMesh *dm, DerivedMesh *source,
         DerivedMeshType type,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys);
+#endif
 
 /** utility function to release a DerivedMesh's layers
  * returns 1 if DerivedMesh has to be released by the backend, 0 otherwise
@@ -581,6 +621,7 @@ void *DM_get_edge_data_layer(struct DerivedMesh *dm, int type);
 void *DM_get_tessface_data_layer(struct DerivedMesh *dm, int type);
 void *DM_get_poly_data_layer(struct DerivedMesh *dm, int type);
 void *DM_get_loop_data_layer(struct DerivedMesh *dm, int type);
+void *DM_get_dim_data_layer(struct DerivedMesh *dm, int type);
 
 /* custom data setting functions
  * copy supplied data into first layer of type using layer's copy function

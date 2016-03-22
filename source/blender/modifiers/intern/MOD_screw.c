@@ -208,7 +208,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	/* don't do anything? */
 	if (!totvert)
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		return CDDM_from_template(dm, 0, 0, 0, 0, 0, 0);
+#else
 		return CDDM_from_template(dm, 0, 0, 0, 0, 0);
+#endif
 
 	switch (ltmd->axis) {
 		case 0:
@@ -333,7 +337,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		uv_u_scale = (uv_u_scale / (float)ltmd->iter) * (angle / ((float)M_PI * 2.0f));
 	}
 	
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	result = CDDM_from_template(dm, (int)maxVerts, (int)maxEdges, 0, (int)maxPolys * 4, (int)maxPolys, 0);
+#else	
 	result = CDDM_from_template(dm, (int)maxVerts, (int)maxEdges, 0, (int)maxPolys * 4, (int)maxPolys);
+#endif
 	
 	/* copy verts from mesh */
 	mvert_orig =    dm->getVertArray(dm);

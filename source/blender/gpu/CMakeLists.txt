@@ -137,5 +137,11 @@ if(WITH_OPENSUBDIV)
 	add_definitions(-DWITH_OPENSUBDIV)
 endif()
 
+
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+endif()
+
+
 blender_add_lib(bf_gpu "${SRC}" "${INC}" "${INC_SYS}")
 

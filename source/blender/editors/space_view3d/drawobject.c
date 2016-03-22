@@ -2653,12 +2653,22 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /**
- * /Brief Draw verts with color set based on selection
+ * /Brief Draw dimensions in ObjectMode
  *
- * /param no1 normal for vertex 1
- * /param no2 normal for vertex 2
- */
-static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
+*/
+static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
+{
+
+
+}
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+/**
+ * /Brief Draw dimensions in EditMode
+ *
+*/
+static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
 {
 	drawDMDims_userData *data = userData;
 	BMEditMesh *em = data->em;
@@ -2733,15 +2743,12 @@ static void draw_dm_dims__mapFunc(void *userData, int index, const float UNUSED(
 	char numstr_dir[32]; /* Stores the measurement display text here with dir info */
 	unsigned char col_sel[4]; /* color of the text to draw */
 	unsigned char col_unsel[4]; /* color of the text to draw */
-	bglMats mats = {{0}};
 
 	UI_GetThemeColor4ubv(TH_TEXT, col_unsel);
 	UI_GetThemeColor4ubv(TH_SELECT, col_sel);
 
 
 	//draw dimension length
-	view3d_get_transformation(ar, ar->regiondata, em->ob, &mats);
-	//ED_view3d_clipping_calc(&bb, clip_planes, &mats, &rect);
 
 
 	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", get_dimension_value(edm));
@@ -2808,7 +2815,11 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 	UI_GetThemeColor4ubv(TH_VERTEX, data.th_vertex);
 	UI_GetThemeColor4ubv(TH_SKIN_ROOT, data.th_skin_root);
 	data.th_vertex_size = UI_GetThemeValuef(TH_VERTEX_SIZE);
-	dm->foreachMappedDim(dm, draw_dm_dims__mapFunc, &data, DM_FOREACH_NOP);
+	if (obedit) {
+		dm->foreachMappedDim(dm, draw_em_dims__mapFunc, &data, DM_FOREACH_NOP);
+	} else {
+		dm->foreachMappedDim(dm, draw_om_dims__mapFunc, &data, DM_FOREACH_NOP);
+	}
 }
 
 #endif
@@ -3458,7 +3469,6 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 								BMEditMesh *em, DerivedMesh *cageDM, BMDim *edm_act,
 								RegionView3D* rv3d)
 {
-	ToolSettings *ts = scene->toolsettings;
 	int sel;
 
 	if (v3d->zbuf) glDepthMask(0);  /* disable write in zbuffer, zbuf select */
@@ -4393,6 +4403,14 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 				glLineWidth(1.0f);
 				dm->drawLooseEdges(dm);
 			}
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			// Draw object dimensions
+			{
+				draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+			}
+#endif
+
 		}
 	}
 	else if (dt == OB_PAINT) {

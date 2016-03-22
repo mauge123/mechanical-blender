@@ -44,8 +44,13 @@ struct MLoopNorSpaceArray;
 struct Object;
 
 /* creates a new CDDerivedMesh */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct DerivedMesh *CDDM_new(int numVerts, int numEdges, int numFaces,
+                             int numLoops, int numPolys, int numDims);
+#else
 struct DerivedMesh *CDDM_new(int numVerts, int numEdges, int numFaces,
                              int numLoops, int numPolys);
+#endif
 
 /* creates a CDDerivedMesh from the given Mesh, this will reference the
  * original data in Mesh, but it is safe to apply vertex coordinates or
@@ -84,15 +89,30 @@ struct DerivedMesh *CDDM_copy_from_tessface(struct DerivedMesh *dm);
  * given DerivedMesh and containing the requested numbers of elements.
  * elements are initialized to all zeros
  */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct DerivedMesh *CDDM_from_template_ex(
+        struct DerivedMesh *source,
+        int numVerts, int numEdges, int numFaces,
+        int numLoops, int numPolys, int numDims,
+        CustomDataMask mask);
+#else
 struct DerivedMesh *CDDM_from_template_ex(
         struct DerivedMesh *source,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys,
         CustomDataMask mask);
+#endif
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct DerivedMesh *CDDM_from_template(
+        struct DerivedMesh *source,
+        int numVerts, int numEdges, int numFaces,
+        int numLoops, int numPolys, int numDims);
+#else
 struct DerivedMesh *CDDM_from_template(
         struct DerivedMesh *source,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys);
+#endif
 
 /* converts mfaces to mpolys.  note things may break if there are not valid
  * medges surrounding each mface.
@@ -162,6 +182,9 @@ struct MEdge *CDDM_get_edges(struct DerivedMesh *dm);
 struct MFace *CDDM_get_tessfaces(struct DerivedMesh *dm);
 struct MLoop *CDDM_get_loops(struct DerivedMesh *dm);
 struct MPoly *CDDM_get_polys(struct DerivedMesh *dm);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct MDim *CDDM_get_dims(struct DerivedMesh *dm);
+#endif
 
 /* Assigns news m*** layers to the cddm.  Note that you must handle
  * freeing the old ones yourself.  Also you must ensure dm->num****Data

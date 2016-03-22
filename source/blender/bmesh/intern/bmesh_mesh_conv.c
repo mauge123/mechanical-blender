@@ -252,6 +252,9 @@ void BM_mesh_bm_from_me(
 	CustomData_free(&bm->edata, bm->totedge);
 	CustomData_free(&bm->ldata, bm->totloop);
 	CustomData_free(&bm->pdata, bm->totface);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_free(&bm->ddata, bm->totdim);
+#endif
 
 	if (!me || !me->totvert) {
 		if (me) { /*no verts? still copy customdata layout*/
@@ -622,7 +625,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	BMEdge *e;
 	BMFace *f;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BMDim *d;
+	BMDim *edm;
 	MDim *mdm, *mdim;
 #endif
 	BMIter iter;
@@ -760,22 +763,18 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	mdm = mdim;
 	i = 0;
-	BM_ITER_MESH (d, &iter, bm, BM_DIMS_OF_MESH) {
-		mdm->v1 = BM_elem_index_get(d->v1);
-		mdm->v2 = BM_elem_index_get(d->v2);
-		mdm->dpos_fact = d->dpos_fact;
-		copy_v3_v3(mdm->fpos, d->fpos);
-		BM_elem_index_set(d, i); /* set_inline */
+	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+		mdm->v1 = BM_elem_index_get(edm->v1);
+		mdm->v2 = BM_elem_index_get(edm->v2);
+		mdm->dpos_fact = edm->dpos_fact;
+		copy_v3_v3(mdm->fpos, edm->fpos);
+		BM_elem_index_set(edm, i); /* set_inline */
 		/* copy over customdat */
-		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, d->head.data, i);
+		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, edm->head.data, i);
 
 		i++;
 		mdm++;
-		BM_CHECK_ELEMENT(d);
-
-
-
-
+		BM_CHECK_ELEMENT(edm);
 	}
 	bm->elem_index_dirty &= ~BM_DIM;
 #endif

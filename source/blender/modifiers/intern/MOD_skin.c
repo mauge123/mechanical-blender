@@ -851,10 +851,17 @@ static DerivedMesh *subdivide_base(DerivedMesh *orig)
 	MEM_freeN(degree);
 
 	/* Allocate output derivedmesh */
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	dm = CDDM_from_template(orig,
+	                        totorigvert + totsubd,
+	                        totorigedge + totsubd,
+	                        0, 0, 0, 0);
+#else
 	dm = CDDM_from_template(orig,
 	                        totorigvert + totsubd,
 	                        totorigedge + totsubd,
 	                        0, 0, 0);
+#endif
 
 	outvert = dm->getVertArray(dm);
 	outedge = dm->getEdgeArray(dm);
