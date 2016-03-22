@@ -85,7 +85,11 @@ typedef enum CustomDataType {
 	CD_MCOL             = 6,
 	CD_ORIGINDEX        = 7,
 	CD_NORMAL           = 8,
+
+	/* Using 42 dues to not be able to compute CD_MASK_MESH on compiler time */
+	CD_MDIM				= 9,
 /*	CD_POLYINDEX        = 9, */
+
 	CD_PROP_FLT         = 10,
 	CD_PROP_INT         = 11,
 	CD_PROP_STR         = 12,
@@ -123,8 +127,6 @@ typedef enum CustomDataType {
 	CD_TESSLOOPNORMAL   = 40,
 	CD_CUSTOMLOOPNORMAL = 41,
 
-/* Using 42 dues to not be able to compute CD_MASK_MESH on compiler time */
-	CD_MDIM				= 9,
 	CD_NUMTYPES         = 43
 
 } CustomDataType;
