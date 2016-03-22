@@ -3675,6 +3675,14 @@ MPoly *CDDM_get_poly(DerivedMesh *dm, int index)
 	return &((CDDerivedMesh *)dm)->mpoly[index];
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+MDim *CDDM_get_dim(DerivedMesh *dm, int index)
+{
+	return &((CDDerivedMesh *)dm)->mdim[index];
+}
+#endif
+
+
 /* array access functions */
 
 MVert *CDDM_get_verts(DerivedMesh *dm)

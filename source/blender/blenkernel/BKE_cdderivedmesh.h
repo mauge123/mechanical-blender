@@ -172,6 +172,10 @@ struct MFace *CDDM_get_tessface(struct DerivedMesh *dm, int index);
 struct MLoop *CDDM_get_loop(struct DerivedMesh *dm, int index);
 struct MPoly *CDDM_get_poly(struct DerivedMesh *dm, int index);
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+struct MDim *CDDM_get_dim(struct DerivedMesh *dm, int index);
+#endif
+
 /* vertex/edge/face array access functions - return the array holding the
  * desired data
  * should always succeed

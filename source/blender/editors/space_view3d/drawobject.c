@@ -78,6 +78,8 @@
 #include "BKE_unit.h"
 #include "BKE_tracking.h"
 
+#include "BKE_cdderivedmesh.h"
+
 #include "BKE_editmesh.h"
 
 #include "IMB_imbuf.h"
@@ -143,13 +145,16 @@ typedef struct drawDMVerts_userData {
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 typedef struct drawDMDims_userData {
+	/* BMesh */
 	BMEditMesh *em;
-
 	BMDim *edm_act;
 	ARegion *ar;
 	char sel;
 	Object* obedit;
 	Scene* scene;
+
+	/* Mesh */
+	DerivedMesh *dm;
 
 	/* cached theme values */
 	unsigned char th_editmesh_active[4];
@@ -2653,12 +2658,106 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /**
+ * @brief draw_linear_dimension
+ * @param p1
+ * @param p2
+ * @param fpos
+ * @param dpos_fact
+ * @param selected
+ *
+ * OUTPUT params
+ *
+ * @param start
+ * @param end
+ * @param txt_pos
+ */
+static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected,
+                                   float *start, float *end, float *txt_pos) {
+
+	float w,h;
+	char numstr[32]; /* Stores the measurement display text here */
+
+	unsigned char col[4]; /* color of the text to draw */
+
+
+	if (selected) {
+		UI_GetThemeColor4ubv(TH_SELECT, col);
+	} else {
+		UI_GetThemeColor4ubv(TH_TEXT, col);
+	}
+
+
+	// Baseline
+	add_v3_v3v3(start,fpos, p1);
+	add_v3_v3v3(end, fpos, p2);
+
+
+
+	// Set txt pos acording pos factor
+	sub_v3_v3v3(txt_pos, end, start);
+	mul_v3_fl(txt_pos,  dpos_fact);
+	add_v3_v3(txt_pos, start);
+
+
+	glPointSize(2);
+	glBegin(GL_POINTS);
+	{
+		glVertex3fv(start);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+	glBegin(GL_LINES);
+	{
+		glVertex3fv(p1);
+		glVertex3fv(start);
+
+		glVertex3fv(p2);
+		glVertex3fv(end);
+
+		glVertex3fv(start);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+
+	glPointSize(2);
+	glBegin(GL_POINTS);
+	{
+		glVertex3fv(start);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+	//draw dimension length
+	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(p1,p2));
+	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
+	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,col);
+
+
+
+}
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+/**
  * /Brief Draw dimensions in ObjectMode
  *
 */
 static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
 {
+	drawDMDims_userData *data = userData;
+	DerivedMesh *dm = data->dm;
+	MDim *mdm = CDDM_get_dim(dm,index);
 
+	float start[3], end[3], txt_pos[3];
+
+	draw_linear_dimension (CDDM_get_vert(dm,mdm->v1)->co,
+	                       CDDM_get_vert(dm,mdm->v2)->co,
+	                       mdm->fpos,
+	                       mdm->dpos_fact,
+	                       false,
+	                       start,end, txt_pos);
 
 }
 #endif
@@ -2681,11 +2780,6 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 		return;
 	}
 
-
-	float end[3], start[3];
-	float txt_pos[3];
-	const short txt_flag = V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII;
-
 	if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
 		if (!G.moving) {
 			// Untag
@@ -2699,59 +2793,11 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 		mul_v3_fl(edm->fpos,-1.0f);
 	}
 
-	//Midline
-	add_v3_v3v3(start,edm->fpos, edm->v1->co);
-	add_v3_v3v3(end, edm->fpos, edm->v2->co);
 
+	draw_linear_dimension (edm->v1->co,edm->v2->co,edm->fpos, edm->dpos_fact,
+	                       BM_elem_flag_test(edm, BM_ELEM_SELECT),
+	                       edm->start, edm->end, edm->dpos);
 
-
-	//Move txt pos
-	sub_v3_v3v3(txt_pos, end, start);
-	copy_v3_v3(edm->start,start);
-	copy_v3_v3(edm->end,end);
-	mul_v3_fl(txt_pos,  edm->dpos_fact);
-	add_v3_v3(txt_pos, start);
-
-	//Store location
-	copy_v3_v3(edm->dpos, txt_pos);
-
-	glPointSize(2);
-	glBegin(GL_POINTS);
-	{
-		glVertex3fv(start);
-		glVertex3fv(end);
-	}
-	glEnd();
-
-	glBegin(GL_LINES);
-	{
-		glVertex3fv(edm->v1->co);
-		glVertex3fv(start);
-
-		glVertex3fv(edm->v2->co);
-		glVertex3fv(end);
-
-		glVertex3fv(start);
-		glVertex3fv(end);
-	}
-	glEnd();
-
-	{
-	float w,h;
-	char numstr[32]; /* Stores the measurement display text here */
-	char numstr_dir[32]; /* Stores the measurement display text here with dir info */
-	unsigned char col_sel[4]; /* color of the text to draw */
-	unsigned char col_unsel[4]; /* color of the text to draw */
-
-	UI_GetThemeColor4ubv(TH_TEXT, col_unsel);
-	UI_GetThemeColor4ubv(TH_SELECT, col_sel);
-
-
-	//draw dimension length
-
-
-	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", get_dimension_value(edm));
-	sprintf (numstr_dir, "%s", numstr);
 
 	//Draw a big point on Dim diection selected or small point on Dim not selected
 	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
@@ -2759,41 +2805,26 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			glPointSize(7);
 			glBegin(GL_POINTS);
 			{
-				glVertex3fv(end);
+				glVertex3fv(edm->end);
 			}
 			glEnd();
 		}else if(edm->dir==-1){
 			glPointSize(7);
 			glBegin(GL_POINTS);
 			{
-				glVertex3fv(start);
+				glVertex3fv(edm->start);
 			}
 			glEnd();
 		}else if(edm->dir==0){
 			glPointSize(7);
 			glBegin(GL_POINTS);
 			{
-				glVertex3fv(end);
-				glVertex3fv(start);
+				glVertex3fv(edm->end);
+				glVertex3fv(edm->start);
 			}
 			glEnd();
 		}
-
-		//Write on the midle of Dim
-		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
-		view3d_cached_text_draw_add(edm->dpos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag, col_sel);
-	}else{
-		glPointSize(2);
-		glBegin(GL_POINTS);
-		{
-			glVertex3fv(start);
-			glVertex3fv(end);
-		}
-		glEnd();
-		BLF_width_and_height(UIFONT_DEFAULT,numstr_dir,sizeof(numstr_dir),&w,&h);
-		view3d_cached_text_draw_add(edm->dpos, numstr_dir, strlen(numstr_dir), (0-w/2), txt_flag,col_unsel);
 	}
-    }
 }
 
 
@@ -2807,6 +2838,7 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 	data.ar = ar;
 	data.obedit = obedit;
 	data.scene = scene;
+	data.dm = dm;
 
 	/* Cache theme values */
 	UI_GetThemeColor4ubv(TH_EDITMESH_ACTIVE, data.th_editmesh_active);
