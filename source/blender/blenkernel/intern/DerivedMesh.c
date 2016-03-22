@@ -177,7 +177,7 @@ static MPoly *dm_getPolyArray(DerivedMesh *dm)
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static MVert *dm_getDimArray(DerivedMesh *dm)
+static MDim *dm_getDimArray(DerivedMesh *dm)
 {
 	MDim *mdim = CustomData_get_layer(&dm->dimData, CD_MDIM);
 

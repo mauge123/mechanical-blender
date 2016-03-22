@@ -51,6 +51,7 @@ struct MVert;
 struct Material;
 struct Mesh;
 struct Multires;
+struct MDim;
 
 typedef struct Mesh {
 	ID id;
@@ -80,6 +81,8 @@ typedef struct Mesh {
 	struct MVert *mvert;	/* array of verts */
 	struct MEdge *medge;	/* array of edges */
 	struct MDeformVert *dvert;	/* deformgroup vertices */
+	/* WITH_MECHANICAL_MESH_DIMENSIONS */
+	struct MDim *mdim;	/* array of dimensions */
 
 	/* array of colors for the tessellated faces, must be number of tessellated
 	 * faces * 4 in length */
@@ -128,8 +131,6 @@ typedef struct Mesh {
 
 	struct Multires *mr DNA_DEPRECATED; /* deprecated multiresolution modeling data, only keep for loading old files */
 
-	/* WITH_MECHANICAL_MESH_DIMENSIONS */
-	struct MDim *mdim;	/* array of dimensions */
 	int totdim;
 	char pad3[4];
 	struct CustomData ddata;

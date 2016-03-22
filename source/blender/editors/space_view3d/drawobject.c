@@ -2672,7 +2672,6 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 {
 	drawDMDims_userData *data = userData;
 	BMEditMesh *em = data->em;
-	ARegion *ar = data->ar;
 	BMDim *edm = BM_dim_at_index(em->bm, index);
 	Object *obedit = data->obedit;
 	Scene *scene = data->scene;
