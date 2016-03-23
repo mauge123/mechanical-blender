@@ -45,12 +45,11 @@ struct Object;
 
 /* creates a new CDDerivedMesh */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-struct DerivedMesh *CDDM_new(int numVerts, int numEdges, int numFaces,
+struct DerivedMesh *CDDM_new_mechanical(int numVerts, int numEdges, int numFaces,
                              int numLoops, int numPolys, int numDims);
-#else
+#endif
 struct DerivedMesh *CDDM_new(int numVerts, int numEdges, int numFaces,
                              int numLoops, int numPolys);
-#endif
 
 /* creates a CDDerivedMesh from the given Mesh, this will reference the
  * original data in Mesh, but it is safe to apply vertex coordinates or

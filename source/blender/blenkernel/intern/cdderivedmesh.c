@@ -2091,7 +2091,10 @@ static CDDerivedMesh *cdDM_create(const char *desc)
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-DerivedMesh *CDDM_new(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys, int numDims)
+DerivedMesh *CDDM_new(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys) {
+	return CDDM_new_mechanical(numVerts, numEdges, numTessFaces, numLoops, numPolys, 0);
+}
+DerivedMesh *CDDM_new_mechanical(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys, int numDims)
 #else
 DerivedMesh *CDDM_new(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys)
 #endif
@@ -2213,18 +2216,11 @@ DerivedMesh *CDDM_from_curve_displist(Object *ob, ListBase *dispbase)
 	        &totloop, &totpoly) != 0)
 	{
 		/* Error initializing mdata. This often happens when curve is empty */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		return CDDM_new(0, 0, 0, 0, 0, 0);
-#else
 		return CDDM_new(0, 0, 0, 0, 0);
-#endif
 	}
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	dm = CDDM_new(totvert, totedge, 0, totloop, totpoly, 0);
-#else
 	dm = CDDM_new(totvert, totedge, 0, totloop, totpoly);
-#endif
+
 	dm->deformedOnly = 1;
 	dm->dirty |= DM_DIRTY_NORMALS;
 
@@ -2305,7 +2301,7 @@ static DerivedMesh *cddm_from_bmesh_ex(
         const int em_tottri, const BMLoop *(*em_looptris)[3])
 {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DerivedMesh *dm = CDDM_new(bm->totvert,
+	DerivedMesh *dm = CDDM_new_mechanical(bm->totvert,
 	                           bm->totedge,
 	                           use_tessface ? em_tottri : 0,
 	                           bm->totloop,

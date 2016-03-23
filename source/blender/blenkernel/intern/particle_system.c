@@ -3019,11 +3019,7 @@ static void hair_create_input_dm(ParticleSimulationData *sim, int totpoint, int 
 	
 	dm = *r_dm;
 	if (!dm) {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		*r_dm = dm = CDDM_new(totpoint, totedge, 0, 0, 0, 0);
-#else
 		*r_dm = dm = CDDM_new(totpoint, totedge, 0, 0, 0);
-#endif
 		DM_add_vert_layer(dm, CD_MDEFORMVERT, CD_CALLOC, NULL);
 	}
 	mvert = CDDM_get_verts(dm);
