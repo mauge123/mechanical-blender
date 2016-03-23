@@ -139,7 +139,7 @@ static DerivedMesh *get_quick_derivedMesh(
 	if (dm_self->getNumPolys(dm_self) == 0 || dm_other->getNumPolys(dm_other) == 0) {
 		switch (operation) {
 			case eBooleanModifierOp_Intersect:
-				result = CDDM_new(0, 0, 0, 0, 0, 0);
+				result = CDDM_new(0, 0, 0, 0, 0);
 				break;
 
 			case eBooleanModifierOp_Union:
