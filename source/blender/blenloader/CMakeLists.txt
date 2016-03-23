@@ -74,6 +74,7 @@ if(WITH_CODEC_FFMPEG)
 endif()
 
 if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 endif()
 

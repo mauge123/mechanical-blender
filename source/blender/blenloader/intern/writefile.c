@@ -3645,9 +3645,16 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
 	FileGlobal fg;
 	bScreen *screen;
 	char subvstr[8];
-	
+#ifdef WITH_MECHANICAL
+	char mechanical_str[12] = "MECHANICAL\0";
+#endif
+
+
+#ifndef WITH_MECHANICAL
 	/* prevent mem checkers from complaining */
 	memset(fg.pad, 0, sizeof(fg.pad));
+#endif
+
 	memset(fg.filename, 0, sizeof(fg.filename));
 	memset(fg.build_hash, 0, sizeof(fg.build_hash));
 
@@ -3679,6 +3686,11 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
 #else
 	fg.build_commit_timestamp = 0;
 	BLI_strncpy(fg.build_hash, "unknown", sizeof(fg.build_hash));
+#endif
+
+#ifdef WITH_MECHANICAL
+	BLI_strncpy(fg.mechanical, mechanical_str, sizeof(mechanical_str));
+	fg.mechanical_version = 0; //Testing not set
 #endif
 	writestruct(wd, GLOB, "FileGlobal", 1, &fg);
 }

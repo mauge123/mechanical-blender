@@ -43,7 +43,14 @@ typedef struct FileGlobal {
 	char subvstr[4];		/* needs to be here, for human fileformat recognition */
 	short subversion;
 	short minversion, minsubversion;
-	char pad[6];
+
+
+	/* WITH_MECHANICAL */
+	char mechanical[12];
+	short mechanical_version;
+
+	/* char pad[6]; */
+
 	struct bScreen *curscreen;
 	struct Scene *curscene;
 	int fileflags;
