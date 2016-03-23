@@ -3148,6 +3148,11 @@ class VIEW3D_PT_view3d_display(Panel):
         col.prop(view, "show_outline_selected")
         col.prop(view, "show_all_objects_origin")
         col.prop(view, "show_relationship_lines")
+# WITH_MECHANICAL_MESH_DIMENSIONS
+
+        layout.separator()
+        col.prop(view, "show_mesh_dimensions")
+        col.prop(view, "show_mesh_dimensions_on_selected")
 
         col = layout.column()
         col.active = display_all

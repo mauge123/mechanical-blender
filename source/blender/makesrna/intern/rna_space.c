@@ -2507,6 +2507,22 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	                         "Show an outline highlight around selected objects in non-wireframe views");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 	
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	prop = RNA_def_property(srna, "show_mesh_dimensions", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_SHOW_MESH_DIMENSIONS);
+	RNA_def_property_ui_text(prop, "Show Mesh Dimensions",
+	                         "Show mesh dimensions on objects");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+
+	prop = RNA_def_property(srna, "show_mesh_dimensions_on_selected", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED);
+	RNA_def_property_ui_text(prop, "Mesh Dimensions on Selected",
+	                         "Show mesh dimensions only on selected objects");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+#endif
+
 	prop = RNA_def_property(srna, "show_all_objects_origin", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_DRAW_CENTERS);
 	RNA_def_property_ui_text(prop, "All Object Origins",

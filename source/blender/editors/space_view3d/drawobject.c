@@ -2746,9 +2746,9 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 */
 static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
 {
-	drawDMDims_userData *data = userData;
-	DerivedMesh *dm = data->dm;
-	MDim *mdm = CDDM_get_dim(dm,index);
+	drawDMDims_userData* data = userData;
+	DerivedMesh* dm = data->dm;
+	MDim* mdm = CDDM_get_dim(dm,index);
 
 	float start[3], end[3], txt_pos[3];
 
@@ -4437,8 +4437,14 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			// Draw object dimensions
-			{
-				draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+			if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS){
+				if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED) {
+					if (base->flag & SELECT) {
+						draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+					}
+				} else {
+					draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+				}
 			}
 #endif
 

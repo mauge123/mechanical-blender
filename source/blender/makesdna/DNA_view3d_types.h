@@ -257,6 +257,10 @@ typedef struct View3D {
 #define V3D_GLOBAL_STATS	8192
 #define V3D_DRAW_CENTERS	32768
 
+/* WITH_MECHANICAL_MESH_DIMENSIONS */
+#define V3D_SHOW_MESH_DIMENSIONS 16
+#define V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED 32
+
 /* RegionView3d->persp */
 #define RV3D_ORTHO				0
 #define RV3D_PERSP				1
