@@ -2511,14 +2511,15 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
 	if (event) {
 		initMouseInput(t, &t->mouse, t->center2d, event->mval);
-	}
 
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
-	if (t->spacetype == SPACE_VIEW3D) {
-		float p[3] = {0,0,0};
-		ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
-	}
+		if (t->spacetype == SPACE_VIEW3D) {
+			float p[3] = {0,0,0};
+			ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+		}
 #endif
+
+	}
 
 	initTransformMode (t, op, event, mode);
 
