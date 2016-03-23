@@ -30,6 +30,7 @@
  */
 
 #include "DNA_object_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_scene_types.h"
 
 #include "BLI_math.h"
@@ -131,19 +132,21 @@ void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float
 	sub_v3_v3v3(res, va->co, prev);
 }
 
-void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints) {
+void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) {
 	float v[3];
 	BMIter iter;
-	BMVert *eve;
+	BMVert* eve;
+	BMEditMesh* em = me->edit_btmesh;
+	BMesh *bm = em->bm;
 
 	if (edm->dir == 0){
 		// Both directions
 		float len=get_dimension_value(edm);
 		float len2=(value-len)/2;
 		edm->dir = 1;
-		apply_dimension_value (bm, edm,(len+len2), constraints);
+		apply_dimension_value (me, edm,(len+len2), constraints);
 		edm->dir = -1;
-		apply_dimension_value (bm, edm,value,constraints);
+		apply_dimension_value (me, edm,value,constraints);
 		edm->dir = 0;
 		return;
 	}
@@ -213,6 +216,8 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints)
 			BM_elem_flag_disable(eve, BM_ELEM_TAG);
 		}
 	}
+
+	EDBM_mesh_normals_update(em);
 
 
  }

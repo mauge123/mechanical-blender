@@ -31,6 +31,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_mesh_types.h"
+
 #include "BLI_bitmap.h"
 #include "BLI_listbase.h"
 #include "BLI_linklist.h"
