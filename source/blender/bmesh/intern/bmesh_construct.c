@@ -693,11 +693,17 @@ void BM_mesh_copy_init_customdata(BMesh *bm_dst, BMesh *bm_src, const BMAllocTem
 	CustomData_copy(&bm_src->edata, &bm_dst->edata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&bm_src->ldata, &bm_dst->ldata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&bm_src->pdata, &bm_dst->pdata, CD_MASK_BMESH, CD_CALLOC, 0);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_copy(&bm_src->ddata, &bm_dst->ddata, CD_MASK_BMESH, CD_CALLOC, 0);
+#endif
 
 	CustomData_bmesh_init_pool(&bm_dst->vdata, allocsize->totvert, BM_VERT);
 	CustomData_bmesh_init_pool(&bm_dst->edata, allocsize->totedge, BM_EDGE);
 	CustomData_bmesh_init_pool(&bm_dst->ldata, allocsize->totloop, BM_LOOP);
 	CustomData_bmesh_init_pool(&bm_dst->pdata, allocsize->totface, BM_FACE);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_bmesh_init_pool(&bm_dst->ddata, allocsize->totdim, BM_DIM);
+#endif
 }
 
 
@@ -707,6 +713,7 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	BMVert *v, *v_new, **vtable = NULL;
 	BMEdge *e, *e_new, **etable = NULL;
 	BMFace *f, *f_new, **ftable = NULL;
+	BMDim *d, *d_new, **dtable = NULL;
 	BMElem **eletable;
 	BMEditSelection *ese;
 	BMIter iter;
@@ -721,6 +728,9 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	vtable = MEM_mallocN(sizeof(BMVert *) * bm_old->totvert, "BM_mesh_copy vtable");
 	etable = MEM_mallocN(sizeof(BMEdge *) * bm_old->totedge, "BM_mesh_copy etable");
 	ftable = MEM_mallocN(sizeof(BMFace *) * bm_old->totface, "BM_mesh_copy ftable");
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	dtable = MEM_mallocN(sizeof(BMDim *) * bm_old->totdim, "BM_mesh_copy dtable");
+#endif
 
 	BM_ITER_MESH_INDEX (v, &iter, bm_old, BM_VERTS_OF_MESH, i) {
 		/* copy between meshes so cant use 'example' argument */
@@ -754,6 +764,27 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 
 	/* safety check */
 	BLI_assert(i == bm_old->totedge);
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BM_ITER_MESH_INDEX (d, &iter, bm_old, BM_DIMS_OF_MESH, i) {
+		d_new = BM_dim_create(bm_new,
+		                       vtable[BM_elem_index_get(d->v1)],
+		                       vtable[BM_elem_index_get(d->v2)],
+		                       d, BM_CREATE_SKIP_CD);
+
+		BM_elem_attrs_copy_ex(bm_old, bm_new, d, d_new, 0xff);
+		d_new->head.hflag = d->head.hflag;  /* low level! don't do this for normal api use */
+		dtable[i] = d_new;
+		BM_elem_index_set(d, i); /* set_inline */
+		BM_elem_index_set(d_new, i); /* set_inline */
+	}
+	bm_old->elem_index_dirty &= ~BM_DIM;
+	bm_new->elem_index_dirty &= ~BM_DIM;
+
+	/* safety check */
+	BLI_assert(i == bm_old->totdim);
+#endif
+
 	
 	BM_ITER_MESH_INDEX (f, &iter, bm_old, BM_FACES_OF_MESH, i) {
 		BM_elem_index_set(f, i); /* set_inline */
@@ -772,6 +803,9 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	bm_new->totvertsel = bm_old->totvertsel;
 	bm_new->totedgesel = bm_old->totedgesel;
 	bm_new->totfacesel = bm_old->totfacesel;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	bm_new->totdimsel = bm_old->totdimsel;
+#endif
 
 	/* safety check */
 	BLI_assert(i == bm_old->totface);
@@ -790,6 +824,10 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 			case BM_FACE:
 				eletable = (BMElem **)ftable;
 				break;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			case BM_DIM:
+				eletable = (BMElem **)dtable;
+#endif
 			default:
 				eletable = NULL;
 				break;
@@ -806,6 +844,9 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	MEM_freeN(etable);
 	MEM_freeN(vtable);
 	MEM_freeN(ftable);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	MEM_freeN(dtable);
+#endif
 
 	return bm_new;
 }
