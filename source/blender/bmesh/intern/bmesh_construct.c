@@ -768,8 +768,8 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_ITER_MESH_INDEX (d, &iter, bm_old, BM_DIMS_OF_MESH, i) {
 		d_new = BM_dim_create(bm_new,
-		                       vtable[BM_elem_index_get(d->v1)],
-		                       vtable[BM_elem_index_get(d->v2)],
+		                       vtable[BM_elem_index_get(d->v[0])],
+		                       vtable[BM_elem_index_get(d->v[1])],
 		                       d, BM_CREATE_SKIP_CD);
 
 		BM_elem_attrs_copy_ex(bm_old, bm_new, d, d_new, 0xff);

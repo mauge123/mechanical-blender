@@ -1956,20 +1956,23 @@ void select_dimension_data (BMDim *edm, void *context) {
 	float d1[3],d2[3];
 	float n1[3];
 
+	//Linear Dimension
+	BLI_assert(edm->totverts==2);
+
 	float len_start_click,len_end_click, len_dpos_end, len_dpos_start, len_start_end;
 
 	//Use only one normal, as the lines should be parallel!
-	sub_v3_v3v3(d,edm->v1->co,edm->v2->co);
-	cross_v3_v3v3(temp,d,edm->v1->co);
+	sub_v3_v3v3(d,edm->v[0]->co,edm->v[1]->co);
+	cross_v3_v3v3(temp,d,edm->v[0]->co);
 	cross_v3_v3v3(n1,temp,d);
 	normalize_v3(n1);
-	add_v3_v3v3(start,n1, edm->v1->co);
-	add_v3_v3v3(end, n1, edm->v2->co);
+	add_v3_v3v3(start,n1, edm->v[0]->co);
+	add_v3_v3v3(end, n1, edm->v[1]->co);
 
 	mul_v3_fl(n1,1.2f);
 
-	add_v3_v3v3(d1, n1, edm->v1->co);
-	add_v3_v3v3(d2, n1, edm->v2->co);
+	add_v3_v3v3(d1, n1, edm->v[0]->co);
+	add_v3_v3v3(d2, n1, edm->v[1]->co);
 
 	ED_view3d_project_float_object(vc->ar,edm->start, screen_co_start, flag);
 	ED_view3d_project_float_object(vc->ar,edm->end, screen_co_end, flag);

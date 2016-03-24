@@ -145,12 +145,14 @@ typedef struct BMDim {
 	BMHeader head;
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 
-	struct BMVert *v1,*v2;
+	struct BMVert *(*v);
+	// Number Of verts
+	int totverts;
 
-	//Dimension position, used for select
+	// Dimension position, used for select
 	float dpos[3];
 
-	//Dimension position fact
+	// Dimension position fact
 	float dpos_fact;
 
 	//Dimension direction

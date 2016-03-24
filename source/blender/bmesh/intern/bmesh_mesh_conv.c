@@ -764,8 +764,8 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	mdm = mdim;
 	i = 0;
 	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		mdm->v1 = BM_elem_index_get(edm->v1);
-		mdm->v2 = BM_elem_index_get(edm->v2);
+		mdm->v1 = BM_elem_index_get(edm->v[0]);
+		mdm->v2 = BM_elem_index_get(edm->v[1]);
 		mdm->dpos_fact = edm->dpos_fact;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		BM_elem_index_set(edm, i); /* set_inline */

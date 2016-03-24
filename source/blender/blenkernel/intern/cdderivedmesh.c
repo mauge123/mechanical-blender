@@ -2397,8 +2397,8 @@ static DerivedMesh *cddm_from_bmesh_ex(
 		mdm->dpos_fact = edm->dpos_fact;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 
-		mdm->v1 = BM_elem_index_get (edm->v1);
-		mdm->v2 = BM_elem_index_get (edm->v2);
+		mdm->v1 = BM_elem_index_get (edm->v[0]);
+		mdm->v2 = BM_elem_index_get (edm->v[1]);
 
 		BM_elem_index_set(edm, i); /* set_inline */
 

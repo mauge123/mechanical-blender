@@ -558,6 +558,9 @@ int bmesh_elem_check(void *element, const char htype)
 		IS_FACE_LOOP_DUPE_VERT                      = (1 << 24),
 		IS_FACE_LOOP_DUPE_EDGE                      = (1 << 25),
 		IS_FACE_WRONG_LENGTH                        = (1 << 26),
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		IS_DIM_WRONG_VERT_TYPE						= (1 << 27),
+#endif
 	} err = 0;
 
 	if (!element)
@@ -734,12 +737,12 @@ int bmesh_elem_check(void *element, const char htype)
 		case BM_DIM:
 		{
 			BMDim *d = element;
-			if (d->v1 && d->v1->head.htype != BM_VERT) {
-				err |= (1 << 24);
+			if (d->v[0] && d->v[0]->head.htype != BM_VERT) {
+				err |= IS_DIM_WRONG_VERT_TYPE;
 			}
 
-			if (d->v2 && d->v2->head.htype != BM_VERT) {
-				err |= (1 << 24);
+			if (d->v[1] && d->v[1]->head.htype != BM_VERT) {
+				err |= IS_DIM_WRONG_VERT_TYPE;
 			}
 			break;
 		}
@@ -1040,7 +1043,7 @@ void BM_vert_kill(BMesh *bm, BMVert *v)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	// Search if delete affects a dimension
 	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		if (v == edm->v1 || v == edm->v2) {
+		if (v == edm->v[0] || v == edm->v[1]) {
 			bm_kill_only_dim (bm,edm);
 		}
 	}
@@ -3019,6 +3022,8 @@ void bm_kill_only_dim(BMesh *bm, BMDim *d)
 	bm->elem_index_dirty |= BM_DIM;
 	bm->elem_table_dirty |= BM_DIM;
 
+	MEM_freeN(d->v);
+
 	BM_select_history_remove(bm, d);
 
 	if (d->head.data)
@@ -3027,6 +3032,8 @@ void bm_kill_only_dim(BMesh *bm, BMDim *d)
 	if (bm->dtoolflagpool) {
 		BLI_mempool_free(bm->dtoolflagpool, d->oflags);
 	}
+
+
 	BLI_mempool_free(bm->dpool, d);
 }
 
@@ -3071,12 +3078,15 @@ BMDim *BM_dim_create(
 	/* allocate flags */
 	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 
-	edm->v1 = v1;
-	edm->v2 = v2;
+	edm->totverts = 2;
+	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
+
+	edm->v[0] = v1;
+	edm->v[1] = v2;
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
-	sub_v3_v3v3(vect,edm->v1->co,edm->v2->co);
-	cross_v3_v3v3(no1,vect, edm->v1->no);
+	sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
+	cross_v3_v3v3(no1,vect, edm->v[0]->no);
 	cross_v3_v3v3(no2,no1,vect);
 	normalize_v3(no2);
 

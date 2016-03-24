@@ -2794,7 +2794,7 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 	}
 
 
-	draw_linear_dimension (edm->v1->co,edm->v2->co,edm->fpos, edm->dpos_fact,
+	draw_linear_dimension (edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
 	                       BM_elem_flag_test(edm, BM_ELEM_SELECT),
 	                       edm->start, edm->end, edm->dpos);
 

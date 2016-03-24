@@ -117,7 +117,7 @@ void MESH_OT_mechanical_dimension_add(wmOperatorType *ot)
 
 //Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
-	return(len_v3v3(edm->v1->co, edm->v2->co));
+	return(len_v3v3(edm->v[0]->co, edm->v[1]->co));
 }
 
 //Apply to the selected direction a dimension value
@@ -168,20 +168,20 @@ void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) 
 		float vec[3];
 		float d_dir[3], p[3];
 
-		sub_v3_v3v3(d_dir,edm->v2->co,edm->v1->co);
+		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[0]->co);
 		normalize_v3(d_dir);
 		BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
 			float d = dot_v3v3(d_dir,f->no);
 			if (fabs(d*d -1) < DIM_CONSTRAINT_PRECISION) {
 				// Coplanar?
 				BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
-					if (edm->v1 ==  eve || edm->v2 == eve) {
+					if (edm->v[0] ==  eve || edm->v[1] == eve) {
 						continue;
 					}
 					if (edm->dir == -1) {
-						sub_v3_v3v3(vec, edm->v1->co, eve->co);
+						sub_v3_v3v3(vec, edm->v[0]->co, eve->co);
 					} else if (edm->dir == 1) {
-						sub_v3_v3v3(vec, edm->v2->co, eve->co);
+						sub_v3_v3v3(vec, edm->v[1]->co, eve->co);
 					}
 					normalize_v3(vec);
 					break;
@@ -197,15 +197,15 @@ void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) 
 
 	}
 	// Untag dimensions vertex
-	BM_elem_flag_disable(edm->v1, BM_ELEM_TAG);
-	BM_elem_flag_disable(edm->v2, BM_ELEM_TAG);
+	BM_elem_flag_disable(edm->v[0], BM_ELEM_TAG);
+	BM_elem_flag_disable(edm->v[1], BM_ELEM_TAG);
 
 
 	// Update Dimension Verts
 	if(edm->dir==1){
-		apply_dimension_direction_value(edm->v2,edm->v1, value, v);
+		apply_dimension_direction_value(edm->v[1],edm->v[0], value, v);
 	}else if(edm->dir==-1){
-		apply_dimension_direction_value(edm->v1,edm->v2, value,v);
+		apply_dimension_direction_value(edm->v[0],edm->v[1], value,v);
 	}
 
 	// Update related Verts
@@ -257,9 +257,9 @@ BMDim* get_selected_dimension(BMEditMesh *em){
 
 void get_dimension_mid(float mid[3],BMDim *edm){
 
-	sub_v3_v3v3(mid, edm->v2->co, edm->v1->co);
+	sub_v3_v3v3(mid, edm->v[1]->co, edm->v[0]->co);
 	mul_v3_fl(mid,0.5);
-	add_v3_v3(mid, edm->v1->co);
+	add_v3_v3(mid, edm->v[0]->co);
 
 
 }
