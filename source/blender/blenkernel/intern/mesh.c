@@ -555,6 +555,9 @@ Mesh *BKE_mesh_copy_ex(Main *bmain, Mesh *me)
 	else {
 		mesh_tessface_clear_intern(men, false);
 	}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_copy(&me->ddata, &men->ddata, CD_MASK_MESH, CD_DUPLICATE, men->totdim);
+#endif
 
 	BKE_mesh_update_customdata_pointers(men, do_tessface);
 
