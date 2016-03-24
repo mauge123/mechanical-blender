@@ -2537,7 +2537,7 @@ static DerivedMesh *cddm_copy_ex(DerivedMesh *source, int faces_from_tessfaces)
 
 	/* this initializes dm, and copies all non mvert/medge/mface layers */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DM_from_template(dm, source, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces,
+	DM_from_template_mechanical(dm, source, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces,
 	                 numLoops, numPolys, numDims);
 #else
 	DM_from_template(dm, source, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces,
@@ -2587,6 +2587,16 @@ DerivedMesh *CDDM_copy_from_tessface(DerivedMesh *source)
 DerivedMesh *CDDM_from_template_ex(
         DerivedMesh *source,
         int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys,
+        CustomDataMask mask)
+{
+	return CDDM_from_template_ex_mechanical (
+	            source,numVerts, numEdges, numTessFaces, numLoops, numPolys,0, mask);
+}
+
+DerivedMesh *CDDM_from_template_ex_mechanical(
+        DerivedMesh *source,
+        int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys, int numDims,
         CustomDataMask mask)
 #else
@@ -2608,7 +2618,7 @@ DerivedMesh *CDDM_from_template_ex(
 
 	/* this does a copy of all non mvert/medge/mface layers */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DM_from_template_ex(
+	DM_from_template_ex_mechanical(
 	        dm, source, DM_TYPE_CDDM,
 	        numVerts, numEdges, numTessFaces,
 	        numLoops, numPolys, numDims,
@@ -2647,9 +2657,19 @@ DerivedMesh *CDDM_from_template_ex(
 DerivedMesh *CDDM_from_template(
         DerivedMesh *source,
         int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys)
+{
+	return CDDM_from_template_mechanical(
+	        source, numVerts, numEdges, numTessFaces,
+	        numLoops, numPolys, 0);
+}
+
+DerivedMesh *CDDM_from_template_mechanical(
+        DerivedMesh *source,
+        int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys, int numDims)
 {
-	return CDDM_from_template_ex(
+	return CDDM_from_template_ex_mechanical(
 	        source, numVerts, numEdges, numTessFaces,
 	        numLoops, numPolys, numDims,
 	        CD_MASK_DERIVEDMESH);
@@ -3377,13 +3397,8 @@ DerivedMesh *CDDM_merge_verts(DerivedMesh *dm, const int *vtargetmap, const int 
 	}
 	
 	/*create new cddm*/
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	cddm2 = (CDDerivedMesh *)CDDM_from_template(
-	        (DerivedMesh *)cddm, STACK_SIZE(mvert), STACK_SIZE(medge), 0, STACK_SIZE(mloop), STACK_SIZE(mpoly), 0);
-#else
 	cddm2 = (CDDerivedMesh *)CDDM_from_template(
 	        (DerivedMesh *)cddm, STACK_SIZE(mvert), STACK_SIZE(medge), 0, STACK_SIZE(mloop), STACK_SIZE(mpoly));
-#endif
 	
 	/*update edge indices and copy customdata*/
 	med = medge;

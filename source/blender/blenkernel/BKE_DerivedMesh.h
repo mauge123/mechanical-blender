@@ -530,32 +530,30 @@ void DM_init(
 
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void DM_from_template_ex(
+void DM_from_template_ex_mechanical(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys, int numDims,
         CustomDataMask mask);
-#else
+#endif
 void DM_from_template_ex(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys,
         CustomDataMask mask);
-#endif
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void DM_from_template(
+void DM_from_template_mechanical(
         DerivedMesh *dm, DerivedMesh *source,
         DerivedMeshType type,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys, int numDims);
-#else
+#endif
 void DM_from_template(
         DerivedMesh *dm, DerivedMesh *source,
         DerivedMeshType type,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys);
-#endif
 
 /** utility function to release a DerivedMesh's layers
  * returns 1 if DerivedMesh has to be released by the backend, 0 otherwise

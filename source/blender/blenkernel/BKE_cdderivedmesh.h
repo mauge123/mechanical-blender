@@ -89,29 +89,28 @@ struct DerivedMesh *CDDM_copy_from_tessface(struct DerivedMesh *dm);
  * elements are initialized to all zeros
  */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-struct DerivedMesh *CDDM_from_template_ex(
+struct DerivedMesh *CDDM_from_template_ex_mechanical(
         struct DerivedMesh *source,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys, int numDims,
         CustomDataMask mask);
-#else
+#endif
 struct DerivedMesh *CDDM_from_template_ex(
         struct DerivedMesh *source,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys,
         CustomDataMask mask);
-#endif
+
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-struct DerivedMesh *CDDM_from_template(
+struct DerivedMesh *CDDM_from_template_mechanical(
         struct DerivedMesh *source,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys, int numDims);
-#else
+#endif
 struct DerivedMesh *CDDM_from_template(
         struct DerivedMesh *source,
         int numVerts, int numEdges, int numFaces,
         int numLoops, int numPolys);
-#endif
 
 /* converts mfaces to mpolys.  note things may break if there are not valid
  * medges surrounding each mface.

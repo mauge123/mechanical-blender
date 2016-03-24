@@ -368,6 +368,18 @@ void DM_init(
 void DM_from_template_ex(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys,
+        CustomDataMask mask) {
+	DM_from_template_ex_mechanical(
+	        dm, source, type,
+	        numVerts, numEdges, numTessFaces,
+	        numLoops, numPolys, 0,
+	        mask);
+
+}
+void DM_from_template_ex_mechanical(
+        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
+        int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys, int numDims,
         CustomDataMask mask)
 #else
@@ -405,9 +417,20 @@ void DM_from_template_ex(
 void DM_from_template(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
+        int numLoops, int numPolys)
+{
+	DM_from_template_mechanical(
+	        dm, source, type,
+	        numVerts, numEdges, numTessFaces,
+	        numLoops, numPolys, 0);
+
+}
+void DM_from_template_mechanical(
+        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
+        int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys, int numDims)
 {
-	DM_from_template_ex(
+	DM_from_template_ex_mechanical(
 	        dm, source, type,
 	        numVerts, numEdges, numTessFaces,
 	        numLoops, numPolys, numDims,

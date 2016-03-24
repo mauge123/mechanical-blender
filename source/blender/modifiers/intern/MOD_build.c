@@ -230,13 +230,8 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *UNUSED(ob),
 	/* now we know the number of verts, edges and faces, we can create
 	 * the mesh
 	 */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	result = CDDM_from_template(dm, BLI_ghash_size(vertHash),
-	                            BLI_ghash_size(edgeHash), 0, numLoops_dst, numFaces_dst, 0);
-#else
 	result = CDDM_from_template(dm, BLI_ghash_size(vertHash),
 	                            BLI_ghash_size(edgeHash), 0, numLoops_dst, numFaces_dst);
-#endif
 
 	/* copy the vertices across */
 	GHASH_ITER (gh_iter, vertHash) {

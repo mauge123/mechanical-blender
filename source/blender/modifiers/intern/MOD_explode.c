@@ -634,15 +634,10 @@ static DerivedMesh *cutEdges(ExplodeModifierData *emd, DerivedMesh *dm)
 	for (i = 0, fs = facesplit; i < totface; i++, fs++)
 		totfsplit += add_faces[*fs];
 	
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	splitdm = CDDM_from_template_ex(
-	        dm, totesplit, 0, totface + totfsplit, 0, 0, 0,
-	        CD_MASK_DERIVEDMESH | CD_MASK_FACECORNERS);
-#else
 	splitdm = CDDM_from_template_ex(
 	        dm, totesplit, 0, totface + totfsplit, 0, 0,
 	        CD_MASK_DERIVEDMESH | CD_MASK_FACECORNERS);
-#endif
+
 	numlayer = CustomData_number_of_layers(&splitdm->faceData, CD_MTFACE);
 
 	/* copy new faces & verts (is it really this painful with custom data??) */
@@ -869,11 +864,7 @@ static DerivedMesh *explodeMesh(ExplodeModifierData *emd,
 	BLI_edgehashIterator_free(ehi);
 
 	/* the final duplicated vertices */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	explode = CDDM_from_template_ex(dm, totdup, 0, totface - delface, 0, 0, 0, CD_MASK_DERIVEDMESH | CD_MASK_FACECORNERS);
-#else
 	explode = CDDM_from_template_ex(dm, totdup, 0, totface - delface, 0, 0, CD_MASK_DERIVEDMESH | CD_MASK_FACECORNERS);
-#endif
 	mtface = CustomData_get_layer_named(&explode->faceData, CD_MTFACE, emd->uvname);
 	/*dupvert = CDDM_get_verts(explode);*/
 

@@ -149,11 +149,7 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 		mul_m4_m4m4(mtx, itmp, mtx);
 	}
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	result = CDDM_from_template(dm, maxVerts * 2, maxEdges * 2, 0, maxLoops * 2, maxPolys * 2, 0);
-#else
 	result = CDDM_from_template(dm, maxVerts * 2, maxEdges * 2, 0, maxLoops * 2, maxPolys * 2);
-#endif
 
 	/*copy customdata to original geometry*/
 	DM_copy_vert_data(dm, result, 0, 0, maxVerts);

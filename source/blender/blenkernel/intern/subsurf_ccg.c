@@ -4859,22 +4859,12 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 	if (use_gpu_backend == false) {
 		BLI_assert(totedge == ccgSubSurf_getNumEdges(ss));
 		BLI_assert(totface == ccgSubSurf_getNumFaces(ss));
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		DM_from_template(&ccgdm->dm, dm, DM_TYPE_CCGDM,
-		                 ccgSubSurf_getNumFinalVerts(ss),
-		                 ccgSubSurf_getNumFinalEdges(ss),
-		                 0,
-		                 ccgSubSurf_getNumFinalFaces(ss) * 4,
-		                 ccgSubSurf_getNumFinalFaces(ss),
-		                 0);
-#else
 		DM_from_template(&ccgdm->dm, dm, DM_TYPE_CCGDM,
 		                 ccgSubSurf_getNumFinalVerts(ss),
 		                 ccgSubSurf_getNumFinalEdges(ss),
 		                 0,
 		                 ccgSubSurf_getNumFinalFaces(ss) * 4,
 		                 ccgSubSurf_getNumFinalFaces(ss));
-#endif
 
 		CustomData_free_layer_active(&ccgdm->dm.polyData, CD_NORMAL,
 		                             ccgdm->dm.numPolyData);
@@ -4886,13 +4876,9 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 		create_ccgdm_maps(ccgdm, ss);
 	}
 	else {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		DM_from_template(&ccgdm->dm, dm, DM_TYPE_CCGDM,
-		                 0, 0, 0, 0, dm->getNumPolys(dm), 0);
-#else
 				DM_from_template(&ccgdm->dm, dm, DM_TYPE_CCGDM,
 		                 0, 0, 0, 0, dm->getNumPolys(dm));
-#endif
+
 		CustomData_copy_data(&dm->polyData,
 		                     &ccgdm->dm.polyData,
 		                     0, 0, dm->getNumPolys(dm));
