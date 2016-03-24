@@ -3018,6 +3018,8 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void bm_kill_only_dim(BMesh *bm, BMDim *d)
 {
+	BLI_assert (d);
+
 	bm->totdim--;
 	bm->elem_index_dirty |= BM_DIM;
 	bm->elem_table_dirty |= BM_DIM;

@@ -104,9 +104,9 @@ static void bmo_remove_tagged_verts_loose(BMesh *bm, const short oflag)
 static void bmo_remove_tagged_dim(BMesh *bm, const short oflag)
 {
 	BMDim *edm=get_selected_dimension_BMesh(bm);
-	BM_dim_kill(bm,edm);
-
-
+	if (edm) {
+		BM_dim_kill(bm,edm);
+	}
 }
 #endif
 
