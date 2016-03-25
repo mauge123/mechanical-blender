@@ -37,10 +37,6 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
 
-BMDim* get_selected_dimension_BMesh(BMesh *bm);
-
-
-
 
 
 /* -------------------------------------------------------------------- */
@@ -103,9 +99,13 @@ static void bmo_remove_tagged_verts_loose(BMesh *bm, const short oflag)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void bmo_remove_tagged_dim(BMesh *bm, const short oflag)
 {
-	BMDim *edm=get_selected_dimension_BMesh(bm);
-	if (edm) {
-		BM_dim_kill(bm,edm);
+	BMDim *d, *d_next;
+	BMIter iter;
+
+	BM_ITER_MESH_MUTABLE (d, d_next, &iter, bm, BM_DIMS_OF_MESH) {
+		if (BMO_elem_flag_test(bm, d, oflag)) {
+			BM_dim_kill(bm, d);
+		}
 	}
 }
 #endif
@@ -133,6 +133,10 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 {
 	BMEdge *e;
 	BMFace *f;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BMDim *d;
+	BMIter diter;
+#endif
 
 	BMIter eiter;
 	BMIter fiter;
@@ -223,8 +227,12 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case DEL_DIM:
 		{
+			BM_ITER_MESH (d, &diter, bm, BM_DIMS_OF_MESH) {
+				if (!BMO_elem_flag_test(bm, d, oflag)) {
+					BMO_elem_flag_enable(bm, d, oflag);
+				}
+			}
 			bmo_remove_tagged_dim(bm, oflag);
-
 			break;
 		}
 #endif
