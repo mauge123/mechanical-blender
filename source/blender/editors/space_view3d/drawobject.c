@@ -4437,6 +4437,11 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			// Draw object dimensions
+			if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED) {
+				// Asume that is also set
+				v3d->flag |= V3D_SHOW_MESH_DIMENSIONS;
+			}
+
 			if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS){
 				if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED) {
 					if (base->flag & SELECT) {

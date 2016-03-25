@@ -3151,7 +3151,12 @@ class VIEW3D_PT_view3d_display(Panel):
 # WITH_MECHANICAL_MESH_DIMENSIONS
 
         layout.separator()
+        col = layout.column()
+        col.active = not view.show_mesh_dimensions_on_selected
         col.prop(view, "show_mesh_dimensions")
+
+        col = layout.column()
+        col.active = True
         col.prop(view, "show_mesh_dimensions_on_selected")
 
         col = layout.column()
