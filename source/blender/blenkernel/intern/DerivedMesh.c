@@ -885,6 +885,12 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
 #ifdef WITH_MECHCANICAL_DIMENSIONS
+	if (me->totdim) {
+		mdim_pr = CustomData_get_layer(&me->ddata,CD_MDIM);
+		for (int n=0;n<me->totdim;mdim_pr++, n++) {
+			MEM_freeN(mdim->v);
+		}
+	}
 	CustomData_free(&me->ddata, me->totdim);
 #endif
 
