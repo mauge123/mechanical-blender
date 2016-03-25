@@ -1825,7 +1825,7 @@ static void cdDM_foreachMappedDim(
         DerivedMesh *dm,
         void (*func)(void *userData, int index, const float pos[3]),
         void *userData,
-        DMForeachFlag flag)
+        DMForeachFlag UNUSED(flag))
 {
 	MDim *mdm = CDDM_get_dims(dm);
 	const int *index = DM_get_dim_data_layer(dm, CD_ORIGINDEX);
@@ -2112,18 +2112,28 @@ DerivedMesh *CDDM_new(int numVerts, int numEdges, int numTessFaces, int numLoops
 	CustomData_add_layer(&dm->edgeData, CD_ORIGINDEX, CD_CALLOC, NULL, numEdges);
 	CustomData_add_layer(&dm->faceData, CD_ORIGINDEX, CD_CALLOC, NULL, numTessFaces);
 	CustomData_add_layer(&dm->polyData, CD_ORIGINDEX, CD_CALLOC, NULL, numPolys);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_add_layer(&dm->dimData, CD_ORIGINDEX, CD_CALLOC, NULL, numDims);
+#endif
 
 	CustomData_add_layer(&dm->vertData, CD_MVERT, CD_CALLOC, NULL, numVerts);
 	CustomData_add_layer(&dm->edgeData, CD_MEDGE, CD_CALLOC, NULL, numEdges);
 	CustomData_add_layer(&dm->faceData, CD_MFACE, CD_CALLOC, NULL, numTessFaces);
 	CustomData_add_layer(&dm->loopData, CD_MLOOP, CD_CALLOC, NULL, numLoops);
 	CustomData_add_layer(&dm->polyData, CD_MPOLY, CD_CALLOC, NULL, numPolys);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_add_layer(&dm->dimData, CD_MDIM, CD_CALLOC, NULL, numDims);
+#endif
+
 
 	cddm->mvert = CustomData_get_layer(&dm->vertData, CD_MVERT);
 	cddm->medge = CustomData_get_layer(&dm->edgeData, CD_MEDGE);
 	cddm->mface = CustomData_get_layer(&dm->faceData, CD_MFACE);
 	cddm->mloop = CustomData_get_layer(&dm->loopData, CD_MLOOP);
 	cddm->mpoly = CustomData_get_layer(&dm->polyData, CD_MPOLY);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	cddm->mdim = CustomData_get_layer(&dm->dimData, CD_MDIM);
+#endif
 
 	return dm;
 }
@@ -2395,10 +2405,13 @@ static DerivedMesh *cddm_from_bmesh_ex(
 	BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
 		MDim *mdm = &mdim[i];
 		mdm->dpos_fact = edm->dpos_fact;
+		mdm->totverts = edm->totverts;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 
-		mdm->v1 = BM_elem_index_get (edm->v[0]);
-		mdm->v2 = BM_elem_index_get (edm->v[1]);
+		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array cddm");
+		for (int n=0;n<edm->totverts;n++) {
+			mdm->v[n] = BM_elem_index_get (edm->v[n]);
+		}
 
 		BM_elem_index_set(edm, i); /* set_inline */
 

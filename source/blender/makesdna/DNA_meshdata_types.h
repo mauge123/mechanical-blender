@@ -69,7 +69,8 @@ typedef struct MVert {
 
 /* WITH_MECHANICAL_MESH_DIMENSIONS */
 typedef struct MDim {
-	unsigned int v1, v2;
+	unsigned int *v; /* Array of vertexs */
+	unsigned int totverts;
 	float dpos_fact;
 	float fpos[3];
 	char flag;

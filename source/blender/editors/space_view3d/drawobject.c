@@ -2752,8 +2752,8 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 
 	float start[3], end[3], txt_pos[3];
 
-	draw_linear_dimension (CDDM_get_vert(dm,mdm->v1)->co,
-	                       CDDM_get_vert(dm,mdm->v2)->co,
+	draw_linear_dimension (CDDM_get_vert(dm,mdm->v[0])->co,
+	                       CDDM_get_vert(dm,mdm->v[1])->co,
 	                       mdm->fpos,
 	                       mdm->dpos_fact,
 	                       false,

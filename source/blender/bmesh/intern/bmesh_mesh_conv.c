@@ -392,7 +392,7 @@ void BM_mesh_bm_from_me(
 		for (i = 0; i < me->totdim; i++, mdim++) {
 
 			BM_mesh_elem_toolflags_ensure(bm);
-			d = dtable[i] = BM_dim_create(bm, vtable[mdim->v1], vtable[mdim->v2], NULL, BM_CREATE_SKIP_CD);
+			d = dtable[i] = BM_dim_create(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
 
 			set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
 
@@ -626,7 +626,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	BMFace *f;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm;
-	MDim *mdm, *mdim;
+	MDim *mdm, *mdim, *mdim_pr;
 #endif
 	BMIter iter;
 	int i, j, ototvert;
@@ -676,6 +676,12 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (me->totdim) {
+		mdim_pr = CustomData_get_layer(&me->ddata,CD_MDIM);
+		for (int n=0;n<me->totdim;mdim_pr++, n++) {
+			MEM_freeN(mdim->v);
+		}
+	}
 	CustomData_free(&me->ddata, me->totdim);
 #endif
 
@@ -764,8 +770,12 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	mdm = mdim;
 	i = 0;
 	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		mdm->v1 = BM_elem_index_get(edm->v[0]);
-		mdm->v2 = BM_elem_index_get(edm->v[1]);
+
+		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array");
+		for (int n=0;n<edm->totverts;n++) {
+			mdm->v[n] = BM_elem_index_get(edm->v[n]);
+		}
+		mdm->totverts = edm->totverts;
 		mdm->dpos_fact = edm->dpos_fact;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		BM_elem_index_set(edm, i); /* set_inline */
