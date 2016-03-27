@@ -83,7 +83,8 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_screw);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	WM_operatortype_append(MESH_OT_mechanical_dimension_add);
+	WM_operatortype_append(MESH_OT_mechanical_dimension_linear_add);
+	WM_operatortype_append(MESH_OT_mechanical_dimension_diameter_add);
 #endif
 
 	WM_operatortype_append(MESH_OT_extrude_region);

@@ -121,9 +121,13 @@ BMVert *bmesh_urmv_loop_region(BMesh *bm, BMLoop *l_sep);
 void    bmesh_face_swap_data(BMFace *f_a, BMFace *f_b);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-BMDim *BM_dim_create(
+BMDim *BM_dim_create_linear(
         BMesh *bm, BMVert *v1, BMVert *v2,
-        const BMDim *e_example, const eBMCreateFlag create_flag);
+        const BMDim *d_example, const eBMCreateFlag create_flag);
+
+BMDim *BM_dim_create(
+        BMesh *bm, BMVert *(*v), int v_count, int dim_type,
+        const BMDim *d_example, const eBMCreateFlag create_flag);
 
 void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) ;
 void BM_dim_kill(BMesh *bm, BMDim *edm);

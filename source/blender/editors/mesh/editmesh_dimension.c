@@ -58,11 +58,14 @@
 
 #include "ED_dimensions.h"
 
-static int mechanical_add_dimension_between_two_vertex (BMEditMesh *em, wmOperator *op) {
+static int mechanical_add_dimension_from_vertexs (const char* func_name, BMEditMesh *em, wmOperator *op) {
 
 	BMOperator bmop;
+	char op_str [255] = {0};
 
-	EDBM_op_init(em, &bmop, op,"create_dimension verts=%hv", BM_ELEM_SELECT);
+	sprintf(op_str,"%s %s", func_name, "verts=%hv");
+
+	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT);
 
 	/* deselect original verts */
 	BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_in, "verts", BM_VERT, BM_ELEM_SELECT, true);
@@ -79,16 +82,14 @@ static int mechanical_add_dimension_between_two_vertex (BMEditMesh *em, wmOperat
 }
 
 
-static int mechanical_add_dimension(bContext *C, wmOperator *op)
+
+static int mechanical_add_dimension_diameter(bContext *C, wmOperator *op)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-	if (em->bm->totedge == 1) {
-
-	}
-	else if (em->bm->totvertsel == 2) {
-		mechanical_add_dimension_between_two_vertex (em, op);
+	if (em->bm->totvertsel >= 3) {
+		return mechanical_add_dimension_from_vertexs("create_dimension_diameter", em, op);
 	}
 	else {
 		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
@@ -99,21 +100,60 @@ static int mechanical_add_dimension(bContext *C, wmOperator *op)
 
 
 
-void MESH_OT_mechanical_dimension_add(wmOperatorType *ot)
+static int mechanical_add_dimension_linear(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = BKE_editmesh_from_object(obedit);
+
+	if (em->bm->totedge == 1) {
+
+	}
+	else if (em->bm->totvertsel == 2) {
+		mechanical_add_dimension_from_vertexs("create_dimension_linear",em, op);
+	}
+	else {
+		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
+	}
+
+	return OPERATOR_FINISHED;
+}
+
+
+
+void MESH_OT_mechanical_dimension_linear_add(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Add Dimension";
-	ot->description = "Adds a Dimension on Mesh";
-	ot->idname = "MESH_OT_mechanical_dimension_add";
+	ot->name = "Add Linear Dimension";
+	ot->description = "Adds a linear Dimension on Mesh";
+	ot->idname = "MESH_OT_mechanical_dimension_linear_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension;
+	ot->exec = mechanical_add_dimension_linear;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 }
+
+
+void MESH_OT_mechanical_dimension_diameter_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Diameter Dimension";
+	ot->description = "Adds a Diameter Dimension on Mesh";
+	ot->idname = "MESH_OT_mechanical_dimension_diameter_add";
+
+	/* api callbacks */
+	ot->exec = mechanical_add_dimension_diameter;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+}
+
+
 
 //Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
@@ -168,7 +208,7 @@ void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) 
 		float vec[3];
 		float d_dir[3], p[3];
 
-		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[0]->co);
+		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[1]->co);
 		normalize_v3(d_dir);
 		BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
 			float d = dot_v3v3(d_dir,f->no);

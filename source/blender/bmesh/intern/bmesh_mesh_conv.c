@@ -392,7 +392,7 @@ void BM_mesh_bm_from_me(
 		for (i = 0; i < me->totdim; i++, mdim++) {
 
 			BM_mesh_elem_toolflags_ensure(bm);
-			d = dtable[i] = BM_dim_create(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
+			d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
 
 			set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
 

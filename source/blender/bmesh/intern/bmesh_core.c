@@ -3047,16 +3047,27 @@ void bm_kill_only_dim(BMesh *bm, BMDim *d)
  *
  * \note base on BM_edge_create function
  */
-BMDim *BM_dim_create(
+BMDim *BM_dim_create_linear(
         BMesh *bm, BMVert *v1, BMVert *v2,
+        const BMDim *d_example, const eBMCreateFlag create_flag)
+{
+	BMVert *v[2]= {v1,v2};
+	return BM_dim_create (bm,v,2,DIM_TYPE_LINEAR,d_example,create_flag);
+}
+
+
+/**
+ * \brief Main function for creating a new dimension.
+ *
+ * \note base on BM_edge_create function
+ */
+BMDim *BM_dim_create(
+        BMesh *bm, BMVert *(*v), int v_count, int dim_type,
         const BMDim *d_example, const eBMCreateFlag create_flag)
 {
 	BMDim *edm;
 	float vect[3], no1[3], no2[3];
 
-
-	BLI_assert(v1 != v2);
-	BLI_assert(v1->head.htype == BM_VERT && v2->head.htype == BM_VERT);
 	BLI_assert((d_example == NULL) || (d_example->head.htype == BM_DIM));
 	BLI_assert(!(create_flag & 1));
 
@@ -3080,19 +3091,30 @@ BMDim *BM_dim_create(
 	/* allocate flags */
 	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 
-	edm->totverts = 2;
-	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
+	edm->dim_type = dim_type;
 
-	edm->v[0] = v1;
-	edm->v[1] = v2;
+	edm->totverts = v_count;
+	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
+	for (int n=0;n<edm->totverts;n++){
+		BLI_assert(v[n]->head.htype == BM_VERT);
+		edm->v[n] = v[n];
+	}
+
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
-	sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
-	cross_v3_v3v3(no1,vect, edm->v[0]->no);
-	cross_v3_v3v3(no2,no1,vect);
-	normalize_v3(no2);
+	switch (edm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			BLI_assert (v_count == 2);
+			BLI_assert (edm->v[0]  != edm->v[1]);
 
-	set_dim_extra_data(edm, 0.5f, no2);
+			sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
+			cross_v3_v3v3(no1,vect, edm->v[0]->no);
+			cross_v3_v3v3(no2,no1,vect);
+			normalize_v3(no2);
+
+			set_dim_extra_data(edm, 0.5f, no2);
+			break;
+	}
 
 
 	/* --- done --- */

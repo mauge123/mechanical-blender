@@ -141,6 +141,12 @@ typedef struct BMLoop {
 
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+
+/* BMDim->dim_type */
+#define DIM_TYPE_LINEAR (1 << 0)
+#define DIM_TYPE_DIAMETER (1 << 1)
+
+
 typedef struct BMDim {
 	BMHeader head;
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
@@ -149,14 +155,17 @@ typedef struct BMDim {
 	// Number Of verts
 	int totverts;
 
+	int dim_type;
+
 	// Dimension position, used for select
 	float dpos[3];
 
 	// Dimension position fact
 	float dpos_fact;
 
-	//Dimension direction
+	// Dimension direction
 	int dir;
+
 	float end[3], start[3];
 
 	//Dimension position, from midpoint
