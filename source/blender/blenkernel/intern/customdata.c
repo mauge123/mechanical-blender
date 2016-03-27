@@ -2716,6 +2716,9 @@ void CustomData_bmesh_init_pool(CustomData *data, int totelem, const char htype)
 		case BM_EDGE: chunksize = bm_mesh_chunksize_default.totedge;  break;
 		case BM_LOOP: chunksize = bm_mesh_chunksize_default.totloop;  break;
 		case BM_FACE: chunksize = bm_mesh_chunksize_default.totface;  break;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case BM_DIM:  chunksize = bm_mesh_chunksize_default.totdim;   break;
+#endif
 		default:
 			BLI_assert(0);
 			chunksize = 512;
