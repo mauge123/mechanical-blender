@@ -236,8 +236,12 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				&tfp->dim_txt_pos,-2.0f,2.0f, 10, RNA_TRANSLATION_PREC_DEFAULT, TIP_("Position"));
 
 			tfp->constraints = ts->dimension_constraints;
+
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
+
+			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint:"),0, yi -= buth + but_margin, 200, buth,
+				&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
 
 		}
 	} else { /* apply */

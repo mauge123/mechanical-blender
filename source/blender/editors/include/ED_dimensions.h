@@ -4,6 +4,7 @@
 #define DIM_CONSTRAINT_PRECISION 1.0e-3
 
 #define DIM_PLANE_CONSTRAINT (1 << 0)
+#define DIM_AXIS_CONSTRAINT (1 << 1)
 
 
 void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints);
@@ -17,6 +18,7 @@ BMDim* get_selected_dimension(BMEditMesh *em);
 BMDim* get_selected_dimension_BMesh(BMesh *bm);
 
 void get_dimension_mid(float mid[3],BMDim *edm);
+void get_dimension_plane (float p[3], BMDim *edm);
 
 void select_dimension_data (BMDim *edm, void *context);
 

@@ -182,12 +182,71 @@ void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float
 	sub_v3_v3v3(res, va->co, prev);
 }
 
-void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) {
-	float v[3];
+
+static void apply_dimension_diameter_value(Mesh *me, BMDim *edm, float value, int constraints) {
+
+	BLI_assert (edm->dim_type == DIM_TYPE_DIAMETER);
+
+	float axis[3],v[3], ncenter[3];
+	float curv = get_dimension_value(edm);
+
 	BMIter iter;
 	BMVert* eve;
 	BMEditMesh* em = me->edit_btmesh;
 	BMesh *bm = em->bm;
+
+
+	get_dimension_plane(axis, edm);
+
+	if (constraints & DIM_AXIS_CONSTRAINT) {
+
+		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+			sub_v3_v3v3(v,eve->co, edm->center);
+			project_v3_v3v3(ncenter,v, axis);
+			add_v3_v3(ncenter,edm->center);
+
+			if ((len_v3v3 (eve->co, ncenter) - curv) <  DIM_CONSTRAINT_PRECISION){
+				BM_elem_flag_enable(eve, BM_ELEM_TAG);
+			}
+		}
+	}
+
+
+	// Update related Verts
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
+			sub_v3_v3v3(v,eve->co, edm->center);
+
+			project_v3_v3v3(ncenter,v, axis);
+			add_v3_v3(ncenter,edm->center);
+
+			sub_v3_v3v3(v,eve->co, ncenter);
+
+			normalize_v3(v);
+			mul_v3_fl(v,value/2.0f);
+			add_v3_v3v3(eve->co,ncenter,v);
+
+			// Reset tag
+			BM_elem_flag_disable(eve, BM_ELEM_TAG);
+		}
+	}
+
+
+
+
+
+}
+
+static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int constraints) {
+
+	float v[3];
+
+	BMIter iter;
+	BMVert* eve;
+	BMEditMesh* em = me->edit_btmesh;
+	BMesh *bm = em->bm;
+
+	BLI_assert (edm->dim_type == DIM_TYPE_LINEAR);
 
 	if (edm->dir == 0){
 		// Both directions
@@ -200,17 +259,6 @@ void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) 
 		edm->dir = 0;
 		return;
 	}
-
-	// Tag all elements to be affected by change
-	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-		if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-			BM_elem_flag_enable(eve, BM_ELEM_TAG);
-		} else {
-			// Disable as default
-			BM_elem_flag_disable(eve, BM_ELEM_TAG);
-		}
-	}
-
 
 	if (constraints & DIM_PLANE_CONSTRAINT) {
 		BMFace *f;
@@ -267,10 +315,42 @@ void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) 
 		}
 	}
 
+}
+
+void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) {
+
+	BMIter iter;
+	BMVert* eve;
+	BMEditMesh* em = me->edit_btmesh;
+	BMesh *bm = em->bm;
+
+	// Tag all elements to be affected by change
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(eve, BM_ELEM_TAG);
+		} else {
+			// Disable as default
+			BM_elem_flag_disable(eve, BM_ELEM_TAG);
+		}
+	}
+
+	// Tag vertexs of dimension
+	for (int i=0;i<edm->totverts;i++) {
+		// Tag elements
+		BM_elem_flag_enable(edm->v[i], BM_ELEM_TAG);
+	}
+
+	switch (edm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			apply_dimension_linear_value (me,edm,value,constraints);
+			break;
+		case DIM_TYPE_DIAMETER:
+			apply_dimension_diameter_value (me,edm,value,constraints);
+	}
+
 	EDBM_mesh_normals_update(em);
+}
 
-
- }
 // text Position
 void apply_txt_dimension_value(BMDim *edm, float value){
 
@@ -308,6 +388,19 @@ BMDim* get_selected_dimension(BMEditMesh *em){
 
 void get_dimension_mid(float mid[3],BMDim *edm){
 	mid_of_2_points(mid, edm->v[0]->co, edm->v[1]->co);
+}
+
+void get_dimension_plane (float p[3], BMDim *edm){
+	float m[3], r[3];
+	if (edm->totverts >= 3) {
+		BLI_assert (edm->dim_type == DIM_TYPE_DIAMETER);
+		sub_v3_v3v3(m,edm->v[0]->co,edm->v[1]->co);
+		sub_v3_v3v3(r,edm->v[2]->co,edm->v[1]->co);
+		cross_v3_v3v3(p,m,r);
+		normalize_v3(p);
+	} else {
+		BLI_assert (0);
+	}
 }
 
 
