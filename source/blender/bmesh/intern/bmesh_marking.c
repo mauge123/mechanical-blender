@@ -481,13 +481,30 @@ void BM_dim_select_set(BMesh *bm, BMDim *d, const bool select)
 		if (!BM_elem_flag_test(d, BM_ELEM_SELECT)) {
 			BM_elem_flag_enable(d, BM_ELEM_SELECT);
 			bm->totdimsel += 1;
+
+			// Select all vertices
+			for (int i=0; i< d->totverts; i++) {
+				if (!BM_elem_flag_test(d->v[i], BM_ELEM_SELECT)) {
+					bm->totvertsel += 1;
+					BM_elem_flag_enable(d->v[i], BM_ELEM_SELECT);
+				}
+			}
 		}
 	}
 	else {
 		if (BM_elem_flag_test(d, BM_ELEM_SELECT)) {
 			bm->totdimsel -= 1;
 			BM_elem_flag_disable(d, BM_ELEM_SELECT);
+
+			// De-select all vertices
+			for (int i =0; i< d->totverts; i++) {
+				if (BM_elem_flag_test(d->v[i], BM_ELEM_SELECT)) {
+					bm->totvertsel -= 1;
+					BM_elem_flag_disable(d->v[i], BM_ELEM_SELECT);
+				}
+			}
 		}
+
 	}
 }
 #endif

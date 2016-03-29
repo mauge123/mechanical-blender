@@ -2726,9 +2726,9 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,col);
 }
 
-static void draw_diameter_dimension (float* center, float *v_dir, float r, int selected) {
+static void draw_diameter_dimension (float* center, float *v_dir, float r, int selected, float *txt_pos) {
 
-	float txt_pos[3], start[3], end[3], vr[3];
+	float start[3], end[3], vr[3];
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
@@ -2870,7 +2870,7 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			break;
 		case DIM_TYPE_DIAMETER:
 			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm)/2.0f,
-			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
+			                         BM_elem_flag_test(edm, BM_ELEM_SELECT), edm->dpos);
 			break;
 		}
 }

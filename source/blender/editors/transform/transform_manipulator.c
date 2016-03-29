@@ -331,15 +331,6 @@ static int calc_manipulator_stats(const bContext *C)
 				calc_tw_center(scene, vec);
 				totsel = 1;
 			}
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-			else if( edm=get_selected_dimension(em)){
-				float mid[3];
-				totsel++;
-				get_dimension_mid(mid, edm);
-				calc_tw_center(scene, mid);
-
-			}
-#endif
 			else {
 				BMesh *bm = em->bm;
 				BMVert *eve;
