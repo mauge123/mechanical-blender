@@ -311,7 +311,6 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	mpoly = CustomData_add_layer(&pdata, CD_MPOLY, CD_CALLOC, NULL, totpoly);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	mdim = CustomData_add_layer(&ddata, CD_MDIM, CD_CALLOC, NULL, totdim);
-	mdim->v = MEM_callocN(sizeof(int)*mdim->totverts, "Mesh Dimension index array");
 #endif
 
 	vertofs = 0;
@@ -454,6 +453,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 				CustomData_copy_data_named(&me->ddata, &ddata, 0, dimofs, me->totdim);
 
 				for (a = 0; a < me->totdim; a++, mdim++) {
+					mdim->v = MEM_callocN(sizeof(int)*mdim->totverts, "Mesh Dimension index array");
 					for (i=0;i<mdim->totverts;i++) {
 						mdim->v[i] = pr_dim->v[i] + vertofs;
 					}
