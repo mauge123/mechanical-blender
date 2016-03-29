@@ -496,13 +496,7 @@ void BM_dim_select_set(BMesh *bm, BMDim *d, const bool select)
 			bm->totdimsel -= 1;
 			BM_elem_flag_disable(d, BM_ELEM_SELECT);
 
-			// De-select all vertices
-			for (int i =0; i< d->totverts; i++) {
-				if (BM_elem_flag_test(d->v[i], BM_ELEM_SELECT)) {
-					bm->totvertsel -= 1;
-					BM_elem_flag_disable(d->v[i], BM_ELEM_SELECT);
-				}
-			}
+			//Do not De-select all vertices: Allows maintain selected if needed
 		}
 
 	}

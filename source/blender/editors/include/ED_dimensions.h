@@ -19,7 +19,7 @@ BMDim* get_selected_dimension_BMesh(BMesh *bm);
 
 void get_dimension_mid(float mid[3],BMDim *edm);
 void get_dimension_plane (float p[3], BMDim *edm);
-void dimemsion_data_update (BMDim *edm);
+void dimension_data_update (BMDim *edm);
 
 void select_dimension_data (BMDim *edm, void *context);
 

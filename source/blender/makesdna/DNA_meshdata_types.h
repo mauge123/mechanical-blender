@@ -73,8 +73,9 @@ typedef struct MDim {
 	unsigned int totverts;
 	float dpos_fact;
 	float fpos[3];
+	short dim_type;
 	char flag;
-	char pad[3];
+	char pad[1];
 
 } MDim;
 

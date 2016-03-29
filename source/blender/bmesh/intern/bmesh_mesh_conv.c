@@ -390,9 +390,21 @@ void BM_mesh_bm_from_me(
 
 		mdim = me->mdim;
 		for (i = 0; i < me->totdim; i++, mdim++) {
+			BMVert *(*v_arr);
 
 			BM_mesh_elem_toolflags_ensure(bm);
-			d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
+
+
+			v_arr = MEM_mallocN(sizeof (BMVert*)*mdim->totverts,"BMVert temp array");
+			for (int j=0;j<mdim->totverts;j++) {
+				v_arr[j] = vtable[mdim->v[j]];
+			}
+
+			//d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
+			d = dtable[i] = BM_dim_create(bm,v_arr,mdim->totverts,mdim->dim_type,NULL,BM_CREATE_SKIP_CD);
+
+			MEM_freeN (v_arr);
+
 
 			/* Already performed during BM_dim_create_linear */
 			// set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
@@ -777,6 +789,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 			mdm->v[n] = BM_elem_index_get(edm->v[n]);
 		}
 		mdm->totverts = edm->totverts;
+		mdm->dim_type = edm->dim_type;
 		mdm->dpos_fact = edm->dpos_fact;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		BM_elem_index_set(edm, i); /* set_inline */

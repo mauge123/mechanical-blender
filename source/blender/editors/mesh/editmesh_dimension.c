@@ -292,7 +292,6 @@ static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int 
 				}
 			}
 		}
-
 	}
 	// Untag dimensions vertex
 	BM_elem_flag_disable(edm->v[0], BM_ELEM_TAG);
@@ -451,10 +450,20 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
 }
 
 void dimension_data_update (BMDim *edm) {
-	float v[3];
+	float axis[3], v1[3], l;
 
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
+			// Set dimension always perpendicular to edge
+			l = len_v3(edm->fpos);
+			sub_v3_v3v3(axis, edm->v[0]->co, edm->v[1]->co);
+			normalize_v3(axis);
+			project_v3_v3v3(v1,edm->fpos,axis);
+			sub_v3_v3(edm->fpos,v1);
+			normalize_v3(edm->fpos);
+			mul_v3_fl (edm->fpos, l);
+
+
 			// Baseline
 			add_v3_v3v3(edm->start,edm->fpos, edm->v[0]->co);
 			add_v3_v3v3(edm->end, edm->fpos, edm->v[1]->co);
@@ -467,15 +476,34 @@ void dimension_data_update (BMDim *edm) {
 
 			break;
 		case DIM_TYPE_DIAMETER:
+			// Set f pos always on dimension plane!
+			get_dimension_plane(v1,edm);
+			project_plane_v3_v3v3(edm->fpos, edm->fpos ,v1);
+
+			// Recalc dimension center
+			if (edm->totverts == 2) {
+				/* Center at midpoint */
+				mid_of_2_points (edm->center, edm->v[0]->co, edm->v[1]->co);
+			} else {
+				if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
+					// Ok
+				} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
+					// Ok
+				} else {
+					// Somthing is going grong!
+					BLI_assert (0);
+				}
+			}
+
+
+			// Calc start end
+			sub_v3_v3v3(v1,edm->fpos, edm->center);
+			normalize_v3(v1);
+			mul_v3_fl(v1,get_dimension_value(edm)/2.0f);
+			add_v3_v3v3(edm->start,edm->center,v1);
+			sub_v3_v3v3(edm->end, edm->center,v1);
 
 			// Set txt pos acording pos factor
-			sub_v3_v3v3(v,edm->fpos, edm->center);
-			normalize_v3(v);
-			mul_v3_fl(v,get_dimension_value(edm)/2.0f);
-			add_v3_v3v3(edm->start,edm->center,v);
-			sub_v3_v3v3(edm->end, edm->center,v);
-
-
 			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
 			mul_v3_fl(edm->dpos, edm->dpos_fact);
 			add_v3_v3(edm->dpos, edm->start);
