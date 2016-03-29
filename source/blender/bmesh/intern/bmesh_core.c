@@ -42,6 +42,12 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
 
+// Defined on ED_dimensions.h
+void mid_of_2_points(float *mid, float *p1, float *p2);
+int center_of_3_points(float *center, float *p1, float *p2, float *p3);
+
+
+
 /* use so valgrinds memcheck alerts us when undefined index is used.
  * TESTING ONLY! */
 // #define USE_DEBUG_INDEX_MEMCHECK
@@ -3112,8 +3118,22 @@ BMDim *BM_dim_create(
 			cross_v3_v3v3(no2,no1,vect);
 			normalize_v3(no2);
 
-			set_dim_extra_data(edm, 0.5f, no2);
+			edm->dpos_fact = 0.5f;
+			copy_v3_v3(edm->fpos, no2);
 			break;
+		case DIM_TYPE_DIAMETER:
+			BLI_assert (v_count >= 2);
+			if (v_count == 2) {
+				/* Center at midpoint */
+				mid_of_2_points (edm->center, edm->v[0]->co, edm->v[1]->co);
+			} else {
+				if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
+					// Ok
+				}
+			}
+			//set direction
+			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
+
 	}
 
 
@@ -3140,9 +3160,4 @@ BMDim *BM_dim_create(
 	return edm;
 }
 
-void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) {
-	edm->dpos_fact = dpos_fact;
-	copy_v3_v3(edm->fpos, fpos);
-
-}
 

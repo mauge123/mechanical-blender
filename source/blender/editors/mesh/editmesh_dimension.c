@@ -88,7 +88,7 @@ static int mechanical_add_dimension_diameter(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-	if (em->bm->totvertsel >= 3) {
+	if (em->bm->totvertsel >= 2) {
 		return mechanical_add_dimension_from_vertexs("create_dimension_diameter", em, op);
 	}
 	else {
@@ -157,7 +157,17 @@ void MESH_OT_mechanical_dimension_diameter_add(wmOperatorType *ot)
 
 //Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
-	return(len_v3v3(edm->v[0]->co, edm->v[1]->co));
+	float v=0;
+	switch (edm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			v = len_v3v3(edm->v[0]->co, edm->v[1]->co);
+			break;
+		case DIM_TYPE_DIAMETER:
+			v = len_v3v3(edm->v[0]->co, edm->center)*2;
+			break;
+	}
+
+	return v;
 }
 
 //Apply to the selected direction a dimension value
@@ -295,13 +305,51 @@ BMDim* get_selected_dimension(BMEditMesh *em){
 	return edm;
 }
 
+
 void get_dimension_mid(float mid[3],BMDim *edm){
+	mid_of_2_points(mid, edm->v[0]->co, edm->v[1]->co);
+}
 
-	sub_v3_v3v3(mid, edm->v[1]->co, edm->v[0]->co);
+
+void mid_of_2_points (float *mid, float *p1, float *p2) {
+	sub_v3_v3v3(mid, p2, p1);
 	mul_v3_fl(mid,0.5);
-	add_v3_v3(mid, edm->v[0]->co);
+	add_v3_v3(mid, p1);
+}
 
+int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
+	float m[3], pm[3], mm[3];
+	float r[3], pr[3], mr[3];
+	float p21[3], p31[3];
+	float p[3]; //Plane vector
 
+	float r1[3],r2[3]; //isect results
+
+	sub_v3_v3v3(m,p2,p1);
+	sub_v3_v3v3(r,p3,p1);
+
+	// Plane vector
+	cross_v3_v3v3(p,m,r);
+
+	// Perpendicular vectors
+	cross_v3_v3v3(pm,m,p);
+	cross_v3_v3v3(pr,r,p);
+
+	// Midpoints
+	mid_of_2_points(mm,p2,p1);
+	mid_of_2_points(mr,p3,p1);
+
+	//Second point
+	add_v3_v3v3(p21,mm,pm);
+	add_v3_v3v3(p31,mr,pr);
+
+	if (isect_line_line_v3(mm, p21, mr, p31,r1,r2) == 1) {
+		// One intersection: Ok
+		copy_v3_v3(center,r1);
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 

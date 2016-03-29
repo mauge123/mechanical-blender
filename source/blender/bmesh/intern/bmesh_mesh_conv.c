@@ -394,7 +394,8 @@ void BM_mesh_bm_from_me(
 			BM_mesh_elem_toolflags_ensure(bm);
 			d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
 
-			set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
+			/* Already performed during BM_dim_create_linear */
+			// set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
 
 
 			BM_elem_index_set(d, i); /* set_ok */

@@ -598,6 +598,11 @@ void DM_add_loop_layer(
 void DM_add_poly_layer(
         struct DerivedMesh *dm, int type, int alloctype,
         void *layer);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		void DM_add_dim_layer(
+		struct DerivedMesh *dm, int type, int alloctype,
+		void *layer);
+#endif
 
 /* custom data access functions
  * return pointer to data from first layer which matches type

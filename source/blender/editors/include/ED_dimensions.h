@@ -8,6 +8,7 @@
 
 void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints);
 void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res);
+
 float get_dimension_value(BMDim *edm);
 
 void apply_txt_dimension_value (BMDim *edm, float value);
@@ -18,4 +19,12 @@ BMDim* get_selected_dimension_BMesh(BMesh *bm);
 void get_dimension_mid(float mid[3],BMDim *edm);
 
 void select_dimension_data (BMDim *edm, void *context);
+
+
+/* Common use */
+void mid_of_2_points(float *mid, float *p1, float *p2);
+int center_of_3_points(float *center, float *p1, float *p2, float *p3);
+
+
+
 #endif // ED_DIMENSIONS_H

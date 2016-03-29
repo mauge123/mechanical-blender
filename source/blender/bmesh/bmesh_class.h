@@ -163,10 +163,12 @@ typedef struct BMDim {
 	// Dimension position fact
 	float dpos_fact;
 
-	// Dimension direction
-	int dir;
+	// Linear Dimension
+	int dir;  // Direction, to which side the value should be modified
+	float end[3], start[3];  //Points of base line
 
-	float end[3], start[3];
+	// Diameter Dimension
+	float center[3];
 
 	//Dimension position, from midpoint
 	float fpos[3]; //fixed
