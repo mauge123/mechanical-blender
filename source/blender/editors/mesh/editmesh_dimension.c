@@ -411,6 +411,8 @@ void mid_of_2_points (float *mid, float *p1, float *p2) {
 }
 
 int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
+	int res=0;
+
 	float m[3], pm[3], mm[3];
 	float r[3], pr[3], mr[3];
 	float p21[3], p31[3];
@@ -436,8 +438,11 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
 	add_v3_v3v3(p21,mm,pm);
 	add_v3_v3v3(p31,mr,pr);
 
-	if (isect_line_line_v3(mm, p21, mr, p31,r1,r2) == 1) {
+	if ((res = isect_line_line_v3(mm, p21, mr, p31,r1,r2)) == 1) {
 		// One intersection: Ok
+		copy_v3_v3(center,r1);
+		return 1;
+	} else if (res == 2 && len_v3v3(r1,r2) < DIM_CONSTRAINT_PRECISION) {
 		copy_v3_v3(center,r1);
 		return 1;
 	} else {
@@ -445,5 +450,37 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
 	}
 }
 
+void dimension_data_update (BMDim *edm) {
+	float v[3];
+
+	switch (edm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			// Baseline
+			add_v3_v3v3(edm->start,edm->fpos, edm->v[0]->co);
+			add_v3_v3v3(edm->end, edm->fpos, edm->v[1]->co);
 
 
+			// Set txt pos acording pos factor
+			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
+			mul_v3_fl(edm->dpos, edm->dpos_fact);
+			add_v3_v3(edm->dpos, edm->start);
+
+			break;
+		case DIM_TYPE_DIAMETER:
+
+			// Set txt pos acording pos factor
+			sub_v3_v3v3(v,edm->fpos, edm->center);
+			normalize_v3(v);
+			mul_v3_fl(v,get_dimension_value(edm)/2.0f);
+			add_v3_v3v3(edm->start,edm->center,v);
+			sub_v3_v3v3(edm->end, edm->center,v);
+
+
+			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
+			mul_v3_fl(edm->dpos, edm->dpos_fact);
+			add_v3_v3(edm->dpos, edm->start);
+
+
+			break;
+	}
+}

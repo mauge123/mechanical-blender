@@ -45,7 +45,7 @@
 // Defined on ED_dimensions.h
 void mid_of_2_points(float *mid, float *p1, float *p2);
 int center_of_3_points(float *center, float *p1, float *p2, float *p3);
-
+void dimension_data_update (BMDim *edm);
 
 
 /* use so valgrinds memcheck alerts us when undefined index is used.
@@ -3129,10 +3129,16 @@ BMDim *BM_dim_create(
 			} else {
 				if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
 					// Ok
+				} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
+					// Ok
+				} else {
+					// Somthing is going grong!
+					BLI_assert (0);
 				}
 			}
 			//set direction
 			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
+			edm->dpos_fact = 0.5f;
 
 	}
 
@@ -3155,7 +3161,10 @@ BMDim *BM_dim_create(
 		}
 	}
 
+	dimension_data_update (edm);
+
 	BM_CHECK_ELEMENT(edm);
+
 
 	return edm;
 }

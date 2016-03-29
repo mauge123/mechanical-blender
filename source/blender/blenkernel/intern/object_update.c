@@ -60,6 +60,9 @@
 
 #include "DEG_depsgraph.h"
 
+void get_dimension_mid(float mid[3],BMDim *edm);
+void dimension_data_update(BMDim *edm);
+
 #ifdef WITH_LEGACY_DEPSGRAPH
 #  define DEBUG_PRINT if (!DEG_depsgraph_use_legacy() && G.debug & G_DEBUG_DEPSGRAPH) printf
 #else
@@ -194,6 +197,34 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 				data_mask |= CD_MASK_FREESTYLE_EDGE | CD_MASK_FREESTYLE_FACE;
 			}
 #endif
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			if (em) {
+				BMesh *bm = em->bm;
+				BMDim *edm;
+				BMIter iter;
+				int i =0;
+				BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
+
+					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
+						if (!G.moving) {
+							// Untag
+							BM_elem_flag_disable(edm, BM_ELEM_TAG);
+						}
+					}
+
+					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
+						get_dimension_mid(edm->fpos,edm);
+						sub_v3_v3(edm->fpos,edm->tpos);
+						mul_v3_fl(edm->fpos,-1.0f);
+					}
+
+					dimension_data_update (edm);
+
+				}
+			}
+#endif
+
 			if (em) {
 				makeDerivedMesh(scene, ob, em,  data_mask, false); /* was CD_MASK_BAREMESH */
 			}

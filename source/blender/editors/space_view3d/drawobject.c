@@ -2671,13 +2671,14 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
  * @param end
  * @param txt_pos
  */
-static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected,
-                                   float *start, float *end, float *txt_pos) {
+static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected) {
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 
 	unsigned char col[4]; /* color of the text to draw */
+
+	float start[3], end[3], txt_pos[3];
 
 
 	if (selected) {
@@ -2726,9 +2727,9 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,col);
 }
 
-static void draw_diameter_dimension (float* center, float *v_dir, float r, int selected, float *txt_pos) {
+static void draw_diameter_dimension(float* center, float *v_dir, float r, float dpos_fact, int selected) {
 
-	float start[3], end[3], vr[3];
+	float start[3], end[3], vr[3], txt_pos[3];
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
@@ -2743,8 +2744,6 @@ static void draw_diameter_dimension (float* center, float *v_dir, float r, int s
 	}
 
 
-	// Set txt pos
-	copy_v3_v3(txt_pos, center);
 
 	copy_v3_v3(vr,v_dir);
 	normalize_v3(vr);
@@ -2752,6 +2751,15 @@ static void draw_diameter_dimension (float* center, float *v_dir, float r, int s
 
 	add_v3_v3v3(start, center, vr);
 	sub_v3_v3v3(end, center, vr);
+
+
+	// Set txt pos acording pos factor
+	sub_v3_v3v3(txt_pos, end, start);
+	mul_v3_fl(txt_pos,  dpos_fact);
+	add_v3_v3(txt_pos, start);
+
+
+
 
 	glPointSize(2);
 	glBegin(GL_POINTS);
@@ -2790,14 +2798,11 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 	DerivedMesh* dm = data->dm;
 	MDim* mdm = CDDM_get_dim(dm,index);
 
-	float start[3], end[3], txt_pos[3];
-
 	draw_linear_dimension (CDDM_get_vert(dm,mdm->v[0])->co,
 	                       CDDM_get_vert(dm,mdm->v[1])->co,
 	                       mdm->fpos,
 	                       mdm->dpos_fact,
-	                       false,
-	                       start,end, txt_pos);
+	                       false);
 
 }
 #endif
@@ -2820,25 +2825,11 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 		return;
 	}
 
-	if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
-		if (!G.moving) {
-			// Untag
-			BM_elem_flag_disable(edm, BM_ELEM_TAG);
-		}
-	}
-
-	if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
-		get_dimension_mid(edm->fpos,edm);
-		sub_v3_v3(edm->fpos,edm->tpos);
-		mul_v3_fl(edm->fpos,-1.0f);
-	}
-
 
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
 			draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
-								   BM_elem_flag_test(edm, BM_ELEM_SELECT),
-								   edm->start, edm->end, edm->dpos);
+								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 
 
 			//Draw a big point on Dim diection selected or small point on Dim not selected
@@ -2869,8 +2860,8 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			}
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm)/2.0f,
-			                         BM_elem_flag_test(edm, BM_ELEM_SELECT), edm->dpos);
+			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm)/2.0f, edm->dpos_fact,
+			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			break;
 		}
 }
