@@ -397,7 +397,6 @@ static bool ui_but_is_interactive(const uiBut *but, const bool labeledit);
 static bool ui_but_contains_pt(uiBut *but, float mx, float my);
 static bool ui_but_contains_point_px(ARegion *ar, uiBut *but, int x, int y);
 static uiBut *ui_but_find_mouse_over_ex(ARegion *ar, const int x, const int y, const bool labeledit);
-static uiBut *ui_but_find_mouse_over(ARegion *ar, const wmEvent *event);
 static void button_activate_init(bContext *C, ARegion *ar, uiBut *but, uiButtonActivateType type);
 static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState state);
 static void button_activate_exit(
@@ -6978,12 +6977,12 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 		}
 		/* handle drivers */
 		else if ((event->type == DKEY) &&
-		         !IS_EVENT_MOD(event, shift, ctrl, oskey) &&
+		         !IS_EVENT_MOD(event, shift, oskey) &&
 		         (event->val == KM_PRESS))
 		{
 			if (event->alt)
 				ui_but_anim_remove_driver(C);
-			else
+			else if (event->ctrl)
 				ui_but_anim_add_driver(C);
 				
 			ED_region_tag_redraw(data->region);
@@ -7506,7 +7505,7 @@ static uiBut *ui_but_find_mouse_over_ex(ARegion *ar, const int x, const int y, c
 	return butover;
 }
 
-static uiBut *ui_but_find_mouse_over(ARegion *ar, const wmEvent *event)
+uiBut *ui_but_find_mouse_over(ARegion *ar, const wmEvent *event)
 {
 	return ui_but_find_mouse_over_ex(ar, event->x, event->y, event->ctrl != 0);
 }
@@ -9955,10 +9954,14 @@ static int ui_popup_handler(bContext *C, const wmEvent *event, void *userdata)
 	menu_region = CTX_wm_menu(C);
 	CTX_wm_menu_set(C, menu->region);
 
-	if (event->type == EVT_DROP) {
-		/* if we're handling drop event we'll want it to be handled by popup callee as well,
-		 * so it'll be possible to perform such operations as opening .blend files by dropping
-		 * them into blender even if there's opened popup like splash screen (sergey)
+	if (event->type == EVT_DROP || event->val == KM_DBL_CLICK) {
+		/* EVT_DROP:
+		 *   If we're handling drop event we'll want it to be handled by popup callee as well,
+		 *   so it'll be possible to perform such operations as opening .blend files by dropping
+		 *   them into blender, even if there's opened popup like splash screen (sergey).
+		 * KM_DBL_CLICK:
+		 *   Continue in case of double click so wm_handlers_do calls handler again with KM_PRESS
+		 *   event. This is needed to ensure correct button handling for fast clicking (T47532).
 		 */
 
 		retval = WM_UI_HANDLER_CONTINUE;
