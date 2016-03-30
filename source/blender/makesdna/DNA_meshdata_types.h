@@ -73,6 +73,8 @@ typedef struct MDim {
 	unsigned int totverts;
 	float dpos_fact;
 	float fpos[3];
+	float center[3];
+	float value; // Stored Dimension Value
 	short dim_type;
 	char flag;
 	char pad[1];

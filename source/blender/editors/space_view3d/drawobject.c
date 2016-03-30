@@ -2727,7 +2727,7 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,col);
 }
 
-static void draw_diameter_dimension(float* center, float *v_dir, float r, float dpos_fact, int selected) {
+static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected) {
 
 	float start[3], end[3], vr[3], txt_pos[3];
 
@@ -2747,7 +2747,7 @@ static void draw_diameter_dimension(float* center, float *v_dir, float r, float 
 
 	copy_v3_v3(vr,v_dir);
 	normalize_v3(vr);
-	mul_v3_fl(vr, r); //Vector radius
+	mul_v3_fl(vr, diameter/2.0f); //Vector radius
 
 	add_v3_v3v3(start, center, vr);
 	sub_v3_v3v3(end, center, vr);
@@ -2798,11 +2798,18 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 	DerivedMesh* dm = data->dm;
 	MDim* mdm = CDDM_get_dim(dm,index);
 
-	draw_linear_dimension (CDDM_get_vert(dm,mdm->v[0])->co,
-	                       CDDM_get_vert(dm,mdm->v[1])->co,
-	                       mdm->fpos,
-	                       mdm->dpos_fact,
-	                       false);
+	switch (mdm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			draw_linear_dimension (CDDM_get_vert(dm,mdm->v[0])->co,
+								   CDDM_get_vert(dm,mdm->v[1])->co,
+								   mdm->fpos,
+								   mdm->dpos_fact,
+								   false);
+			break;
+		case DIM_TYPE_DIAMETER:
+			draw_diameter_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
+			break;
+	}
 
 }
 #endif
@@ -2860,7 +2867,7 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			}
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm)/2.0f, edm->dpos_fact,
+			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
 			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			break;
 		}

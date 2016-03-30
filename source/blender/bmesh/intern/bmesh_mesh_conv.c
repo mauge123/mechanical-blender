@@ -98,6 +98,8 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h" /* for element checking */
 
+float get_dimension_value(BMDim *edm);
+
 /**
  * Currently this is only used for Python scripts
  * which may fail to keep matching UV/TexFace layers.
@@ -791,7 +793,9 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		mdm->totverts = edm->totverts;
 		mdm->dim_type = edm->dim_type;
 		mdm->dpos_fact = edm->dpos_fact;
+		mdm->value = get_dimension_value(edm);
 		copy_v3_v3(mdm->fpos, edm->fpos);
+		copy_v3_v3(mdm->center, edm->center);
 		BM_elem_index_set(edm, i); /* set_inline */
 		/* copy over customdat */
 		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, edm->head.data, i);
