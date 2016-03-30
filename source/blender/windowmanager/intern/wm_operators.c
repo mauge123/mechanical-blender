@@ -1836,6 +1836,9 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url",
 	              "http://www.blender.org/manual");
 	uiItemStringO(col, IFACE_("Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
+#ifdef WITH_MECHANICAL
+	uiItemStringO(col, IFACE_("Mechanical Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.mechanicalblender.org");
+#endif
 	if (STREQ(STRINGIFY(BLENDER_VERSION_CYCLE), "release")) {
 		BLI_snprintf(url, sizeof(url), "http://www.blender.org/documentation/blender_python_api_%d_%d"
 		                               STRINGIFY(BLENDER_VERSION_CHAR) "_release",

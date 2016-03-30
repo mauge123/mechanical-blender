@@ -110,7 +110,10 @@ class USERPREF_MT_splash(Menu):
 
         split = layout.split()
         row = split.row()
-        row.label("")
+## WITH_MECHANICAL
+        row.label("Mechanical Blender Version")
+## ELSE
+##      row.label("")
         row = split.row()
         row.label("Interaction:")
 

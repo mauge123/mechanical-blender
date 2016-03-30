@@ -303,7 +303,8 @@ class INFO_MT_help(Menu):
         layout.operator("wm.url_open", text="Manual", icon='HELP').url = "http://www.blender.org/manual"
         layout.operator("wm.url_open", text="Release Log", icon='URL').url = "http://wiki.blender.org/index.php/Dev:Ref/Release_Notes/%d.%d" % bpy.app.version[:2]
         layout.separator()
-
+        ## WITH_MECHANICAL
+        layout.operator("wm.url_open", text="Mechanical Blender Website", icon='URL').url = "http://www.mechanicalblender.org"
         layout.operator("wm.url_open", text="Blender Website", icon='URL').url = "http://www.blender.org"
         layout.operator("wm.url_open", text="Blender Store", icon='URL').url = "https://store.blender.org"
         layout.operator("wm.url_open", text="Developer Community", icon='URL').url = "http://www.blender.org/get-involved/"

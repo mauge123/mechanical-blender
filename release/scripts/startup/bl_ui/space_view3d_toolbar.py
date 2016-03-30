@@ -1927,5 +1927,20 @@ class VIEW3D_PT_tools_history(View3DPanel, Panel):
         col.operator("screen.repeat_history", text="History...")
 
 
+## WITH_MECHANIAL
+class VIEW3D_PT_tools_mechanical(View3DPanel, Panel):
+    bl_category = "Mechanical"
+    bl_context = "mesh_edit"
+    bl_label = "Mechanical"
+
+    def draw(self, context):
+        layout = self.layout
+
+        col = layout.column(align=True)
+        col.label(text="Dimensons:")
+        col.operator("mesh.mechanical_dimension_linear_add", text = "Linear")
+        col.operator("mesh.mechanical_dimension_diameter_add", text = "Diameter")
+
+
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)
