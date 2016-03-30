@@ -1,5 +1,5 @@
-#ifndef ED_DIMENSIONS_H
-#define ED_DIMENSIONS_H
+#ifndef MESH_DIMENSIONS_H
+#define MESH_DIMENSIONS_H
 
 #define DIM_CONSTRAINT_PRECISION 1.0e-3
 
@@ -30,4 +30,4 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3);
 
 
 
-#endif // ED_DIMENSIONS_H
+#endif // MESH_DIMENSIONS_H

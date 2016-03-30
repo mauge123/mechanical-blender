@@ -153,3 +153,8 @@ if(WITH_FREESTYLE)
 	add_subdirectory(freestyle)
 endif()
 
+if(WITH_MECHANICAL)
+	add_subdirectory(mechanical)
+endif()
+
+

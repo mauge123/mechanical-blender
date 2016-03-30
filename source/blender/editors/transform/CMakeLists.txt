@@ -62,6 +62,10 @@ if(WITH_LEGACY_DEPSGRAPH)
 endif()
 
 if(WITH_MECHANICAL)
+	list(APPEND INC
+		../../mechanical
+	)
+
 	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_GRAB_W_BASE_POINT)
 	add_definitions(-DWITH_MECHANICAL_ROTATE_W_BASE_POINT)

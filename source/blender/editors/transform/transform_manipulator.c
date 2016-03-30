@@ -69,7 +69,8 @@
 #include "ED_curve.h"
 #include "ED_particle.h"
 #include "ED_view3d.h"
-#include "ED_dimensions.h"
+
+#include "mesh_dimensions.h"
 
 #include "UI_resources.h"
 

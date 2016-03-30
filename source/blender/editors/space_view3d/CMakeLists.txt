@@ -91,6 +91,9 @@ if(WITH_FREESTYLE)
 endif()
 
 if(WITH_MECHANICAL)
+	list(APPEND INC
+		../../mechanical
+	)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 endif()
 

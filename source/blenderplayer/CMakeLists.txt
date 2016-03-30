@@ -224,6 +224,11 @@ endif()
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_openvdb)
 	endif()
 
+	if(WITH_MECHANICAL)
+		list(APPEND BLENDER_SORTED_LIBS bf_mechanical)
+	endif()
+
+
 	foreach(SORTLIB ${BLENDER_SORTED_LIBS})
 		set(REMLIB ${SORTLIB})
 		foreach(SEARCHLIB ${BLENDER_LINK_LIBS})

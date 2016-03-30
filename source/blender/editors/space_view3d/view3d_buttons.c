@@ -70,7 +70,8 @@
 #include "ED_armature.h"
 #include "ED_mesh.h"
 #include "ED_screen.h"
-#include "ED_dimensions.h"
+
+#include "mesh_dimensions.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"

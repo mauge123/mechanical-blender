@@ -98,7 +98,8 @@
 #include "ED_screen.h"
 #include "ED_sculpt.h"
 #include "ED_types.h"
-#include "ED_dimensions.h"
+
+#include "mesh_dimensions.h"
 
 #include "UI_resources.h"
 #include "UI_interface_icons.h"

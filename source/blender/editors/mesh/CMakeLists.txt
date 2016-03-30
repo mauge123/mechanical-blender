@@ -86,6 +86,10 @@ endif()
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 
+	list(APPEND INC
+		../../mechanical
+	)
+
 	list(APPEND SRC
 		editmesh_dimension.c
 	)

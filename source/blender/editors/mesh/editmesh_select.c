@@ -62,7 +62,6 @@
 #include "ED_mesh.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
-#include "ED_dimensions.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -71,6 +70,8 @@
 #include "UI_resources.h"
 
 #include "bmesh_tools.h"
+
+#include "mesh_dimensions.h"
 
 #include "mesh_intern.h"  /* own include */
 

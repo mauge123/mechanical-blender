@@ -108,7 +108,8 @@
 #include "ED_clip.h"
 #include "ED_mask.h"
 #include "ED_gpencil.h"
-#include "ED_dimensions.h"
+
+#include "mesh_dimensions.h"
 
 #include "WM_api.h"  /* for WM_event_add_notifier to deal with stabilization nodes */
 #include "WM_types.h"
