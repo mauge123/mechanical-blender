@@ -3122,20 +3122,17 @@ BMDim *BM_dim_create(
 			copy_v3_v3(edm->fpos, no2);
 			break;
 		case DIM_TYPE_DIAMETER:
-			BLI_assert (v_count >= 2);
-			if (v_count == 2) {
-				/* Center at midpoint */
-				mid_of_2_points (edm->center, edm->v[0]->co, edm->v[1]->co);
+			BLI_assert (v_count >= 3);
+
+			if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
+				// Ok
+			} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
+				// Ok
 			} else {
-				if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
-					// Ok
-				} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
-					// Ok
-				} else {
-					// Somthing is going grong!
-					BLI_assert (0);
-				}
+				// Somthing is going grong!
+				BLI_assert (0);
 			}
+
 			//set direction
 			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
 			edm->dpos_fact = 0.5f;

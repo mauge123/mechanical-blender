@@ -214,9 +214,20 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 					}
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
-						get_dimension_mid(edm->fpos,edm);
-						sub_v3_v3(edm->fpos,edm->tpos);
-						mul_v3_fl(edm->fpos,-1.0f);
+						switch (edm->dim_type){
+							case DIM_TYPE_LINEAR:
+								get_dimension_mid(edm->fpos,edm);
+								sub_v3_v3(edm->fpos,edm->tpos);
+								mul_v3_fl(edm->fpos,-1.0f);
+								break;
+							case DIM_TYPE_DIAMETER:
+								copy_v3_v3(edm->fpos,edm->center);
+								sub_v3_v3(edm->fpos,edm->tpos);
+								mul_v3_fl(edm->fpos,-1.0f);
+								break;
+						}
+
+
 					}
 
 					dimension_data_update (edm);

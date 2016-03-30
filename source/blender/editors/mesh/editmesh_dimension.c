@@ -88,7 +88,7 @@ static int mechanical_add_dimension_diameter(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-	if (em->bm->totvertsel >= 2) {
+	if (em->bm->totvertsel >= 3) {
 		return mechanical_add_dimension_from_vertexs("create_dimension_diameter", em, op);
 	}
 	else {
@@ -391,15 +391,14 @@ void get_dimension_mid(float mid[3],BMDim *edm){
 
 void get_dimension_plane (float p[3], BMDim *edm){
 	float m[3], r[3];
-	if (edm->totverts >= 3) {
-		BLI_assert (edm->dim_type == DIM_TYPE_DIAMETER);
-		sub_v3_v3v3(m,edm->v[0]->co,edm->v[1]->co);
-		sub_v3_v3v3(r,edm->v[2]->co,edm->v[1]->co);
-		cross_v3_v3v3(p,m,r);
-		normalize_v3(p);
-	} else {
-		BLI_assert (0);
-	}
+
+	BLI_assert (edm->totverts >= 3);
+	BLI_assert (edm->dim_type == DIM_TYPE_DIAMETER);
+	sub_v3_v3v3(m,edm->v[0]->co,edm->v[1]->co);
+	sub_v3_v3v3(r,edm->v[2]->co,edm->v[1]->co);
+	cross_v3_v3v3(p,m,r);
+	normalize_v3(p);
+
 }
 
 
@@ -481,20 +480,14 @@ void dimension_data_update (BMDim *edm) {
 			project_plane_v3_v3v3(edm->fpos, edm->fpos ,v1);
 
 			// Recalc dimension center
-			if (edm->totverts == 2) {
-				/* Center at midpoint */
-				mid_of_2_points (edm->center, edm->v[0]->co, edm->v[1]->co);
+			if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
+				// Ok
+			} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
+				// Ok
 			} else {
-				if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
-					// Ok
-				} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
-					// Ok
-				} else {
-					// Somthing is going grong!
-					BLI_assert (0);
-				}
+				// Somthing is going grong!
+				BLI_assert (0);
 			}
-
 
 			// Calc start end
 			sub_v3_v3v3(v1,edm->fpos, edm->center);

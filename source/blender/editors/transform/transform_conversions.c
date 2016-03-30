@@ -2325,10 +2325,18 @@ static int createTransEditDim(TransInfo *t) {
 		td->flag = 0;
 		td->loc = edm->tpos;
 
-		get_dimension_mid(mid,edm);
+		switch (edm->dim_type){
+			case DIM_TYPE_LINEAR:
+				get_dimension_mid(mid,edm);
+				copy_v3_v3(td->iloc, mid);
+				copy_v3_v3(td->center, mid);
+				break;
+			case DIM_TYPE_DIAMETER:
+				copy_v3_v3(td->iloc,edm->center);
+				copy_v3_v3(td->center, edm->center);
+				break;
+		}
 
-		copy_v3_v3(td->iloc, mid);
-		copy_v3_v3(td->center, mid);
 		td->ext = NULL;
 		td->val = NULL;
 		td->extra = NULL;
