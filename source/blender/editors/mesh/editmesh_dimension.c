@@ -272,6 +272,7 @@ static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int 
 			float d = dot_v3v3(d_dir,f->no);
 			if (fabs(d*d -1) < DIM_CONSTRAINT_PRECISION) {
 				// Coplanar?
+				int ok =1;
 				BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
 					if (edm->v[0] ==  eve || edm->v[1] == eve) {
 						continue;
@@ -282,10 +283,13 @@ static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int 
 						sub_v3_v3v3(vec, edm->v[1]->co, eve->co);
 					}
 					normalize_v3(vec);
-					break;
+					project_v3_v3v3(p,vec,d_dir);
+					if (len_squared_v3(p) > DIM_CONSTRAINT_PRECISION) {
+						ok = 0;
+						break;
+					}
 				}
-				project_v3_v3v3(p,vec,d_dir);
-				if (len_squared_v3(p) < DIM_CONSTRAINT_PRECISION) {
+				if (ok) {
 					BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
 						BM_elem_flag_enable(eve, BM_ELEM_TAG);
 					}
