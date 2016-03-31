@@ -2658,6 +2658,16 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+
+
+static void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text) {
+
+	UI_GetThemeColor4ubv(selected ? TH_DIM_SEL : TH_DIM, r_lines);
+	UI_GetThemeColor4ubv(selected ? TH_DIM_TEXT_SEL : TH_DIM_TEXT, r_text);
+
+}
+
+
 /**
  * @brief draw_linear_dimension
  * @param p1
