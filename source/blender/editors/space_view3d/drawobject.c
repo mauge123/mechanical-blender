@@ -2677,16 +2677,12 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 
-	unsigned char col[4]; /* color of the text to draw */
+	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
 	float start[3], end[3], txt_pos[3];
 
 
-	if (selected) {
-		UI_GetThemeColor4ubv(TH_SELECT, col);
-	} else {
-		UI_GetThemeColor4ubv(TH_TEXT, col);
-	}
+	get_dimension_theme_values(selected, col, tcol);
 
 
 	// Baseline
@@ -2701,6 +2697,7 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	add_v3_v3(txt_pos, start);
 
 
+	glColor3ubv(col);
 	glPointSize(2);
 	glBegin(GL_POINTS);
 	{
@@ -2725,7 +2722,7 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	//draw dimension length
 	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(p1,p2));
 	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
-	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,col);
+	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
 static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected) {
@@ -2735,15 +2732,10 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 
-	unsigned char col[4]; /* color of the text to draw */
+	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
 
-	if (selected) {
-		UI_GetThemeColor4ubv(TH_SELECT, col);
-	} else {
-		UI_GetThemeColor4ubv(TH_TEXT, col);
-	}
-
+	get_dimension_theme_values(selected, col, tcol);
 
 
 	copy_v3_v3(vr,v_dir);
@@ -2761,6 +2753,7 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 
 
 
+	glColor3ubv(col);
 
 	glPointSize(2);
 	glBegin(GL_POINTS);
@@ -2780,7 +2773,7 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 	//draw dimension length
 	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
 	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
-	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,col);
+	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 
 }
 

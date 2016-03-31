@@ -298,7 +298,15 @@ enum {
 	TH_V3D_CLIPPING_BORDER,
 
 	TH_METADATA_BG,
-	TH_METADATA_TEXT
+	TH_METADATA_TEXT,
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	TH_DIM,
+	TH_DIM_SEL,
+	TH_DIM_TEXT,
+	TH_DIM_TEXT_SEL
+#endif
+
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */
 

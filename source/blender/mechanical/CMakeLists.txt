@@ -37,6 +37,7 @@ set(INC
 	../imbuf
 	../makesdna
 	../makesrna
+	../editors/include
 	../../../intern/guardedalloc
 )
 

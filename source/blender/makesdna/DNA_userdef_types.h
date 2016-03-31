@@ -342,6 +342,10 @@ typedef struct ThemeSpace {
 
 	char metadatabg[4];
 	char metadatatext[4];
+
+//WITH_MECHANICAL
+	char dim_lines[4], dim_lines_sel[4];
+	char dim_text[4], dim_text_sel[4];
 } ThemeSpace;
 
 

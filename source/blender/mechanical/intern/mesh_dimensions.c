@@ -6,6 +6,8 @@
 
 #include "BKE_editmesh.h"
 
+#include "UI_resources.h"
+
 #include "bmesh.h"
 
 #include "mesh_dimensions.h"
@@ -363,4 +365,11 @@ void dimension_data_update (BMDim *edm) {
 
 			break;
 	}
+}
+
+void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text) {
+
+	UI_GetThemeColor4ubv(selected ? TH_DIM_SEL : TH_DIM, r_lines);
+	UI_GetThemeColor4ubv(selected ? TH_DIM_TEXT_SEL : TH_DIM_TEXT, r_text);
+
 }

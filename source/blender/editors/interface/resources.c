@@ -694,6 +694,20 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 				case TH_V3D_CLIPPING_BORDER:
 					cp = ts->clipping_border_3d;
 					break;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+				case TH_DIM:
+					cp = ts->dim_lines;
+					break;
+				case TH_DIM_SEL:
+					cp = ts->dim_lines_sel;
+					break;
+				case TH_DIM_TEXT:
+					cp = ts->dim_text;
+					break;
+				case TH_DIM_TEXT_SEL:
+					cp = ts->dim_text_sel;
+					break;
+#endif
 			}
 		}
 	}
@@ -1200,6 +1214,11 @@ void ui_theme_init_default(void)
 	rgba_char_args_set(btheme->tclip.strip_select, 0xff, 0x8c, 0x00, 0xff);
 	btheme->tclip.handle_vertex_size = 5;
 	ui_theme_space_init_handles_color(&btheme->tclip);
+
+#ifdef WITH_MECHANICAL
+	btheme->tmechanical = btheme->tv3d;
+#endif
+
 }
 
 void ui_style_init_default(void)

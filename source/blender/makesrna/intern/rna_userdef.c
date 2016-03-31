@@ -1797,6 +1797,32 @@ static void rna_def_userdef_theme_space_view3d(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Outline Width", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	prop = RNA_def_property(srna, "dimension_line", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "dim_lines");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Dimension Lines", "Color of dimension lines");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "dimension_line_sel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "dim_lines_sel");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Dimension Lines Sel", "Color of selected dimension lines");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "dimension_text", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "dim_text");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Dimension Text", "Color of dimension text");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "dimension_text_sel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "dim_text_sel");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Dimension Text sel", "Color of selected dimension text");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+#endif
 }
 
 
@@ -3052,6 +3078,10 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
 		{16, "FILE_BROWSER", ICON_FILESEL, "File Browser", ""},
 		{17, "CONSOLE", ICON_CONSOLE, "Python Console", ""},
 		{20, "CLIP_EDITOR", ICON_CLIP, "Movie Clip Editor", ""},
+#ifdef WITH_MECHANICAL_OUT
+		// Not used
+		{21, "MECHANICAL_PREFERENCES", ICON_MECHANICAL, "Mechanical", ""},
+#endif
 		{0, NULL, 0, NULL, NULL}
 	};
 

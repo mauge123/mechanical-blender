@@ -278,9 +278,7 @@ static int calc_manipulator_stats(const bContext *C)
 	Base *base;
 	Object *ob = OBACT;
 	bGPdata *gpd = CTX_data_gpencil_data(C);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BMDim *edm;
-#endif
+
 	const bool is_gp_edit = ((gpd) && (gpd->flag & GP_DATA_STROKE_EDITMODE));
 	int a, totsel = 0;
 

@@ -23,6 +23,7 @@ void dimension_data_update (BMDim *edm);
 
 void select_dimension_data (BMDim *edm, void *context);
 
+void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text);
 
 /* Common use */
 void mid_of_2_points(float *mid, float *p1, float *p2);

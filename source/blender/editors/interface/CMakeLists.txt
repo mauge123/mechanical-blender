@@ -73,6 +73,11 @@ if(WITH_PYTHON)
 	add_definitions(-DWITH_PYTHON)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+endif()
+
+
 if(WIN32)
 	if(WITH_INPUT_IME)
 		add_definitions(-DWITH_INPUT_IME)

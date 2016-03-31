@@ -572,6 +572,8 @@ class USERPREF_PT_theme(Panel):
             "split_normal",
             "bone_solid",
             "paint_curve_pivot",
+#WITH_MECHANICAL
+            "dimension_text_sel",
             },
         'GRAPH_EDITOR': {
             "handle_vertex_select",
