@@ -222,18 +222,12 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 			// At least one dimension
 			tfp->dimension_value = get_dimension_value(edm_sel);
-			// Add dimension info
-			uiDefBut(block, UI_BTYPE_LABEL, 0, totdim == 1 ? IFACE_("Dimension Value:") : IFACE_("Height Dimension:"),
-				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
-			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Dimension:"),0, yi -= buth + but_margin, 200, buth,
+			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
 
 			tfp->dim_txt_pos= edm_sel->dpos_fact;
 			// Add dimension position
-			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("Dimension Text Position:"),
-				0, yi -= buth + but_margin, 200, buth, NULL, 0.0, 0.0, 0, 0, "");
-
-			uiDefButF(block, UI_BTYPE_NUM_SLIDER, B_OBJECTPANELMEDIAN,IFACE_("Dimension:"),0, yi -= buth + but_margin, 200, buth,
+			uiDefButF(block, UI_BTYPE_NUM_SLIDER, B_OBJECTPANELMEDIAN,IFACE_("Text Position:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_txt_pos,-2.0f,2.0f, 10, RNA_TRANSLATION_PREC_DEFAULT, TIP_("Position"));
 
 			tfp->constraints = ts->dimension_constraints;
