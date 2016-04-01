@@ -2054,6 +2054,25 @@ static BMOpDefine bmo_create_dimemsion_diameter_def = {
 };
 
 
+/*
+ * Creates a radius dimension from 3 or more vertices.
+ *
+ */
+static BMOpDefine bmo_create_dimemsion_radius_def = {
+	"create_dimension_radius",
+	/* slots_in */
+	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
+	 {{'\0'}},
+	},
+	/* slots_out */
+	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
+	 {{'\0'}},
+	},
+	bmo_create_dimension_radius_exec,
+	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
+};
+
+
 #endif
 
 const BMOpDefine *bmo_opdefines[] = {
@@ -2145,6 +2164,8 @@ const BMOpDefine *bmo_opdefines[] = {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	&bmo_create_dimemsion_linear_def,
 	&bmo_create_dimemsion_diameter_def,
+    &bmo_create_dimemsion_radius_def,
+
 #endif
 };
 

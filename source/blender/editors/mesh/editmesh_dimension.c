@@ -116,6 +116,22 @@ static int mechanical_add_dimension_linear(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
+static int mechanical_add_dimension_radius(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = BKE_editmesh_from_object(obedit);
+
+
+	if (em->bm->totvertsel >= 3) {
+		mechanical_add_dimension_from_vertexs("create_dimension_radius",em, op);
+	}
+	else {
+		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
+	}
+
+	return OPERATOR_FINISHED;
+}
+
 
 
 void MESH_OT_mechanical_dimension_linear_add(wmOperatorType *ot)
@@ -144,6 +160,23 @@ void MESH_OT_mechanical_dimension_diameter_add(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = mechanical_add_dimension_diameter;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+}
+
+
+void MESH_OT_mechanical_dimension_radius_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Radius Dimension";
+	ot->description = "Adds a Radius Dimension on Mesh";
+	ot->idname = "MESH_OT_mechanical_dimension_radius_add";
+
+	/* api callbacks */
+	ot->exec = mechanical_add_dimension_radius;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */

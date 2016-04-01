@@ -767,10 +767,16 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_ITER_MESH_INDEX (d, &iter, bm_old, BM_DIMS_OF_MESH, i) {
-		d_new = BM_dim_create_linear(bm_new,
-		                       vtable[BM_elem_index_get(d->v[0])],
-		                       vtable[BM_elem_index_get(d->v[1])],
-		                       d, BM_CREATE_SKIP_CD);
+		BMVert *(*v_arr);
+
+		v_arr = MEM_mallocN(sizeof (BMVert*)*d->totverts,"BMVert temp array");
+		for (int j=0;j<d->totverts;j++) {
+			v_arr[j] = vtable[BM_elem_index_get(d->v[j])];
+		}
+
+		d_new = BM_dim_create(bm_new,v_arr,d->totverts,d->dim_type,d,BM_CREATE_SKIP_CD);
+
+		MEM_freeN (v_arr);
 
 		BM_elem_attrs_copy_ex(bm_old, bm_new, d, d_new, 0xff);
 		d_new->head.hflag = d->head.hflag;  /* low level! don't do this for normal api use */

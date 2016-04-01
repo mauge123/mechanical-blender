@@ -85,3 +85,9 @@ void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op)
 {
 	bmo_create_dimension_exec(bm,op,DIM_TYPE_DIAMETER);
 }
+
+
+void bmo_create_dimension_radius_exec(BMesh *bm, BMOperator *op)
+{
+	bmo_create_dimension_exec(bm,op,DIM_TYPE_RADIUS);
+}

@@ -3056,20 +3056,6 @@ void bm_kill_only_dim(BMesh *bm, BMDim *d)
 
 #endif
 
-
-/**
- * \brief Main function for creating a new dimension.
- *
- * \note base on BM_edge_create function
- */
-BMDim *BM_dim_create_linear(
-        BMesh *bm, BMVert *v1, BMVert *v2,
-        const BMDim *d_example, const eBMCreateFlag create_flag)
-{
-	BMVert *v[2]= {v1,v2};
-	return BM_dim_create (bm,v,2,DIM_TYPE_LINEAR,d_example,create_flag);
-}
-
 static int order_select_compare (const void *ptr_a,const void *ptr_b) {
 	BMHeader *a = *(BMHeader**)ptr_a;
 	BMHeader *b = *(BMHeader**)ptr_b;
@@ -3131,7 +3117,7 @@ BMDim *BM_dim_create(
 
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
-			BLI_assert (v_count == 2);
+			BLI_assert (v_count >= 2);
 			BLI_assert (edm->v[0]  != edm->v[1]);
 
 			sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
@@ -3143,6 +3129,7 @@ BMDim *BM_dim_create(
 			copy_v3_v3(edm->fpos, no2);
 			break;
 		case DIM_TYPE_DIAMETER:
+		case DIM_TYPE_RADIUS:
 			BLI_assert (v_count >= 3);
 
 			if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {

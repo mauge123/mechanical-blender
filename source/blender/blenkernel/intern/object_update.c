@@ -198,6 +198,11 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 			}
 #endif
 
+/*
+ * Update dimension fpos from tpos while moving the dimension
+ * This is done because fpos is related to a fixed point on dimension,
+ * allowing the dimension position be relative to geometry
+ */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			if (em) {
 				BMesh *bm = em->bm;
@@ -221,6 +226,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 								mul_v3_fl(edm->fpos,-1.0f);
 								break;
 							case DIM_TYPE_DIAMETER:
+							case DIM_TYPE_RADIUS:
 								copy_v3_v3(edm->fpos,edm->center);
 								sub_v3_v3(edm->fpos,edm->tpos);
 								mul_v3_fl(edm->fpos,-1.0f);

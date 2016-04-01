@@ -2333,6 +2333,7 @@ static int createTransEditDim(TransInfo *t) {
 				copy_v3_v3(td->center, mid);
 				break;
 			case DIM_TYPE_DIAMETER:
+			case DIM_TYPE_RADIUS:
 				copy_v3_v3(td->iloc,edm->center);
 				copy_v3_v3(td->center, edm->center);
 				break;

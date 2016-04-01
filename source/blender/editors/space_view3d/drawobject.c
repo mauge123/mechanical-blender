@@ -2781,6 +2781,59 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 }
 
 
+static void draw_radius_dimension(float* center, float *v_dir, float radius, float dpos_fact, int selected) {
+
+	float start[3], end[3], vr[3], txt_pos[3];
+
+	float w,h;
+	char numstr[32]; /* Stores the measurement display text here */
+
+	unsigned char col[4], tcol[4]; /* color of the text to draw */
+
+
+	get_dimension_theme_values(selected, col, tcol);
+
+
+	copy_v3_v3(vr,v_dir);
+	normalize_v3(vr);
+	mul_v3_fl(vr, radius); //Vector radius
+
+	copy_v3_v3(start,center);
+	sub_v3_v3v3(end, center, vr);
+
+
+	// Set txt pos acording pos factor
+	sub_v3_v3v3(txt_pos, end, start);
+	mul_v3_fl(txt_pos,  dpos_fact);
+	add_v3_v3(txt_pos, start);
+
+
+
+	glColor3ubv(col);
+
+	glPointSize(2);
+	glBegin(GL_POINTS);
+	{
+		glVertex3fv(start);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+	glBegin(GL_LINES);
+	{
+		glVertex3fv(start);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+	//draw dimension length
+	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
+	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
+	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
+
+}
+
+
 
 #endif
 
@@ -2805,6 +2858,9 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 			break;
 		case DIM_TYPE_DIAMETER:
 			draw_diameter_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
+			break;
+		case DIM_TYPE_RADIUS:
+			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
 	}
 
@@ -2865,6 +2921,10 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			break;
 		case DIM_TYPE_DIAMETER:
 			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
+			break;
+		case DIM_TYPE_RADIUS:
+			draw_radius_dimension (edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
 			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			break;
 		}

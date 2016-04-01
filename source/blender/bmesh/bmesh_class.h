@@ -149,8 +149,9 @@ typedef struct BMLoop {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 
 /* BMDim->dim_type */
-#define DIM_TYPE_LINEAR (1 << 0)
-#define DIM_TYPE_DIAMETER (1 << 1)
+#define DIM_TYPE_LINEAR		(1 << 0)
+#define DIM_TYPE_DIAMETER	(1 << 1)
+#define DIM_TYPE_RADIUS		(1 << 2)
 
 
 typedef struct BMDim {

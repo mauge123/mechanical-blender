@@ -22,6 +22,9 @@ float get_dimension_value(BMDim *edm){
 		case DIM_TYPE_DIAMETER:
 			v = len_v3v3(edm->v[0]->co, edm->center)*2;
 			break;
+		case DIM_TYPE_RADIUS:
+			v = len_v3v3(edm->v[0]->co, edm->center);
+			break;
 	}
 
 	return v;
@@ -40,18 +43,15 @@ void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float
 }
 
 
-static void apply_dimension_diameter_value(Mesh *me, BMDim *edm, float value, int constraints) {
+static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float value, int constraints) {
 
-	BLI_assert (edm->dim_type == DIM_TYPE_DIAMETER);
+	BLI_assert (ELEM(edm->dim_type,DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS));
 
 	float axis[3],v[3], ncenter[3];
 	float curv = get_dimension_value(edm);
 
 	BMIter iter;
 	BMVert* eve;
-	BMEditMesh* em = me->edit_btmesh;
-	BMesh *bm = em->bm;
-
 
 	get_dimension_plane(axis, edm);
 
@@ -80,7 +80,7 @@ static void apply_dimension_diameter_value(Mesh *me, BMDim *edm, float value, in
 			sub_v3_v3v3(v,eve->co, ncenter);
 
 			normalize_v3(v);
-			mul_v3_fl(v,value/2.0f);
+			mul_v3_fl(v,value);
 			add_v3_v3v3(eve->co,ncenter,v);
 
 			// Reset tag
@@ -201,7 +201,12 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints)
 			apply_dimension_linear_value (bm,edm,value,constraints);
 			break;
 		case DIM_TYPE_DIAMETER:
-			apply_dimension_diameter_value (bm,edm,value,constraints);
+			apply_dimension_diameter_from_center (bm,edm,value/2.0f,constraints);
+			break;
+		case DIM_TYPE_RADIUS:
+			apply_dimension_diameter_from_center (bm,edm,value,constraints);
+			break;
+
 	}
 
 	//EDBM_mesh_normals_update(em);
@@ -240,7 +245,7 @@ void get_dimension_plane (float p[3], BMDim *edm){
 	float m[3], r[3];
 
 	BLI_assert (edm->totverts >= 3);
-	BLI_assert (edm->dim_type == DIM_TYPE_DIAMETER);
+	BLI_assert (ELEM(edm->dim_type,DIM_TYPE_DIAMETER,DIM_TYPE_RADIUS));
 	sub_v3_v3v3(m,edm->v[0]->co,edm->v[1]->co);
 	sub_v3_v3v3(r,edm->v[2]->co,edm->v[1]->co);
 	cross_v3_v3v3(p,m,r);
@@ -322,6 +327,7 @@ void dimension_data_update (BMDim *edm) {
 
 			break;
 		case DIM_TYPE_DIAMETER:
+		case DIM_TYPE_RADIUS:
 			// Set f pos always on dimension plane!
 			get_dimension_plane(v1,edm);
 			project_plane_v3_v3v3(edm->fpos, edm->fpos ,v1);

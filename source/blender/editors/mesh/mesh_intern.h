@@ -95,6 +95,7 @@ void MESH_OT_primitive_ico_sphere_add(struct wmOperatorType *ot);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void MESH_OT_mechanical_dimension_linear_add(struct wmOperatorType *ot);
 void MESH_OT_mechanical_dimension_diameter_add(struct wmOperatorType *ot);
+void MESH_OT_mechanical_dimension_radius_add(struct wmOperatorType *ot);
 #endif
 
 
