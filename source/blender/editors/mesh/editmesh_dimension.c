@@ -105,10 +105,8 @@ static int mechanical_add_dimension_linear(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-	if (em->bm->totedge == 1) {
 
-	}
-	else if (em->bm->totvertsel == 2) {
+	if (em->bm->totvertsel >= 2) {
 		mechanical_add_dimension_from_vertexs("create_dimension_linear",em, op);
 	}
 	else {

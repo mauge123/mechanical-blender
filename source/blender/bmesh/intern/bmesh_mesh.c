@@ -168,6 +168,9 @@ BMesh *BM_mesh_create(const BMAllocTemplate *allocsize)
 	/* allocate one flag pool that we don't get rid of. */
 	bm->toolflag_index = 0;
 	bm->totflags = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	bm->nsel = 0;
+#endif
 
 	CustomData_reset(&bm->vdata);
 	CustomData_reset(&bm->edata);

@@ -45,26 +45,8 @@ enum {
 	EXT_DEL     = 4
 };
 
-void bmo_create_dimension_linear_exec(BMesh *bm, BMOperator *op)
-{
-	BMOIter siter;
-	BMVert *v1,*v2;
-	BMDim *d;
 
-	v1 = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT);
-	v2 = BMO_iter_step(&siter);
-
-	if (v1 && v2) {
-		d = BM_dim_create_linear(bm, v1, v2, NULL, BM_CREATE_NOP);
-
-		BMO_elem_flag_enable(bm, d, EXT_KEEP);
-		BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
-
-	}
-}
-
-
-void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op)
+void bmo_create_dimension_exec(BMesh *bm, BMOperator *op, int type)
 {
 	BMOIter siter;
 	BMVert *v;
@@ -83,7 +65,7 @@ void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op)
 		v_arr[n] = v;
 	}
 
-	d = BM_dim_create(bm, v_arr,v_count,DIM_TYPE_DIAMETER, NULL, BM_CREATE_NOP);
+	d = BM_dim_create(bm, v_arr,v_count,type, NULL, BM_CREATE_NOP);
 
 	MEM_freeN (v_arr);
 
@@ -91,4 +73,15 @@ void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op)
 	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
 
 
+}
+
+void bmo_create_dimension_linear_exec(BMesh *bm, BMOperator *op)
+{
+	bmo_create_dimension_exec(bm,op,DIM_TYPE_LINEAR);
+}
+
+
+void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op)
+{
+	bmo_create_dimension_exec(bm,op,DIM_TYPE_DIAMETER);
 }

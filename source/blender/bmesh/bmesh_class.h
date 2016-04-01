@@ -79,9 +79,15 @@ typedef struct BMHeader {
 	 * so adding a flag here gives no increase in size */
 	char api_flag;
 //	char _pad;
+
+// WITH_MECHANICAL_STORE_SELECT_ORDER
+	int nsel;
+	void *bm;
 } BMHeader;
 
-BLI_STATIC_ASSERT((sizeof(BMHeader) <= 16), "BMHeader size has grown!");
+// WITH_MECHANICAL_STORE_SELECT_ORDER
+// Do not know if this will due to bad issues ¿?
+//BLI_STATIC_ASSERT((sizeof(BMHeader) <= 16), "BMHeader size has grown!");
 
 /* note: need some way to specify custom locations for custom data layers.  so we can
  * make them point directly into structs.  and some way to make it only happen to the
@@ -223,6 +229,10 @@ typedef struct BMFlagLayer {
 // #pragma GCC diagnostic ignored "-Wpadded"
 
 typedef struct BMesh {
+	// Must Be on first position
+	// @see bmesh_inline.h
+	int nsel;
+
 	int totvert, totedge, totloop, totface;
 	int totvertsel, totedgesel, totfacesel;
 

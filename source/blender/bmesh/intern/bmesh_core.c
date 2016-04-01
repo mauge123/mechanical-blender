@@ -85,6 +85,9 @@ BMVert *BM_vert_create(
 	v->head.htype = BM_VERT;
 	v->head.hflag = 0;
 	v->head.api_flag = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	v->head.bm = bm;
+#endif
 
 	/* allocate flags */
 	v->oflags = bm->vtoolflagpool ? BLI_mempool_calloc(bm->vtoolflagpool) : NULL;
@@ -178,6 +181,9 @@ BMEdge *BM_edge_create(
 	e->head.htype = BM_EDGE;
 	e->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
 	e->head.api_flag = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	e->head.bm = bm;
+#endif
 
 	/* allocate flags */
 	e->oflags = bm->etoolflagpool ? BLI_mempool_calloc(bm->etoolflagpool) : NULL;
@@ -249,6 +255,9 @@ static BMLoop *bm_loop_create(
 	l->head.htype = BM_LOOP;
 	l->head.hflag = 0;
 	l->head.api_flag = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	l->head.bm = bm;
+#endif
 
 	l->v = v;
 	l->e = e;
@@ -390,6 +399,9 @@ BLI_INLINE BMFace *bm_face_create__internal(BMesh *bm)
 	f->head.htype = BM_FACE;
 	f->head.hflag = 0;
 	f->head.api_flag = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	f->head.bm = bm;
+#endif
 
 	/* allocate flags */
 	f->oflags = bm->ftoolflagpool ? BLI_mempool_calloc(bm->ftoolflagpool) : NULL;
@@ -3061,6 +3073,14 @@ BMDim *BM_dim_create_linear(
 	return BM_dim_create (bm,v,2,DIM_TYPE_LINEAR,d_example,create_flag);
 }
 
+static int order_select_compare (const void *ptr_a,const void *ptr_b) {
+	BMHeader *a = *(BMHeader**)ptr_a;
+	BMHeader *b = *(BMHeader**)ptr_b;
+	if (a->nsel < b->nsel) return -1;
+	if (a->nsel > b->nsel) return  1;
+	return 0;
+}
+
 
 /**
  * \brief Main function for creating a new dimension.
@@ -3093,6 +3113,9 @@ BMDim *BM_dim_create(
 	edm->head.htype = BM_DIM;
 	edm->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
 	edm->head.api_flag = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	edm->head.bm = bm;
+#endif
 
 	/* allocate flags */
 	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
@@ -3105,6 +3128,7 @@ BMDim *BM_dim_create(
 		BLI_assert(v[n]->head.htype == BM_VERT);
 		edm->v[n] = v[n];
 	}
+	qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
 
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 

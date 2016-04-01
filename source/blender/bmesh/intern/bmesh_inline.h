@@ -54,6 +54,12 @@ BLI_INLINE bool _bm_elem_flag_test_bool(const BMHeader *head, const char hflag)
 BLI_INLINE void _bm_elem_flag_enable(BMHeader *head, const char hflag)
 {
 	head->hflag |= hflag;
+// WITH_MECHANICAL_STORE_SELECT_ORDER
+	if (hflag == BM_ELEM_SELECT) {
+		if (~*((int*)head->bm)) {
+			head->nsel = (*((int*)head->bm))++;
+		}
+	}
 }
 
 BLI_INLINE void _bm_elem_flag_disable(BMHeader *head, const char hflag)

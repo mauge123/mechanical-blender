@@ -183,8 +183,12 @@ endif()
 
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+	add_definitions(-DWITH_MECHANICAL_STORE_SELECT_ORDER)
 	list(APPEND SRC
 		operators/bmo_dimensions.c
+	)
+	list(APPEND INC
+		../mechanical
 	)
 endif()
 
