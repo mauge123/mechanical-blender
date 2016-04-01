@@ -94,14 +94,12 @@ static void apply_dimension_diameter_value(Mesh *me, BMDim *edm, float value, in
 
 }
 
-static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int constraints) {
+static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int constraints) {
 
 	float v[3];
 
 	BMIter iter;
 	BMVert* eve;
-	BMEditMesh* em = me->edit_btmesh;
-	BMesh *bm = em->bm;
 
 	BLI_assert (edm->dim_type == DIM_TYPE_LINEAR);
 
@@ -110,9 +108,9 @@ static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int 
 		float len=get_dimension_value(edm);
 		float len2=(value-len)/2;
 		edm->dir = 1;
-		apply_dimension_value (me, edm,(len+len2), constraints);
+		apply_dimension_value (bm, edm,(len+len2), constraints);
 		edm->dir = -1;
-		apply_dimension_value (me, edm,value,constraints);
+		apply_dimension_value (bm, edm,value,constraints);
 		edm->dir = 0;
 		return;
 	}
@@ -177,12 +175,10 @@ static void apply_dimension_linear_value(Mesh *me, BMDim *edm, float value, int 
 
 }
 
-void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) {
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints) {
 
 	BMIter iter;
 	BMVert* eve;
-	BMEditMesh* em = me->edit_btmesh;
-	BMesh *bm = em->bm;
 
 	// Tag all elements to be affected by change
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
@@ -202,10 +198,10 @@ void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints) 
 
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
-			apply_dimension_linear_value (me,edm,value,constraints);
+			apply_dimension_linear_value (bm,edm,value,constraints);
 			break;
 		case DIM_TYPE_DIAMETER:
-			apply_dimension_diameter_value (me,edm,value,constraints);
+			apply_dimension_diameter_value (bm,edm,value,constraints);
 	}
 
 	//EDBM_mesh_normals_update(em);
@@ -222,7 +218,7 @@ void apply_txt_dimension_value(BMDim *edm, float value){
 
 }
 
-BMDim* get_selected_dimension_BMesh(BMesh *bm){
+BMDim* get_selected_dimension(BMesh *bm){
 	BMDim *edm = NULL;
 	BMIter iter;
 	if (bm->totdimsel == 1) {
@@ -232,16 +228,6 @@ BMDim* get_selected_dimension_BMesh(BMesh *bm){
 			}
 		}
 	}
-	return edm;
-}
-
-
-//Return edm.
-BMDim* get_selected_dimension(BMEditMesh *em){
-	BMDim *edm = NULL;
-	BMesh *bm = em->bm;
-
-	edm=get_selected_dimension_BMesh(bm);
 	return edm;
 }
 

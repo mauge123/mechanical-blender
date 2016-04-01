@@ -7,15 +7,14 @@
 #define DIM_AXIS_CONSTRAINT (1 << 1)
 
 
-void apply_dimension_value (Mesh *me, BMDim *edm, float value, int constraints);
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints);
 void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res);
 
 float get_dimension_value(BMDim *edm);
 
 void apply_txt_dimension_value (BMDim *edm, float value);
 
-BMDim* get_selected_dimension(BMEditMesh *em);
-BMDim* get_selected_dimension_BMesh(BMesh *bm);
+BMDim* get_selected_dimension(BMesh *bm);
 
 void get_dimension_mid(float mid[3],BMDim *edm);
 void get_dimension_plane (float p[3], BMDim *edm);

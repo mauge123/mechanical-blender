@@ -157,13 +157,6 @@ typedef struct drawDMDims_userData {
 	/* Mesh */
 	DerivedMesh *dm;
 
-	/* cached theme values */
-	unsigned char th_editmesh_active[4];
-	unsigned char th_vertex_select[4];
-	unsigned char th_vertex[4];
-	unsigned char th_skin_root[4];
-	float th_vertex_size;
-
 } drawDMDims_userData;
 
 #endif
@@ -2890,12 +2883,6 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 	data.scene = scene;
 	data.dm = dm;
 
-	/* Cache theme values */
-	UI_GetThemeColor4ubv(TH_EDITMESH_ACTIVE, data.th_editmesh_active);
-	UI_GetThemeColor4ubv(TH_VERTEX_SELECT, data.th_vertex_select);
-	UI_GetThemeColor4ubv(TH_VERTEX, data.th_vertex);
-	UI_GetThemeColor4ubv(TH_SKIN_ROOT, data.th_skin_root);
-	data.th_vertex_size = UI_GetThemeValuef(TH_VERTEX_SIZE);
 	if (obedit) {
 		dm->foreachMappedDim(dm, draw_em_dims__mapFunc, &data, DM_FOREACH_NOP);
 	} else {

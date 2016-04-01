@@ -2309,7 +2309,7 @@ static void VertsToTransData(TransInfo *t, TransData *td, TransDataExtension *tx
 static int createTransEditDim(TransInfo *t) {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
     BMesh *bm = em->bm;
-	BMDim *edm=get_selected_dimension(em);
+	BMDim *edm=get_selected_dimension(bm);
 	TransData *td = NULL;
 	float mtx[3][3], smtx[3][3];
     if (bm->totdimsel == 1) {

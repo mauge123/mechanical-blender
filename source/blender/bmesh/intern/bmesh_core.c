@@ -42,10 +42,7 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h"
 
-// Defined on ED_dimensions.h
-void mid_of_2_points(float *mid, float *p1, float *p2);
-int center_of_3_points(float *center, float *p1, float *p2, float *p3);
-void dimension_data_update (BMDim *edm);
+#include "mesh_dimensions.h"
 
 
 /* use so valgrinds memcheck alerts us when undefined index is used.
