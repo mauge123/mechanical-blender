@@ -2799,7 +2799,7 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 	mul_v3_fl(vr, radius); //Vector radius
 
 	copy_v3_v3(start,center);
-	sub_v3_v3v3(end, center, vr);
+	add_v3_v3v3(end, center, vr);
 
 
 	// Set txt pos acording pos factor

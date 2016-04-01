@@ -300,6 +300,31 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
 	}
 }
 
+static void set_dimension_start_end (BMDim *edm) {
+	float v1[3];
+	switch (edm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			add_v3_v3v3(edm->start,edm->fpos, edm->v[0]->co);
+			add_v3_v3v3(edm->end, edm->fpos, edm->v[1]->co);
+			break;
+		case DIM_TYPE_DIAMETER:
+			break;
+			// Calc start end
+			sub_v3_v3v3(v1,edm->fpos, edm->center);
+			normalize_v3(v1);
+			mul_v3_fl(v1,get_dimension_value(edm)/2.0f);
+			add_v3_v3v3(edm->start,edm->center,v1);
+			sub_v3_v3v3(edm->end, edm->center,v1);
+		case DIM_TYPE_RADIUS:
+			sub_v3_v3v3(v1,edm->fpos, edm->center);
+			normalize_v3(v1);
+			mul_v3_fl(v1,get_dimension_value(edm));
+			copy_v3_v3(edm->start,edm->center);
+			add_v3_v3v3(edm->end, edm->center, v1);
+			break;
+	}
+}
+
 void dimension_data_update (BMDim *edm) {
 	float axis[3], v1[3], l;
 
@@ -316,9 +341,7 @@ void dimension_data_update (BMDim *edm) {
 
 
 			// Baseline
-			add_v3_v3v3(edm->start,edm->fpos, edm->v[0]->co);
-			add_v3_v3v3(edm->end, edm->fpos, edm->v[1]->co);
-
+			set_dimension_start_end(edm);
 
 			// Set txt pos acording pos factor
 			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
@@ -342,12 +365,7 @@ void dimension_data_update (BMDim *edm) {
 				BLI_assert (0);
 			}
 
-			// Calc start end
-			sub_v3_v3v3(v1,edm->fpos, edm->center);
-			normalize_v3(v1);
-			mul_v3_fl(v1,get_dimension_value(edm)/2.0f);
-			add_v3_v3v3(edm->start,edm->center,v1);
-			sub_v3_v3v3(edm->end, edm->center,v1);
+			set_dimension_start_end(edm);
 
 			// Set txt pos acording pos factor
 			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
