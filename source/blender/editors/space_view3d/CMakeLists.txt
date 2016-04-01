@@ -95,6 +95,7 @@ if(WITH_MECHANICAL)
 		../../mechanical
 	)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+	add_definitions(-DWITH_MECHANICAL_3D_VIEW_NUM_INPUT)
 endif()
 
 if(WITH_LEGACY_DEPSGRAPH)

@@ -46,6 +46,10 @@ set(SRC
 	action_intern.h
 )
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_3D_VIEW_NUM_INPUT)
+endif()
+
 add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_editor_space_action "${SRC}" "${INC}" "${INC_SYS}")

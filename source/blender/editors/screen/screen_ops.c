@@ -207,6 +207,19 @@ int ED_operator_view3d_active(bContext *C)
 
 int ED_operator_region_view3d_active(bContext *C)
 {
+
+#ifdef WITH_MECHANICAL_3D_VIEW_NUM_INPUT
+	Scene *scene = CTX_data_scene(C);
+	Object *obedit = scene->obedit;
+	if (obedit) {
+		Mesh *me = obedit->data;
+		BMesh *bm = me->edit_btmesh->bm;
+		if (get_selected_dimension(bm)) {
+			return 0;
+		}
+	}
+#endif
+
 	if (CTX_wm_region_view3d(C))
 		return true;
 

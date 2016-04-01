@@ -37,6 +37,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_mesh_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -44,6 +45,8 @@
 #include "BLI_kdopbvh.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
+
+#include "BLT_translation.h"
 
 #include "BKE_armature.h"
 #include "BKE_camera.h"
@@ -57,6 +60,8 @@
 #include "BKE_screen.h"
 #include "BKE_action.h"
 #include "BKE_depsgraph.h" /* for ED_view3d_camera_lock_sync */
+#include "BKE_unit.h"
+#include "BKE_editmesh.h"
 
 
 #include "BIF_gl.h"
@@ -75,10 +80,16 @@
 #include "ED_transform.h"
 #include "ED_mesh.h"
 #include "ED_view3d.h"
+#include "ED_numinput.h"
 
 #include "UI_resources.h"
 
 #include "PIL_time.h" /* smoothview */
+
+
+#include "bmesh.h"
+#include "mesh_dimensions.h"
+
 
 #include "view3d_intern.h"  /* own include */
 
@@ -5253,3 +5264,105 @@ bool ED_view3d_snap_from_region(
 
 	return is_hit;
 }
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+
+
+static int dim_value_num_input_invoke(bContext *C, wmOperator *op,const wmEvent *event) {
+
+	Scene *scene = CTX_data_scene(C);
+
+
+	NumInput *num;
+
+	op->customdata = num = MEM_callocN(sizeof(NumInput), "Num Input");
+
+	initNumInput(num);
+	num->unit_sys = scene->unit.system;
+	num->idx_max = 0;
+	num->idx = 0;
+	num->unit_type[0] = B_UNIT_LENGTH;
+
+	WM_event_add_modal_handler(C, op);
+
+	if (event->val == KM_PRESS ) {
+		handleNumInput(C, num, event);
+	}
+
+
+	return OPERATOR_RUNNING_MODAL;
+}
+
+
+static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	Scene *scene = CTX_data_scene(C);
+
+	View3D *v3d = CTX_wm_view3d(C);
+	ToolSettings *ts = scene->toolsettings;
+	ScrArea *sa = CTX_wm_area(C);
+	Object *obedit = scene->obedit;
+	Mesh *me = obedit->data;
+	BMesh *bm = me->edit_btmesh->bm;
+	BMDim *edm;
+
+
+	NumInput *num = op->customdata;
+
+	int ret=OPERATOR_PASS_THROUGH;
+
+	if (event->type == MIDDLEMOUSE && event->val == KM_PRESS) {
+		// Allow navigation
+		ret=OPERATOR_PASS_THROUGH;
+	}
+	else if (event->val == KM_PRESS ) {
+		handleNumInput(C, num, event);
+		ret = OPERATOR_RUNNING_MODAL;
+	}
+	else if (ELEM(event->type,ESCKEY,RIGHTMOUSE)) {
+		ED_area_headerprint(sa, NULL);
+		ret = OPERATOR_CANCELLED;
+	}
+	else if (ELEM(event->type, LEFTMOUSE,PADENTER, RETKEY)) {
+		if (hasNumInput(num)) {
+			// Apply value only once confirmed
+			edm = get_selected_dimension(bm);
+		    apply_dimension_value(bm,edm,num->val[0],ts->dimension_constraints);
+		    DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
+		    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
+		}
+		ED_area_headerprint(sa, NULL);
+		ret = OPERATOR_FINISHED;
+	}
+
+	if (ELEM(ret, OPERATOR_RUNNING_MODAL, OPERATOR_PASS_THROUGH)) {
+		// Set Header at end
+		if (hasNumInput(num)) {
+			char c[NUM_STR_REP_LEN];
+			char str[256]="";
+			outputNumInput(num, c, &scene->unit);
+			BLI_snprintf(str, 256, IFACE_("Dimension value: %s"), &c[0]);
+			ED_area_headerprint(sa, str);
+		}
+	}
+	return ret;
+}
+
+
+void VIEW3D_OT_dim_value_num_input(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Numpad Input";
+	ot->description = "Starts numpad input";
+	ot->idname = "VIEW3D_OT_dim_value_num_input";
+
+	/* api callbacks */
+	ot->invoke = dim_value_num_input_invoke;
+	ot->modal =dim_value_num_input_modal;
+
+	/* flags */
+	ot->flag = 0;
+
+}
+
+#endif

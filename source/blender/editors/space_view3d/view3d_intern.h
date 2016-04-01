@@ -104,6 +104,10 @@ void VIEW3D_OT_render_border(struct wmOperatorType *ot);
 void VIEW3D_OT_clear_render_border(struct wmOperatorType *ot);
 void VIEW3D_OT_zoom_border(struct wmOperatorType *ot);
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+void VIEW3D_OT_dim_value_num_input(struct wmOperatorType *ot);
+#endif
+
 void view3d_boxview_copy(ScrArea *sa, ARegion *ar);
 
 void view3d_orbit_apply_dyn_ofs(

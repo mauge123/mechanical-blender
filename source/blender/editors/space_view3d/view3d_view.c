@@ -32,6 +32,7 @@
 #include "DNA_camera_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
+#include "DNA_mesh_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -50,6 +51,7 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
+#include "BKE_editmesh.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -61,6 +63,9 @@
 
 #include "ED_screen.h"
 #include "ED_armature.h"
+
+#include "bmesh.h"
+#include "mesh_dimensions.h"
 
 
 #ifdef WITH_GAMEENGINE
@@ -606,6 +611,18 @@ int ED_operator_rv3d_user_region_poll(bContext *C)
 {
 	View3D *v3d_dummy;
 	ARegion *ar_dummy;
+
+#ifdef WITH_MECHANICAL_3D_VIEW_NUM_INPUT
+	Scene *scene = CTX_data_scene(C);
+	Object *obedit = scene->obedit;
+	if (obedit) {
+		Mesh *me = obedit->data;
+		BMesh *bm = me->edit_btmesh->bm;
+		if (get_selected_dimension(bm)) {
+			return 0;
+		}
+	}
+#endif
 
 	return ED_view3d_context_user_region(C, &v3d_dummy, &ar_dummy);
 }
@@ -1883,3 +1900,4 @@ void ED_view3d_operator_properties_viewmat_get(wmOperator *op, int *winx, int *w
 	RNA_float_get_array(op->ptr, "perspective_matrix", (float *)persmat);
 }
 #endif
+
