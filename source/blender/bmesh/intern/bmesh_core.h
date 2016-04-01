@@ -125,7 +125,6 @@ BMDim *BM_dim_create(
         BMesh *bm, BMVert *(*v), int v_count, int dim_type,
         const BMDim *d_example, const eBMCreateFlag create_flag);
 
-void set_dim_extra_data (BMDim *edm, float dpos_fact, float *fpos) ;
 void BM_dim_kill(BMesh *bm, BMDim *edm);
 void bm_kill_only_dim(BMesh *bm, BMDim *d);
 #endif

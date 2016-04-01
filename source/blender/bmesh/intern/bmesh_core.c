@@ -3166,6 +3166,10 @@ BMDim *BM_dim_create(
 		}
 	}
 
+	if (d_example) {
+		copy_v3_v3(edm->fpos,d_example->fpos);
+	}
+
 	dimension_data_update (edm);
 
 	BM_CHECK_ELEMENT(edm);

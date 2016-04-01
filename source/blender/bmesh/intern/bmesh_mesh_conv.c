@@ -398,8 +398,8 @@ void BM_mesh_bm_from_me(
 
 
 			v_arr = MEM_mallocN(sizeof (BMVert*)*mdim->totverts,"BMVert temp array");
-			for (int j=0;j<mdim->totverts;j++) {
-				v_arr[j] = vtable[mdim->v[j]];
+			for (int k=0;k<mdim->totverts;k++) {
+				v_arr[k] = vtable[mdim->v[k]];
 			}
 
 			//d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
@@ -407,6 +407,7 @@ void BM_mesh_bm_from_me(
 
 			MEM_freeN (v_arr);
 
+			copy_v3_v3(d->fpos,mdim->fpos);
 
 			/* Already performed during BM_dim_create_linear */
 			// set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
