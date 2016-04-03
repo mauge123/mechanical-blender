@@ -2025,13 +2025,14 @@ static BMOpDefine bmo_create_dimemsion_linear_def = {
 	"create_dimension_linear",
 	/* slots_in */
 	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
+     {"dim_type",BMO_OP_SLOT_INT},
 	 {{'\0'}},
 	},
 	/* slots_out */
 	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
 	 {{'\0'}},
 	},
-	bmo_create_dimension_linear_exec,
+	bmo_create_dimension_exec,
 	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
 
@@ -2049,7 +2050,7 @@ static BMOpDefine bmo_create_dimemsion_diameter_def = {
 	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
 	 {{'\0'}},
 	},
-	bmo_create_dimension_diameter_exec,
+	bmo_create_dimension_exec,
 	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
 
@@ -2068,7 +2069,7 @@ static BMOpDefine bmo_create_dimemsion_radius_def = {
 	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
 	 {{'\0'}},
 	},
-	bmo_create_dimension_radius_exec,
+	bmo_create_dimension_exec,
 	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
 
@@ -2164,7 +2165,7 @@ const BMOpDefine *bmo_opdefines[] = {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	&bmo_create_dimemsion_linear_def,
 	&bmo_create_dimemsion_diameter_def,
-    &bmo_create_dimemsion_radius_def,
+	&bmo_create_dimemsion_radius_def,
 
 #endif
 };

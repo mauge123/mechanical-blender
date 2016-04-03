@@ -58,14 +58,14 @@
 
 #include "mesh_dimensions.h"
 
-static int mechanical_add_dimension_from_vertexs (const char* func_name, BMEditMesh *em, wmOperator *op) {
+static int mechanical_add_dimension_from_vertexs (int dim_type, const char* func_name, BMEditMesh *em, wmOperator *op) {
 
 	BMOperator bmop;
 	char op_str [255] = {0};
 
-	sprintf(op_str,"%s %s", func_name, "verts=%hv");
+	sprintf(op_str,"%s %s %s", func_name, "verts=%hv", "dim_type=%i");
 
-	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT);
+	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, dim_type);
 
 	/* deselect original verts */
 	BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_in, "verts", BM_VERT, BM_ELEM_SELECT, true);
@@ -89,7 +89,7 @@ static int mechanical_add_dimension_diameter(bContext *C, wmOperator *op)
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
 	if (em->bm->totvertsel >= 3) {
-		return mechanical_add_dimension_from_vertexs("create_dimension_diameter", em, op);
+		return mechanical_add_dimension_from_vertexs(DIM_TYPE_DIAMETER, "create_dimension_diameter", em, op);
 	}
 	else {
 		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
@@ -107,7 +107,7 @@ static int mechanical_add_dimension_linear(bContext *C, wmOperator *op)
 
 
 	if (em->bm->totvertsel >= 2) {
-		mechanical_add_dimension_from_vertexs("create_dimension_linear",em, op);
+		mechanical_add_dimension_from_vertexs(DIM_TYPE_LINEAR, "create_dimension_linear",em, op);
 	}
 	else {
 		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
@@ -123,7 +123,7 @@ static int mechanical_add_dimension_radius(bContext *C, wmOperator *op)
 
 
 	if (em->bm->totvertsel >= 3) {
-		mechanical_add_dimension_from_vertexs("create_dimension_radius",em, op);
+		mechanical_add_dimension_from_vertexs(DIM_TYPE_RADIUS, "create_dimension_radius",em, op);
 	}
 	else {
 		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");

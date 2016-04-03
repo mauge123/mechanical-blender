@@ -46,7 +46,7 @@ enum {
 };
 
 
-void bmo_create_dimension_exec(BMesh *bm, BMOperator *op, int type)
+void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMVert *v;
@@ -55,6 +55,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op, int type)
 
 	int v_count =0;
 	int n=0;
+	int type = BMO_slot_int_get(op->slots_in,"dim_type");
 
 
 	for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), v_count++);
@@ -73,21 +74,4 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op, int type)
 	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
 
 
-}
-
-void bmo_create_dimension_linear_exec(BMesh *bm, BMOperator *op)
-{
-	bmo_create_dimension_exec(bm,op,DIM_TYPE_LINEAR);
-}
-
-
-void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op)
-{
-	bmo_create_dimension_exec(bm,op,DIM_TYPE_DIAMETER);
-}
-
-
-void bmo_create_dimension_radius_exec(BMesh *bm, BMOperator *op)
-{
-	bmo_create_dimension_exec(bm,op,DIM_TYPE_RADIUS);
 }
