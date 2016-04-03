@@ -783,15 +783,15 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	int alloctype = CD_DUPLICATE;
 
 	if (take_ownership && dm->type == DM_TYPE_CDDM && dm->needsFree) {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		bool has_any_referenced_layers =
 		        CustomData_has_referenced(&dm->vertData) ||
 		        CustomData_has_referenced(&dm->edgeData) ||
 		        CustomData_has_referenced(&dm->loopData) ||
 		        CustomData_has_referenced(&dm->faceData) ||
-		        CustomData_has_referenced(&dm->polyData) ||
-		        CustomData_has_referenced(&dm->dimData);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		        CustomData_has_referenced(&dm->dimData)	 ||
 #endif
+		        CustomData_has_referenced(&dm->polyData);
 		if (!has_any_referenced_layers) {
 			alloctype = CD_ASSIGN;
 		}
