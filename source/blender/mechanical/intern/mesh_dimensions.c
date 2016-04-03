@@ -308,13 +308,12 @@ static void set_dimension_start_end (BMDim *edm) {
 			add_v3_v3v3(edm->end, edm->fpos, edm->v[1]->co);
 			break;
 		case DIM_TYPE_DIAMETER:
-			break;
-			// Calc start end
 			sub_v3_v3v3(v1,edm->fpos, edm->center);
 			normalize_v3(v1);
 			mul_v3_fl(v1,get_dimension_value(edm)/2.0f);
 			add_v3_v3v3(edm->start,edm->center,v1);
 			sub_v3_v3v3(edm->end, edm->center,v1);
+			break;
 		case DIM_TYPE_RADIUS:
 			sub_v3_v3v3(v1,edm->fpos, edm->center);
 			normalize_v3(v1);
