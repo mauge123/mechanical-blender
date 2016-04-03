@@ -58,12 +58,12 @@
 
 #include "mesh_dimensions.h"
 
-static int mechanical_add_dimension_from_vertexs (int dim_type, const char* func_name, BMEditMesh *em, wmOperator *op) {
+static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, wmOperator *op) {
 
 	BMOperator bmop;
 	char op_str [255] = {0};
 
-	sprintf(op_str,"%s %s %s", func_name, "verts=%hv", "dim_type=%i");
+	sprintf(op_str,"create_dimension %s %s", "verts=%hv", "dim_type=%i");
 
 	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, dim_type);
 
@@ -83,70 +83,55 @@ static int mechanical_add_dimension_from_vertexs (int dim_type, const char* func
 
 
 
-static int mechanical_add_dimension_diameter(bContext *C, wmOperator *op)
+static int mechanical_add_dimension(bContext *C, wmOperator *op)
 {
+	int ret = OPERATOR_FINISHED;
+
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-	if (em->bm->totvertsel >= 3) {
-		return mechanical_add_dimension_from_vertexs(DIM_TYPE_DIAMETER, "create_dimension_diameter", em, op);
+	int dim_type = RNA_enum_get(op->ptr, "dim_type");
+
+	int min_vert[] = {0,
+	                  2, // DIM_TYPE_LINEAR
+	                  3, // DIM_TYPE_DIAMETER
+	                  3  // DIM_TYPE_RADIUS
+	                 };
+
+	if (em->bm->totvertsel >= min_vert[dim_type]) {
+		if (!mechanical_add_dimension_from_vertexs(dim_type, em, op)) {
+			ret = OPERATOR_CANCELLED;
+		}
 	}
 	else {
 		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
+		ret = OPERATOR_CANCELLED;
 	}
-
-	return OPERATOR_FINISHED;
+	return ret;
 }
 
-
-
-static int mechanical_add_dimension_linear(bContext *C, wmOperator *op)
-{
-	Object *obedit = CTX_data_edit_object(C);
-	BMEditMesh *em = BKE_editmesh_from_object(obedit);
-
-
-	if (em->bm->totvertsel >= 2) {
-		mechanical_add_dimension_from_vertexs(DIM_TYPE_LINEAR, "create_dimension_linear",em, op);
-	}
-	else {
-		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
-	}
-
-	return OPERATOR_FINISHED;
-}
-
-static int mechanical_add_dimension_radius(bContext *C, wmOperator *op)
-{
-	Object *obedit = CTX_data_edit_object(C);
-	BMEditMesh *em = BKE_editmesh_from_object(obedit);
-
-
-	if (em->bm->totvertsel >= 3) {
-		mechanical_add_dimension_from_vertexs(DIM_TYPE_RADIUS, "create_dimension_radius",em, op);
-	}
-	else {
-		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
-	}
-
-	return OPERATOR_FINISHED;
-}
-
-
+static EnumPropertyItem dim_type_items[] = {
+	{DIM_TYPE_LINEAR, "linear", 0, "Linear", "Linear Dimension"},
+	{DIM_TYPE_DIAMETER, "diameter", 0, "Diameter", "Diameter Dimension"},
+	{DIM_TYPE_RADIUS, "radius", 0, "Radius", "Radius Dimension"},
+	{0, NULL, 0, NULL, NULL}
+};
 
 void MESH_OT_mechanical_dimension_linear_add(wmOperatorType *ot)
-{
+{		
 	/* identifiers */
 	ot->name = "Add Linear Dimension";
 	ot->description = "Adds a linear Dimension on Mesh";
 	ot->idname = "MESH_OT_mechanical_dimension_linear_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension_linear;
+	ot->exec = mechanical_add_dimension;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_LINEAR,"dimension type","dimension type");
 
 }
 
@@ -159,11 +144,14 @@ void MESH_OT_mechanical_dimension_diameter_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_diameter_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension_diameter;
+	ot->exec = mechanical_add_dimension;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_DIAMETER,"dimension type","dimension type");
+
 
 }
 
@@ -176,11 +164,14 @@ void MESH_OT_mechanical_dimension_radius_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_radius_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension_radius;
+	ot->exec = mechanical_add_dimension;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_RADIUS,"dimension type","dimension type");
+
 
 }
 

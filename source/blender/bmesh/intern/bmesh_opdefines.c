@@ -2021,51 +2021,12 @@ static BMOpDefine bmo_symmetrize_def = {
  * Creates a dimension betwen two vertexs.
  *
  */
-static BMOpDefine bmo_create_dimemsion_linear_def = {
-	"create_dimension_linear",
+static BMOpDefine bmo_create_dimension_def = {
+	"create_dimension",
 	/* slots_in */
 	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
      {"dim_type",BMO_OP_SLOT_INT},
 	 {{'\0'}},
-	},
-	/* slots_out */
-	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
-	 {{'\0'}},
-	},
-	bmo_create_dimension_exec,
-	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
-};
-
-/*
- * Creates a diameter dimension from 3 or more vertices.
- *
- */
-static BMOpDefine bmo_create_dimemsion_diameter_def = {
-	"create_dimension_diameter",
-	/* slots_in */
-	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
-     {"dim_type",BMO_OP_SLOT_INT},
-     {{'\0'}},
-	},
-	/* slots_out */
-	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
-	 {{'\0'}},
-	},
-	bmo_create_dimension_exec,
-	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
-};
-
-
-/*
- * Creates a radius dimension from 3 or more vertices.
- *
- */
-static BMOpDefine bmo_create_dimemsion_radius_def = {
-	"create_dimension_radius",
-	/* slots_in */
-	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
-	 {"dim_type",BMO_OP_SLOT_INT},
-     {{'\0'}},
 	},
 	/* slots_out */
 	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
@@ -2165,10 +2126,7 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_weld_verts_def,
 	&bmo_wireframe_def,
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	&bmo_create_dimemsion_linear_def,
-	&bmo_create_dimemsion_diameter_def,
-	&bmo_create_dimemsion_radius_def,
-
+	&bmo_create_dimension_def,
 #endif
 };
 
