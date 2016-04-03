@@ -2044,7 +2044,8 @@ static BMOpDefine bmo_create_dimemsion_diameter_def = {
 	"create_dimension_diameter",
 	/* slots_in */
 	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
-	 {{'\0'}},
+     {"dim_type",BMO_OP_SLOT_INT},
+     {{'\0'}},
 	},
 	/* slots_out */
 	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
@@ -2063,7 +2064,8 @@ static BMOpDefine bmo_create_dimemsion_radius_def = {
 	"create_dimension_radius",
 	/* slots_in */
 	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
-	 {{'\0'}},
+	 {"dim_type",BMO_OP_SLOT_INT},
+     {{'\0'}},
 	},
 	/* slots_out */
 	{{"dim.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},  /* output created dimension */
