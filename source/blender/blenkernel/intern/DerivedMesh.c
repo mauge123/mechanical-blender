@@ -783,12 +783,15 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	int alloctype = CD_DUPLICATE;
 
 	if (take_ownership && dm->type == DM_TYPE_CDDM && dm->needsFree) {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		bool has_any_referenced_layers =
 		        CustomData_has_referenced(&dm->vertData) ||
 		        CustomData_has_referenced(&dm->edgeData) ||
 		        CustomData_has_referenced(&dm->loopData) ||
 		        CustomData_has_referenced(&dm->faceData) ||
-		        CustomData_has_referenced(&dm->polyData);
+		        CustomData_has_referenced(&dm->polyData) ||
+		        CustomData_has_referenced(&dm->dimData);
+#endif
 		if (!has_any_referenced_layers) {
 			alloctype = CD_ASSIGN;
 		}
@@ -799,6 +802,9 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	CustomData_reset(&tmp.fdata);
 	CustomData_reset(&tmp.ldata);
 	CustomData_reset(&tmp.pdata);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_reset(&tmp.ddata);
+#endif
 
 	DM_ensure_normals(dm);
 
@@ -806,7 +812,11 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me, Object *ob, CustomDataMask mask, bool
 	totedge = tmp.totedge = dm->getNumEdges(dm);
 	totloop = tmp.totloop = dm->getNumLoops(dm);
 	totpoly = tmp.totpoly = dm->getNumPolys(dm);
+
 	tmp.totface = 0;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	tmp.totdim = 0;
+#endif
 
 	CustomData_copy(&dm->vertData, &tmp.vdata, mask, alloctype, totvert);
 	CustomData_copy(&dm->edgeData, &tmp.edata, mask, alloctype, totedge);
