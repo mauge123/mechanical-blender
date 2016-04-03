@@ -115,9 +115,7 @@ void bmo_weld_verts_exec(BMesh *bm, BMOperator *op);
 void bmo_wireframe_exec(BMesh *bm, BMOperator *op);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void bmo_create_dimension_linear_exec(BMesh *bm, BMOperator *op);
-void bmo_create_dimension_diameter_exec(BMesh *bm, BMOperator *op);
-void bmo_create_dimension_radius_exec(BMesh *bm, BMOperator *op);
+void bmo_create_dimension_exec(BMesh *bm, BMOperator *op);
 #endif
 
 #endif /* __BMESH_OPERATORS_PRIVATE_H__ */
