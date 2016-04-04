@@ -2679,20 +2679,14 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
-
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
-
 	float start[3], end[3], txt_pos[3];
 
-
 	get_dimension_theme_values(selected, col, tcol);
-
 
 	// Baseline
 	add_v3_v3v3(start,fpos, p1);
 	add_v3_v3v3(end, fpos, p2);
-
-
 
 	// Set txt pos acording pos factor
 	sub_v3_v3v3(txt_pos, end, start);
@@ -2731,15 +2725,11 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected) {
 
 	float start[3], end[3], vr[3], txt_pos[3];
-
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
-
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
-
 	get_dimension_theme_values(selected, col, tcol);
-
 
 	copy_v3_v3(vr,v_dir);
 	normalize_v3(vr);
@@ -2748,13 +2738,10 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 	add_v3_v3v3(start, center, vr);
 	sub_v3_v3v3(end, center, vr);
 
-
 	// Set txt pos acording pos factor
 	sub_v3_v3v3(txt_pos, end, start);
 	mul_v3_fl(txt_pos,  dpos_fact);
 	add_v3_v3(txt_pos, start);
-
-
 
 	glColor3ubv(col);
 
@@ -2777,22 +2764,17 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
 	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
-
 }
 
 
 static void draw_radius_dimension(float* center, float *v_dir, float radius, float dpos_fact, int selected) {
 
 	float start[3], end[3], vr[3], txt_pos[3];
-
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
-
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
-
 	get_dimension_theme_values(selected, col, tcol);
-
 
 	copy_v3_v3(vr,v_dir);
 	normalize_v3(vr);
@@ -2801,13 +2783,10 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 	copy_v3_v3(start,center);
 	add_v3_v3v3(end, center, vr);
 
-
 	// Set txt pos acording pos factor
 	sub_v3_v3v3(txt_pos, end, start);
 	mul_v3_fl(txt_pos,  dpos_fact);
 	add_v3_v3(txt_pos, start);
-
-
 
 	glColor3ubv(col);
 
@@ -2830,10 +2809,79 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
 	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
-
 }
 
+static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected) {
 
+	float start[3], end[3], vr1[3], vr2[3], txt_pos[3], pos[3], pos_tmp[3];
+	float axis[3];
+	float lpos;
+	float w,h;
+	char numstr[32]; /* Stores the measurement display text here */
+	unsigned char col[4], tcol[4]; /* color of the text to draw */
+	float dim_angle, step;
+	float rmat[4][4];
+
+	get_dimension_theme_values(selected, col, tcol);
+
+	lpos = len_v3(fpos);
+
+	sub_v3_v3v3(vr1,p1,center);
+	normalize_v3(vr1);
+
+	sub_v3_v3v3(vr2,p2,center);
+	normalize_v3(vr2);
+
+	cross_v3_v3v3(axis,vr1,vr2);
+	//dim_angle = RAD2DEG(angle_v3v3(vr1,vr2));
+	dim_angle = RAD2DEG(acos(dot_v3v3(vr1,vr2)));
+
+	mul_v3_fl(vr1,lpos);
+	add_v3_v3v3(start, center, vr1);
+
+	mul_v3_fl(vr2,lpos);
+	add_v3_v3v3(end, center, vr2);
+
+	// Set txt pos acording pos factor
+	rotate_v3_v3v3fl(txt_pos,vr1,axis, DEG2RAD(dim_angle*dpos_fact));
+	add_v3_v3(txt_pos, center);
+
+	glColor3ubv(col);
+	glPointSize(2);
+	glBegin(GL_POINTS);
+	{
+		glVertex3fv(start);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+	step = dim_angle/32.0f;
+	glBegin(GL_LINE_STRIP);
+	{
+		for (int i=0;i<=32;i++){
+			rotate_v3_v3v3fl(pos,vr1,axis, DEG2RAD(step*i));
+			add_v3_v3(pos, center);
+			glVertex3fv(pos);
+		}
+	}
+	glEnd();
+
+	glBegin(GL_LINES);
+	{
+		glVertex3fv(center);
+		glVertex3fv(start);
+		glVertex3fv(center);
+		glVertex3fv(end);
+	}
+	glEnd();
+
+
+	//draw dimension length
+	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", dim_angle);
+	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
+	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
+
+}
 
 #endif
 
@@ -2862,12 +2910,52 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 		case DIM_TYPE_RADIUS:
 			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
+		case DIM_TYPE_ANGLE_3P:
+			draw_angle_3p_dimension(
+			            CDDM_get_vert(dm,mdm->v[0])->co,
+						CDDM_get_vert(dm,mdm->v[2])->co,
+						CDDM_get_vert(dm,mdm->v[1])->co,
+						mdm->fpos,
+						mdm->dpos_fact,
+						false);
+			break;
+		default:
+			BLI_assert(0);
 	}
 
 }
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void draw_dimension_direction_points(BMDim *edm) {
+	//Draw a big point on Dim diection selected or small point on Dim not selected
+	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
+		if(edm->dir==1){
+			glPointSize(7);
+			glBegin(GL_POINTS);
+			{
+				glVertex3fv(edm->end);
+			}
+			glEnd();
+		}else if(edm->dir==-1){
+			glPointSize(7);
+			glBegin(GL_POINTS);
+			{
+				glVertex3fv(edm->start);
+			}
+			glEnd();
+		}else if(edm->dir==0){
+			glPointSize(7);
+			glBegin(GL_POINTS);
+			{
+				glVertex3fv(edm->end);
+				glVertex3fv(edm->start);
+			}
+			glEnd();
+		}
+	}
+}
+
 /**
  * /Brief Draw dimensions in EditMode
  *
@@ -2890,43 +2978,23 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 		case DIM_TYPE_LINEAR:
 			draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
 								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
-
-
-			//Draw a big point on Dim diection selected or small point on Dim not selected
-			if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
-				if(edm->dir==1){
-					glPointSize(7);
-					glBegin(GL_POINTS);
-					{
-						glVertex3fv(edm->end);
-					}
-					glEnd();
-				}else if(edm->dir==-1){
-					glPointSize(7);
-					glBegin(GL_POINTS);
-					{
-						glVertex3fv(edm->start);
-					}
-					glEnd();
-				}else if(edm->dir==0){
-					glPointSize(7);
-					glBegin(GL_POINTS);
-					{
-						glVertex3fv(edm->end);
-						glVertex3fv(edm->start);
-					}
-					glEnd();
-				}
-			}
+			draw_dimension_direction_points(edm);
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension (edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+			draw_diameter_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
 			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			break;
 		case DIM_TYPE_RADIUS:
-			draw_radius_dimension (edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+			draw_radius_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
 			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			break;
+		case DIM_TYPE_ANGLE_3P:
+			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
+								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+			draw_dimension_direction_points(edm);
+			break;
+		default:
+			BLI_assert(0);
 		}
 }
 

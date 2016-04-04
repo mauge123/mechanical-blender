@@ -251,7 +251,8 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					apply_dimension_value (bm, edm, tfp->dimension_value, tfp->constraints);
-					apply_txt_dimension_value(edm, tfp->dim_txt_pos);
+					//apply_txt_dimension_value(edm, tfp->dim_txt_pos);
+					edm->dpos_fact = tfp->dim_txt_pos;
 					ts->dimension_constraints = tfp->constraints;
 				}
 			}

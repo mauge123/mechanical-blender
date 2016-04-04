@@ -66,7 +66,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		v_arr[n] = v;
 	}
 
-	d = BM_dim_create(bm, v_arr,v_count,type, NULL, BM_CREATE_NOP);
+	d = BM_dim_create(bm, v_arr,v_count,type, NULL, BM_CREATE_USE_SELECT_ORDER);
 
 	MEM_freeN (v_arr);
 

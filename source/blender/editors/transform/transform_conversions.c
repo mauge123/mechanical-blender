@@ -2306,6 +2306,7 @@ static void VertsToTransData(TransInfo *t, TransData *td, TransDataExtension *tx
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static int createTransEditDim(TransInfo *t) {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
     BMesh *bm = em->bm;
@@ -2337,6 +2338,12 @@ static int createTransEditDim(TransInfo *t) {
 				copy_v3_v3(td->iloc,edm->center);
 				copy_v3_v3(td->center, edm->center);
 				break;
+			case DIM_TYPE_ANGLE_3P:
+				copy_v3_v3(td->iloc,edm->v[1]->co);
+				copy_v3_v3(td->center, edm->v[1]->co);
+				break;
+			default:
+				BLI_assert(0);
 		}
 
 		td->ext = NULL;
@@ -2351,8 +2358,8 @@ static int createTransEditDim(TransInfo *t) {
         // no dimension select
         return 0;
     }
-
 }
+#endif
 
 static void createTransEditVerts(TransInfo *t)
 {

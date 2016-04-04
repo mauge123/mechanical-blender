@@ -12,8 +12,6 @@ void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float
 
 float get_dimension_value(BMDim *edm);
 
-void apply_txt_dimension_value (BMDim *edm, float value);
-
 BMDim* get_selected_dimension(BMesh *bm);
 
 void get_dimension_mid(float mid[3],BMDim *edm);

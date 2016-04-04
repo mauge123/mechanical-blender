@@ -24,8 +24,8 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(SRC
-	mesh_dimensions.h
 	intern/mesh_dimensions.c
+	intern/mechanical_utils.c
 )
 
 set(INC

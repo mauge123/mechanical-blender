@@ -3111,7 +3111,9 @@ BMDim *BM_dim_create(
 		BLI_assert(v[n]->head.htype == BM_VERT);
 		edm->v[n] = v[n];
 	}
-	qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
+	if (create_flag & BM_CREATE_USE_SELECT_ORDER) {
+		qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
+	}
 
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
@@ -3143,7 +3145,18 @@ BMDim *BM_dim_create(
 
 			//set direction
 			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
+			normalize_v3(edm->fpos);
 			edm->dpos_fact = 0.5f;
+			break;
+		case DIM_TYPE_ANGLE_3P:
+			//set direction
+			sub_v3_v3v3(edm->fpos,edm->v[1]->co, edm->v[2]->co);
+			normalize_v3(edm->fpos);
+			edm->dpos_fact = 0.5f;
+			break;
+		default:
+			BLI_assert(0);
+
 
 	}
 

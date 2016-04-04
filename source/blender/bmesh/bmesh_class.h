@@ -152,6 +152,7 @@ typedef struct BMLoop {
 #define DIM_TYPE_LINEAR		1
 #define DIM_TYPE_DIAMETER	2
 #define DIM_TYPE_RADIUS		3
+#define DIM_TYPE_ANGLE_3P	4
 
 
 typedef struct BMDim {

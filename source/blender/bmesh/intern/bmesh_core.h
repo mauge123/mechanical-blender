@@ -39,6 +39,9 @@ typedef enum eBMCreateFlag {
 	 * use if we immediately write customdata into the element so this skips copying from 'example'
 	 * args or setting defaults, speeds up conversion when data is converted all at once. */
 	BM_CREATE_SKIP_CD   = (1 << 2),
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	BM_CREATE_USE_SELECT_ORDER   = (1 << 3),
+#endif
 } eBMCreateFlag;
 
 BMVert *BM_vert_create(

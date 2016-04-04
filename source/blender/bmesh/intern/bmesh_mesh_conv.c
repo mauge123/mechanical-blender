@@ -409,10 +409,6 @@ void BM_mesh_bm_from_me(
 
 			copy_v3_v3(d->fpos,mdim->fpos);
 
-			/* Already performed during BM_dim_create_linear */
-			// set_dim_extra_data (d,mdim->dpos_fact,mdim->fpos);
-
-
 			BM_elem_index_set(d, i); /* set_ok */
 
 			/* transfer flags */

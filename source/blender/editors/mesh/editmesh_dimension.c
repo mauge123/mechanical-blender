@@ -95,7 +95,8 @@ static int mechanical_add_dimension(bContext *C, wmOperator *op)
 	int min_vert[] = {0,
 	                  2, // DIM_TYPE_LINEAR
 	                  3, // DIM_TYPE_DIAMETER
-	                  3  // DIM_TYPE_RADIUS
+	                  3,  // DIM_TYPE_RADIUS
+	                  3, // DIM_TYPE_ANGLE_3P
 	                 };
 
 	if (em->bm->totvertsel >= min_vert[dim_type]) {
@@ -114,7 +115,8 @@ static EnumPropertyItem dim_type_items[] = {
 	{DIM_TYPE_LINEAR, "linear", 0, "Linear", "Linear Dimension"},
 	{DIM_TYPE_DIAMETER, "diameter", 0, "Diameter", "Diameter Dimension"},
 	{DIM_TYPE_RADIUS, "radius", 0, "Radius", "Radius Dimension"},
-	{0, NULL, 0, NULL, NULL}
+    {DIM_TYPE_ANGLE_3P, "angle3p", 0, "Angle3P", "3 Points Angle dimension"},
+    {0, NULL, 0, NULL, NULL}
 };
 
 void MESH_OT_mechanical_dimension_linear_add(wmOperatorType *ot)
@@ -172,8 +174,25 @@ void MESH_OT_mechanical_dimension_radius_add(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_RADIUS,"dimension type","dimension type");
 
-
 }
+
+void MESH_OT_mechanical_dimension_angle_3p_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add 3 Points Angle Dimension";
+	ot->description = "Adds an angle dimension on mesh from 3 points";
+	ot->idname = "MESH_OT_mechanical_dimension_angle_3p_add";
+
+	/* api callbacks */
+	ot->exec = mechanical_add_dimension;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_ANGLE_3P,"dimension type","dimension type");
+}
+
 
 
 
