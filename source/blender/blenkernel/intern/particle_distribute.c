@@ -795,24 +795,19 @@ static int psys_thread_context_init_distribute(ParticleThreadContext *ctx, Parti
 		return 0;
 	}
 	
+	/* XXX This distribution code is totally broken in case from == PART_FROM_CHILD, it's always using finaldm
+	 *     even if use_modifier_stack is unset... But making things consistent here break all existing edited
+	 *     hair systems, so better wait for complete rewrite.
+	 */
+
 	psys_thread_context_init(ctx, sim);
-
-	if (psys->part->use_modifier_stack)
-		dm = finaldm;
-	else
-		dm= CDDM_from_mesh((Mesh*)ob->data);
-
-	/* BMESH ONLY, for verts we don't care about tessfaces */
-	if (from != PART_FROM_VERT) {
-		DM_ensure_tessface(dm);
-	}
-
+	
 	/* First handle special cases */
 	if (from == PART_FROM_CHILD) {
 		/* Simple children */
 		if (part->childtype != PART_CHILD_FACES) {
 			BLI_srandom(31415926 + psys->seed + psys->child_seed);
-			distribute_simple_children(scene, ob, dm, sim->psmd->dm_deformed, psys);
+			distribute_simple_children(scene, ob, finaldm, sim->psmd->dm_deformed, psys);
 			return 0;
 		}
 	}
@@ -821,9 +816,19 @@ static int psys_thread_context_init_distribute(ParticleThreadContext *ctx, Parti
 		if (part->distr==PART_DISTR_GRID && from != PART_FROM_VERT) {
 			BLI_srandom(31415926 + psys->seed);
 
-			distribute_grid(dm, psys);
+			if (psys->part->use_modifier_stack) {
+				dm = finaldm;
+			}
+			else {
+				dm = CDDM_from_mesh((Mesh*)ob->data);
+			}
+			DM_ensure_tessface(dm);
 
-			if (dm != finaldm) dm->release(dm);
+			distribute_grid(dm,psys);
+
+			if (dm != finaldm) {
+				dm->release(dm);
+			}
 
 			return 0;
 		}
@@ -833,6 +838,10 @@ static int psys_thread_context_init_distribute(ParticleThreadContext *ctx, Parti
 	if (from == PART_FROM_CHILD) {
 		distr=PART_DISTR_RAND;
 		BLI_srandom(31415926 + psys->seed + psys->child_seed);
+		dm= finaldm;
+
+		/* BMESH ONLY */
+		DM_ensure_tessface(dm);
 
 		children=1;
 
@@ -853,6 +862,16 @@ static int psys_thread_context_init_distribute(ParticleThreadContext *ctx, Parti
 		distr = part->distr;
 		BLI_srandom(31415926 + psys->seed);
 		
+		if (psys->part->use_modifier_stack)
+			dm = finaldm;
+		else
+			dm= CDDM_from_mesh((Mesh*)ob->data);
+
+		/* BMESH ONLY, for verts we don't care about tessfaces */
+		if (from != PART_FROM_VERT) {
+			DM_ensure_tessface(dm);
+		}
+
 		/* we need orco for consistent distributions */
 		if (!CustomData_has_layer(&dm->vertData, CD_ORCO))
 			DM_add_vert_layer(dm, CD_ORCO, CD_ASSIGN, BKE_mesh_orco_verts_get(ob));
@@ -1011,7 +1030,7 @@ static int psys_thread_context_init_distribute(ParticleThreadContext *ctx, Parti
 		double step, pos;
 		
 		step= (totpart < 2) ? 0.5 : 1.0/(double)totpart;
-		pos= 1e-6; /* tiny offset to avoid zero weight face */
+		pos = (from == PART_FROM_VERT) ? 0.0 : 1e-6; /* tiny offset to avoid zero weight face */
 		i= 0;
 
 		for (p=0; p<totpart; p++, pos+=step) {

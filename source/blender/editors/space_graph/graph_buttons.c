@@ -537,7 +537,7 @@ static void driver_dvar_invalid_name_query_cb(bContext *C, void *dvar_v, void *U
 		uiItemL(layout, 
 		        "It cannot start with a special character,"
 		        " including '$', '@', '!', '~', '+', '-', '_', '.', or ' '",
-				ICON_NONE);
+		        ICON_NONE);
 	}
 	if (dvar->flag & DVAR_FLAG_INVALID_HAS_SPACE) {
 		uiItemL(layout, "It cannot contain spaces (e.g. 'a space')", ICON_ERROR);
@@ -857,7 +857,7 @@ static void graph_panel_drivers(const bContext *C, Panel *pa)
 		
 		if (dvar->flag & DVAR_FLAG_INVALID_NAME) {
 			but = uiDefIconBut(block, UI_BTYPE_BUT, B_IPO_DEPCHANGE, ICON_ERROR, 290, 0, UI_UNIT_X, UI_UNIT_Y,
-			                   NULL, 0.0, 0.0, 0.0, 0.0, IFACE_("Invalid variable name. Click here for details"));
+			                   NULL, 0.0, 0.0, 0.0, 0.0, IFACE_("Invalid variable name, click here for details"));
 			UI_but_func_set(but, driver_dvar_invalid_name_query_cb, dvar, NULL); // XXX: reports?
 		}
 		

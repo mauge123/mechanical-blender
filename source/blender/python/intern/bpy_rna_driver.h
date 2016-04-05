@@ -15,38 +15,19 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s):
- *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BMESH_TOOLS_H__
-#define __BMESH_TOOLS_H__
+#ifndef __BPY_RNA_DRIVER_H__
+#define __BPY_RNA_DRIVER_H__
 
-/** \file blender/bmesh/bmesh_tools.h
- *  \ingroup bmesh
- *
- * Utility functions that operate directly on the BMesh,
- * These can be used by both Modifiers and BMesh-Operators.
+/** \file blender/python/intern/bpy_rna_driver.h
+ *  \ingroup pythonintern
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct ChannelDriver;
+struct DriverTarget;
 
-#include "tools/bmesh_beautify.h"
-#include "tools/bmesh_bevel.h"
-#include "tools/bmesh_bisect_plane.h"
-#include "tools/bmesh_decimate.h"
-#include "tools/bmesh_edgenet.h"
-#include "tools/bmesh_edgesplit.h"
-#include "tools/bmesh_path.h"
-#include "tools/bmesh_path_region.h"
-#include "tools/bmesh_region_match.h"
-#include "tools/bmesh_triangulate.h"
+PyObject *pyrna_driver_get_variable_value(struct ChannelDriver *driver, struct DriverTarget *dtar);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __BMESH_TOOLS_H__ */
+#endif  /* __BPY_RNA_DRIVER_H__ */
