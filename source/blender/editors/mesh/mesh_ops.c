@@ -87,6 +87,7 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_mechanical_dimension_diameter_add);
 	WM_operatortype_append(MESH_OT_mechanical_dimension_radius_add);
 	WM_operatortype_append(MESH_OT_mechanical_dimension_angle_3p_add);
+	WM_operatortype_append(MESH_OT_mechanical_dimension_angle_4p_add);
 #endif
 
 	WM_operatortype_append(MESH_OT_extrude_region);

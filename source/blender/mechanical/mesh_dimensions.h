@@ -14,9 +14,13 @@ float get_dimension_value(BMDim *edm);
 
 BMDim* get_selected_dimension(BMesh *bm);
 
+int get_necessary_dimension_verts(int dim_type);
+
 void get_dimension_mid(float mid[3],BMDim *edm);
 void get_dimension_plane (float p[3], BMDim *edm);
 void dimension_data_update (BMDim *edm);
+
+void set_dimension_center(BMDim *edm);
 
 void select_dimension_data (BMDim *edm, void *context);
 

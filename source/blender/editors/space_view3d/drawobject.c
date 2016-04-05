@@ -2919,6 +2919,15 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 						mdm->dpos_fact,
 						false);
 			break;
+		case DIM_TYPE_ANGLE_4P:
+			draw_angle_3p_dimension(
+			            CDDM_get_vert(dm,mdm->v[0])->co,
+						CDDM_get_vert(dm,mdm->v[3])->co,
+						mdm->center,
+						mdm->fpos,
+						mdm->dpos_fact,
+						false);
+			break;
 		default:
 			BLI_assert(0);
 	}
@@ -2928,31 +2937,17 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void draw_dimension_direction_points(BMDim *edm) {
+	glPointSize(7);
 	//Draw a big point on Dim diection selected or small point on Dim not selected
 	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
-		if(edm->dir==1){
-			glPointSize(7);
-			glBegin(GL_POINTS);
-			{
-				glVertex3fv(edm->end);
-			}
-			glEnd();
-		}else if(edm->dir==-1){
-			glPointSize(7);
-			glBegin(GL_POINTS);
-			{
-				glVertex3fv(edm->start);
-			}
-			glEnd();
-		}else if(edm->dir==0){
-			glPointSize(7);
-			glBegin(GL_POINTS);
-			{
-				glVertex3fv(edm->end);
-				glVertex3fv(edm->start);
-			}
-			glEnd();
+
+		glBegin(GL_POINTS);
+		if(edm->dir==1 || edm->dir == 0){
+			glVertex3fv(edm->end);
+		}else if(edm->dir==-1 || edm->dir == 0){
+			glVertex3fv(edm->start);
 		}
+		glEnd();
 	}
 }
 
@@ -2990,6 +2985,11 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			break;
 		case DIM_TYPE_ANGLE_3P:
 			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
+								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+			draw_dimension_direction_points(edm);
+			break;
+		case DIM_TYPE_ANGLE_4P:
+			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->center,edm->fpos, edm->dpos_fact,
 								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			draw_dimension_direction_points(edm);
 			break;

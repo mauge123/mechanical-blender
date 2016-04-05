@@ -3134,14 +3134,7 @@ BMDim *BM_dim_create(
 		case DIM_TYPE_RADIUS:
 			BLI_assert (v_count >= 3);
 
-			if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
-				// Ok
-			} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
-				// Ok
-			} else {
-				// Somthing is going grong!
-				BLI_assert (0);
-			}
+			set_dimension_center(edm);
 
 			//set direction
 			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
@@ -3149,6 +3142,7 @@ BMDim *BM_dim_create(
 			edm->dpos_fact = 0.5f;
 			break;
 		case DIM_TYPE_ANGLE_3P:
+		case DIM_TYPE_ANGLE_4P:
 			copy_v3_v3(edm->center, edm->v[1]->co);
 			//set direction
 			sub_v3_v3v3(edm->fpos,edm->center, edm->v[2]->co);

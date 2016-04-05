@@ -92,14 +92,8 @@ static int mechanical_add_dimension(bContext *C, wmOperator *op)
 
 	int dim_type = RNA_enum_get(op->ptr, "dim_type");
 
-	int min_vert[] = {0,
-	                  2, // DIM_TYPE_LINEAR
-	                  3, // DIM_TYPE_DIAMETER
-	                  3,  // DIM_TYPE_RADIUS
-	                  3, // DIM_TYPE_ANGLE_3P
-	                 };
 
-	if (em->bm->totvertsel >= min_vert[dim_type]) {
+	if (em->bm->totvertsel >= get_necessary_dimension_verts(dim_type)) {
 		if (!mechanical_add_dimension_from_vertexs(dim_type, em, op)) {
 			ret = OPERATOR_CANCELLED;
 		}
@@ -116,6 +110,7 @@ static EnumPropertyItem dim_type_items[] = {
 	{DIM_TYPE_DIAMETER, "diameter", 0, "Diameter", "Diameter Dimension"},
 	{DIM_TYPE_RADIUS, "radius", 0, "Radius", "Radius Dimension"},
     {DIM_TYPE_ANGLE_3P, "angle3p", 0, "Angle3P", "3 Points Angle dimension"},
+    {DIM_TYPE_ANGLE_4P, "angle4p", 0, "Angle4P", "4 Points Angle dimension"},
     {0, NULL, 0, NULL, NULL}
 };
 
@@ -192,6 +187,25 @@ void MESH_OT_mechanical_dimension_angle_3p_add(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_ANGLE_3P,"dimension type","dimension type");
 }
+
+
+void MESH_OT_mechanical_dimension_angle_4p_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add 4 Points Angle Dimension";
+	ot->description = "Adds an angle dimension on mesh from 4 points";
+	ot->idname = "MESH_OT_mechanical_dimension_angle_4p_add";
+
+	/* api callbacks */
+	ot->exec = mechanical_add_dimension;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_ANGLE_4P,"dimension type","dimension type");
+}
+
 
 
 
