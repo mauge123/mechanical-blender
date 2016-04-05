@@ -330,10 +330,10 @@ void get_dimension_plane (float v[3], BMDim *edm){
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
+		case DIM_TYPE_ANGLE_3P:
 			sub_v3_v3v3(m,edm->v[0]->co,edm->center);
 			sub_v3_v3v3(r,edm->v[2]->co,edm->center);
 			break;
-		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_4P:
 			sub_v3_v3v3(m,edm->v[0]->co,edm->center);
 			sub_v3_v3v3(r,edm->v[3]->co,edm->center);
