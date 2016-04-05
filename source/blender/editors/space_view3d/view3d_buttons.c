@@ -96,6 +96,7 @@ typedef struct {
 	float dimension_value;
 	float dim_txt_pos;
 	int constraints;
+	int dim_constraints;
 #endif
 } TransformProperties;
 
@@ -208,17 +209,23 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 		    }
 		}
 	}
-
-	if (totdim == 0) {
-		uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("No dimension selected"), 0, 130, 200, 20, NULL, 0, 0, 0, 0, "");
-		return;
-	}
-
 	if (block) { /* buttons */
+		int yi = 200;
+		const int buth = 20 * UI_DPI_FAC;
+		const int but_margin = 2;
+
+		/* global dimension settings */
+		tfp->constraints = ts->dimension_constraints;
+
+		uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
+			&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
+
+		uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint:"),0, yi -= buth + but_margin, 200, buth,
+			&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+
 		if (totdim) {
-			int yi = 200;
-			const int buth = 20 * UI_DPI_FAC;
-			const int but_margin = 2;
+			/* Individual dimension settings */
+			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("Dimension settings"), 0, yi -= buth + but_margin, 200, 20, NULL, 0, 0, 0, 0, "");
 
 			// At least one dimension
 			tfp->dimension_value = get_dimension_value(edm_sel);
@@ -230,16 +237,29 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			uiDefButF(block, UI_BTYPE_NUM_SLIDER, B_OBJECTPANELMEDIAN,IFACE_("Text Position:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_txt_pos,-2.0f,2.0f, 10, RNA_TRANSLATION_PREC_DEFAULT, TIP_("Position"));
 
-			tfp->constraints = ts->dimension_constraints;
+
+			tfp->dim_constraints = edm_sel->constraints;
+
+			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONSTRAINT_OVERRIDE ,B_OBJECTPANELMEDIAN, IFACE_("Override constraints:"),0, yi -= buth + but_margin, 200, buth,
+				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Override Automatic Constraints"));
+
+			UI_block_lock_set(block,(tfp->dim_constraints & DIM_CONSTRAINT_OVERRIDE) == 0, "Disabled");
 
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
-				&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
+				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
 
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint:"),0, yi -= buth + but_margin, 200, buth,
-				&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
 
+			UI_block_lock_clear(block);
+
+		} else {
+			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("No dimension selected"), 0, 130, 200, 20, NULL, 0, 0, 0, 0, "");
 		}
 	} else { /* apply */
+
+		ts->dimension_constraints = tfp->constraints;
+
 		if (totdim) {
 
 			Mesh *me = ob->data;
@@ -250,10 +270,10 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
-					apply_dimension_value (bm, edm, tfp->dimension_value, tfp->constraints);
+					apply_dimension_value (bm, edm, tfp->dimension_value, ts);
 					//apply_txt_dimension_value(edm, tfp->dim_txt_pos);
 					edm->dpos_fact = tfp->dim_txt_pos;
-					ts->dimension_constraints = tfp->constraints;
+					edm->constraints = tfp->dim_constraints;
 				}
 			}
 		}

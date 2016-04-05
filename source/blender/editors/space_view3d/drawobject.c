@@ -2944,7 +2944,8 @@ static void draw_dimension_direction_points(BMDim *edm) {
 		glBegin(GL_POINTS);
 		if(edm->dir==1 || edm->dir == 0){
 			glVertex3fv(edm->end);
-		}else if(edm->dir==-1 || edm->dir == 0){
+		}
+		if(edm->dir==-1 || edm->dir == 0){
 			glVertex3fv(edm->start);
 		}
 		glEnd();

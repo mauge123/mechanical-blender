@@ -408,6 +408,7 @@ void BM_mesh_bm_from_me(
 			MEM_freeN (v_arr);
 
 			copy_v3_v3(d->fpos,mdim->fpos);
+			d->constraints = mdim->constraints;
 
 			BM_elem_index_set(d, i); /* set_ok */
 
@@ -791,6 +792,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		mdm->dim_type = edm->dim_type;
 		mdm->dpos_fact = edm->dpos_fact;
 		mdm->value = get_dimension_value(edm);
+		mdm->constraints = edm->constraints;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		copy_v3_v3(mdm->center, edm->center);
 		BM_elem_index_set(edm, i); /* set_inline */

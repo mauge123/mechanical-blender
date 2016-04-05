@@ -254,10 +254,11 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	}
 }
 
-void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints) {
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts) {
 
 	BMIter iter;
 	BMVert* eve;
+	int constraints = (edm->constraints & DIM_CONSTRAINT_OVERRIDE) ? edm->constraints : ts->dimension_constraints;
 
 	// Tag all elements to be affected by change
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {

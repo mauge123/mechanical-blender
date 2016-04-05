@@ -5,9 +5,12 @@
 
 #define DIM_PLANE_CONSTRAINT (1 << 0)
 #define DIM_AXIS_CONSTRAINT (1 << 1)
+#define DIM_CONSTRAINT_OVERRIDE (1<<2)
+
+#include "DNA_scene_types.h"
 
 
-void apply_dimension_value (BMesh *bm, BMDim *edm, float value, int constraints);
+void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts);
 void apply_dimension_direction_value( BMVert *va, BMVert *vb, float value, float *res);
 
 float get_dimension_value(BMDim *edm);

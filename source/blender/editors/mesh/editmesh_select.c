@@ -1983,7 +1983,7 @@ void select_dimension_data (BMDim *edm, void *context) {
 				if(len_dpos_end-len_end_click>5){
 					edm->dir=1;
 				}else if(len_dpos_end-len_end_click<-5){
-						edm->dir=-1;
+					edm->dir=-1;
 				}else {
 					edm->dir=0;
 				}

@@ -5327,7 +5327,7 @@ static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent 
 		if (hasNumInput(num)) {
 			// Apply value only once confirmed
 			edm = get_selected_dimension(bm);
-		    apply_dimension_value(bm,edm,num->val[0],ts->dimension_constraints);
+		    apply_dimension_value(bm,edm,num->val[0],ts);
 		    DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 		    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
 		}

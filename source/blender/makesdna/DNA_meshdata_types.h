@@ -77,8 +77,7 @@ typedef struct MDim {
 	float value; // Stored Dimension Value
 	short dim_type;
 	char flag;
-	char pad[1];
-
+	char constraints;
 } MDim;
 
 /* tessellation vertex color data.

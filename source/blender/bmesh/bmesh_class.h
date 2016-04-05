@@ -166,6 +166,8 @@ typedef struct BMDim {
 
 	int dim_type;
 
+	short constraints; //Overrided constraints
+
 	// Dimension position, used for select
 	float dpos[3];
 
@@ -182,6 +184,7 @@ typedef struct BMDim {
 	//Dimension position, from midpoint
 	float fpos[3]; //fixed
 	float tpos[3]; //while moving: used when tagged
+
 
 } BMDim;
 #endif

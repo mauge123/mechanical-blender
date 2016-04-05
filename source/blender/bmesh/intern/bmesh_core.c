@@ -3104,6 +3104,7 @@ BMDim *BM_dim_create(
 	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 
 	edm->dim_type = dim_type;
+	edm->constraints = 0;
 
 	edm->totverts = v_count;
 	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
@@ -3176,6 +3177,7 @@ BMDim *BM_dim_create(
 
 	if (d_example) {
 		copy_v3_v3(edm->fpos,d_example->fpos);
+		edm->constraints = d_example->constraints;
 	}
 
 	dimension_data_update (edm);
