@@ -3149,8 +3149,9 @@ BMDim *BM_dim_create(
 			edm->dpos_fact = 0.5f;
 			break;
 		case DIM_TYPE_ANGLE_3P:
+			copy_v3_v3(edm->center, edm->v[1]->co);
 			//set direction
-			sub_v3_v3v3(edm->fpos,edm->v[1]->co, edm->v[2]->co);
+			sub_v3_v3v3(edm->fpos,edm->center, edm->v[2]->co);
 			normalize_v3(edm->fpos);
 			edm->dpos_fact = 0.5f;
 			break;

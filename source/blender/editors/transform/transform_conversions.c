@@ -2335,12 +2335,9 @@ static int createTransEditDim(TransInfo *t) {
 				break;
 			case DIM_TYPE_DIAMETER:
 			case DIM_TYPE_RADIUS:
+			case DIM_TYPE_ANGLE_3P:
 				copy_v3_v3(td->iloc,edm->center);
 				copy_v3_v3(td->center, edm->center);
-				break;
-			case DIM_TYPE_ANGLE_3P:
-				copy_v3_v3(td->iloc,edm->v[1]->co);
-				copy_v3_v3(td->center, edm->v[1]->co);
 				break;
 			default:
 				BLI_assert(0);

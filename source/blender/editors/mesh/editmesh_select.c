@@ -1951,69 +1951,49 @@ void select_dimension_data (BMDim *edm, void *context) {
 	fmval[0]=vc->mval[0];
 	fmval[1]=vc->mval[1];
 
-	float end[3], start[3];
-	float temp[3];
-	float d[3];
-	float d1[3],d2[3];
-	float n1[3];
-
-	//Linear Dimension
-	BLI_assert(edm->totverts==2);
-
 	float len_start_click,len_end_click, len_dpos_end, len_dpos_start, len_start_end;
 
-	//Use only one normal, as the lines should be parallel!
-	sub_v3_v3v3(d,edm->v[0]->co,edm->v[1]->co);
-	cross_v3_v3v3(temp,d,edm->v[0]->co);
-	cross_v3_v3v3(n1,temp,d);
-	normalize_v3(n1);
-	add_v3_v3v3(start,n1, edm->v[0]->co);
-	add_v3_v3v3(end, n1, edm->v[1]->co);
+	switch (edm->dim_type)
+	{
+		case DIM_TYPE_LINEAR:
+		case DIM_TYPE_ANGLE_3P:
 
-	mul_v3_fl(n1,1.2f);
+			ED_view3d_project_float_object(vc->ar,edm->start, screen_co_start, flag);
+			ED_view3d_project_float_object(vc->ar,edm->end, screen_co_end, flag);
 
-	add_v3_v3v3(d1, n1, edm->v[0]->co);
-	add_v3_v3v3(d2, n1, edm->v[1]->co);
+			ED_view3d_project_float_object(vc->ar,edm->dpos, screen_co_dpos, flag);
 
-	ED_view3d_project_float_object(vc->ar,edm->start, screen_co_start, flag);
-	ED_view3d_project_float_object(vc->ar,edm->end, screen_co_end, flag);
-
-	ED_view3d_project_float_object(vc->ar,edm->dpos, screen_co_dpos, flag);
-
-	len_start_end=len_v2v2(screen_co_start, screen_co_end);
-	len_start_click=len_v2v2(screen_co_start,fmval);
-	len_end_click=len_v2v2(screen_co_end, fmval);
-	len_dpos_end=len_v2v2(screen_co_dpos,screen_co_end);
-	len_dpos_start=len_v2v2(screen_co_dpos, screen_co_start);
+			len_start_end=len_v2v2(screen_co_start, screen_co_end);
+			len_start_click=len_v2v2(screen_co_start,fmval);
+			len_end_click=len_v2v2(screen_co_end, fmval);
+			len_dpos_end=len_v2v2(screen_co_dpos,screen_co_end);
+			len_dpos_start=len_v2v2(screen_co_dpos, screen_co_start);
 
 
-	if(len_dpos_end>len_start_end){
-		if(len_dpos_start-len_start_click>5){
-			edm->dir=1;
-		}else if(len_dpos_start-len_start_click<-5){
-			edm->dir=-1;
-		}else{
-			edm->dir=0;
-		}
-	}else if(len_dpos_start>len_start_end){
-		if(len_dpos_end-len_end_click>5){
-			edm->dir=-1;
-		}else if(len_dpos_end-len_end_click<-5){
-				edm->dir=1;
-		}else {
-			edm->dir=0;
-		}
-
-
-	}else{
-		if(len_dpos_end-len_end_click>5 ){
-			edm->dir=1;
-		}else if( len_dpos_start-len_start_click>5){
-			edm->dir=-1;
-		}else{
-			edm->dir=0;
-		}
-
+			if(len_dpos_end>len_start_end){
+				if(len_dpos_start-len_start_click>5){
+					edm->dir=-1;
+				}else if(len_dpos_start-len_start_click<-5){
+					edm->dir=1;
+				}else{
+					edm->dir=0;
+				}
+			}else {
+				if(len_dpos_end-len_end_click>5){
+					edm->dir=1;
+				}else if(len_dpos_end-len_end_click<-5){
+						edm->dir=-1;
+				}else {
+					edm->dir=0;
+				}
+			}
+			break;
+		case DIM_TYPE_DIAMETER:
+		case DIM_TYPE_RADIUS:
+			edm->dir = 0;
+			break;
+		default:
+			BLI_assert(0);
 	}
 }
 #endif

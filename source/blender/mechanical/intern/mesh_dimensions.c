@@ -218,10 +218,10 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
 
-			sub_v3_v3v3(v,eve->co, edm->v[1]->co);
+			sub_v3_v3v3(v,eve->co, edm->center);
 
 			project_v3_v3v3(ncenter,v, axis);
-			add_v3_v3(ncenter,edm->v[1]->co);
+			add_v3_v3(ncenter,edm->center);
 
 			apply_dimension_angle_exec(eve->co,ncenter, axis,d);
 
@@ -287,7 +287,14 @@ BMDim* get_selected_dimension(BMesh *bm){
 
 
 void get_dimension_mid(float mid[3],BMDim *edm){
-	mid_of_2_points(mid, edm->v[0]->co, edm->v[1]->co);
+	switch (edm->dim_type)
+	{
+		case DIM_TYPE_LINEAR:
+			mid_of_2_points(mid, edm->v[0]->co, edm->v[1]->co);
+			break;
+		default:
+			BLI_assert(0);
+	}
 }
 
 void get_dimension_plane (float p[3], BMDim *edm){
@@ -433,17 +440,19 @@ void dimension_data_update (BMDim *edm) {
 			project_plane_v3_v3v3(edm->fpos, edm->fpos ,v1);
 			set_dimension_start_end(edm);
 
+			copy_v3_v3(edm->center, edm->v[1]->co);
+
 			// Set txt pos acording pos factor
-			sub_v3_v3v3(v1,edm->start,edm->v[1]->co);
+			sub_v3_v3v3(v1,edm->start,edm->center);
 			normalize_v3(v1);
-			sub_v3_v3v3(v2,edm->end,edm->v[1]->co);
+			sub_v3_v3v3(v2,edm->end,edm->center);
 			cross_v3_v3v3(axis,v1,v2);
 			normalize_v3(v2);
 
 			// Set txt pos acording pos factor
 			mul_v3_fl(v1,len_v3(edm->fpos));
 			rotate_v3_v3v3fl(edm->dpos,v1,axis, acos(dot_v3v3(v1,v2))*edm->dpos_fact);
-			add_v3_v3(edm->dpos, edm->v[1]->co);
+			add_v3_v3(edm->dpos, edm->center);
 			break;
 		default:
 			BLI_assert(0);
