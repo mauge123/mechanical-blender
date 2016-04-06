@@ -2125,7 +2125,7 @@ static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), voi
 	drawPropCircle(C, t);
 	drawSnapping(C, t);
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-	if (t->state == TRANS_BASE_POINT){
+	if (ELEM(t->state,TRANS_BASE_POINT, TRANS_SELECT_CENTER)){
 		drawSelectedPoint(C,t);
 	}
 #endif

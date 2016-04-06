@@ -1937,9 +1937,12 @@ class VIEW3D_PT_tools_mechanical(View3DPanel, Panel):
         layout = self.layout
 
         col = layout.column(align=True)
-        col.label(text="Dimensons:")
+        col.label(text="Dimensions:")
         col.operator("mesh.mechanical_dimension_linear_add", text = "Linear")
         col.operator("mesh.mechanical_dimension_diameter_add", text = "Diameter")
+        col.operator("mesh.mechanical_dimension_radius_add", text = "Radi")
+        col.operator("mesh.mechanical_dimension_angle_3p_add", text = "3 Points angle")
+        col.operator("mesh.mechanical_dimension_angle_4p_add", text = "4 Points angle")
 
 
 if __name__ == "__main__":  # only for live edit.
