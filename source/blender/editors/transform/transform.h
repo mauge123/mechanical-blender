@@ -96,6 +96,8 @@ typedef struct TransSnap {
 	float	snapTangent[3];
 	char	snapNodeBorder;
 	ListBase points;
+// WITH_MECHANICAL
+	ListBase targets;  /* Multiple snap targets */
 	TransSnapPoint	*selectedPoint;
 	double	last;
 	void  (*applySnap)(struct TransInfo *, float *);
@@ -615,6 +617,7 @@ typedef struct TransInfo {
 #define POINT_INIT		4
 #define MULTI_POINTS	8
 #define TARGET_FIXED	16
+#define MULTI_TARGETS	32
 
 bool initTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 void saveTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op);
@@ -744,6 +747,10 @@ void getSnapPoint(TransInfo *t, float vec[3]);
 void addSnapPoint(TransInfo *t);
 eRedrawFlag updateSelectedSnapPoint(TransInfo *t);
 void removeSnapPoint(TransInfo *t);
+
+#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+void addSnapTarget(TransInfo *t);
+#endif
 
 /********************** Mouse Input ******************************/
 

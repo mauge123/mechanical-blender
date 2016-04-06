@@ -1106,7 +1106,13 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 				t->state = TRANS_RUNNING;
 				handled=true;
 				break;
+			case TFM_MODAL_ADD_SNAP:
+				addSnapTarget(t);
+				t->redraw |= TREDRAW_HARD;
+				handled = true;
+				break;
 			case TFM_MODAL_SNAP_ELEMENT_SELECT:
+				// Select drop list
 				modal_snap_element_select(t);
 				handled = true;
 				break;
@@ -2119,7 +2125,9 @@ static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), voi
 	drawPropCircle(C, t);
 	drawSnapping(C, t);
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
-	drawSelectedPoint(C,t);
+	if (t->state == TRANS_BASE_POINT){
+		drawSelectedPoint(C,t);
+	}
 #endif
 
 	/* edge slide, vert slide */

@@ -145,9 +145,10 @@ bool activeSnap(TransInfo *t)
 #ifdef WITH_MECHANICAL_SELECT_TRANSFORM_CENTER
 void drawSelectedPoint(const struct bContext *C, TransInfo *t)
 {
-	if ((t->spacetype == SPACE_VIEW3D)  && (t->flag & T_USE_SELECTED_POINT)){
+	if (t->spacetype == SPACE_VIEW3D){
 		View3D *v3d = CTX_wm_view3d(C);
 		RegionView3D *rv3d = CTX_wm_region_view3d(C);
+		TransSnapPoint *p;
 		unsigned char activeCol[4];
 		float size;
 		float imat[4][4];
@@ -162,9 +163,16 @@ void drawSelectedPoint(const struct bContext *C, TransInfo *t)
 		invert_m4_m4(imat, rv3d->viewmat);
 
 		glColor4ubv(activeCol);
-		drawcircball(GL_LINE_LOOP, t->selected_point, ED_view3d_pixel_size(rv3d, t->selected_point) * size, imat);
 
-		if (v3d->zbuf)
+		for (p = t->tsnap.targets.first; p; p = p->next) {
+			drawcircball(GL_LINE_LOOP, p->co, ED_view3d_pixel_size(rv3d, p->co) * size * 0.75f, imat);
+		}
+
+		if (t->flag & T_USE_SELECTED_POINT) {
+			drawcircball(GL_LINE_LOOP, t->selected_point, ED_view3d_pixel_size(rv3d, t->selected_point) * size, imat);
+		}
+
+	if (v3d->zbuf)
 			glEnable(GL_DEPTH_TEST);
 	}
 
@@ -764,9 +772,43 @@ void addSnapPoint(TransInfo *t)
 }
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
+void addSnapTarget(TransInfo *t)
+{
+	/* Currently only 3D viewport works for snapping points. */
+	if (t->flag & T_USE_SELECTED_POINT && t->spacetype == SPACE_VIEW3D) {
+		TransSnapPoint *p = MEM_callocN(sizeof(TransSnapPoint), "SnapPoint");
+
+		//t->tsnap.selectedPoint = p;
+
+		copy_v3_v3(p->co, t->selected_point);
+
+		BLI_addtail(&t->tsnap.targets, p);
+
+		t->tsnap.status |= MULTI_TARGETS;
+	}
+}
+
+
 void fixSnapTarget (TransInfo *t, const float* target)
 {
-	copy_v3_v3(t->tsnap.snapTarget,target);
+	if (t->tsnap.targets.first) {
+		TransSnapPoint *p;
+		int total = 0;
+		zero_v3(t->tsnap.snapTarget);
+
+		for (p = t->tsnap.targets.first; p; p = p->next, total++) {
+			add_v3_v3(t->tsnap.snapTarget, p->co);
+		}
+
+		if (t->flag & T_USE_SELECTED_POINT) {
+			add_v3_v3(t->tsnap.snapTarget,target);
+			total++;
+		}
+
+		mul_v3_fl(t->tsnap.snapTarget, 1.0f / total);
+	} else {
+		copy_v3_v3(t->tsnap.snapTarget,target);
+	}
 	t->tsnap.status |= (TARGET_FIXED | TARGET_INIT);
 }
 
