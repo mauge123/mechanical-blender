@@ -1795,10 +1795,10 @@ void change_transform_step (TransInfo *t, int state)
 	if ((t->flag & T_USES_MANIPULATOR) == 0) {
 		switch (state) {
 			case TRANS_BASE_POINT:
-				ok = (ELEM (t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE));
+				ok = (ELEM (t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE, TFM_MATCH));
 				break;
 			case TRANS_SELECT_CENTER:
-				ok = (ELEM (t->mode, TFM_ROTATION, TFM_RESIZE));
+				ok = (ELEM (t->mode, TFM_ROTATION, TFM_RESIZE, TFM_MATCH));
 				break;
 		}
 	}

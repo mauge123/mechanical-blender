@@ -64,7 +64,7 @@ static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float va
 	BLI_assert (ELEM(edm->dim_type,DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS));
 
 	float axis[3],v[3], ncenter[3];
-	float curv = get_dimension_value(edm);
+	float curv = get_dimension_value(edm); // Current Value
 
 	BMIter iter;
 	BMVert* eve;

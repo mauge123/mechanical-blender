@@ -81,6 +81,9 @@ static const char OP_VERT_SLIDE[] = "TRANSFORM_OT_vert_slide";
 static const char OP_EDGE_CREASE[] = "TRANSFORM_OT_edge_crease";
 static const char OP_EDGE_BWEIGHT[] = "TRANSFORM_OT_edge_bevelweight";
 static const char OP_SEQ_SLIDE[] = "TRANSFORM_OT_seq_slide";
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+static const char OP_MATCH[] = "TRANSFORM_OT_match";
+#endif
 
 static void TRANSFORM_OT_translate(struct wmOperatorType *ot);
 static void TRANSFORM_OT_rotate(struct wmOperatorType *ot);
@@ -99,6 +102,10 @@ static void TRANSFORM_OT_vert_slide(struct wmOperatorType *ot);
 static void TRANSFORM_OT_edge_crease(struct wmOperatorType *ot);
 static void TRANSFORM_OT_edge_bevelweight(struct wmOperatorType *ot);
 static void TRANSFORM_OT_seq_slide(struct wmOperatorType *ot);
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+static void TRANSFORM_OT_match(struct wmOperatorType *ot);
+#endif
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 static void select_transform_modal_func(wmOperatorType *ot, TransInfo *t);
@@ -123,6 +130,9 @@ static TransformModeItem transform_modes[] =
 	{OP_EDGE_CREASE, TFM_CREASE, TRANSFORM_OT_edge_crease},
 	{OP_EDGE_BWEIGHT, TFM_BWEIGHT, TRANSFORM_OT_edge_bevelweight},
 	{OP_SEQ_SLIDE, TFM_SEQ_SLIDE, TRANSFORM_OT_seq_slide},
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+	{OP_MATCH, TFM_MATCH, TRANSFORM_OT_match},
+#endif
 	{NULL, 0}
 };
 
@@ -415,11 +425,21 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	switch (t->state) {
 		case TRANS_BASE_POINT:
 			exit_code = transformEventBasePoint(t, event);
-			sprintf(str,"%s","Select Snap Target point");
+			if (ELEM(t->mode,TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE)) {
+				sprintf(str,"%s","Select Snap Target point");
+			}
+			if (t->mode == TFM_MATCH) {
+				sprintf (str,"%s","Select reference points");
+			}
 			break;
 		case TRANS_SELECT_CENTER:
 			exit_code = transformEventSelectCenter(t, event);
-			sprintf(str,"%s","Select Pivot point");
+			if (ELEM(t->mode,TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE)) {
+				sprintf(str,"%s","Select Pivot point");
+			}
+			if (t->mode == TFM_MATCH) {
+				sprintf (str, "%s", "Select location points");
+			}
 			break;
 		default:
 			BLI_assert(false);
@@ -451,7 +471,6 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	}
 
 	copy_v3_v3(t->selected_point, loc);
-
 
 	if (!exit_code) {
 		exit_code |= transformEnd(C, t);
@@ -764,6 +783,24 @@ static void TRANSFORM_OT_resize(struct wmOperatorType *ot)
 
 	Transform_Properties(ot, P_CONSTRAINT | P_PROPORTIONAL | P_MIRROR | P_GEO_SNAP | P_OPTIONS | P_GPENCIL_EDIT);
 }
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+static void TRANSFORM_OT_match(struct wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name   = "Match";
+	ot->description = "Match geometry on selected items";
+	ot->idname = OP_MATCH;
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
+
+	/* api callbacks */
+	ot->invoke = transform_invoke;
+	ot->exec   = transform_exec;
+	ot->modal  = transform_modal;
+	ot->cancel = transform_cancel;
+	ot->poll   = ED_operator_screenactive;
+}
+#endif
 
 static int skin_resize_poll(bContext *C)
 {

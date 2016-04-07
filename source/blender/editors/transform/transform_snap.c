@@ -749,6 +749,12 @@ static void setSnappingCallback(TransInfo *t)
 				t->tsnap.targetSnap = TargetSnapMedian;
 			}
 			break;
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+		case TFM_MATCH:
+			t->tsnap.applySnap = ApplySnapTranslation;
+			t->tsnap.distance = TranslationBetween;
+			break;
+#endif
 		default:
 			t->tsnap.applySnap = NULL;
 			break;
@@ -778,12 +784,8 @@ void addSnapTarget(TransInfo *t)
 	if (t->flag & T_USE_SELECTED_POINT && t->spacetype == SPACE_VIEW3D) {
 		TransSnapPoint *p = MEM_callocN(sizeof(TransSnapPoint), "SnapPoint");
 
-		//t->tsnap.selectedPoint = p;
-
 		copy_v3_v3(p->co, t->selected_point);
-
 		BLI_addtail(&t->tsnap.targets, p);
-
 		t->tsnap.status |= MULTI_TARGETS;
 	}
 }

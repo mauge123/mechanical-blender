@@ -198,6 +198,11 @@ static void applyAlign(TransInfo *t, const int mval[2]);
 
 static void initSeqSlide(TransInfo *t);
 static void applySeqSlide(TransInfo *t, const int mval[2]);
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+static void initMatch(TransInfo *t);
+static void applyMatch(TransInfo *t, const int mval[2]);
+#endif
 /* end transform callbacks */
 
 
@@ -1089,21 +1094,37 @@ int transformEventBasePoint(TransInfo *t, const wmEvent *event)
 	}else if (event->type == EVT_MODAL_MAP) {
 		switch (event->val) {
 			case TFM_MODAL_CONFIRM:
-				BLI_assert(ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE));
+				if (ELEM(t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE)) {
 
-				copy_v2_v2_int(t->mouse.imval,t->mval);
+					copy_v2_v2_int(t->mouse.imval,t->mval);
 
-				if (ELEM(t->mode, TFM_ROTATION,TFM_RESIZE)) {
-					//Get 2D cordinates of selected Point
-					ED_view3d_project_float_v2_m4(ar, t->selected_point, pos, rv3d->persmat);
-					t->mouse.imval[0] = t->mval[0] = (int) pos[0];
-					t->mouse.imval[1] = t->mval[1] = (int) pos[1];
+					if (ELEM(t->mode, TFM_ROTATION,TFM_RESIZE)) {
+						//Get 2D cordinates of selected Point
+						ED_view3d_project_float_v2_m4(ar, t->selected_point, pos, rv3d->persmat);
+						t->mouse.imval[0] = t->mval[0] = (int) pos[0];
+						t->mouse.imval[1] = t->mval[1] = (int) pos[1];
+					}
+
+					fixSnapTarget(t, t->selected_point);
+					initTransformMode(t,NULL,NULL,t->mode);
+					t->state = TRANS_RUNNING;
 				}
-
-				fixSnapTarget(t, t->selected_point);
-				initTransformMode(t,NULL,NULL,t->mode);
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+				if (t->mode == TFM_MATCH) {
+					// ¿?
+					t->modifiers |= MOD_SNAP;
+					t->modifiers &= ~MOD_SNAP_INVERT;
+					applySnapping(t,t->values);
+					addSnapPoint(t);
+					if (BLI_listbase_count(&t->tsnap.points) < BLI_listbase_count(&t->tsnap.targets)) {
+						// Continue on this state!
+						t->state = TRANS_BASE_POINT;
+					} else {
+						t->state = TRANS_RUNNING;
+					}
+				}
+#endif
 				t->redraw |= TREDRAW_HARD;
-				t->state = TRANS_RUNNING;
 				handled=true;
 				break;
 			case TFM_MODAL_ADD_SNAP:
@@ -1142,34 +1163,62 @@ int transformEventSelectCenter(TransInfo *t, const wmEvent *event)
 				handled = true;
 				break;
 			case TFM_MODAL_CONFIRM:
-				BLI_assert(ELEM(t->mode, TFM_RESIZE, TFM_ROTATION));
-				if (t->flag & (T_EDIT | T_POSE)) {
-					/* Center is relative to obect */
-					Object *ob = t->obedit ? t->obedit : t->poseobj;
-					mul_v3_m4v3(t->center,ob->imat, t->selected_point);
-				} else {
-					copy_v3_v3(t->center, t->selected_point);
-				}
-				t->around = V3D_FIXED;
-				calculateCenter(t);
-				copy_v2_v2_int(t->mouse.imval,t->mval);
-				copy_v2_v2 (t->mouse.center, t->center2d);
-				initTransformMode(t,NULL,NULL,t->mode);
+				if (ELEM(t->mode, TFM_RESIZE, TFM_ROTATION)) {
+					if (t->flag & (T_EDIT | T_POSE)) {
+						/* Center is relative to obect */
+						Object *ob = t->obedit ? t->obedit : t->poseobj;
+						mul_v3_m4v3(t->center,ob->imat, t->selected_point);
+					} else {
+						copy_v3_v3(t->center, t->selected_point);
+					}
+					t->around = V3D_FIXED;
+					calculateCenter(t);
+					copy_v2_v2_int(t->mouse.imval,t->mval);
+					copy_v2_v2 (t->mouse.center, t->center2d);
+					initTransformMode(t,NULL,NULL,t->mode);
 
-				if ((t->settings->snap_target == SCE_SNAP_TARGET_MANUAL) &&
-				    ((t->tsnap.status & TARGET_FIXED) == 0)) {
-					/* Change to Manual Snap */
-					change_transform_step(t,TRANS_BASE_POINT);
-				} else {
-					t->state = TRANS_RUNNING;
+					if ((t->settings->snap_target == SCE_SNAP_TARGET_MANUAL) &&
+						((t->tsnap.status & TARGET_FIXED) == 0)) {
+						/* Change to Manual Snap */
+						change_transform_step(t,TRANS_BASE_POINT);
+					} else {
+						t->state = TRANS_RUNNING;
+					}
 				}
-
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+				if (t->mode == TFM_MATCH) {
+					// ¿?
+					t->modifiers |= MOD_SNAP;
+					t->modifiers &= ~MOD_SNAP_INVERT;
+					addSnapTarget(t);
+					int n = BLI_listbase_count(&t->tsnap.targets);
+					if (n >= 1) {
+						// Next
+						change_transform_step(t,TRANS_SELECT_CENTER);
+					} if (n == 3) {
+						// Change
+						change_transform_step(t,TRANS_BASE_POINT);
+					}
+				}
+#endif
 				t->redraw |= TREDRAW_HARD;
-
 				handled=true;
 				break;
 		}
 	}
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+	else if (event->val == KM_PRESS) {
+		switch (event->type) {
+			case RIGHTMOUSE:
+				// Cancel means ok with current selection
+				t->state = TRANS_RUNNING;
+				if (!BLI_listbase_is_empty(&t->tsnap.targets)) {
+					change_transform_step(t,TRANS_BASE_POINT);
+				}
+				break;
+		}
+	}
+	#endif
 
 	if (handled) {
 		return 0;
@@ -2734,9 +2783,15 @@ void initTransformMode(TransInfo *t, wmOperator *op, const wmEvent* UNUSED(event
 		case TFM_SEQ_SLIDE:
 			initSeqSlide(t);
 			break;
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+		case TFM_MATCH:
+			initMatch(t);
+			break;
+#endif
 	}
 }
 #endif
+
 
 
 void transformApply(bContext *C, TransInfo *t)
@@ -8949,5 +9004,136 @@ bool checkUseAxisMatrix(TransInfo *t)
 
 	return false;
 }
+
+#ifdef WITH_MECHANICAL_TRANSFORM_MATCH
+static void initMatch(TransInfo *t)
+{
+	/* Only developed in 3D View*/
+	BLI_assert(t->spacetype == SPACE_VIEW3D);
+
+	t->mode = TFM_MATCH;
+
+	t->transform = applyMatch;
+
+	change_transform_step(t, TRANS_SELECT_CENTER);
+
+	t->modifiers |= MOD_SNAP;
+
+	/* No numeric input */
+}
+
+static void applyMatch(TransInfo *t, const int UNUSED(mval[2]))
+{
+	TransSnapPoint *target, *point;
+	TransData *td = t->data;
+	float tvec[3];  //  Translation
+	int i =0;
+	float a[3], b[3];
+	float center[3], axis[3], ncenter[3];
+	float matr_a[3][3]; // Rotate to axis matris
+	float matr_p[3][3]; // Rotate to plane matrix
+
+	// Chekcs
+	int count = BLI_listbase_count(&t->tsnap.targets);
+	BLI_assert (count == BLI_listbase_count(&t->tsnap.points));
+	BLI_assert ((0 < count) && (count <= 3));
+
+	unit_m3(matr_a);
+	unit_m3(matr_p);
+
+	target = t->tsnap.targets.first;
+	point = t->tsnap.points.first;
+
+	if (target && point) {
+		// Place
+		sub_v3_v3v3(tvec,point->co, target->co);
+		mul_m3_v3(td->smtx, tvec);
+		mul_v3_fl(tvec, td->factor);
+
+		copy_v3_v3(center,point->co);
+
+		target = target->next;
+		point = point->next;
+	}
+
+	if (target && point) {
+		// Axis Aling
+
+		add_v3_v3v3(a,target->co,tvec);
+		sub_v3_v3(a, center);
+		sub_v3_v3v3(b,point->co, center);
+
+		copy_v3_v3(axis,point->co);
+		sub_v3_v3(axis,center);
+		normalize_v3(axis);
+
+		normalize_v3(a);
+		normalize_v3(b);
+		rotation_between_vecs_to_mat3(matr_a,a,b);
+
+		target = target->next;
+		point = point->next;
+	}
+
+	if (target && point) {
+		// Plane align
+
+		add_v3_v3v3(a,target->co,tvec);
+		sub_v3_v3(a, center);
+		mul_m3_v3(matr_a,a);
+		sub_v3_v3v3(b,point->co, center);
+
+		project_v3_v3v3(ncenter,a, axis);
+		sub_v3_v3(a,ncenter);
+
+		project_v3_v3v3(ncenter,b, axis);
+		sub_v3_v3(b,ncenter);
+
+		normalize_v3(a);
+		normalize_v3(b);
+		rotation_between_vecs_to_mat3(matr_p,a,b);
+	}
+
+
+	// Apply
+	for (i = 0; i < t->total; i++, td++) {
+		if (td->flag & TD_NOACTION)
+			break;
+
+		if (td->flag & TD_SKIP)
+			continue;
+
+		if (td->loc) {
+			if (t->flag | T_OBJECT) {
+				float matf[3][3];
+				// Apply first
+				mul_m3_m3m3(matf,matr_p,matr_a);
+				copy_v3_v3(t->center,center);
+				ElementRotation(t, td, matf, 0);
+			}
+
+			// Apply translation
+			add_v3_v3v3(td->loc,tvec,td->iloc);
+
+			// Apply to axis rotation
+			sub_v3_v3(td->loc,center);
+			mul_m3_v3(matr_a,td->loc);
+			add_v3_v3(td->loc,center);
+
+			// Apply to plane rotation
+			sub_v3_v3(td->loc,center);
+			mul_m3_v3(matr_p,td->loc);
+			add_v3_v3(td->loc,center);
+
+		}
+
+	}
+
+
+	t->state = TRANS_CONFIRM; // END!
+
+	recalcData(t);
+}
+#endif
 
 #undef MAX_INFO_LEN
