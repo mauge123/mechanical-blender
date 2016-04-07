@@ -410,8 +410,13 @@ static BVHTree *bvhtree_from_mesh_verts_create_tree(
 						}
 
 						eve = BM_vert_at_index(em->bm, index);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+						/* Allow reference to itself */
+						if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN))
+#else
 						if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
 						    BM_elem_flag_test(eve, BM_ELEM_SELECT))
+#endif
 						{
 							continue;
 						}
@@ -443,8 +448,13 @@ static BVHTree *bvhtree_from_mesh_verts_create_tree(
 					}
 
 					eve = BM_vert_at_index(em->bm, index);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+					/* Allow reference to itself */
+					if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN))
+#else
 					if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN) ||
 					    BM_elem_flag_test(eve, BM_ELEM_SELECT))
+#endif
 					{
 						continue;
 					}
