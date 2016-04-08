@@ -9046,9 +9046,12 @@ static void applyMatch(TransInfo *t, const int UNUSED(mval[2]))
 
 	if (target && point) {
 		// Place
+		if (t->obedit) {
+			mul_m4_v3(t->obedit->imat,target->co);
+			mul_m4_v3(t->obedit->imat,point->co);
+		}
+
 		sub_v3_v3v3(tvec,point->co, target->co);
-		mul_m3_v3(td->smtx, tvec);
-		mul_v3_fl(tvec, td->factor);
 
 		copy_v3_v3(center,point->co);
 
@@ -9058,6 +9061,10 @@ static void applyMatch(TransInfo *t, const int UNUSED(mval[2]))
 
 	if (target && point) {
 		// Axis Aling
+		if (t->obedit) {
+			mul_m4_v3(t->obedit->imat,target->co);
+			mul_m4_v3(t->obedit->imat,point->co);
+		}
 
 		add_v3_v3v3(a,target->co,tvec);
 		sub_v3_v3(a, center);
@@ -9077,6 +9084,11 @@ static void applyMatch(TransInfo *t, const int UNUSED(mval[2]))
 
 	if (target && point) {
 		// Plane align
+		if (t->obedit) {
+			mul_m4_v3(t->obedit->imat,target->co);
+			mul_m4_v3(t->obedit->imat,point->co);
+		}
+
 
 		add_v3_v3v3(a,target->co,tvec);
 		sub_v3_v3(a, center);
@@ -9104,7 +9116,7 @@ static void applyMatch(TransInfo *t, const int UNUSED(mval[2]))
 			continue;
 
 		if (td->loc) {
-			if (t->flag | T_OBJECT) {
+			if (t->obedit == NULL) {
 				float matf[3][3];
 				// Apply first
 				mul_m3_m3m3(matf,matr_p,matr_a);
