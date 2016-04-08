@@ -44,3 +44,25 @@ void tag_vertexs_on_coplanar_faces(BMesh *bm, float *point, float* dir){
 		}
 	}
 }
+
+void tag_vertexs_affected_by_dimension (BMesh *bm, BMDim *edm)
+{
+	BMIter iter;
+	BMVert* eve;
+
+	// Tag all elements to be affected by change
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(eve, BM_ELEM_TAG);
+		} else {
+			// Disable as default
+			BM_elem_flag_disable(eve, BM_ELEM_TAG);
+		}
+	}
+
+	// Tag vertexs of dimension
+	for (int i=0;i<edm->totverts;i++) {
+		// Tag elements
+		BM_elem_flag_enable(edm->v[i], BM_ELEM_TAG);
+	}
+}

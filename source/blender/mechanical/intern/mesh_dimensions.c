@@ -71,6 +71,8 @@ static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float va
 
 	get_dimension_plane(axis, p, edm);
 
+	tag_vertexs_affected_by_dimension (bm, edm);
+
 	if (constraints & DIM_AXIS_CONSTRAINT) {
 
 		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
@@ -144,6 +146,8 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 		return;
 	}
 
+	tag_vertexs_affected_by_dimension (bm, edm);
+
 	if (constraints & DIM_PLANE_CONSTRAINT) {
 		float p[3], d_dir[3];
 		if (edm->dir == -1) {
@@ -177,11 +181,43 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 
 }
 
-static void apply_dimension_angle_exec (float *a, float *center, float *axis, float value) {
-	float rot[3], v[3];
-	sub_v3_v3v3(v,a,center);
-	rotate_v3_v3v3fl(rot, v,axis, DEG2RAD(value));
-	add_v3_v3v3(a,rot,center);
+static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center, float *axis, float value, int constraints) {
+	float rot[3], delta[3], r[3];
+	BMVert *v,*v2;
+	BMFace *f;
+	BMIter iterv;
+	BMIter iterf;
+
+	float dir[3];
+	float t;
+
+	sub_v3_v3v3(delta, eve->co, center);
+	cross_v3_v3v3(dir,delta,axis);
+	normalize_v3(dir);
+	rotate_v3_v3v3fl(rot, delta, axis, DEG2RAD(value));
+	add_v3_v3v3(eve->co, rot, center);
+
+	if (constraints & DIM_ALLOW_SLIDE_CONSTRAINT) {
+		BM_ITER_MESH (f, &iterv, bm, BM_FACES_OF_MESH) {
+			// Fin a vertex on face not matching eve
+			BM_ITER_ELEM (v2, &iterf, f, BM_VERTS_OF_FACE) {
+				if (v2 != eve) break;
+			}
+			BM_ITER_ELEM (v, &iterf, f, BM_VERTS_OF_FACE) {
+				if (v == eve) {
+					t = fabs(dot_v3v3(dir,f->no));
+					if (fabs(t-1)> DIM_CONSTRAINT_PRECISION) {
+						if (len_v3v3(dir,f->no) > DIM_CONSTRAINT_PRECISION) {
+							if (isect_line_plane_v3(r, center, eve->co, v2->co, f->no)){
+								copy_v3_v3(eve->co,r);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 }
 
 static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constraints) {
@@ -206,6 +242,8 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		return;
 	}
 
+	tag_vertexs_affected_by_dimension (bm, edm);
+
 	if (constraints & DIM_PLANE_CONSTRAINT) {
 		float p[3], r[3], d_dir[3];
 		if (edm->dir == 1) {
@@ -224,16 +262,16 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	untag_dimension_necessary_verts(edm);
 
 	if (edm->dir == 1) {
-		apply_dimension_angle_exec(edm->v[2]->co,edm->center, axis,d);
+		apply_dimension_angle_exec(bm,edm->v[2],edm->center, axis,d,constraints);
 		if (edm->dim_type == DIM_TYPE_ANGLE_4P){
-			apply_dimension_angle_exec(edm->v[3]->co,edm->center, axis,d);
+			apply_dimension_angle_exec(bm, edm->v[3],edm->center, axis,d,constraints);
 		}
 	}
 	if (edm->dir == -1) {
 		d = d*(-1);
-		apply_dimension_angle_exec(edm->v[0]->co,edm->center, axis, d);
+		apply_dimension_angle_exec(bm, edm->v[0],edm->center, axis, d,constraints);
 		if (edm->dim_type == DIM_TYPE_ANGLE_4P){
-			apply_dimension_angle_exec(edm->v[1]->co,edm->center, axis,d);
+			apply_dimension_angle_exec(bm, edm->v[1],edm->center, axis,d, constraints);
 		}
 	}
 
@@ -246,7 +284,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 			project_v3_v3v3(ncenter,v, axis);
 			add_v3_v3(ncenter,edm->center);
 
-			apply_dimension_angle_exec(eve->co,ncenter, axis,d);
+			apply_dimension_angle_exec(bm, eve,ncenter, axis,d,constraints);
 
 			// Reset tag
 			BM_elem_flag_disable(eve, BM_ELEM_TAG);
@@ -256,25 +294,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts) {
 
-	BMIter iter;
-	BMVert* eve;
 	int constraints = (edm->constraints & DIM_CONSTRAINT_OVERRIDE) ? edm->constraints : ts->dimension_constraints;
-
-	// Tag all elements to be affected by change
-	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-		if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-			BM_elem_flag_enable(eve, BM_ELEM_TAG);
-		} else {
-			// Disable as default
-			BM_elem_flag_disable(eve, BM_ELEM_TAG);
-		}
-	}
-
-	// Tag vertexs of dimension
-	for (int i=0;i<edm->totverts;i++) {
-		// Tag elements
-		BM_elem_flag_enable(edm->v[i], BM_ELEM_TAG);
-	}
 
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
