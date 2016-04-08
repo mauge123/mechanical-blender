@@ -6,6 +6,7 @@
 #define DIM_PLANE_CONSTRAINT (1 << 0)
 #define DIM_AXIS_CONSTRAINT (1 << 1)
 #define DIM_CONSTRAINT_OVERRIDE (1<<2)
+#define DIM_ALLOW_SLIDE_CONSTRAINT (1<<3)
 
 #include "DNA_scene_types.h"
 
@@ -20,7 +21,7 @@ BMDim* get_selected_dimension(BMesh *bm);
 int get_necessary_dimension_verts(int dim_type);
 
 void get_dimension_mid(float mid[3],BMDim *edm);
-void get_dimension_plane (float p[3], BMDim *edm);
+void get_dimension_plane (float v[3], float p[3], BMDim *edm);
 void dimension_data_update (BMDim *edm);
 
 void set_dimension_center(BMDim *edm);

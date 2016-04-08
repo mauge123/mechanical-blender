@@ -177,6 +177,21 @@ static void apply_scale_factor_clamp(float *val, const int tot, const float ve_m
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /* is used for both read and write... */
+static int v3d_mesh_constraints_buts(uiBlock *block,int *constraints, int yi, int buth, int but_margin) {
+
+	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint"),0, yi -= buth + but_margin, 200, buth,
+		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
+
+	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint"),0, yi -= buth + but_margin, 200, buth,
+		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+
+	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_ALLOW_SLIDE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Allow Slide"),0, yi -= buth + but_margin, 200, buth,
+		constraints,0.0f,0.0f, 0, 0, TIP_("Allow Slide"));
+
+	return yi;
+}
+
+
 static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d, Object *ob, float lim)
 {
 	uiBlock *block = (layout) ? uiLayoutAbsoluteBlock(layout) : NULL;
@@ -217,11 +232,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 		/* global dimension settings */
 		tfp->constraints = ts->dimension_constraints;
 
-		uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
-			&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
-
-		uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint:"),0, yi -= buth + but_margin, 200, buth,
-			&tfp->constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+		yi= v3d_mesh_constraints_buts(block,&tfp->constraints, yi, buth, but_margin);
 
 		if (totdim) {
 			/* Individual dimension settings */
@@ -243,18 +254,15 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONSTRAINT_OVERRIDE ,B_OBJECTPANELMEDIAN, IFACE_("Override constraints:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Override Automatic Constraints"));
 
+			// Enable / Disable according setting
 			UI_block_lock_set(block,(tfp->dim_constraints & DIM_CONSTRAINT_OVERRIDE) == 0, "Disabled");
 
-			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint:"),0, yi -= buth + but_margin, 200, buth,
-				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
-
-			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint:"),0, yi -= buth + but_margin, 200, buth,
-				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+			yi= v3d_mesh_constraints_buts(block,&tfp->dim_constraints, yi, buth, but_margin);
 
 			UI_block_lock_clear(block);
 
 		} else {
-			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("No dimension selected"), 0, 130, 200, 20, NULL, 0, 0, 0, 0, "");
+			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("No dimension selected"), 0, yi -= buth + but_margin, 200, 20, NULL, 0, 0, 0, 0, "");
 		}
 	} else { /* apply */
 
