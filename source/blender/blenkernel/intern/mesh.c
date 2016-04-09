@@ -469,6 +469,9 @@ void BKE_mesh_free(Mesh *me, int unlink)
 	CustomData_free(&me->fdata, me->totface);
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
+#ifdef WITH_MECHANICAL_MESH_DIMENSION
+	CustomData_free(&me->ddata, me->totdim);
+#endif
 
 	if (me->adt) {
 		BKE_animdata_free(&me->id);

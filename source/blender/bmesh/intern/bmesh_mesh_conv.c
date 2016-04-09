@@ -692,7 +692,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	if (me->totdim) {
 		mdim_pr = CustomData_get_layer(&me->ddata,CD_MDIM);
 		for (int n=0;n<me->totdim;mdim_pr++, n++) {
-			MEM_freeN(mdim->v);
+			MEM_freeN(mdim_pr->v);
 		}
 	}
 	CustomData_free(&me->ddata, me->totdim);
