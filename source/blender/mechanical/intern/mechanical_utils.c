@@ -20,11 +20,10 @@ void tag_vertexs_on_coplanar_faces(BMesh *bm, float *point, float* dir){
 	BMFace *f;
 	BMVert *eve;
 	BMIter iter, viter;
-	float p[3],vec[3], d;
+	float p[3],vec[3];
 
 	BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-		d = dot_v3v3(dir,f->no);
-		if (fabs(d*d -1) < DIM_CONSTRAINT_PRECISION) {
+		if (parallel_v3u_v3u(dir,f->no)) {
 			// Coplanar?
 			int ok =1;
 			BM_ITER_ELEM (eve, &viter, f, BM_VERTS_OF_FACE) {
@@ -65,4 +64,16 @@ void tag_vertexs_affected_by_dimension (BMesh *bm, BMDim *edm)
 		// Tag elements
 		BM_elem_flag_enable(edm->v[i], BM_ELEM_TAG);
 	}
+}
+
+bool parallel_v3_v3(float *v1, float *v2) {
+	return fabs(fabs(dot_v3v3(v1,v2)) - len_v3(v1)*len_v3(v2)) < DIM_CONSTRAINT_PRECISION;
+}
+
+bool parallel_v3u_v3u(float *v1, float *v2) {
+	return fabs(fabs(dot_v3v3(v1,v2)) - 1) < DIM_CONSTRAINT_PRECISION;
+}
+
+bool perpendicular_v3_v3(float *v1, float *v2) {
+	return fabs(dot_v3v3(v1,v2)) < DIM_CONSTRAINT_PRECISION;
 }

@@ -187,9 +187,7 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center, fl
 	BMFace *f;
 	BMIter iterv;
 	BMIter iterf, iterf2;
-
-	float dir[3], n[3];
-	float t;
+	float dir[3];
 
 	sub_v3_v3v3(delta, eve->co, center);
 	cross_v3_v3v3(dir,delta,axis);
@@ -201,10 +199,8 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center, fl
 		BM_ITER_MESH (f, &iterv, bm, BM_FACES_OF_MESH) {
 			BM_ITER_ELEM (v, &iterf, f, BM_VERTS_OF_FACE) {
 				if (v == eve) {
-					cross_v3_v3v3(n,f->no,dir);
-					t = fabs(dot_v3v3(n,axis));
-					if (fabs(t-1)< DIM_CONSTRAINT_PRECISION) {
-						if (len_v3v3(dir,f->no) > DIM_CONSTRAINT_PRECISION) {
+					if (perpendicular_v3_v3(axis, f->no)) {
+						if (!parallel_v3u_v3u(dir,f->no)) {
 							// Fin a vertex on face not matching eve
 							BM_ITER_ELEM (v2, &iterf2, f, BM_VERTS_OF_FACE) {
 								if (v2 != eve) break;
@@ -345,7 +341,6 @@ void get_dimension_mid(float mid[3],BMDim *edm){
 
 void get_dimension_plane (float v[3], float p[3], BMDim *edm){
 	float m[3]={0}, r[3]={0};
-	float t;
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
 			BLI_assert(0); // Not possible
@@ -356,8 +351,7 @@ void get_dimension_plane (float v[3], float p[3], BMDim *edm){
 			normalize_v3(m);
 			sub_v3_v3v3(r,edm->v[1]->co,edm->center);
 			normalize_v3(r);
-			t = fabs(dot_v3v3(m, r));
-			if (fabs(t-1.0f) < DIM_CONSTRAINT_PRECISION) {
+			if (parallel_v3u_v3u(m,r)) {
 				// Parallel vector, use next
 				sub_v3_v3v3(r,edm->v[2]->co,edm->center);
 				normalize_v3(r);
