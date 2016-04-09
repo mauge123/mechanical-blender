@@ -186,9 +186,9 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center, fl
 	BMVert *v,*v2;
 	BMFace *f;
 	BMIter iterv;
-	BMIter iterf;
+	BMIter iterf, iterf2;
 
-	float dir[3];
+	float dir[3], n[3];
 	float t;
 
 	sub_v3_v3v3(delta, eve->co, center);
@@ -199,15 +199,16 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center, fl
 
 	if (constraints & DIM_ALLOW_SLIDE_CONSTRAINT) {
 		BM_ITER_MESH (f, &iterv, bm, BM_FACES_OF_MESH) {
-			// Fin a vertex on face not matching eve
-			BM_ITER_ELEM (v2, &iterf, f, BM_VERTS_OF_FACE) {
-				if (v2 != eve) break;
-			}
 			BM_ITER_ELEM (v, &iterf, f, BM_VERTS_OF_FACE) {
 				if (v == eve) {
-					t = fabs(dot_v3v3(dir,f->no));
-					if (fabs(t-1)> DIM_CONSTRAINT_PRECISION) {
+					cross_v3_v3v3(n,f->no,dir);
+					t = fabs(dot_v3v3(n,axis));
+					if (fabs(t-1)< DIM_CONSTRAINT_PRECISION) {
 						if (len_v3v3(dir,f->no) > DIM_CONSTRAINT_PRECISION) {
+							// Fin a vertex on face not matching eve
+							BM_ITER_ELEM (v2, &iterf2, f, BM_VERTS_OF_FACE) {
+								if (v2 != eve) break;
+							}
 							if (isect_line_plane_v3(r, center, eve->co, v2->co, f->no)){
 								copy_v3_v3(eve->co,r);
 							}
