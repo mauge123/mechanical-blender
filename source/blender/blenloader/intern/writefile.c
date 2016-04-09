@@ -2058,6 +2058,10 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 				write_customdata(wd, &mesh->id, mesh->totpoly, &mesh->pdata, players, -1, 0);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 				write_customdata(wd, &mesh->id, mesh->totdim, &mesh->ddata, dlayers, -1, 0);
+				MDim *mdm = CustomData_get_layer(&mesh->ddata, CD_MDIM);
+				for (int i =0;i< mesh->totdim;i++){
+					writedata(wd, DATA, sizeof(int)*mdm->totverts, mdm->v);
+				}
 #endif
 
 				/* restore pointer */
