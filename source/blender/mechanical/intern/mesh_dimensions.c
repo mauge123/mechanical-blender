@@ -15,6 +15,23 @@
 #include "mesh_dimensions.h"
 #include "mechanical_utils.h"
 
+
+bool valid_constraint_setting(BMDim *edm, int constraint) {
+	bool ret = false;
+	switch (constraint) {
+		case DIM_PLANE_CONSTRAINT:
+			ret = ELEM(edm->dim_type,DIM_TYPE_LINEAR,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P);
+			break;
+		case DIM_AXIS_CONSTRAINT:
+			ret = ELEM(edm->dim_type,DIM_TYPE_RADIUS, DIM_TYPE_DIAMETER);
+			break;
+		case DIM_ALLOW_SLIDE_CONSTRAINT:
+			ret = ELEM(edm->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P);
+			break;
+	}
+	return ret;
+}
+
 //Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
 	float v=0;

@@ -177,16 +177,26 @@ static void apply_scale_factor_clamp(float *val, const int tot, const float ve_m
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /* is used for both read and write... */
-static int v3d_mesh_constraints_buts(uiBlock *block,int *constraints, int yi, int buth, int but_margin) {
+static int v3d_mesh_constraints_buts(BMDim *edm, int totdim, uiBlock *block,int *constraints, int yi, int buth, int but_margin) {
 
+	// Enable / Disable according setting
+	bool all = (edm == NULL) || totdim > 1;
+	bool none = (edm != NULL) && ((*constraints & DIM_CONSTRAINT_OVERRIDE) == 0);
+
+	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_PLANE_CONSTRAINT))), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
+	UI_block_lock_clear(block);
 
+	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_AXIS_CONSTRAINT))), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+	UI_block_lock_clear(block);
 
+	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_ALLOW_SLIDE_CONSTRAINT))), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_ALLOW_SLIDE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Allow Slide"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Allow Slide"));
+	UI_block_lock_clear(block);
 
 	return yi;
 }
@@ -232,7 +242,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 		/* global dimension settings */
 		tfp->constraints = ts->dimension_constraints;
 
-		yi= v3d_mesh_constraints_buts(block,&tfp->constraints, yi, buth, but_margin);
+		yi= v3d_mesh_constraints_buts(NULL, totdim, block,&tfp->constraints, yi, buth, but_margin);
 
 		if (totdim) {
 			/* Individual dimension settings */
@@ -254,12 +264,9 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONSTRAINT_OVERRIDE ,B_OBJECTPANELMEDIAN, IFACE_("Override constraints:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Override Automatic Constraints"));
 
-			// Enable / Disable according setting
-			UI_block_lock_set(block,(tfp->dim_constraints & DIM_CONSTRAINT_OVERRIDE) == 0, "Disabled");
 
-			yi= v3d_mesh_constraints_buts(block,&tfp->dim_constraints, yi, buth, but_margin);
+			yi= v3d_mesh_constraints_buts(edm_sel, totdim, block,&tfp->dim_constraints, yi, buth, but_margin);
 
-			UI_block_lock_clear(block);
 
 		} else {
 			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("No dimension selected"), 0, yi -= buth + but_margin, 200, 20, NULL, 0, 0, 0, 0, "");
