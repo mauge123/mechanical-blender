@@ -3189,3 +3189,22 @@ BMDim *BM_dim_create(
 }
 
 
+/**
+ * \brief Main function for creating a new dimension.
+ *
+ * \note base on BM_edge_create function
+ */
+BMPlane *BM_reference_plane_create(
+        BMesh *bm, float *v1, float *v2, float *v3, float *v4,
+        const BMPlane *d_example, const eBMCreateFlag create_flag)
+{
+	BMPlane *bmp = 	BLI_mempool_alloc(bm->ppool);
+
+	copy_v3_v3(bmp->v1,v1);
+	copy_v3_v3(bmp->v2,v2);
+	copy_v3_v3(bmp->v3,v3);
+	copy_v3_v3(bmp->v4,v4);
+
+	return bmp;
+}
+

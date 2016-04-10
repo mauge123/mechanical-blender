@@ -15,12 +15,9 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2004 by Blender Foundation.
- * All rights reserved.
+ * This file is created for Mechanical Blender
  *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Joseph Eagar
+ * Contributor(s): Jaume Bellet
  *
  * ***** END GPL LICENSE BLOCK *****
  */
@@ -83,7 +80,7 @@ static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, 
 
 
 
-static int mechanical_add_dimension(bContext *C, wmOperator *op)
+static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 {
 	int ret = OPERATOR_FINISHED;
 
@@ -122,7 +119,7 @@ void MESH_OT_mechanical_dimension_linear_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_linear_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension;
+	ot->exec = mechanical_add_dimension_exec;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
@@ -141,7 +138,7 @@ void MESH_OT_mechanical_dimension_diameter_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_diameter_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension;
+	ot->exec = mechanical_add_dimension_exec;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
@@ -161,7 +158,7 @@ void MESH_OT_mechanical_dimension_radius_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_radius_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension;
+	ot->exec = mechanical_add_dimension_exec;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
@@ -179,7 +176,7 @@ void MESH_OT_mechanical_dimension_angle_3p_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_angle_3p_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension;
+	ot->exec = mechanical_add_dimension_exec;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
@@ -197,7 +194,7 @@ void MESH_OT_mechanical_dimension_angle_4p_add(wmOperatorType *ot)
 	ot->idname = "MESH_OT_mechanical_dimension_angle_4p_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_dimension;
+	ot->exec = mechanical_add_dimension_exec;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */

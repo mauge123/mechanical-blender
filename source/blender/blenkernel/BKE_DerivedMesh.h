@@ -515,6 +515,13 @@ struct DerivedMesh {
 	                          void *userData,
 	                          DMForeachFlag flag);
 /* */
+
+// WITH_MECHANICAL_MESH_REFERENCEO_OBJECTS
+	void (*foreachMappedReferencePlanes)(DerivedMesh *dm,
+	                                     void (*func)(void *userData, int index, void *element),
+			                             void *userData,
+			                             DMForeachFlag flag);
+/* */
 };
 
 void DM_init_funcs(DerivedMesh *dm);

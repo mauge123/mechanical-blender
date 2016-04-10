@@ -132,5 +132,11 @@ void BM_dim_kill(BMesh *bm, BMDim *edm);
 void bm_kill_only_dim(BMesh *bm, BMDim *d);
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+BMPlane *BM_reference_plane_create(
+        BMesh *bm, float *v1, float *v2, float *v3, float *v4,
+        const BMPlane *d_example, const eBMCreateFlag create_flag);
+#endif
+
 
 #endif /* __BMESH_CORE_H__ */

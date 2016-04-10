@@ -704,6 +704,26 @@ static void emDM_foreachMappedDim(
 }
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void emDM_foreachMappedReferencePlanes (
+        DerivedMesh *dm,
+        void (*func)(void *userData, int index, BMPlane *ep),
+        void *userData,
+        DMForeachFlag UNUSED(flag)){
+	EditDerivedBMesh *bmdm = (EditDerivedBMesh *)dm;
+	BMesh *bm = bmdm->em->bm;
+	BMPlane *ep;
+	BMIter iter;
+	int i;
+
+
+	BM_ITER_MESH (ep, &iter, bm, BM_PLANES_OF_MESH) {
+		func(userData,i,ep);
+	}
+}
+
+#endif
+
 static void emDM_drawMappedEdges(
         DerivedMesh *dm,
         DMSetDrawOptions setDrawOptions,
@@ -2249,7 +2269,13 @@ DerivedMesh *getEditDerivedBMesh(
 	bmdm->dm.foreachMappedLoop = emDM_foreachMappedLoop;
 	bmdm->dm.foreachMappedEdge = emDM_foreachMappedEdge;
 	bmdm->dm.foreachMappedFaceCenter = emDM_foreachMappedFaceCenter;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	bmdm->dm.foreachMappedDim = emDM_foreachMappedDim;
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	bmdm->dm.foreachMappedReferencePlanes = emDM_foreachMappedReferencePlanes;
+#endif
 
 	bmdm->dm.drawEdges = emDM_drawEdges;
 	bmdm->dm.drawMappedEdges = emDM_drawMappedEdges;

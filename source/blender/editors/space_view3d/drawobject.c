@@ -3021,6 +3021,25 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void draw_em_reference_planes__mapFunc(void *userData, int index, BMPlane *ep)
+{
+	glBegin(GL_QUADS);
+	glVertex3fv(ep->v1);
+	glVertex3fv(ep->v2);
+	glVertex3fv(ep->v3);
+	glVertex3fv(ep->v4);
+	glEnd();
+}
+
+
+static void draw_dm_reference_planes(DerivedMesh *dm)
+{
+	dm->foreachMappedReferencePlanes(dm, draw_em_reference_planes__mapFunc, NULL, DM_FOREACH_NOP);
+}
+#endif
+
+
 /* Draw edges with color set based on selection */
 static DMDrawOption draw_dm_edges_sel__setDrawOptions(void *userData, int index)
 {
@@ -3660,7 +3679,6 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 	}
 }
 
-
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* obedit,
 								BMEditMesh *em, DerivedMesh *cageDM, BMDim *edm_act,
@@ -3714,6 +3732,13 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 
 	if (v3d->zbuf) glDepthMask(1);
 	glPointSize(1.0);
+}
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void draw_em_reference_planes(Scene *scene, DerivedMesh *dm)
+{
+	draw_dm_reference_planes(dm);
 }
 #endif
 
@@ -4354,7 +4379,12 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 	}
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	draw_em_fancy_dims(ar, scene, v3d, ob, em, cageDM, edm_act, rv3d);
+	if (em->bm->totdim) {
+		draw_em_fancy_dims(ar, scene, v3d, ob, em, cageDM, edm_act, rv3d);
+	}
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	draw_em_reference_planes(scene, cageDM);
 #endif
 
 	if (dt > OB_WIRE) {

@@ -2036,7 +2036,30 @@ static BMOpDefine bmo_create_dimension_def = {
 	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
 
+#endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+/*
+ * Create Reference Plane
+ *
+ * Creates a Reference plane.
+ */
+static BMOpDefine bmo_create_reference_plane_def = {
+	"create_reference_plane",
+	/* slots_in */
+	{
+	 {"verts", BMO_OP_SLOT_ELEMENT_BUF},
+     {"matrix", BMO_OP_SLOT_MAT},  /* matrix to multiply the new geometry with */
+	 {"dia", BMO_OP_SLOT_FLT},
+     {{'\0'}},
+	},
+	/* slots_out */
+	{{"plane", BMO_OP_SLOT_ELEMENT_BUF, {BM_PLANE}}, /* output verts */
+	 {{'\0'}},
+	},
+	bmo_create_reference_plane_exec,
+	0,
+};
 #endif
 
 const BMOpDefine *bmo_opdefines[] = {
@@ -2127,6 +2150,9 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_wireframe_def,
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	&bmo_create_dimension_def,
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+    &bmo_create_reference_plane_def,
 #endif
 };
 

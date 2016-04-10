@@ -90,6 +90,10 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_mechanical_dimension_angle_4p_add);
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	WM_operatortype_append(MESH_OT_mechanical_reference_plane_add);
+#endif
+
 	WM_operatortype_append(MESH_OT_extrude_region);
 	WM_operatortype_append(MESH_OT_extrude_faces_indiv);
 	WM_operatortype_append(MESH_OT_extrude_edges_indiv);

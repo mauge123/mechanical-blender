@@ -495,6 +495,7 @@ endif()
 
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 endif()
 
 

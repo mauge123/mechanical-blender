@@ -79,6 +79,9 @@ typedef enum BMIterType {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_DIMS_OF_MESH = 14,
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BM_PLANES_OF_MESH = 15
+#endif
 } BMIterType;
 
 #define BM_ITYPE_MAX 15

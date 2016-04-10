@@ -118,4 +118,8 @@ void bmo_wireframe_exec(BMesh *bm, BMOperator *op);
 void bmo_create_dimension_exec(BMesh *bm, BMOperator *op);
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op);
+#endif
+
 #endif /* __BMESH_OPERATORS_PRIVATE_H__ */

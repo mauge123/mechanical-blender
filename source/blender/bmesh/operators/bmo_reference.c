@@ -15,15 +15,11 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s): Jaume Bellet.
+ * This file is created for Mechanical Blender
+ *
+ * Contributor(s): Jaume Bellet
  *
  * ***** END GPL LICENSE BLOCK *****
- */
-
-/** \file blender/bmesh/operators/bmo_extrude.c
- *  \ingroup bmesh
- *
- * Extrude faces and solidify.
  */
 
 #include "MEM_guardedalloc.h"
@@ -39,39 +35,30 @@
 
 #include "intern/bmesh_operators_private.h" /* own include */
 
-enum {
-	EXT_INPUT   = 1,
-	EXT_KEEP    = 2,
-	EXT_DEL     = 4
-};
-
-
-void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
+void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 {
-	BMOIter siter;
-	BMVert *v;
-	BMVert *(*v_arr);
-	BMDim *d;
+	BMPlane *ep;
+	float mat[4][4];
+	float v1[3],v2[3],v3[3],v4[3];
+	float dia;
 
-	int v_count =0;
-	int n=0;
-	int type = BMO_slot_int_get(op->slots_in,"dim_type");
+	BMO_slot_mat4_get(op->slots_in,"matrix",mat);
+	dia = BMO_slot_float_get(op->slots_in,"dia");
 
+	v1[0]=dia; v1[1]=dia; v1[2]=0;
+	v2[0]=dia;v2[1]=-dia;v2[2]=0;
+	v3[0]=-dia; v3[1]=-dia;v3[2]=0;
+	v4[0]=-dia;v4[1]=dia; v4[2]=0;
 
-	for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), v_count++);
+	mul_m4_v3(mat, v1);
+	mul_m4_v3(mat, v2);
+	mul_m4_v3(mat, v3);
+	mul_m4_v3(mat, v4);
 
-	v_arr = MEM_mallocN(sizeof (BMVert*)*v_count,"BMVert temp array");
+	ep = BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, 0);
 
-	for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), n++) {
-		v_arr[n] = v;
-	}
-
-	d = BM_dim_create(bm, v_arr,v_count,type, NULL, BM_CREATE_USE_SELECT_ORDER);
-
-	MEM_freeN (v_arr);
-
-	BMO_elem_flag_enable(bm, d, EXT_KEEP);
-	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
-
-
+	return ep;
 }
+
+
+

@@ -46,8 +46,13 @@
 
 /* used as an extern, defined in bmesh.h */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512, 512, 32};
+const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512, 512, 32};
+#else
 const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512, 512};
 const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512, 512};
+#endif
 #else
 const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512};
 const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512};
@@ -66,6 +71,10 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	bm->dpool = BLI_mempool_create(sizeof(BMDim), allocsize->totdim,
 	                               bm_mesh_chunksize_default.totdim, BLI_MEMPOOL_ALLOW_ITER);
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	bm->ppool = BLI_mempool_create(sizeof(BMPlane), allocsize->totdim,
+	                               bm_mesh_chunksize_default.totplane, BLI_MEMPOOL_ALLOW_ITER);
 #endif
 
 #ifdef USE_BMESH_HOLES
@@ -243,6 +252,9 @@ void BM_mesh_data_free(BMesh *bm)
 	BLI_mempool_destroy(bm->fpool);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BLI_mempool_destroy(bm->dpool);
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BLI_mempool_destroy(bm->ppool);
 #endif
 
 	if (bm->vtable) MEM_freeN(bm->vtable);

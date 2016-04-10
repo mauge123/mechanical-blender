@@ -146,7 +146,7 @@ typedef struct BMLoop {
 } BMLoop;
 
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 
 /* BMDim->dim_type */
 #define DIM_TYPE_LINEAR		1
@@ -166,7 +166,7 @@ typedef struct BMDim {
 
 	int dim_type;
 
-	short constraints; //Overrided constraints
+	short constraints; //Overrided automatic constraints
 
 	// Dimension position, used for select
 	float dpos[3];
@@ -187,7 +187,23 @@ typedef struct BMDim {
 
 
 } BMDim;
-#endif
+
+
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+
+typedef struct BMPlane {
+	BMHeader head;
+
+	float v1[3];
+	float v2[3];
+	float v3[3];
+
+	float v4[3]; //Aux
+
+	float no;
+} BMPlane;
+
+//
 
 
 /* can cast BMFace/BMEdge/BMVert, but NOT BMLoop, since these don't have a flag layer */
@@ -299,7 +315,7 @@ typedef struct BMesh {
 
 	void *py_handle;
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 	int totdim;
 	int totdimsel;
 	struct BLI_mempool *dpool;
@@ -309,8 +325,13 @@ typedef struct BMesh {
 	int dtable_tot;
 
 	CustomData ddata;
+//
 
-#endif
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	// We are not using custom data for planes
+	struct BLI_mempool *ppool;
+	int totplanes;
+//
 
 } BMesh;
 
@@ -323,11 +344,14 @@ enum {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_DIM = 16,
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BM_PLANE = 32,
+#endif
 };
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 
-#define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM)
+#define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM | BM_PLANE)
 #define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE | BM_DIM)
 
 #else
