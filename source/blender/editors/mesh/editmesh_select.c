@@ -880,6 +880,38 @@ static void findnearestface__doClosest(void *userData, BMFace *efa, const float 
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+BMPlane *EDBM_reference_plane_find_nearest_ex(
+        ViewContext *vc, float *r_dist,
+        const bool use_select_bias, const bool use_cycle)
+{
+	BMesh *bm = vc->em->bm;
+
+	if (V3D_IS_ZBUF(vc->v3d)) {
+		float dist_test = 0.0f;
+		unsigned int index;
+		BMPlane *bmp;
+
+		ED_view3d_backbuf_validate(vc);
+
+		index = ED_view3d_backbuf_sample(vc, vc->mval[0], vc->mval[1]);
+		bmp = index ? BM_reference_plane_at_index_find(bm, index - 1) : NULL;
+
+		if (bmp) {
+			if (dist_test < *r_dist) {
+				*r_dist = dist_test;
+				return bmp;
+			}
+		}
+		return NULL;
+	}
+	else {
+		BLI_assert(0);
+		return NULL;
+	}
+}
+#endif
+
 
 BMFace *EDBM_face_find_nearest_ex(
         ViewContext *vc, float *r_dist,
@@ -981,11 +1013,12 @@ BMFace *EDBM_face_find_nearest(ViewContext *vc, float *r_dist)
  * selected vertices and edges get disadvantage
  * return 1 if found one
  */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, BMFace **r_efa, BMDim **r_edm)
-#else
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, BMFace **r_efa, BMDim **r_edm, BMPlane **r_bmp)
+/*
 static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, BMFace **r_efa)
-#endif
+*/
 {
 	BMEditMesh *em = vc->em;
 	static short mval_prev[2] = {-1, -1};
@@ -1004,10 +1037,19 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm = NULL;
 #endif
-
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMPlane *bmp = NULL;
+#endif
 
 	/* no afterqueue (yet), so we check it now, otherwise the em_xxxofs indices are bad */
 	ED_view3d_backbuf_validate(vc);
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if ((dist > 0.0f) && em->selectmode & SCE_SELECT_REFERENCE) {
+		bmp = EDBM_reference_plane_find_nearest_ex(vc, &dist, true, use_cycle);
+	}
+
+#endif
 
 	if ((dist > 0.0f) && em->selectmode & SCE_SELECT_FACE) {
 		float dist_center = 0.0f;
@@ -1039,7 +1081,7 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	/* return only one of 4 pointers, for frontbuffer redraws */
 	if (edm) {
-		eve = NULL, efa = NULL; eed = NULL;
+		eve = NULL; efa = NULL; eed = NULL;
 	}
 	else if (eve) {
 #else
@@ -1051,14 +1093,20 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	else if (eed) {
 		efa = NULL;
 	}
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	else if (bmp) {
+		eve = efa = eed = edm = NULL;
+	}
+#endif
 
 	/* there may be a face under the cursor, who's center if too far away
 	 * use this if all else fails, it makes sense to select this */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if ((edm || eve || eed || efa) == 0) {
-#else
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if ((edm || eve || eed || efa || bmp) == 0) {
+/*
 	if ((eve || eed || efa) == 0) {
-#endif
+*/
 		if (eed_zbuf) {
 			eed = eed_zbuf;
 		}
@@ -1076,12 +1124,17 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	*r_edm = edm;
 #endif
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	return (edm || eve || eed || efa);
-#else
-	return (eve || eed || efa);
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	*r_bmp = bmp;
 #endif
+
+
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	return (edm || eve || eed || efa || bmp);
+/*
+	return (eve || eed || efa);
+*/
 }
 
 /** \} */
@@ -1469,6 +1522,7 @@ void MESH_OT_select_mode(wmOperatorType *ot)
 		{SCE_SELECT_VERTEX, "VERT", ICON_VERTEXSEL, "Vertices", ""},
 		{SCE_SELECT_EDGE,   "EDGE", ICON_EDGESEL, "Edges", ""},
 		{SCE_SELECT_FACE,   "FACE", ICON_FACESEL, "Faces", ""},
+		{SCE_SELECT_REFERENCE,   "REFERENCE", ICON_FACESEL, "References", ""},
 		{0, NULL, 0, NULL, NULL},
 	};
 
@@ -2012,17 +2066,21 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm = NULL;
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMPlane *bmp = NULL;
+#endif
 
 	/* setup view context for argument to callbacks */
 	em_setup_viewcontext(C, &vc);
 	vc.mval[0] = mval[0];
 	vc.mval[1] = mval[1];
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm)) {
-#else
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANCIAL_REFERENCE_OBJECTS
+	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm, &bmp)) {
+/*
 	if (unified_findnearest(&vc, &eve, &eed, &efa)) {
-#endif
+*/
 
 		/* Deselect everything */
 		if (extend == false && deselect == false && toggle == false)
@@ -2132,6 +2190,32 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 					BM_select_history_remove(vc.em->bm, edm);
 					select_dimension_data(edm, &vc);
 					BM_dim_select_set(vc.em->bm, edm, false);
+				}
+			}
+		}
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		else if (bmp) {
+			if (extend) {
+				/* Work-around: deselect first, so we can guarantee it will */
+				/* be active even if it was already selected */
+				BM_select_history_remove(vc.em->bm, bmp);
+				BM_reference_plane_select_set(vc.em->bm, bmp, false);
+				BM_select_history_store(vc.em->bm, bmp);
+				BM_reference_plane_select_set(vc.em->bm, bmp, true);
+			}
+			else if (deselect) {
+				BM_select_history_remove(vc.em->bm,bmp);
+				BM_reference_plane_select_set(vc.em->bm, bmp, false);
+			}
+			else {
+				if (!BM_elem_flag_test(bmp, BM_ELEM_SELECT)) {
+					BM_select_history_store(vc.em->bm, bmp);
+					BM_reference_plane_select_set(vc.em->bm, bmp, true);
+				}
+				else if (toggle) {
+					BM_select_history_remove(vc.em->bm, bmp);
+					BM_reference_plane_select_set(vc.em->bm, bmp, false);
 				}
 			}
 		}
@@ -2437,6 +2521,16 @@ bool EDBM_selectmode_toggle(bContext *C, const short selectmode_new,
 			EDBM_selectmode_set(em);
 			ret = true;
 			break;
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		case SCE_SELECT_REFERENCE:
+			if (use_extend == 0 || em->selectmode == 0) {
+				em->selectmode = SCE_SELECT_REFERENCE;
+			}
+			ts->selectmode = em->selectmode;
+			EDBM_selectmode_set(em);
+			ret = true;
+			break;
+#endif
 		default:
 			BLI_assert(0);
 			break;
@@ -2995,6 +3089,9 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm;
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMPlane *bmp;
+#endif
 	const bool sel = !RNA_boolean_get(op->ptr, "deselect");
 	int index;
 
@@ -3019,7 +3116,7 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 
 	/* return warning! */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm) == 0) {
+	if (unified_findnearest(&vc, &eve, &eed, &efa, &edm, &bmp) == 0) {
 #else
 	if (unified_findnearest(&vc, &eve, &eed, &efa) == 0) {
 #endif

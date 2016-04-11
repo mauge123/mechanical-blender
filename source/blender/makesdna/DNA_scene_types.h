@@ -1843,6 +1843,8 @@ extern const char *RE_engine_id_CYCLES;
 #define SCE_SELECT_VERTEX	1 /* for mesh */
 #define SCE_SELECT_EDGE		2
 #define SCE_SELECT_FACE		4
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#define SCE_SELECT_REFERENCE		8
 
 /* toolsettings->statvis->type */
 #define SCE_STATVIS_OVERHANG	0

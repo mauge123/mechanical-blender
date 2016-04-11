@@ -584,6 +584,30 @@ void BM_face_select_set(BMesh *bm, BMFace *f, const bool select)
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+void BM_reference_plane_select_set(BMesh *bm, BMPlane *p, const bool select)
+{
+	BLI_assert(p->head.htype == BM_PLANE);
+
+	if (BM_elem_flag_test(p, BM_ELEM_HIDDEN)) {
+		return;
+	}
+
+	if (select) {
+		if (!BM_elem_flag_test(p, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(p, BM_ELEM_SELECT);
+			bm->totplanesel += 1;
+		}
+	}
+	else {
+		if (BM_elem_flag_test(p, BM_ELEM_SELECT)) {
+			bm->totplanesel -= 1;
+			BM_elem_flag_disable(p, BM_ELEM_SELECT);
+		}
+	}
+}
+#endif
+
 /** \name Non flushing versions element selection.
  * \{ */
 

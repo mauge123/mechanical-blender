@@ -330,7 +330,8 @@ typedef struct BMesh {
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	// We are not using custom data for planes
 	struct BLI_mempool *ppool;
-	int totplanes;
+	int totplane;
+	int totplanesel;
 //
 
 } BMesh;

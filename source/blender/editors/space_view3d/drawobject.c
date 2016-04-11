@@ -3024,6 +3024,12 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void draw_em_reference_planes__mapFunc(void *userData, int index, BMPlane *ep)
 {
+	if (BM_elem_flag_test(ep, BM_ELEM_SELECT)) {
+		glColor4f(1.0f,1.0f,1.0f,0.5f);
+	} else {
+		glColor4f(0.0f,0.0f,0.0f,0.5f);
+	}
+
 	glBegin(GL_QUADS);
 	glVertex3fv(ep->v1);
 	glVertex3fv(ep->v2);
@@ -3031,7 +3037,6 @@ static void draw_em_reference_planes__mapFunc(void *userData, int index, BMPlane
 	glVertex3fv(ep->v4);
 	glEnd();
 }
-
 
 static void draw_dm_reference_planes(DerivedMesh *dm)
 {
@@ -8842,6 +8847,14 @@ static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
+							  Object *ob, DerivedMesh *dm)
+{
+	dm->drawMappedReferencePlanes(dm, bbs_mesh_solid__setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
+}
+#endif
+
 static DMDrawOption bbs_mesh_solid__setDrawOpts(void *UNUSED(userData), int index)
 {
 	WM_framebuffer_index_set(index + 1);
@@ -8919,7 +8932,20 @@ void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, Objec
 
 	switch (ob->type) {
 		case OB_MESH:
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+			if (ob->mode & OB_MODE_EDIT && ts->selectmode & SCE_SELECT_REFERENCE) {
+				Mesh *me = ob->data;
+				BMEditMesh *em = me->edit_btmesh;
+
+				DerivedMesh *dm = editbmesh_get_derived_cage(scene, ob, em, CD_MASK_BAREMESH);
+
+				bbs_mesh_solid_reference_planes_EM(em, scene, v3d, ob, dm);
+
+				dm->release(dm);
+			} else if (ob->mode & OB_MODE_EDIT) {
+#else
 			if (ob->mode & OB_MODE_EDIT) {
+#endif
 				Mesh *me = ob->data;
 				BMEditMesh *em = me->edit_btmesh;
 

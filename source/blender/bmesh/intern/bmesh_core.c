@@ -3200,6 +3200,26 @@ BMPlane *BM_reference_plane_create(
 {
 	BMPlane *bmp = 	BLI_mempool_alloc(bm->ppool);
 
+	/* --- assign all members --- */
+	bmp->head.data = NULL;
+
+#ifdef USE_DEBUG_INDEX_MEMCHECK
+	DEBUG_MEMCHECK_INDEX_INVALIDATE(bmp)
+#else
+	BM_elem_index_set(bmp, -1); /* set_ok_invalid */
+#endif
+
+	bmp->head.htype = BM_PLANE;
+	bmp->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
+	bmp->head.api_flag = 0;
+#ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
+	bmp->head.bm = bm;
+#endif
+
+	/* --- done --- */
+
+	bm->totplane++;
+
 	copy_v3_v3(bmp->v1,v1);
 	copy_v3_v3(bmp->v2,v2);
 	copy_v3_v3(bmp->v3,v3);

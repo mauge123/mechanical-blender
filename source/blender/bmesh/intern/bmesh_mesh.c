@@ -1463,6 +1463,14 @@ BMFace *BM_face_at_index_find(BMesh *bm, const int index)
 	return BLI_mempool_findelem(bm->fpool, index);
 }
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+BMPlane *BM_reference_plane_at_index_find(BMesh *bm, const int index)
+{
+	return BLI_mempool_findelem(bm->ppool, index);
+}
+#endif
+
+
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_at_index_find(BMesh *bm, const int index)
 {

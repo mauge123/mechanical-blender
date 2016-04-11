@@ -59,6 +59,9 @@
 #include "GPU_shader.h"
 #include "GPU_basic_shader.h"
 
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#include "WM_api.h"
+
 static void bmdm_get_tri_colpreview(BMLoop *ls[3], MLoopCol *lcol[3], unsigned char(*color_vert_array)[4]);
 
 typedef struct EditDerivedBMesh {
@@ -717,7 +720,7 @@ static void emDM_foreachMappedReferencePlanes (
 	int i;
 
 
-	BM_ITER_MESH (ep, &iter, bm, BM_PLANES_OF_MESH) {
+	BM_ITER_MESH_INDEX (ep, &iter, bm, BM_PLANES_OF_MESH, i) {
 		func(userData,i,ep);
 	}
 }
@@ -912,6 +915,35 @@ static void emDM_foreachMappedFaceCenter(
 		}
 	}
 }
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void draw_em_reference_planes_select_mapFunc(void *userData, int index, BMPlane *ep)
+{
+	if (!BM_elem_flag_test(ep, BM_ELEM_HIDDEN)) {
+		WM_framebuffer_index_set(index + 1);
+		glBegin(GL_QUADS);
+		glVertex3fv(ep->v1);
+		glVertex3fv(ep->v2);
+		glVertex3fv(ep->v3);
+		glVertex3fv(ep->v4);
+		glEnd();
+	}
+}
+
+
+static void emDM_drawMappedReferencePlanes(
+        DerivedMesh *dm,
+        DMSetDrawOptions setDrawOptions,
+        DMSetMaterial setMaterial,
+        /* currently unused -- each original face is handled separately */
+        DMCompareDrawOptions UNUSED(compareDrawOptions),
+        void *userData,
+        DMDrawFlag flag)
+{
+	dm->foreachMappedReferencePlanes(dm, draw_em_reference_planes_select_mapFunc, userData, DM_FOREACH_NOP);
+}
+#endif
+
 
 static void emDM_drawMappedFaces(
         DerivedMesh *dm,
@@ -2287,6 +2319,9 @@ DerivedMesh *getEditDerivedBMesh(
 	bmdm->dm.drawFacesTex = emDM_drawFacesTex;
 	bmdm->dm.drawFacesGLSL = emDM_drawFacesGLSL;
 	bmdm->dm.drawUVEdges = emDM_drawUVEdges;
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	bmdm->dm.drawMappedReferencePlanes = emDM_drawMappedReferencePlanes;
+#endif
 
 	bmdm->dm.release = emDM_release;
 
