@@ -2311,7 +2311,6 @@ static int createTransEditDim(TransInfo *t) {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
     BMesh *bm = em->bm;
 	BMDim *edm=get_selected_dimension(bm);
-	BMIter *iter;
 	TransData *td = NULL;
 	float mtx[3][3], smtx[3][3];
 	int ret =0;
@@ -2360,6 +2359,55 @@ static int createTransEditDim(TransInfo *t) {
 		}
     }
 	return ret;
+}
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void createPlanePointTransdata (TransData *td, float *p, float mtx[3][3], float smtx[3][3]) {
+	td->loc =p;
+	td->flag |= TD_SELECTED;
+	copy_v3_v3(td->iloc, td->loc);
+	copy_v3_v3(td->center, td->loc);
+	copy_m3_m3(td->smtx, smtx);
+	copy_m3_m3(td->mtx, mtx);
+}
+
+static void createTransEditRefs(TransInfo *t)
+{
+	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
+	// Mesh *me = t->obedit->data;
+	BMesh *bm = em->bm;
+	BMPlane *bmp;
+	BMIter iter;
+	TransData *td;
+	int n_total;
+
+	float mtx[3][3];
+	float smtx[3][3];
+
+	copy_m3_m4(mtx, t->obedit->obmat);
+	/* we use a pseudoinverse so that when one of the axes is scaled to 0,
+	 * matrix inversion still works and we can still moving along the other */
+	pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
+
+	if (bm->totplanesel) {
+
+		n_total = t->total+bm->totplanesel*4;
+		t->data = MEM_recallocN_id(t->data, n_total*sizeof(TransData), "Added space for ref data");
+		td = &t->data[t->total];
+
+		BM_ITER_MESH (bmp, &iter, bm, BM_PLANES_OF_MESH) {
+			if (!BM_elem_flag_test(bmp, BM_ELEM_HIDDEN)) {
+				if (BM_elem_flag_test(bmp, BM_ELEM_SELECT)) {
+					createPlanePointTransdata(td,bmp->v1,mtx,smtx);td++;
+					createPlanePointTransdata(td,bmp->v2,mtx,smtx);td++;
+					createPlanePointTransdata(td,bmp->v3,mtx,smtx);td++;
+					createPlanePointTransdata(td,bmp->v4,mtx,smtx);td++;
+				}
+			}
+		}
+		t->total = n_total ;
+	}
 }
 #endif
 
@@ -8018,8 +8066,11 @@ void createTransData(bContext *C, TransInfo *t)
 		t->ext = NULL;
 		if (t->obedit->type == OB_MESH) {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-    			if (!createTransEditDim (t)) {
+    			if (!createTransEditDim(t)) {
        				createTransEditVerts(t);
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+				createTransEditRefs(t);
+#endif
     			}
 #else
 			createTransEditVerts(t);
@@ -8044,7 +8095,7 @@ void createTransData(bContext *C, TransInfo *t)
 
 		t->flag |= T_EDIT | T_POINTS;
 
-		if (t->data && t->flag & T_PROP_EDIT) {
+			if (t->data && t->flag & T_PROP_EDIT) {
 			if (ELEM(t->obedit->type, OB_CURVE, OB_MESH)) {
 				sort_trans_data(t); // makes selected become first in array
 				set_prop_dist(t, 0);

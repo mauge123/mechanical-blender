@@ -3024,6 +3024,8 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void draw_em_reference_planes__mapFunc(void *userData, int index, BMPlane *ep)
 {
+	glEnable (GL_BLEND);
+	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	if (BM_elem_flag_test(ep, BM_ELEM_SELECT)) {
 		glColor4f(1.0f,1.0f,1.0f,0.5f);
 	} else {
@@ -3036,6 +3038,7 @@ static void draw_em_reference_planes__mapFunc(void *userData, int index, BMPlane
 	glVertex3fv(ep->v3);
 	glVertex3fv(ep->v4);
 	glEnd();
+	glDisable(GL_BLEND);
 }
 
 static void draw_dm_reference_planes(DerivedMesh *dm)

@@ -344,6 +344,21 @@ static int calc_manipulator_stats(const bContext *C)
 						}
 					}
 				}
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+				if (totsel == 0){
+					BMPlane *bmp;
+					BM_ITER_MESH(bmp, &iter, bm, BM_PLANES_OF_MESH) {
+						if (BM_elem_flag_test(bmp, BM_ELEM_SELECT)) {
+							totsel+=4;
+							calc_tw_center(scene, bmp->v1);
+							calc_tw_center(scene, bmp->v2);
+							calc_tw_center(scene, bmp->v3);
+							calc_tw_center(scene, bmp->v4);
+						}
+					}
+				}
+#endif
 			}
 		} /* end editmesh */
 		else if (obedit->type == OB_ARMATURE) {
