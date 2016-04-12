@@ -219,6 +219,31 @@ static BMFace *bm_face_create_from_mpoly(
 }
 
 
+static void BM_references_to_me_references(BMesh *bm, Mesh *me)
+{
+	BMReference *erf;
+	MReference *mrf;
+	mrf = me->refs;
+	for (int i = 0; i < me->totref; i++, mrf++) {
+
+		BM_mesh_elem_toolflags_ensure(bm);
+
+
+		erf = BM_reference_plane_create(bm,mrf->p1,mrf->p2, mrf->p3, mrf->p4,NULL,BM_CREATE_SKIP_CD);
+
+		BM_elem_index_set(erf, i); /* set_ok */
+
+		/* transfer flags */
+		erf->head.hflag = BM_reference_flag_from_mflag(mrf->flag & ~SELECT);
+
+		/* this is necessary for selection counts to work properly */
+		if (mrf->flag & SELECT) {
+			BM_reference_select_set(bm, erf, true);
+		}
+	}
+}
+
+
 /**
  * \brief Mesh -> BMesh
  *
@@ -258,7 +283,7 @@ void BM_mesh_bm_from_me(
 	CustomData_free(&bm->ddata, bm->totdim);
 #endif
 
-	if (!me || !me->totvert) {
+	if (!me || !me->totvert ) {
 		if (me) { /*no verts? still copy customdata layout*/
 			CustomData_copy(&me->vdata, &bm->vdata, CD_MASK_BMESH, CD_ASSIGN, 0);
 			CustomData_copy(&me->edata, &bm->edata, CD_MASK_BMESH, CD_ASSIGN, 0);
@@ -275,7 +300,13 @@ void BM_mesh_bm_from_me(
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			CustomData_bmesh_init_pool(&bm->ddata, me->totdim, BM_DIM);
 #endif
+
 		}
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		// Copy References!
+		BM_references_to_me_references(bm,me);
+#endif
+
 		return; /* sanity check */
 	}
 
@@ -424,6 +455,10 @@ void BM_mesh_bm_from_me(
 		bm->elem_index_dirty &= ~BM_DIM; /* added in order, clear dirty flag */
 	}
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BM_references_to_me_references(bm,me);
+#endif
+
 
 	if (!me->totedge) {
 		MEM_freeN(vtable);
@@ -641,6 +676,10 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	BMDim *edm;
 	MDim *mdm, *mdim, *mdim_pr;
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMReference *erf;
+	MReference *mrf;
+#endif
 	BMIter iter;
 	int i, j, ototvert;
 
@@ -672,6 +711,11 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	else mdim = MEM_callocN(bm->totdim * sizeof(MDim), "loadeditbMesh dimension");
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if (bm->totref == 0) mrf = NULL;
+	else mrf = me->refs =  MEM_callocN(bm->totref * sizeof(MReference), "loadeditbMesh reference");
+#endif
+
 
 	/* lets save the old verts just in case we are actually working on
 	 * a key ... we now do processing of the keys at the end */
@@ -698,7 +742,6 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	CustomData_free(&me->ddata, me->totdim);
 #endif
 
-
 	/* add new custom data */
 	me->totvert = bm->totvert;
 	me->totedge = bm->totedge;
@@ -706,6 +749,9 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	me->totpoly = bm->totface;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	me->totdim =  bm->totdim;
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	me->totref = bm->totref;
 #endif
 	/* will be overwritten with a valid value if 'dotess' is set, otherwise we
 	 * end up with 'me->totface' and me->mface == NULL which can crash [#28625]
@@ -805,6 +851,18 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 	}
 	bm->elem_index_dirty &= ~BM_DIM;
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BM_ITER_MESH(erf,&iter,bm,BM_REFERENCES_OF_MESH) {
+		 copy_v3_v3(mrf->p1, erf->v1);
+		 copy_v3_v3(mrf->p2, erf->v2);
+		 copy_v3_v3(mrf->p3, erf->v3);
+		 copy_v3_v3(mrf->p4, erf->v4);
+		 mrf->type = erf->type;
+		 mrf++;
+		 BM_CHECK_ELEMENT(erf);
+	}
+#endif
+
 
 	i = 0;
 	j = 0;

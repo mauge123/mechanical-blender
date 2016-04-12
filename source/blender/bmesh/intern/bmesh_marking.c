@@ -45,10 +45,20 @@
 
 static void recount_totsels(BMesh *bm)
 {
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	const char iter_types[5] = {BM_VERTS_OF_MESH,
+	                            BM_EDGES_OF_MESH,
+	                            BM_FACES_OF_MESH,
+								BM_DIMS_OF_MESH,
+								BM_REFERENCES_OF_MESH};
+	int *tots[5];
+/*
 	const char iter_types[3] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 	int *tots[3];
+*/
 	int i;
 
 	/* recount (tot * sel) variables */
@@ -56,9 +66,23 @@ static void recount_totsels(BMesh *bm)
 	tots[0] = &bm->totvertsel;
 	tots[1] = &bm->totedgesel;
 	tots[2] = &bm->totfacesel;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	bm->totdimsel = 0;
+	tots[3] = &bm->totdimsel;
+
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	bm->totrefsel = 0;
+	tots[4] = &bm->totrefsel;
+#endif
 
 #pragma omp parallel for schedule(static) if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	for (i = 0; i < 5; i++) {
+/*
 	for (i = 0; i < 3; i++) {
+*/
 		BMIter iter;
 		BMElem *ele;
 		int count = 0;

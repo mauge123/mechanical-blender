@@ -3196,7 +3196,7 @@ BMDim *BM_dim_create(
  */
 BMReference *BM_reference_plane_create(
         BMesh *bm, float *v1, float *v2, float *v3, float *v4,
-        const BMReference *d_example, const eBMCreateFlag create_flag)
+        const BMReference *UNUSED(d_example), const eBMCreateFlag UNUSED(create_flag))
 {
 	BMReference *erf = 	BLI_mempool_alloc(bm->ppool);
 

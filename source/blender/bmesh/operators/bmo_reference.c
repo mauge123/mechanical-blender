@@ -37,7 +37,7 @@
 
 void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 {
-	//BMReference *erf;
+	BMReference *erf;
 	float mat[4][4];
 	float v1[3],v2[3],v3[3],v4[3];
 	float dia;
@@ -55,6 +55,15 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 	mul_m4_v3(mat, v3);
 	mul_m4_v3(mat, v4);
 
-	BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, 0);
+	BM_mesh_elem_hflag_disable_all(bm, BM_ALL_NOLOOP, BM_ELEM_SELECT,true);
+
+	erf = BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, 0);
+
+	BM_elem_flag_enable(erf, BM_ELEM_SELECT);
+
+	BM_mesh_select_mode_flush(bm); // Will update counters
+
+
+
 }
 

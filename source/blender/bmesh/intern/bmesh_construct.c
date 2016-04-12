@@ -880,6 +880,13 @@ char BM_dim_flag_from_mflag(const short meflag)
 	         );
 }
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+char BM_reference_flag_from_mflag(const short meflag)
+{
+	return ( ((meflag & SELECT)        ? BM_ELEM_SELECT : 0)
+	         );
+}
+#endif
 char BM_face_flag_from_mflag(const char  meflag)
 {
 	return ( ((meflag & ME_FACE_SEL)  ? BM_ELEM_SELECT : 0) |

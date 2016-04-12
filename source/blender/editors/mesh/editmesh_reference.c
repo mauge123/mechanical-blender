@@ -79,6 +79,8 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 
 	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, mat, dia);
 
+
+
 	BMO_op_exec(em->bm, &bmop);
 
 	if (!EDBM_op_finish(em, &bmop, op, true)) {
