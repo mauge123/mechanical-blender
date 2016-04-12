@@ -170,6 +170,12 @@ struct BMDim *EDBM_dim_find_nearest_ex(
         const bool use_select_bias, bool use_cycle);
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+struct BMPlane *EDBM_reference_plane_find_nearest_ex(
+        struct ViewContext *vc, float *r_dist,
+        const bool use_select_bias, const bool use_cycle);
+#endif
+
 bool EDBM_select_pick(struct bContext *C, const int mval[2], bool extend, bool deselect, bool toggle);
 
 void EDBM_selectmode_set(struct BMEditMesh *em);

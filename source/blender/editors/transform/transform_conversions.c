@@ -2311,50 +2311,55 @@ static int createTransEditDim(TransInfo *t) {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
     BMesh *bm = em->bm;
 	BMDim *edm=get_selected_dimension(bm);
+	BMIter *iter;
 	TransData *td = NULL;
 	float mtx[3][3], smtx[3][3];
+	int ret =0;
     if (bm->totdimsel == 1) {
-
-		//Tag the dimension as being moved
-		BM_elem_flag_enable(edm, BM_ELEM_TAG);
-		float mid[3];
-		copy_m3_m4(mtx, t->obedit->obmat);
-		/* we use a pseudoinverse so that when one of the axes is scaled to 0,
-		 * matrix inversion still works and we can still moving along the other */
-		pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
-		t->total = 1; // Only 1 dimension
-		td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Dimension)");
-		td->flag = 0;
-		td->loc = edm->tpos;
-
-		switch (edm->dim_type){
-			case DIM_TYPE_LINEAR:
-				get_dimension_mid(mid,edm);
-				copy_v3_v3(td->iloc, mid);
-				copy_v3_v3(td->center, mid);
-				break;
-			case DIM_TYPE_DIAMETER:
-			case DIM_TYPE_RADIUS:
-			case DIM_TYPE_ANGLE_3P:
-				copy_v3_v3(td->iloc,edm->center);
-				copy_v3_v3(td->center, edm->center);
-				break;
-			default:
-				BLI_assert(0);
+		ret = 1;
+		for (int i=0;i<edm->totverts;i++) {
+			if (BM_elem_flag_test(edm->v[i],BM_ELEM_SELECT)) {
+				ret =0;
+			}
 		}
+		if (ret) {
+			//Tag the dimension as being moved
+			BM_elem_flag_enable(edm, BM_ELEM_TAG);
+			float mid[3];
+			copy_m3_m4(mtx, t->obedit->obmat);
+			/* we use a pseudoinverse so that when one of the axes is scaled to 0,
+			 * matrix inversion still works and we can still moving along the other */
+			pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
+			t->total = 1; // Only 1 dimension
+			td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Dimension)");
+			td->flag = 0;
+			td->loc = edm->tpos;
 
-		td->ext = NULL;
-		td->val = NULL;
-		td->extra = NULL;
+			switch (edm->dim_type){
+				case DIM_TYPE_LINEAR:
+					get_dimension_mid(mid,edm);
+					copy_v3_v3(td->iloc, mid);
+					copy_v3_v3(td->center, mid);
+					break;
+				case DIM_TYPE_DIAMETER:
+				case DIM_TYPE_RADIUS:
+				case DIM_TYPE_ANGLE_3P:
+					copy_v3_v3(td->iloc,edm->center);
+					copy_v3_v3(td->center, edm->center);
+					break;
+				default:
+					BLI_assert(0);
+			}
 
-		copy_m3_m3(td->smtx, smtx);
-		copy_m3_m3(td->mtx, mtx);
+			td->ext = NULL;
+			td->val = NULL;
+			td->extra = NULL;
 
-        return 1;
-    } else {
-        // no dimension select
-        return 0;
+			copy_m3_m3(td->smtx, smtx);
+			copy_m3_m3(td->mtx, mtx);
+		}
     }
+	return ret;
 }
 #endif
 

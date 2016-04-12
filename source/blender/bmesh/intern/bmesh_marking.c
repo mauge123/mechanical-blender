@@ -774,6 +774,16 @@ void BM_elem_select_set(BMesh *bm, BMElem *ele, const bool select)
 		case BM_FACE:
 			BM_face_select_set(bm, (BMFace *)ele, select);
 			break;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case BM_DIM:
+			BM_dim_select_set(bm, (BMDim *)ele, select);
+			break;
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		case BM_PLANE:
+			BM_reference_plane_select_set(bm, (BMPlane *)ele, select);
+			break;
+#endif
 		default:
 			BLI_assert(0);
 			break;
@@ -1120,20 +1130,23 @@ void BM_mesh_elem_hflag_disable_test(
         BMesh *bm, const char htype, const char hflag,
         const bool respecthide, const bool overwrite, const char hflag_test)
 {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	const char iter_types[4] = {    BM_DIMS_OF_MESH,
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	const char iter_types[5] = {
+									BM_PLANES_OF_MESH,
+									BM_DIMS_OF_MESH,
 									BM_VERTS_OF_MESH,
 									BM_EDGES_OF_MESH,
 									BM_FACES_OF_MESH};
 
-	const char flag_types[4] = {BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
-#else
+	const char flag_types[5] = {BM_PLANE, BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
+/*
 	const char iter_types[3] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 
 	const char flag_types[3] = {BM_VERT, BM_EDGE, BM_FACE};
-#endif
+*/
 	const char hflag_nosel = hflag & ~BM_ELEM_SELECT;
 
 	int i;
@@ -1163,11 +1176,12 @@ void BM_mesh_elem_hflag_disable_test(
 #pragma omp parallel for schedule(static) if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
 #endif
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		for (i = 0; i < 4; i++) {
-#else
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		for (i = 0; i < 5; i++) {
+/*
 		for (i = 0; i < 3; i++) {
-#endif
+*/
 			BMIter iter;
 			BMElem *ele;
 
@@ -1180,11 +1194,12 @@ void BM_mesh_elem_hflag_disable_test(
 		bm->totvertsel = bm->totedgesel = bm->totfacesel= bm->totdimsel = 0;
 	}
 	else {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		for (i = 0; i < 4; i++) {
-#else
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		for (i = 0; i < 5; i++) {
+/*
 		for (i = 0; i < 3; i++) {
-#endif
+*/
 			BMIter iter;
 			BMElem *ele;
 
@@ -1218,11 +1233,23 @@ void BM_mesh_elem_hflag_enable_test(
         BMesh *bm, const char htype, const char hflag,
         const bool respecthide, const bool overwrite, const char hflag_test)
 {
-	const char iter_types[3] = {BM_VERTS_OF_MESH,
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	const char iter_types[5] = {
+								BM_DIMS_OF_MESH,
+								BM_PLANES_OF_MESH,
+								BM_VERTS_OF_MESH,
+	                            BM_EDGES_OF_MESH,
+	                            BM_FACES_OF_MESH};
+
+	const char flag_types[5] = {BM_DIM, BM_PLANE, BM_VERT, BM_EDGE, BM_FACE};
+/*
+	const char iter_types[4] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 
 	const char flag_types[3] = {BM_VERT, BM_EDGE, BM_FACE};
+*/
 
 	/* use the nosel version when setting so under no
 	 * condition may a hidden face become selected.
@@ -1243,7 +1270,11 @@ void BM_mesh_elem_hflag_enable_test(
 	 * because hidden geometry and different selection modes can give different results,
 	 * we could of course check for no hidden faces and then use quicker method but its not worth it. */
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	for (i = 0; i < 5; i++) {
+#else
 	for (i = 0; i < 3; i++) {
+#endif
 		if (htype & flag_types[i]) {
 			ele = BM_iter_new(&iter, bm, iter_types[i], NULL);
 			for ( ; ele; ele = BM_iter_step(&iter)) {

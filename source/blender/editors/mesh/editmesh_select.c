@@ -883,7 +883,7 @@ static void findnearestface__doClosest(void *userData, BMFace *efa, const float 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 BMPlane *EDBM_reference_plane_find_nearest_ex(
         ViewContext *vc, float *r_dist,
-        const bool use_select_bias, const bool use_cycle)
+        const bool UNUSED(use_select_bias), const bool UNUSED(use_cycle))
 {
 	BMesh *bm = vc->em->bm;
 
@@ -1095,7 +1095,7 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	}
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	else if (bmp) {
-		eve = efa = eed = edm = NULL;
+		eve = NULL; efa = NULL; eed = NULL; edm = NULL;
 	}
 #endif
 
@@ -2591,7 +2591,12 @@ void EDBM_deselect_by_material(BMEditMesh *em, const short index, const bool sel
 
 void EDBM_select_toggle_all(BMEditMesh *em) /* exported for UV */
 {
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if (em->bm->totvertsel || em->bm->totedgesel || em->bm->totfacesel  || em->bm->totdimsel || em->bm->totplanesel)
+/*
 	if (em->bm->totvertsel || em->bm->totedgesel || em->bm->totfacesel)
+*/
 		EDBM_flag_disable_all(em, BM_ELEM_SELECT);
 	else
 		EDBM_flag_enable_all(em, BM_ELEM_SELECT);
