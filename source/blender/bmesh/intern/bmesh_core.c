@@ -3194,37 +3194,38 @@ BMDim *BM_dim_create(
  *
  * \note base on BM_edge_create function
  */
-BMPlane *BM_reference_plane_create(
+BMReference *BM_reference_plane_create(
         BMesh *bm, float *v1, float *v2, float *v3, float *v4,
-        const BMPlane *d_example, const eBMCreateFlag create_flag)
+        const BMReference *d_example, const eBMCreateFlag create_flag)
 {
-	BMPlane *bmp = 	BLI_mempool_alloc(bm->ppool);
+	BMReference *erf = 	BLI_mempool_alloc(bm->ppool);
 
 	/* --- assign all members --- */
-	bmp->head.data = NULL;
+	erf->head.data = NULL;
 
 #ifdef USE_DEBUG_INDEX_MEMCHECK
-	DEBUG_MEMCHECK_INDEX_INVALIDATE(bmp)
+	DEBUG_MEMCHECK_INDEX_INVALIDATE(erf)
 #else
-	BM_elem_index_set(bmp, -1); /* set_ok_invalid */
+	BM_elem_index_set(erf, -1); /* set_ok_invalid */
 #endif
 
-	bmp->head.htype = BM_PLANE;
-	bmp->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
-	bmp->head.api_flag = 0;
+	erf->head.htype = BM_REFERENCE;
+	erf->head.hflag = BM_ELEM_SMOOTH | BM_ELEM_DRAW;
+	erf->head.api_flag = 0;
 #ifdef WITH_MECHANICAL_STORE_SELECT_ORDER
-	bmp->head.bm = bm;
+	erf->head.bm = bm;
 #endif
 
 	/* --- done --- */
 
-	bm->totplane++;
+	bm->totref++;
 
-	copy_v3_v3(bmp->v1,v1);
-	copy_v3_v3(bmp->v2,v2);
-	copy_v3_v3(bmp->v3,v3);
-	copy_v3_v3(bmp->v4,v4);
+	erf->type = BM_REFERENCE_TYPE_PLANE;
+	copy_v3_v3(erf->v1,v1);
+	copy_v3_v3(erf->v2,v2);
+	copy_v3_v3(erf->v3,v3);
+	copy_v3_v3(erf->v4,v4);
 
-	return bmp;
+	return erf;
 }
 

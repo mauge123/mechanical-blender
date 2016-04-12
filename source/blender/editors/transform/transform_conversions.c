@@ -2377,7 +2377,7 @@ static void createTransEditRefs(TransInfo *t)
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
 	// Mesh *me = t->obedit->data;
 	BMesh *bm = em->bm;
-	BMPlane *bmp;
+	BMReference *erf;
 	BMIter iter;
 	TransData *td;
 	int n_total;
@@ -2390,19 +2390,19 @@ static void createTransEditRefs(TransInfo *t)
 	 * matrix inversion still works and we can still moving along the other */
 	pseudoinverse_m3_m3(smtx, mtx, PSEUDOINVERSE_EPSILON);
 
-	if (bm->totplanesel) {
+	if (bm->totrefsel) {
 
-		n_total = t->total+bm->totplanesel*4;
+		n_total = t->total+bm->totrefsel*4;
 		t->data = MEM_recallocN_id(t->data, n_total*sizeof(TransData), "Added space for ref data");
 		td = &t->data[t->total];
 
-		BM_ITER_MESH (bmp, &iter, bm, BM_PLANES_OF_MESH) {
-			if (!BM_elem_flag_test(bmp, BM_ELEM_HIDDEN)) {
-				if (BM_elem_flag_test(bmp, BM_ELEM_SELECT)) {
-					createPlanePointTransdata(td,bmp->v1,mtx,smtx);td++;
-					createPlanePointTransdata(td,bmp->v2,mtx,smtx);td++;
-					createPlanePointTransdata(td,bmp->v3,mtx,smtx);td++;
-					createPlanePointTransdata(td,bmp->v4,mtx,smtx);td++;
+		BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+			if (!BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
+				if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+					createPlanePointTransdata(td,erf->v1,mtx,smtx);td++;
+					createPlanePointTransdata(td,erf->v2,mtx,smtx);td++;
+					createPlanePointTransdata(td,erf->v3,mtx,smtx);td++;
+					createPlanePointTransdata(td,erf->v4,mtx,smtx);td++;
 				}
 			}
 		}

@@ -191,8 +191,13 @@ typedef struct BMDim {
 
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 
-typedef struct BMPlane {
+/* BMReference->type */
+#define BM_REFERENCE_TYPE_PLANE 1
+
+typedef struct BMReference {
 	BMHeader head;
+
+	short type;
 
 	float v1[3];
 	float v2[3];
@@ -201,7 +206,7 @@ typedef struct BMPlane {
 	float v4[3]; //Aux
 
 	float no;
-} BMPlane;
+} BMReference;
 
 //
 
@@ -330,8 +335,8 @@ typedef struct BMesh {
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	// We are not using custom data for planes
 	struct BLI_mempool *ppool;
-	int totplane;
-	int totplanesel;
+	int totref;
+	int totrefsel;
 //
 
 } BMesh;
@@ -346,13 +351,13 @@ enum {
 	BM_DIM = 16,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_PLANE = 32,
+	BM_REFERENCE = 32,
 #endif
 };
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 
-#define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM | BM_PLANE)
+#define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM | BM_REFERENCE)
 #define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE | BM_DIM)
 
 #else

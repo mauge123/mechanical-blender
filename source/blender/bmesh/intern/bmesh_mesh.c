@@ -73,7 +73,7 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 	                               bm_mesh_chunksize_default.totdim, BLI_MEMPOOL_ALLOW_ITER);
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	bm->ppool = BLI_mempool_create(sizeof(BMPlane), allocsize->totdim,
+	bm->ppool = BLI_mempool_create(sizeof(BMReference), allocsize->totdim,
 	                               bm_mesh_chunksize_default.totplane, BLI_MEMPOOL_ALLOW_ITER);
 #endif
 
@@ -1464,7 +1464,7 @@ BMFace *BM_face_at_index_find(BMesh *bm, const int index)
 }
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-BMPlane *BM_reference_plane_at_index_find(BMesh *bm, const int index)
+BMReference *BM_reference_at_index_find(BMesh *bm, const int index)
 {
 	return BLI_mempool_findelem(bm->ppool, index);
 }

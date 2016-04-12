@@ -2054,7 +2054,7 @@ static BMOpDefine bmo_create_reference_plane_def = {
      {{'\0'}},
 	},
 	/* slots_out */
-	{{"plane", BMO_OP_SLOT_ELEMENT_BUF, {BM_PLANE}}, /* output verts */
+	{{"plane", BMO_OP_SLOT_ELEMENT_BUF, {BM_REFERENCE}}, /* output verts */
 	 {{'\0'}},
 	},
 	bmo_create_reference_plane_exec,

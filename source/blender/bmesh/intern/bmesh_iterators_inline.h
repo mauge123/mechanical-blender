@@ -160,7 +160,7 @@ BLI_INLINE bool BM_iter_init(BMIter *iter, BMesh *bm, const char itype, void *da
 			break;
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-		case BM_PLANES_OF_MESH:
+		case BM_REFERENCES_OF_MESH:
 			BLI_assert(bm != NULL);
 			BLI_assert(data == NULL);
 			iter->begin = (BMIter__begin_cb)bmiter__elem_of_mesh_begin;

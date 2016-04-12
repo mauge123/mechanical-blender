@@ -80,7 +80,7 @@ typedef enum BMIterType {
 	BM_DIMS_OF_MESH = 14,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_PLANES_OF_MESH = 15
+	BM_REFERENCES_OF_MESH = 15
 #endif
 } BMIterType;
 

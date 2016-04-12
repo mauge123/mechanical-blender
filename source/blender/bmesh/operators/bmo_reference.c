@@ -37,7 +37,7 @@
 
 void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 {
-	BMPlane *ep;
+	//BMReference *erf;
 	float mat[4][4];
 	float v1[3],v2[3],v3[3],v4[3];
 	float dia;
@@ -55,10 +55,6 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 	mul_m4_v3(mat, v3);
 	mul_m4_v3(mat, v4);
 
-	ep = BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, 0);
-
-	return ep;
+	BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, 0);
 }
-
-
 

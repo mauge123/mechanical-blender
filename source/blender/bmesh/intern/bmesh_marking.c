@@ -585,24 +585,24 @@ void BM_face_select_set(BMesh *bm, BMFace *f, const bool select)
 }
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-void BM_reference_plane_select_set(BMesh *bm, BMPlane *p, const bool select)
+void BM_reference_select_set(BMesh *bm, BMReference *erf, const bool select)
 {
-	BLI_assert(p->head.htype == BM_PLANE);
+	BLI_assert(erf->head.htype == BM_REFERENCE);
 
-	if (BM_elem_flag_test(p, BM_ELEM_HIDDEN)) {
+	if (BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
 		return;
 	}
 
 	if (select) {
-		if (!BM_elem_flag_test(p, BM_ELEM_SELECT)) {
-			BM_elem_flag_enable(p, BM_ELEM_SELECT);
-			bm->totplanesel += 1;
+		if (!BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(erf, BM_ELEM_SELECT);
+			bm->totrefsel += 1;
 		}
 	}
 	else {
-		if (BM_elem_flag_test(p, BM_ELEM_SELECT)) {
-			bm->totplanesel -= 1;
-			BM_elem_flag_disable(p, BM_ELEM_SELECT);
+		if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+			bm->totrefsel -= 1;
+			BM_elem_flag_disable(erf, BM_ELEM_SELECT);
 		}
 	}
 }
@@ -780,8 +780,8 @@ void BM_elem_select_set(BMesh *bm, BMElem *ele, const bool select)
 			break;
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-		case BM_PLANE:
-			BM_reference_plane_select_set(bm, (BMPlane *)ele, select);
+		case BM_REFERENCE:
+			BM_reference_select_set(bm, (BMReference *)ele, select);
 			break;
 #endif
 		default:
@@ -1133,13 +1133,13 @@ void BM_mesh_elem_hflag_disable_test(
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	const char iter_types[5] = {
-									BM_PLANES_OF_MESH,
+									BM_REFERENCES_OF_MESH,
 									BM_DIMS_OF_MESH,
 									BM_VERTS_OF_MESH,
 									BM_EDGES_OF_MESH,
 									BM_FACES_OF_MESH};
 
-	const char flag_types[5] = {BM_PLANE, BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
+	const char flag_types[5] = {BM_REFERENCE, BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
 /*
 	const char iter_types[3] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
@@ -1237,12 +1237,12 @@ void BM_mesh_elem_hflag_enable_test(
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	const char iter_types[5] = {
 								BM_DIMS_OF_MESH,
-								BM_PLANES_OF_MESH,
+								BM_REFERENCES_OF_MESH,
 								BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH};
 
-	const char flag_types[5] = {BM_DIM, BM_PLANE, BM_VERT, BM_EDGE, BM_FACE};
+	const char flag_types[5] = {BM_DIM, BM_REFERENCE, BM_VERT, BM_EDGE, BM_FACE};
 /*
 	const char iter_types[4] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,

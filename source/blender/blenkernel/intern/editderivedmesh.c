@@ -708,23 +708,20 @@ static void emDM_foreachMappedDim(
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void emDM_foreachMappedReferencePlanes (
+static void emDM_foreachMappedReference (
         DerivedMesh *dm,
-        void (*func)(void *userData, int index, BMPlane *ep),
+        void (*func)(void *userData, int index, void *ele),
         void *userData,
         DMForeachFlag UNUSED(flag)){
 	EditDerivedBMesh *bmdm = (EditDerivedBMesh *)dm;
 	BMesh *bm = bmdm->em->bm;
-	BMPlane *ep;
+	BMReference *erf;
 	BMIter iter;
 	int i;
-
-
-	BM_ITER_MESH_INDEX (ep, &iter, bm, BM_PLANES_OF_MESH, i) {
-		func(userData,i,ep);
+	BM_ITER_MESH_INDEX (erf, &iter, bm, BM_REFERENCES_OF_MESH, i) {
+		func(userData,i,erf);
 	}
 }
-
 #endif
 
 static void emDM_drawMappedEdges(
@@ -917,15 +914,16 @@ static void emDM_foreachMappedFaceCenter(
 }
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes_select_mapFunc(void *userData, int index, BMPlane *ep)
+static void draw_em_reference_planes_select_mapFunc(void *UNUSED(userData), int index, void *ele)
 {
-	if (!BM_elem_flag_test(ep, BM_ELEM_HIDDEN)) {
+	BMReference *erf = ele;
+	if (!BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
 		WM_framebuffer_index_set(index + 1);
 		glBegin(GL_QUADS);
-		glVertex3fv(ep->v1);
-		glVertex3fv(ep->v2);
-		glVertex3fv(ep->v3);
-		glVertex3fv(ep->v4);
+		glVertex3fv(erf->v1);
+		glVertex3fv(erf->v2);
+		glVertex3fv(erf->v3);
+		glVertex3fv(erf->v4);
 		glEnd();
 	}
 }
@@ -933,14 +931,14 @@ static void draw_em_reference_planes_select_mapFunc(void *userData, int index, B
 
 static void emDM_drawMappedReferencePlanes(
         DerivedMesh *dm,
-        DMSetDrawOptions setDrawOptions,
-        DMSetMaterial setMaterial,
+        DMSetDrawOptions UNUSED(setDrawOptions),
+        DMSetMaterial UNUSED(setMaterial),
         /* currently unused -- each original face is handled separately */
         DMCompareDrawOptions UNUSED(compareDrawOptions),
         void *userData,
-        DMDrawFlag flag)
+        DMDrawFlag UNUSED(flag))
 {
-	dm->foreachMappedReferencePlanes(dm, draw_em_reference_planes_select_mapFunc, userData, DM_FOREACH_NOP);
+	dm->foreachMappedReference(dm, draw_em_reference_planes_select_mapFunc, userData, DM_FOREACH_NOP);
 }
 #endif
 
@@ -2306,7 +2304,7 @@ DerivedMesh *getEditDerivedBMesh(
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	bmdm->dm.foreachMappedReferencePlanes = emDM_foreachMappedReferencePlanes;
+	bmdm->dm.foreachMappedReference = emDM_foreachMappedReference;
 #endif
 
 	bmdm->dm.drawEdges = emDM_drawEdges;

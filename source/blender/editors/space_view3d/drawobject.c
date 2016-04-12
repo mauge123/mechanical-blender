@@ -3022,28 +3022,28 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes__mapFunc(void *userData, int index, BMPlane *ep)
+static void draw_em_reference_planes__mapFunc(void *userData, int index, BMReference *erf)
 {
 	glEnable (GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	if (BM_elem_flag_test(ep, BM_ELEM_SELECT)) {
+	if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
 		glColor4f(1.0f,1.0f,1.0f,0.5f);
 	} else {
 		glColor4f(0.0f,0.0f,0.0f,0.5f);
 	}
 
 	glBegin(GL_QUADS);
-	glVertex3fv(ep->v1);
-	glVertex3fv(ep->v2);
-	glVertex3fv(ep->v3);
-	glVertex3fv(ep->v4);
+	glVertex3fv(erf->v1);
+	glVertex3fv(erf->v2);
+	glVertex3fv(erf->v3);
+	glVertex3fv(erf->v4);
 	glEnd();
 	glDisable(GL_BLEND);
 }
 
 static void draw_dm_reference_planes(DerivedMesh *dm)
 {
-	dm->foreachMappedReferencePlanes(dm, draw_em_reference_planes__mapFunc, NULL, DM_FOREACH_NOP);
+	dm->foreachMappedReference(dm, draw_em_reference_planes__mapFunc, NULL, DM_FOREACH_NOP);
 }
 #endif
 
