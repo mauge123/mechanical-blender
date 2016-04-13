@@ -9,6 +9,7 @@
 bool parallel_v3_v3(float *v1, float *v2);
 bool parallel_v3u_v3u(float *v1, float *v2);
 bool perpendicular_v3_v3(float *v1, float *v2);
+bool point_on_axis (float *c, float*a, float *p);
 
 
 void tag_vertexs_on_coplanar_faces(BMesh *bm, float* point, float *dir);

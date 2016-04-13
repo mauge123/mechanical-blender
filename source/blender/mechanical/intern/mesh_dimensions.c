@@ -218,12 +218,14 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center, fl
 				if (v == eve) {
 					if (perpendicular_v3_v3(axis, f->no)) {
 						if (!parallel_v3u_v3u(dir,f->no)) {
-							// Fin a vertex on face not matching eve
-							BM_ITER_ELEM (v2, &iterf2, f, BM_VERTS_OF_FACE) {
-								if (v2 != eve) break;
-							}
-							if (isect_line_plane_v3(r, center, eve->co, v2->co, f->no)){
-								copy_v3_v3(eve->co,r);
+							if (!point_on_axis(center,axis,eve->co)) {
+								// Fin a vertex on face not matching eve
+								BM_ITER_ELEM (v2, &iterf2, f, BM_VERTS_OF_FACE) {
+									if (v2 != eve) break;
+								}
+								if (isect_line_plane_v3(r, center, eve->co, v2->co, f->no)){
+									copy_v3_v3(eve->co,r);
+								}
 							}
 						}
 					}
