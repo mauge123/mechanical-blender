@@ -3024,6 +3024,8 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void draw_em_reference_planes__mapFunc(void *userData, int index, BMReference *erf)
 {
+	// May be set to other values
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glEnable (GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
