@@ -3056,14 +3056,15 @@ void bm_kill_only_dim(BMesh *bm, BMDim *d)
 
 #endif
 
-static int order_select_compare (const void *ptr_a,const void *ptr_b) {
+#ifdef WITH_MECHANICAL
+int order_select_compare (const void *ptr_a,const void *ptr_b) {
 	BMHeader *a = *(BMHeader**)ptr_a;
 	BMHeader *b = *(BMHeader**)ptr_b;
 	if (a->nsel < b->nsel) return -1;
 	if (a->nsel > b->nsel) return  1;
 	return 0;
 }
-
+#endif
 
 /**
  * \brief Main function for creating a new dimension.

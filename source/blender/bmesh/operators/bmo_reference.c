@@ -40,20 +40,44 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 	BMReference *erf;
 	float mat[4][4];
 	float v1[3],v2[3],v3[3],v4[3];
+	float a[3],axis[3],r[3];
 	float dia;
+	BMOpSlot *op_verts_slot = BMO_slot_get(op->slots_in, "verts");
+	BMVert *v[3];
+	BMOIter siter;
 
-	BMO_slot_mat4_get(op->slots_in,"matrix",mat);
-	dia = BMO_slot_float_get(op->slots_in,"dia");
+	if (op_verts_slot->len >= 3) {
+		/* From selection */
+		v[0] = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT);
+		v[1] = BMO_iter_step(&siter);
+		v[2] = BMO_iter_step(&siter);
+		qsort(v,3, sizeof (MVert*), order_select_compare);
 
-	v1[0]=-dia; v1[1]=-dia; v1[2]=0;
-	v2[0]=dia;v2[1]=-dia;v2[2]=0;
-	v3[0]=dia; v3[1]=dia;v3[2]=0;
-	v4[0]=-dia;v4[1]=dia; v4[2]=0;
+		copy_v3_v3(v1, v[0]->co);
+		copy_v3_v3(v2, v[1]->co);
+		copy_v3_v3(v3, v[2]->co);
+		sub_v3_v3v3(a,v3,v1);
+		sub_v3_v3v3(axis,v2,v1);
+		normalize_v3(axis);
+		project_v3_v3v3(r,a,axis);
+		sub_v3_v3(a,r);
+		add_v3_v3v3(v3,v2,a);
+		add_v3_v3v3(v4,v1,a);
+	} else {
+		/* Default, no selection, added on 3D Cursor */
+		BMO_slot_mat4_get(op->slots_in,"matrix",mat);
+		dia = BMO_slot_float_get(op->slots_in,"dia");
 
-	mul_m4_v3(mat, v1);
-	mul_m4_v3(mat, v2);
-	mul_m4_v3(mat, v3);
-	mul_m4_v3(mat, v4);
+		v1[0]=-dia; v1[1]=-dia; v1[2]=0;
+		v2[0]=dia;v2[1]=-dia;v2[2]=0;
+		v3[0]=dia; v3[1]=dia;v3[2]=0;
+		v4[0]=-dia;v4[1]=dia; v4[2]=0;
+
+		mul_m4_v3(mat, v1);
+		mul_m4_v3(mat, v2);
+		mul_m4_v3(mat, v3);
+		mul_m4_v3(mat, v4);
+	}
 
 	BM_mesh_elem_hflag_disable_all(bm, BM_ALL_NOLOOP, BM_ELEM_SELECT,true);
 

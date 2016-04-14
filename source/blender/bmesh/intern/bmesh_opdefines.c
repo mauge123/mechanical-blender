@@ -2076,7 +2076,7 @@ static BMOpDefine bmo_create_reference_plane_def = {
 	"create_reference_plane",
 	/* slots_in */
 	{
-	 {"verts", BMO_OP_SLOT_ELEMENT_BUF},
+ 	 {"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},
      {"matrix", BMO_OP_SLOT_MAT},  /* matrix to multiply the new geometry with */
 	 {"dia", BMO_OP_SLOT_FLT},
      {{'\0'}},

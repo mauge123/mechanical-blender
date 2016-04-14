@@ -138,5 +138,8 @@ BMReference *BM_reference_plane_create(
         const BMReference *d_example, const eBMCreateFlag create_flag);
 #endif
 
+#ifdef WITH_MECHANICAL
+int order_select_compare (const void *ptr_a,const void *ptr_b);
+#endif
 
 #endif /* __BMESH_CORE_H__ */
