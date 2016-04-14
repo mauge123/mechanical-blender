@@ -177,40 +177,40 @@ static void editmesh_faces_nearest_point(void *userdata, int index, const float 
 	}
 }
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
+static void get_triangle_from_plane_index(BMesh *bm, int index, float *r1, float *r2, float *r3)
+{
+	BMReference* erf;
+	erf = BM_reference_at_index_find(bm, (int) index/2);
+	if (index%2 == 0) {
+		copy_v3_v3(r1,erf->v1);
+		copy_v3_v3(r2,erf->v2);
+		copy_v3_v3(r3,erf->v3);
+	} else {
+		copy_v3_v3(r1,erf->v1);
+		copy_v3_v3(r2,erf->v3);
+		copy_v3_v3(r3,erf->v4);
+	}
+}
+
 static void editmesh_planes_nearest_point(void *userdata, int index, const float co[3], BVHTreeNearest *nearest)
 {
 	const BVHTreeFromMesh *data = (BVHTreeFromMesh *) userdata;
 	BMEditMesh *em = data->em_evil;
 	BMesh *bm = em->bm;
-	//const BMLoop **ltri = (const BMLoop **)em->looptris[index];
-	BMReference* erf;
-	const float *t0, *t1, *t2;
+	float nearest_tmp[3], dist_sq;
 
-	if (index%2 == 0) {
-		erf = BM_reference_at_index_find(bm, (int) index/2);
-		t0 = erf->v1;
-		t1 = erf->v2;
-		t2 = erf->v3;
-	} else {
-		erf = BM_reference_at_index_find(bm, (int) (index/2));
-		t0 = erf->v1;
-		t1 = erf->v3;
-		t2 = erf->v4;
-	}
+	float t0[3], t1[3], t2[3];
+	get_triangle_from_plane_index(bm, index, t0,t1,t2);
 
-	{
-		float nearest_tmp[3], dist_sq;
+	closest_on_tri_to_point_v3(nearest_tmp, co, t0, t1, t2);
+	dist_sq = len_squared_v3v3(co, nearest_tmp);
 
-		closest_on_tri_to_point_v3(nearest_tmp, co, t0, t1, t2);
-		dist_sq = len_squared_v3v3(co, nearest_tmp);
-
-		if (dist_sq < nearest->dist_sq) {
-			nearest->index = index;
-			nearest->dist_sq = dist_sq;
-			copy_v3_v3(nearest->co, nearest_tmp);
-			normal_tri_v3(nearest->no, t0, t1, t2);
-		}
+	if (dist_sq < nearest->dist_sq) {
+		nearest->index = index;
+		nearest->dist_sq = dist_sq;
+		copy_v3_v3(nearest->co, nearest_tmp);
+		normal_tri_v3(nearest->no, t0, t1, t2);
 	}
 }
 #endif
@@ -307,42 +307,28 @@ static void editmesh_faces_spherecast(void *userdata, int index, const BVHTreeRa
 	}
 }
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
 static void editmesh_planes_spherecast(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
 {
 	const BVHTreeFromMesh *data = (BVHTreeFromMesh *) userdata;
 	BMEditMesh *em = data->em_evil;
 	//const BMLoop **ltri = (const BMLoop **)em->looptris[index];
 	BMesh *bm = em->bm;
-	BMReference* erf;
-	const float *t0, *t1, *t2;
+	float t0[3], t1[3], t2[3];
+	get_triangle_from_plane_index(bm,index,t0,t1,t2);
 
-	if (index%2 == 0) {
-		erf = BM_reference_at_index_find(bm, (int) index/2);
-		t0 = erf->v1;
-		t1 = erf->v2;
-		t2 = erf->v3;
-	} else {
-		erf = BM_reference_at_index_find(bm, (int) (index/2));
-		t0 = erf->v1;
-		t1 = erf->v3;
-		t2 = erf->v4;
-	}
+	float dist;
+	if (data->sphere_radius == 0.0f)
+		dist = bvhtree_ray_tri_intersection(ray, hit->dist, t0, t1, t2);
+	else
+		dist = bvhtree_sphereray_tri_intersection(ray, data->sphere_radius, hit->dist, t0, t1, t2);
 
-	{
-		float dist;
-		if (data->sphere_radius == 0.0f)
-			dist = bvhtree_ray_tri_intersection(ray, hit->dist, t0, t1, t2);
-		else
-			dist = bvhtree_sphereray_tri_intersection(ray, data->sphere_radius, hit->dist, t0, t1, t2);
+	if (dist >= 0 && dist < hit->dist) {
+		hit->index = index;
+		hit->dist = dist;
+		madd_v3_v3v3fl(hit->co, ray->origin, ray->direction, dist);
 
-		if (dist >= 0 && dist < hit->dist) {
-			hit->index = index;
-			hit->dist = dist;
-			madd_v3_v3v3fl(hit->co, ray->origin, ray->direction, dist);
-
-			normal_tri_v3(hit->no, t0, t1, t2);
-		}
+		normal_tri_v3(hit->no, t0, t1, t2);
 	}
 }
 #endif
@@ -1099,12 +1085,10 @@ static BVHTree *bvhtree_from_mesh_looptri_create_tree(
 	return tree;
 }
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
 static BVHTree *bvhtree_from_mesh_plane_looptri_create_tree(
         float epsilon, int tree_type, int axis,
-        BMEditMesh *em, const bool em_all,
-        const MVert *vert, const MLoop *mloop, const MLoopTri *looptri, const int looptri_num,
-        BLI_bitmap *mask, int looptri_num_active)
+        BMEditMesh *em, const int looptri_num)
 {
 	BVHTree *tree = NULL;
 	int i;
@@ -1114,7 +1098,6 @@ static BVHTree *bvhtree_from_mesh_plane_looptri_create_tree(
 
 	if (looptri_num) {
 		/* Create a bvh-tree of the given target */
-		/* printf("%s: building BVH, total=%d\n", __func__, numFaces); */
 		tree = BLI_bvhtree_new(looptri_num, epsilon, tree_type, axis);
 		if (tree) {
 			if (em) {
@@ -1126,7 +1109,6 @@ static BVHTree *bvhtree_from_mesh_plane_looptri_create_tree(
 					copy_v3_v3(co[2], erf->v3);
 
 					BLI_bvhtree_insert(tree, i*2, co[0], 3);
-
 
 					copy_v3_v3(co[0], erf->v1);
 					copy_v3_v3(co[1], erf->v3);
@@ -1194,7 +1176,7 @@ static void bvhtree_from_mesh_looptri_setup_data(
 	}
 }
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
 static void bvhtree_from_mesh_plane_looptri_setup_data(
         BVHTreeFromMesh *data, BVHTree *tree, const bool is_cached,
         float epsilon, BMEditMesh *em,
@@ -1280,8 +1262,7 @@ BVHTree *bvhtree_from_mesh_plane_looptri(BVHTreeFromMesh *data, DerivedMesh *dm,
 
 			tree = bvhtree_from_mesh_plane_looptri_create_tree(
 			        epsilon, tree_type, axis,
-			        em, (bvhcache_type == BVHTREE_FROM_PLANES_EDITMESH_SNAP),
-			        mvert, mloop, looptri, looptri_num, NULL, -1);
+			        em, looptri_num);
 			if (tree) {
 				/* Save on cache for later use */
 				/* printf("BVHTree built and saved on cache\n"); */
