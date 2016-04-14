@@ -52,21 +52,18 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 	BMVert *v;
 	BMVert *(*v_arr);
 	BMDim *d;
+	BMOpSlot *op_verts_slot = BMO_slot_get(op->slots_in, "verts");
 
-	int v_count =0;
 	int n=0;
 	int type = BMO_slot_int_get(op->slots_in,"dim_type");
 
-
-	for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), v_count++);
-
-	v_arr = MEM_mallocN(sizeof (BMVert*)*v_count,"BMVert temp array");
+	v_arr = MEM_mallocN(sizeof (BMVert*)*op_verts_slot->len,"BMVert temp array");
 
 	for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), n++) {
 		v_arr[n] = v;
 	}
 
-	d = BM_dim_create(bm, v_arr,v_count,type, NULL, BM_CREATE_USE_SELECT_ORDER);
+	d = BM_dim_create(bm, v_arr,op_verts_slot->len,type, NULL, BM_CREATE_USE_SELECT_ORDER);
 
 	MEM_freeN (v_arr);
 

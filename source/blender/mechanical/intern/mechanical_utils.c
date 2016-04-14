@@ -82,11 +82,19 @@ bool perpendicular_v3_v3(float *v1, float *v2) {
  * @param c reference point
  * @param a axis
  * @param p point
- * @return
+ * @return true if the point is on axis
  */
 bool point_on_axis (float *c, float*a, float *p) {
 	float v1[3],v2[3];
 	add_v3_v3v3(v1,c,a);
 	sub_v3_v3v3(v2,p,c);
 	return fabs(dot_v3v3(v1,v2)) < DIM_CONSTRAINT_PRECISION;
+}
+
+
+void v_perpendicular_to_axis(float *r, float *c, float *p, float *a) {
+	float m[3];
+	sub_v3_v3v3(r,p,c);
+	project_v3_v3v3(m,r,a);
+	sub_v3_v3(r,m);
 }
