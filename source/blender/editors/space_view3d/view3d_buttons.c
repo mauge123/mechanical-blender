@@ -341,6 +341,9 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		BMEditMesh *em = me->edit_btmesh;
 		BMesh *bm = em->bm;
 		BMVert *eve;
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		BMReference *erf;
+#endif
 		BMEdge *eed;
 		BMIter iter;
 
@@ -368,6 +371,19 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				}
 			}
 		}
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		if (bm->totrefsel) {
+			BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+				if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+					add_v3_v3(&median[LOC_X], erf->v1);
+					add_v3_v3(&median[LOC_X], erf->v2);
+					add_v3_v3(&median[LOC_X], erf->v3);
+					add_v3_v3(&median[LOC_X], erf->v4);
+					tot+=4;
+				}
+			}
+		}
+#endif
 
 		if ((cd_edge_bweight_offset != -1) || (cd_edge_crease_offset  != -1)) {
 			if (bm->totedgesel) {
@@ -670,6 +686,9 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			BMesh *bm = em->bm;
 			BMIter iter;
 			BMVert *eve;
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+			BMReference *erf;
+#endif
 			BMEdge *eed;
 
 			int cd_vert_bweight_offset = -1;
@@ -739,6 +758,19 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 						}
 					}
 				}
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+				BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+					if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+						if (apply_vcos) {
+							apply_raw_diff_v3(erf->v1, tot, &ve_median[LOC_X], &median[LOC_X]);
+							apply_raw_diff_v3(erf->v2, tot, &ve_median[LOC_X], &median[LOC_X]);
+							apply_raw_diff_v3(erf->v3, tot, &ve_median[LOC_X], &median[LOC_X]);
+							apply_raw_diff_v3(erf->v4, tot, &ve_median[LOC_X], &median[LOC_X]);
+						}
+					}
+				}
+#endif
 			}
 
 			if (apply_vcos) {
