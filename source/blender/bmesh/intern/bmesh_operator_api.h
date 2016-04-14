@@ -113,7 +113,18 @@ typedef enum eBMOpSlotType {
 #define BMO_OP_SLOT_TOTAL_TYPES 11
 
 /* don't overlap values to avoid confusion */
-#ifndef WITH_MECHANICAL_MESH_DIMENSIONS
+//WITH_MECHANICAL_MESH_DIMENSIONS
+//WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+typedef enum eBMOpSlotSubType_Elem {
+	/* use as flags */
+	BMO_OP_SLOT_SUBTYPE_ELEM_VERT = BM_VERT,
+	BMO_OP_SLOT_SUBTYPE_ELEM_EDGE = BM_EDGE,
+	BMO_OP_SLOT_SUBTYPE_ELEM_FACE = BM_FACE,
+	BMO_OP_SLOT_SUBTYPE_ELEM_DIM = BM_DIM,
+	BMO_OP_SLOT_SUBTYPE_ELEM_REFERENCE = BM_REFERENCE,
+	BMO_OP_SLOT_SUBTYPE_ELEM_IS_SINGLE = (BM_REFERENCE << 1),
+} eBMOpSlotSubType_Elem;
+#if 0
 typedef enum eBMOpSlotSubType_Elem {
 	/* use as flags */
 	BMO_OP_SLOT_SUBTYPE_ELEM_VERT = BM_VERT,
@@ -121,16 +132,9 @@ typedef enum eBMOpSlotSubType_Elem {
 	BMO_OP_SLOT_SUBTYPE_ELEM_FACE = BM_FACE,
 	BMO_OP_SLOT_SUBTYPE_ELEM_IS_SINGLE = (BM_FACE << 1),
 } eBMOpSlotSubType_Elem;
-#else
-typedef enum eBMOpSlotSubType_Elem {
-	/* use as flags */
-	BMO_OP_SLOT_SUBTYPE_ELEM_VERT = BM_VERT,
-	BMO_OP_SLOT_SUBTYPE_ELEM_EDGE = BM_EDGE,
-	BMO_OP_SLOT_SUBTYPE_ELEM_FACE = BM_FACE,
-	BMO_OP_SLOT_SUBTYPE_ELEM_DIM = BM_DIM,
-	BMO_OP_SLOT_SUBTYPE_ELEM_IS_SINGLE = (BM_DIM << 1),
-} eBMOpSlotSubType_Elem;
 #endif
+
+
 typedef enum eBMOpSlotSubType_Map {
 	BMO_OP_SLOT_SUBTYPE_MAP_EMPTY    = 64,  /* use as a set(), unused value */
 	BMO_OP_SLOT_SUBTYPE_MAP_ELEM     = 65,

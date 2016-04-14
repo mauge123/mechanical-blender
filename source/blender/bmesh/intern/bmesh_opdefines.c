@@ -1319,10 +1319,37 @@ static BMOpDefine bmo_delete_def = {
  * Utility operator to duplicate geometry,
  * optionally into a destination mesh.
  */
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static BMOpDefine bmo_duplicate_def = {
 	"duplicate",
 	/* slots_in */
-	{{"geom", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE}},
+    {{"geom", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE | BM_REFERENCE}},
+	/* destination bmesh, if NULL will use current on */
+	 {"dest", BMO_OP_SLOT_PTR, {(int)BMO_OP_SLOT_SUBTYPE_PTR_BMESH}},
+	 {"use_select_history", BMO_OP_SLOT_BOOL},
+	 {{'\0'}},
+	},
+	/* slots_out */
+	{{"geom_orig.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE | BM_REFERENCE}},
+	 {"geom.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE | BM_REFERENCE}},
+	/* facemap maps from source faces to dupe
+	 * faces, and from dupe faces to source faces */
+	 {"vert_map.out", BMO_OP_SLOT_MAPPING, {(int)BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	 {"edge_map.out", BMO_OP_SLOT_MAPPING, {(int)BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	 {"face_map.out", BMO_OP_SLOT_MAPPING, {(int)BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	 {"boundary_map.out", BMO_OP_SLOT_MAPPING, {(int)BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	 {"isovert_map.out", BMO_OP_SLOT_MAPPING, {(int)BMO_OP_SLOT_SUBTYPE_MAP_ELEM}},
+	{{'\0'}},
+	},
+	bmo_duplicate_exec,
+	(BMO_OPTYPE_FLAG_NORMALS_CALC |
+	 BMO_OPTYPE_FLAG_SELECT_FLUSH),
+};
+#else
+static BMOpDefine bmo_duplicate_def = {
+	"duplicate",
+	/* slots_in */
+    {{"geom", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE}},
 	/* destination bmesh, if NULL will use current on */
 	 {"dest", BMO_OP_SLOT_PTR, {(int)BMO_OP_SLOT_SUBTYPE_PTR_BMESH}},
 	 {"use_select_history", BMO_OP_SLOT_BOOL},
@@ -1344,6 +1371,7 @@ static BMOpDefine bmo_duplicate_def = {
 	(BMO_OPTYPE_FLAG_NORMALS_CALC |
 	 BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
+#endif
 
 /*
  * Split Off Geometry.

@@ -768,7 +768,14 @@ static int bm_mesh_flag_count(
 			if (BM_elem_flag_test_bool(ele, hflag) == test_for_enabled) tot++;
 		}
 	}
-
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if (htype & BM_REFERENCE) {
+		BM_ITER_MESH (ele, &iter, bm, BM_REFERENCES_OF_MESH) {
+			if (respecthide && BM_elem_flag_test(ele, BM_ELEM_HIDDEN)) continue;
+			if (BM_elem_flag_test_bool(ele, hflag) == test_for_enabled) tot++;
+		}
+	}
+#endif
 	return tot;
 }
 

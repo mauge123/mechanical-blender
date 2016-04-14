@@ -192,6 +192,10 @@ static void bmo_mesh_copy(BMOperator *op, BMesh *bm_dst, BMesh *bm_src)
 	BMVert *v = NULL, *v2;
 	BMEdge *e = NULL;
 	BMFace *f = NULL;
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMReference *erf = NULL;
+	BMIter riter;
+#endif
 	
 	BMIter viter, eiter, fiter;
 	GHash *vhash, *ehash;
@@ -284,6 +288,16 @@ static void bmo_mesh_copy(BMOperator *op, BMesh *bm_dst, BMesh *bm_src)
 
 			bmo_face_copy(op, slot_face_map_out, bm_dst, bm_src, f, vhash, ehash);
 			BMO_elem_flag_enable(bm_src, f, DUPE_DONE);
+		}
+	}
+
+	BM_ITER_MESH (erf, &riter, bm_src, BM_REFERENCES_OF_MESH) {
+		if (BMO_elem_flag_test(bm_src, erf, DUPE_INPUT) &&
+		    !BMO_elem_flag_test(bm_src, erf, DUPE_DONE))
+		{
+			BMReference *nerf = BM_reference_plane_create(bm_dst, erf->v1, erf->v2, erf->v3, erf->v4, NULL, 0);
+			BMO_elem_flag_enable(bm_src, erf, DUPE_DONE);
+			BMO_elem_flag_enable(bm_src, nerf, DUPE_NEW);
 		}
 	}
 	

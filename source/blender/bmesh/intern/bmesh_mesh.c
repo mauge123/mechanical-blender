@@ -84,15 +84,16 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 
 void BM_mesh_elem_toolflags_ensure(BMesh *bm)
 {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool && bm->dtoolflagpool) {
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool && bm->dtoolflagpool && bm->ptoolflagpool) {
 		return;
 	}
-#else
+/*
 	if (bm->vtoolflagpool && bm->etoolflagpool && bm->ftoolflagpool) {
 		return;
 	}
-#endif
+*/
 
 	bm->vtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totvert, 512, BLI_MEMPOOL_NOP);
 	bm->etoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totedge, 512, BLI_MEMPOOL_NOP);
@@ -100,6 +101,10 @@ void BM_mesh_elem_toolflags_ensure(BMesh *bm)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	bm->dtoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totdim, 512, BLI_MEMPOOL_NOP);
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	bm->ptoolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), bm->totref, 512, BLI_MEMPOOL_NOP);
+#endif
+
 #pragma omp parallel sections if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
 	{
 #pragma omp section
@@ -129,6 +134,29 @@ void BM_mesh_elem_toolflags_ensure(BMesh *bm)
 				ele->oflags = BLI_mempool_calloc(toolflagpool);
 			}
 		}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#pragma omp section
+		{
+			BLI_mempool *toolflagpool = bm->dtoolflagpool;
+			BMIter iter;
+			BMElemF *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+				ele->oflags = BLI_mempool_calloc(toolflagpool);
+			}
+		}
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#pragma omp section
+		{
+			BLI_mempool *toolflagpool = bm->ptoolflagpool;
+			BMIter iter;
+			BMElemF *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_REFERENCES_OF_MESH) {
+				ele->oflags = BLI_mempool_calloc(toolflagpool);
+			}
+		}
+#endif
+
 	}
 
 

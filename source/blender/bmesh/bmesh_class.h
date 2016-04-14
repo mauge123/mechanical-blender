@@ -196,6 +196,8 @@ typedef struct BMDim {
 
 typedef struct BMReference {
 	BMHeader head;
+	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
+
 
 	short type;
 
@@ -335,6 +337,7 @@ typedef struct BMesh {
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	// We are not using custom data for planes
 	struct BLI_mempool *ppool;
+	struct BLI_mempool *ptoolflagpool;
 	int totref;
 	int totrefsel;
 //
@@ -347,26 +350,20 @@ enum {
 	BM_EDGE = 2,
 	BM_LOOP = 4,
 	BM_FACE = 8,
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_DIM = 16,
-#endif
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+//WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	BM_REFERENCE = 32,
-#endif
 };
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-
+//WITH_MECHANICAL_MESH_DIMENSIONS
+//WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 #define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE | BM_DIM | BM_REFERENCE)
-#define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE | BM_DIM)
-
-#else
-
+#define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE | BM_DIM | BM_REFERENCE)
+/*
 #define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE)
 #define BM_ALL_NOLOOP (BM_VERT | BM_EDGE | BM_FACE)
-
-#endif
-
+*/
 
 /* args for _Generic */
 #define _BM_GENERIC_TYPE_ELEM_NONCONST \

@@ -1427,7 +1427,7 @@ static int edbm_duplicate_exec(bContext *C, wmOperator *op)
 
 	EDBM_op_init(
 	        em, &bmop, op,
-	        "duplicate geom=%hvef use_select_history=%b",
+	        "duplicate geom=%hvefr use_select_history=%b",
 	        BM_ELEM_SELECT, true);
 
 	BMO_op_exec(bm, &bmop);

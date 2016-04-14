@@ -3216,6 +3216,9 @@ BMReference *BM_reference_plane_create(
 	erf->head.bm = bm;
 #endif
 
+	/* allocate flags */
+	erf->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+
 	/* --- done --- */
 
 	bm->totref++;
