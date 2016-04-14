@@ -177,6 +177,44 @@ static void editmesh_faces_nearest_point(void *userdata, int index, const float 
 	}
 }
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void editmesh_planes_nearest_point(void *userdata, int index, const float co[3], BVHTreeNearest *nearest)
+{
+	const BVHTreeFromMesh *data = (BVHTreeFromMesh *) userdata;
+	BMEditMesh *em = data->em_evil;
+	BMesh *bm = em->bm;
+	//const BMLoop **ltri = (const BMLoop **)em->looptris[index];
+	BMReference* erf;
+	const float *t0, *t1, *t2;
+
+	if (index%2 == 0) {
+		erf = BM_reference_at_index_find(bm, (int) index/2);
+		t0 = erf->v1;
+		t1 = erf->v2;
+		t2 = erf->v3;
+	} else {
+		erf = BM_reference_at_index_find(bm, (int) (index/2));
+		t0 = erf->v1;
+		t1 = erf->v3;
+		t2 = erf->v4;
+	}
+
+	{
+		float nearest_tmp[3], dist_sq;
+
+		closest_on_tri_to_point_v3(nearest_tmp, co, t0, t1, t2);
+		dist_sq = len_squared_v3v3(co, nearest_tmp);
+
+		if (dist_sq < nearest->dist_sq) {
+			nearest->index = index;
+			nearest->dist_sq = dist_sq;
+			copy_v3_v3(nearest->co, nearest_tmp);
+			normal_tri_v3(nearest->no, t0, t1, t2);
+		}
+	}
+}
+#endif
+
 /* Callback to bvh tree raycast. The tree must have been built using bvhtree_from_mesh_faces.
  * userdata must be a BVHMeshCallbackUserdata built from the same mesh as the tree. */
 static void mesh_faces_spherecast(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
@@ -268,6 +306,46 @@ static void editmesh_faces_spherecast(void *userdata, int index, const BVHTreeRa
 		}
 	}
 }
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void editmesh_planes_spherecast(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
+{
+	const BVHTreeFromMesh *data = (BVHTreeFromMesh *) userdata;
+	BMEditMesh *em = data->em_evil;
+	//const BMLoop **ltri = (const BMLoop **)em->looptris[index];
+	BMesh *bm = em->bm;
+	BMReference* erf;
+	const float *t0, *t1, *t2;
+
+	if (index%2 == 0) {
+		erf = BM_reference_at_index_find(bm, (int) index/2);
+		t0 = erf->v1;
+		t1 = erf->v2;
+		t2 = erf->v3;
+	} else {
+		erf = BM_reference_at_index_find(bm, (int) (index/2));
+		t0 = erf->v1;
+		t1 = erf->v3;
+		t2 = erf->v4;
+	}
+
+	{
+		float dist;
+		if (data->sphere_radius == 0.0f)
+			dist = bvhtree_ray_tri_intersection(ray, hit->dist, t0, t1, t2);
+		else
+			dist = bvhtree_sphereray_tri_intersection(ray, data->sphere_radius, hit->dist, t0, t1, t2);
+
+		if (dist >= 0 && dist < hit->dist) {
+			hit->index = index;
+			hit->dist = dist;
+			madd_v3_v3v3fl(hit->co, ray->origin, ray->direction, dist);
+
+			normal_tri_v3(hit->no, t0, t1, t2);
+		}
+	}
+}
+#endif
 
 /* Callback to bvh tree nearest point. The tree must have been built using bvhtree_from_mesh_edges.
  * userdata must be a BVHMeshCallbackUserdata built from the same mesh as the tree. */
@@ -1021,6 +1099,54 @@ static BVHTree *bvhtree_from_mesh_looptri_create_tree(
 	return tree;
 }
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static BVHTree *bvhtree_from_mesh_plane_looptri_create_tree(
+        float epsilon, int tree_type, int axis,
+        BMEditMesh *em, const bool em_all,
+        const MVert *vert, const MLoop *mloop, const MLoopTri *looptri, const int looptri_num,
+        BLI_bitmap *mask, int looptri_num_active)
+{
+	BVHTree *tree = NULL;
+	int i;
+	BMesh *bm = em->bm;
+	BMReference *erf;
+	BMIter iter;
+
+	if (looptri_num) {
+		/* Create a bvh-tree of the given target */
+		/* printf("%s: building BVH, total=%d\n", __func__, numFaces); */
+		tree = BLI_bvhtree_new(looptri_num, epsilon, tree_type, axis);
+		if (tree) {
+			if (em) {
+				BM_ITER_MESH_INDEX(erf, &iter, bm, BM_REFERENCES_OF_MESH,i) {
+					// Add Plane triangles
+					float co[3][3];
+					copy_v3_v3(co[0], erf->v1);
+					copy_v3_v3(co[1], erf->v2);
+					copy_v3_v3(co[2], erf->v3);
+
+					BLI_bvhtree_insert(tree, i*2, co[0], 3);
+
+
+					copy_v3_v3(co[0], erf->v1);
+					copy_v3_v3(co[1], erf->v3);
+					copy_v3_v3(co[2], erf->v4);
+
+					BLI_bvhtree_insert(tree, i*2+1, co[0], 3);
+
+				}
+			}
+			else {
+				BLI_assert(0);
+			}
+			BLI_bvhtree_balance(tree);
+		}
+	}
+
+	return tree;
+}
+#endif
+
 static void bvhtree_from_mesh_looptri_setup_data(
         BVHTreeFromMesh *data, BVHTree *tree, const bool is_cached,
         float epsilon, BMEditMesh *em,
@@ -1067,6 +1193,117 @@ static void bvhtree_from_mesh_looptri_setup_data(
 		}
 	}
 }
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void bvhtree_from_mesh_plane_looptri_setup_data(
+        BVHTreeFromMesh *data, BVHTree *tree, const bool is_cached,
+        float epsilon, BMEditMesh *em,
+        const MVert *vert, const bool vert_allocated,
+        const MLoop *mloop, const bool loop_allocated,
+        const MLoopTri *looptri, const bool looptri_allocated)
+{
+	memset(data, 0, sizeof(*data));
+	data->em_evil = em;
+
+	if (tree) {
+		data->tree = tree;
+		data->cached = is_cached;
+
+		if (em) {
+			data->nearest_callback = editmesh_planes_nearest_point;
+			data->raycast_callback = editmesh_planes_spherecast;
+			data->nearest_to_ray_callback = NULL;
+		}
+		else {
+			data->nearest_callback = mesh_looptri_nearest_point;
+			data->raycast_callback = mesh_looptri_spherecast;
+			data->nearest_to_ray_callback = NULL;
+
+			data->vert = vert;
+			data->vert_allocated = vert_allocated;
+			data->loop = mloop;
+			data->loop_allocated = loop_allocated;
+			data->looptri = looptri;
+			data->looptri_allocated = looptri_allocated;
+		}
+
+		data->sphere_radius = epsilon;
+	}
+	else {
+		if (vert_allocated) {
+			MEM_freeN((void *)vert);
+		}
+		if (loop_allocated) {
+			MEM_freeN((void *)mloop);
+		}
+		if (looptri_allocated) {
+			MEM_freeN((void *)looptri);
+		}
+	}
+}
+
+
+BVHTree *bvhtree_from_mesh_plane_looptri(BVHTreeFromMesh *data, DerivedMesh *dm, float epsilon, int tree_type, int axis)
+{
+	BMEditMesh *em = data->em_evil;
+	BMesh *bm = em->bm;
+	const int bvhcache_type = BVHTREE_FROM_PLANES_EDITMESH_SNAP;
+	BVHTree *tree;
+	MVert *mvert = NULL;
+	MLoop *mloop = NULL;
+	const MLoopTri *looptri = NULL;
+	bool vert_allocated = false;
+	bool loop_allocated = false;
+	bool looptri_allocated = false;
+
+	BLI_rw_mutex_lock(&cache_rwlock, THREAD_LOCK_READ);
+	tree = bvhcache_find(&dm->bvhCache, bvhcache_type);
+	BLI_rw_mutex_unlock(&cache_rwlock);
+
+	if (em == NULL) {
+		BLI_assert(0);
+	}
+
+	/* Not in cache */
+	if (tree == NULL) {
+		BLI_rw_mutex_lock(&cache_rwlock, THREAD_LOCK_WRITE);
+		tree = bvhcache_find(&dm->bvhCache, bvhcache_type);
+		if (tree == NULL) {
+			int looptri_num;
+
+			if (em) {
+				looptri_num = bm->totref*2;
+			}
+			else {
+				BLI_assert(0);
+			}
+
+			tree = bvhtree_from_mesh_plane_looptri_create_tree(
+			        epsilon, tree_type, axis,
+			        em, (bvhcache_type == BVHTREE_FROM_PLANES_EDITMESH_SNAP),
+			        mvert, mloop, looptri, looptri_num, NULL, -1);
+			if (tree) {
+				/* Save on cache for later use */
+				/* printf("BVHTree built and saved on cache\n"); */
+				bvhcache_insert(&dm->bvhCache, tree, bvhcache_type);
+			}
+		}
+		BLI_rw_mutex_unlock(&cache_rwlock);
+	}
+	else {
+		/* printf("BVHTree is already build, using cached tree\n"); */
+	}
+
+	/* Setup BVHTreeFromMesh */
+	bvhtree_from_mesh_plane_looptri_setup_data(
+	        data, tree, true, epsilon, em,
+	        mvert, vert_allocated,
+	        mloop, loop_allocated,
+	        looptri, looptri_allocated);
+
+	return data->tree;
+}
+#endif
 
 /**
  * Builds a bvh tree where nodes are the looptri faces of the given dm

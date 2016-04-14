@@ -1841,9 +1841,11 @@ extern const char *RE_engine_id_CYCLES;
 #define SCE_SNAP_MODE_NODE_Y	6
 #define SCE_SNAP_MODE_NODE_XY	7
 #define SCE_SNAP_MODE_GRID		8
-#ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
+// WITH_MECHANICAL_SNAP_TO_CURSOR
 #define SCE_SNAP_MODE_CURSOR	9
-#endif
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#define SCE_SNAP_MODE_PLANE		10
+
 
 /* toolsettings->selectmode */
 #define SCE_SELECT_VERTEX	1 /* for mesh */

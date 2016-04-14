@@ -116,6 +116,12 @@ BVHTree *bvhtree_from_mesh_looptri_ex(
         BLI_bitmap *mask, int looptri_num_active,
         float epsilon, int tree_type, int axis);
 
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
+BVHTree *bvhtree_from_mesh_plane_looptri(
+        struct BVHTreeFromMesh *data, struct DerivedMesh *mesh, float epsilon, int tree_type, int axis);
+
+#endif
+
 /**
  * Frees data allocated by a call to bvhtree_from_mesh_*.
  */
@@ -150,6 +156,9 @@ enum {
 	BVHTREE_FROM_FACES_EDITMESH_SNAP    = 5,
 	// BVHTREE_FROM_EDGES_EDITMESH_SNAP    = 6,
 	BVHTREE_FROM_VERTS_EDITMESH_SNAP    = 7,
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BVHTREE_FROM_PLANES_EDITMESH_SNAP    = 8,
+#endif
 };
 
 typedef struct LinkNode *BVHCache;

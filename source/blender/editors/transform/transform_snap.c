@@ -1704,7 +1704,7 @@ static bool snapDerivedMesh(
 
 	if (totvert > 0) {
 		const bool do_ray_start_correction = (
-		         ELEM(snap_to, SCE_SNAP_MODE_FACE, SCE_SNAP_MODE_VERTEX) &&
+		         ELEM(snap_to, SCE_SNAP_MODE_FACE, SCE_SNAP_MODE_VERTEX, SCE_SNAP_MODE_PLANE) &&
 		         (ar && !((RegionView3D *)ar->regiondata)->is_persp));
 		bool need_ray_start_correction_init = do_ray_start_correction;
 
@@ -1761,6 +1761,9 @@ static bool snapDerivedMesh(
 		treedata.em_evil = em;
 		treedata.em_evil_all = false;
 		switch (snap_to) {
+			case SCE_SNAP_MODE_PLANE:
+				bvhtree_from_mesh_plane_looptri(&treedata, dm, 0.0f, 4, 6);
+				break;
 			case SCE_SNAP_MODE_FACE:
 				bvhtree_from_mesh_looptri(&treedata, dm, 0.0f, 4, 6);
 				break;
@@ -1810,6 +1813,9 @@ static bool snapDerivedMesh(
 
 		switch (snap_to) {
 			case SCE_SNAP_MODE_FACE:
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+			case SCE_SNAP_MODE_PLANE:
+#endif
 			{
 				BVHTreeRayHit hit;
 

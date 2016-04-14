@@ -168,7 +168,10 @@ EnumPropertyItem rna_enum_snap_element_items[] = {
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
 	// Todo: Add Icon
 	{SCE_SNAP_MODE_CURSOR, "CURSOR", ICON_CURSOR, "Cursor", "Snap to cursor"},
- #endif
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	{SCE_SNAP_MODE_PLANE, "PLANE", ICON_SNAP_FACE, "Plane", "Snap to plane"},
+#endif
     {0, NULL, 0, NULL, NULL}
 };
 

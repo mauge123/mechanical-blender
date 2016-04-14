@@ -45,9 +45,9 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 	BMO_slot_mat4_get(op->slots_in,"matrix",mat);
 	dia = BMO_slot_float_get(op->slots_in,"dia");
 
-	v1[0]=dia; v1[1]=dia; v1[2]=0;
+	v1[0]=-dia; v1[1]=-dia; v1[2]=0;
 	v2[0]=dia;v2[1]=-dia;v2[2]=0;
-	v3[0]=-dia; v3[1]=-dia;v3[2]=0;
+	v3[0]=dia; v3[1]=dia;v3[2]=0;
 	v4[0]=-dia;v4[1]=dia; v4[2]=0;
 
 	mul_m4_v3(mat, v1);
@@ -62,8 +62,6 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 	BM_elem_flag_enable(erf, BM_ELEM_SELECT);
 
 	BM_mesh_select_mode_flush(bm); // Will update counters
-
-
 
 }
 
