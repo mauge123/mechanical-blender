@@ -8818,6 +8818,20 @@ static DMDrawOption bbs_mesh_solid__setSolidDrawOptions(void *userData, int inde
 	}
 }
 
+static DMDrawOption bbs_mesh_solid_plane_setSolidDrawOptions(void *userData, int index)
+{
+	BMReference *erf = userData;
+
+	if (!BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
+		WM_framebuffer_index_set(index + 1);
+		return DM_DRAW_OPTION_NORMAL;
+	}
+	else {
+		return DM_DRAW_OPTION_SKIP;
+	}
+}
+
+
 static void bbs_mesh_solid__drawCenter(void *userData, int index, const float cent[3], const float UNUSED(no[3]))
 {
 	BMFace *efa = BM_face_at_index(userData, index);
@@ -8856,7 +8870,7 @@ static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 							  Object *ob, DerivedMesh *dm)
 {
-	dm->drawMappedReferencePlanes(dm, bbs_mesh_solid__setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
+	dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
 }
 #endif
 
