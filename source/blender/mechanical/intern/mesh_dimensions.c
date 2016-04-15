@@ -93,11 +93,14 @@ static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float va
 	if (constraints & DIM_AXIS_CONSTRAINT) {
 
 		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+			if (BM_elem_flag_test(eve,BM_ELEM_TAG)) {
+				continue;
+			}
 			sub_v3_v3v3(v,eve->co, edm->center);
 			project_v3_v3v3(ncenter,v, axis);
 			add_v3_v3(ncenter,edm->center);
 
-			if ((len_v3v3 (eve->co, ncenter) - curv) <  DIM_CONSTRAINT_PRECISION){
+			if (fabs((len_v3v3 (eve->co, ncenter)*2 - curv)) <  DIM_CONSTRAINT_PRECISION){
 				BM_elem_flag_enable(eve, BM_ELEM_TAG);
 			}
 		}
