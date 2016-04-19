@@ -257,9 +257,9 @@ struct DerivedMesh {
 	struct MFace *(*getTessFaceArray)(DerivedMesh * dm);
 	struct MLoop *(*getLoopArray)(DerivedMesh * dm);
 	struct MPoly *(*getPolyArray)(DerivedMesh * dm);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 	struct MDim *(*getDimArray)(DerivedMesh * dm);
-#endif
+/* */
 
 	/** Copy all verts/edges/faces from the derived mesh into
 	 * *{vert/edge/face}_r (must point to a buffer large enough)
