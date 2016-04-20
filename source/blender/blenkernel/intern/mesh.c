@@ -1509,11 +1509,17 @@ void BKE_mesh_from_nurbs_displist(Object *ob, ListBase *dispbase, const bool use
 		me->totedge = totedge;
 		me->totloop = totloop;
 		me->totpoly = totpoly;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		me->totdim = 0;
+#endif
 
 		me->mvert = CustomData_add_layer(&me->vdata, CD_MVERT, CD_ASSIGN, allvert, me->totvert);
 		me->medge = CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, alledge, me->totedge);
 		me->mloop = CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, allloop, me->totloop);
 		me->mpoly = CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, allpoly, me->totpoly);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		me->mdim = CustomData_add_layer(&me->ddata, CD_MDIM, CD_ASSIGN, NULL, me->totdim);
+#endif
 
 		if (alluv) {
 			const char *uvname = "Orco";
