@@ -519,6 +519,9 @@ void BKE_mesh_init(Mesh *me)
 	CustomData_reset(&me->fdata);
 	CustomData_reset(&me->pdata);
 	CustomData_reset(&me->ldata);
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	CustomData_reset(&me->ddata);
+#endif
 }
 
 Mesh *BKE_mesh_add(Main *bmain, const char *name)
