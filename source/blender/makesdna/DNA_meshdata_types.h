@@ -89,6 +89,7 @@ typedef struct MReference {
 	float p3[3];
 	float p4[3];
 	short flag;
+	char name[48];
 	char pad[2];
 } MReference;
 /* */

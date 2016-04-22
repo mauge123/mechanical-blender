@@ -4523,7 +4523,7 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	mesh->refs = newdataadr(fd, mesh->refs);
+	mesh->mref = newdataadr(fd, mesh->mref);
 #endif
 	
 	/* animdata */

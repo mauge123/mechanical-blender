@@ -137,7 +137,7 @@ typedef struct Mesh {
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	int totdim, totref;
 	struct CustomData ddata;
-	struct MReference *refs;
+	struct MReference *mref;
 /**/
 
 

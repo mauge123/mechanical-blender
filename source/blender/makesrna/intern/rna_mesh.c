@@ -1361,6 +1361,12 @@ static char *rna_MeshVertex_path(PointerRNA *ptr)
 	return BLI_sprintfN("vertices[%d]", (int)((MVert *)ptr->data - rna_mesh(ptr)->mvert));
 }
 
+//WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static char *rna_MeshReference_path(PointerRNA *ptr)
+{
+	return BLI_sprintfN("references[%d]", (int)((MReference *)ptr->data - rna_mesh(ptr)->mref));
+}
+
 static char *rna_MeshTextureFaceLayer_path(PointerRNA *ptr)
 {
 	CustomDataLayer *cdl = ptr->data;
@@ -1682,6 +1688,21 @@ static int rna_Mesh_tot_face_get(PointerRNA *ptr)
 	return me->edit_btmesh ? me->edit_btmesh->bm->totfacesel : 0;
 }
 
+// WITH_MECHANICAL_MESH_DIMENSIONS
+static int rna_Mesh_tot_dim_get(PointerRNA *ptr)
+{
+	Mesh *me = rna_mesh(ptr);
+	return me->edit_btmesh ? me->edit_btmesh->bm->totdimsel : 0;
+}
+
+//WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static int rna_Mesh_tot_ref_get(PointerRNA *ptr)
+{
+	Mesh *me = rna_mesh(ptr);
+	return me->edit_btmesh ? me->edit_btmesh->bm->totrefsel : 0;
+}
+
+
 static PointerRNA rna_Mesh_vertex_color_new(struct Mesh *me, const char *name)
 {
 	PointerRNA ptr;
@@ -1942,6 +1963,22 @@ static void rna_def_mvert(BlenderRNA *brna)
 	RNA_def_property_float_funcs(prop, "rna_MeshVertex_undeformed_co_get", NULL, NULL);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 }
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void rna_def_mref(BlenderRNA *brna){
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "MeshReference", NULL);
+	RNA_def_struct_sdna(srna, "MReference");
+	RNA_def_struct_ui_text(srna, "Mesh Reference", "Object Reference in a Mesh data-block");
+	RNA_def_struct_path_func(srna, "rna_MeshReference_path");
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "name");
+	RNA_def_property_ui_text(prop, "Name", "");
+}
+#endif
 
 static void rna_def_medge(BlenderRNA *brna)
 {
@@ -2761,6 +2798,24 @@ static void rna_def_mesh_vertices(BlenderRNA *brna, PropertyRNA *cprop)
 #endif
 }
 
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+/* mesh.references */
+static void rna_def_mesh_references(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+/*	PropertyRNA *prop; */
+
+	FunctionRNA *func;
+/*	PropertyRNA *parm; */
+
+	RNA_def_property_srna(cprop, "MeshReferences");
+	srna = RNA_def_struct(brna, "MeshReferences", NULL);
+	RNA_def_struct_sdna(srna, "Mesh");
+	RNA_def_struct_ui_text(srna, "Mesh References", "Collection of mesh references");
+}
+#endif
+
 /* mesh.edges */
 static void rna_def_mesh_edges(BlenderRNA *brna, PropertyRNA *cprop)
 {
@@ -3264,6 +3319,14 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Vertices", "Vertices of the mesh");
 	rna_def_mesh_vertices(brna, prop);
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	prop = RNA_def_property(srna, "references", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "mref", "totref");
+	RNA_def_property_struct_type(prop, "MeshReference");
+	RNA_def_property_ui_text(prop, "References", "Object References of the mesh");
+	rna_def_mesh_references(brna, prop);
+#endif
+
 	prop = RNA_def_property(srna, "edges", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_collection_sdna(prop, NULL, "medge", "totedge");
 	RNA_def_property_struct_type(prop, "MeshEdge");
@@ -3690,6 +3753,20 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Selected Face Total", "Selected face count in editmode");
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	prop = RNA_def_property(srna, "total_dim_sel", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_funcs(prop, "rna_Mesh_tot_dim_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Selected Dim Total", "Selected dim count in editmode");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	prop = RNA_def_property(srna, "total_ref_sel", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_funcs(prop, "rna_Mesh_tot_ref_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Selected References Total", "Selected references count in editmode");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+#endif
+
 	prop = RNA_def_property(srna, "is_editmode", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_funcs(prop, "rna_Mesh_is_editmode_get", NULL);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
@@ -3706,6 +3783,9 @@ void RNA_def_mesh(BlenderRNA *brna)
 {
 	rna_def_mesh(brna);
 	rna_def_mvert(brna);
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	rna_def_mref(brna);
+#endif
 	rna_def_mvert_group(brna);
 	rna_def_medge(brna);
 	rna_def_mface(brna);

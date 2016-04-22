@@ -219,11 +219,11 @@ static BMFace *bm_face_create_from_mpoly(
 }
 
 
-static void BM_references_to_me_references(BMesh *bm, Mesh *me)
+static void BM_references_from_me_references(BMesh *bm, Mesh *me)
 {
 	BMReference *erf;
 	MReference *mrf;
-	mrf = me->refs;
+	mrf = me->mref;
 	for (int i = 0; i < me->totref; i++, mrf++) {
 
 		BM_mesh_elem_toolflags_ensure(bm);
@@ -304,7 +304,7 @@ void BM_mesh_bm_from_me(
 		}
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 		// Copy References!
-		BM_references_to_me_references(bm,me);
+		BM_references_from_me_references(bm,me);
 #endif
 
 		return; /* sanity check */
@@ -456,7 +456,7 @@ void BM_mesh_bm_from_me(
 	}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_references_to_me_references(bm,me);
+	BM_references_from_me_references(bm,me);
 #endif
 
 
@@ -713,7 +713,7 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	if (bm->totref == 0) mrf = NULL;
-	else mrf = me->refs =  MEM_callocN(bm->totref * sizeof(MReference), "loadeditbMesh reference");
+	else mrf = me->mref =  MEM_callocN(bm->totref * sizeof(MReference), "loadeditbMesh reference");
 #endif
 
 

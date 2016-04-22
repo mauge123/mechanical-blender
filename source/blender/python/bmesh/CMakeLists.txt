@@ -57,4 +57,8 @@ if(WITH_FREESTYLE)
 	add_definitions(-DWITH_FREESTYLE)
 endif()
 
+if (WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANCIAL_MESH_REFERENCE_OBJECTS)
+endif()
+
 blender_add_lib(bf_python_bmesh "${SRC}" "${INC}" "${INC_SYS}")
