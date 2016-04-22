@@ -3129,6 +3129,10 @@ if(FIRST_RUN)
 	message("${_config_msg}")
 endif()
 
+
+# Additional linking libraries
+set(CMAKE_EXE_LINKER_FLAGS   "-lrt -static-libstdc++"  CACHE STRING "" FORCE)
+
 if(0)
 	print_all_vars()
 endif()
