@@ -526,7 +526,7 @@ struct DerivedMesh {
 	                          DMForeachFlag flag);
 /* */
 
-// WITH_MECHANICAL_MESH_REFERENCEO_OBJECTS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	void (*foreachMappedReference)(DerivedMesh *dm,
 	                                     void (*func)(void *userData, int index, void *element),
 			                             void *userData,

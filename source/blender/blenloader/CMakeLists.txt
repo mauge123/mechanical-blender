@@ -76,6 +76,7 @@ endif()
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 endif()
 
 blender_add_lib(bf_blenloader "${SRC}" "${INC}" "${INC_SYS}")

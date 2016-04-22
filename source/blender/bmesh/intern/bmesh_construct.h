@@ -75,5 +75,8 @@ char  BM_vert_flag_from_mflag(const char  mflag);
 char  BM_face_flag_to_mflag(BMFace *f);
 short BM_edge_flag_to_mflag(BMEdge *e);
 char  BM_vert_flag_to_mflag(BMVert *v);
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+char  BM_reference_flag_to_mflag(BMReference *erf);
+#endif
 
 #endif /* __BMESH_CONSTRUCT_H__ */

@@ -927,3 +927,11 @@ char  BM_face_flag_to_mflag(BMFace *efa)
 	         ((hflag & BM_ELEM_HIDDEN) ? ME_HIDE     : 0)
 	         );
 }
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+char  BM_reference_flag_to_mflag(BMReference *erf)
+{
+	const char hflag = erf->head.hflag;
+
+	return  (hflag & BM_ELEM_SELECT) ? SELECT : 0;
+}
+#endif

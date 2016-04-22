@@ -858,6 +858,8 @@ void BM_mesh_bm_to_me(BMesh *bm, Mesh *me, bool do_tessface)
 		 copy_v3_v3(mrf->p3, erf->v3);
 		 copy_v3_v3(mrf->p4, erf->v4);
 		 mrf->type = erf->type;
+		 mrf->flag = BM_reference_flag_to_mflag(erf);
+		 BM_elem_index_set(erf, i); /* set_inline */
 		 mrf++;
 		 BM_CHECK_ELEMENT(erf);
 	}

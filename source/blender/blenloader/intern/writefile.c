@@ -2064,6 +2064,9 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 				}
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+				writedata(wd, DATA, sizeof(MReference)*mesh->totref, mesh->refs);
+#endif
 				/* restore pointer */
 				mesh = old_mesh;
 			}
