@@ -461,7 +461,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	if (t->tsnap.mode == SCE_SNAP_MODE_CURSOR) {
 		found = snapCursor(t,mval,&dist_px,loc);
 	} else {
-		found = snapObjectsTransform(t, mval,SNAP_ALL, loc, no, &dist_px);
+		found = snapObjectsTransform(t, mval,SNAP_ALL, &dist_px, loc, no);
 	}
 
 	if (found) {

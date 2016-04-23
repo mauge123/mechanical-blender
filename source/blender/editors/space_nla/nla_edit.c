@@ -542,6 +542,30 @@ void NLA_OT_view_selected(wmOperatorType *ot)
 }
 
 /* *********************************************** */
+
+static int nlaedit_viewframe_exec(bContext *C, wmOperator *op)
+{
+	const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
+	ANIM_center_frame(C, smooth_viewtx);
+	return OPERATOR_FINISHED;
+}
+
+void NLA_OT_view_frame(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "View Frame";
+	ot->idname = "NLA_OT_view_frame";
+	ot->description = "Reset viewable area to show range around current frame";
+	
+	/* api callbacks */
+	ot->exec = nlaedit_viewframe_exec;
+	ot->poll = ED_operator_nla_active;
+	
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/* *********************************************** */
 /* NLA Editing Operations (Constructive/Destructive) */
 
 /* ******************** Add Action-Clip Operator ***************************** */
@@ -2235,7 +2259,9 @@ static EnumPropertyItem *nla_fmodifier_itemf(bContext *C, PointerRNA *UNUSED(ptr
 			continue;
 		
 		index = RNA_enum_from_value(rna_enum_fmodifier_type_items, fmi->type);
-		RNA_enum_item_add(&item, &totitem, &rna_enum_fmodifier_type_items[index]);
+		if (index != -1) {  /* Not all types are implemented yet... */
+			RNA_enum_item_add(&item, &totitem, &rna_enum_fmodifier_type_items[index]);
+		}
 	}
 	
 	RNA_enum_item_end(&item, &totitem);

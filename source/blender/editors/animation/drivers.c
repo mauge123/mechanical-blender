@@ -635,12 +635,9 @@ void ANIM_driver_vars_copybuf_free(void)
 {
 	/* Free the driver variables kept in the buffer */
 	if (driver_vars_copybuf.first) {
-		/* We use a dummy driver here, as the variable freeing code assumes there's a driver */
-		ChannelDriver dummy_driver = {{NULL}};
-		dummy_driver.variables = driver_vars_copybuf;
+		DriverVar *dvar, *dvarn;
 		
 		/* Free variables (and any data they use) */
-		DriverVar *dvar, *dvarn;
 		for (dvar = driver_vars_copybuf.first; dvar; dvar = dvarn) {
 			dvarn = dvar->next;
 			driver_free_variable(&driver_vars_copybuf, dvar);
@@ -751,7 +748,8 @@ EnumPropertyItem prop_driver_create_mapping_types[] = {
 	 "Drive all components of this property using the target picked"},
 	{CREATEDRIVER_MAPPING_1_1, "DIRECT", 0, "Single from Target",
 	 "Drive this component of this property using the target picked"},
-	{CREATEDRIVER_MAPPING_N_N, "MATCH", 0, "Match Indices",
+	 
+	{CREATEDRIVER_MAPPING_N_N, "MATCH", ICON_COLOR, "Match Indices",
 	 "Create drivers for each pair of corresponding elements"},
 	 
 	{CREATEDRIVER_MAPPING_NONE_ALL, "NONE_ALL", ICON_HAND, "Manually Create Later",

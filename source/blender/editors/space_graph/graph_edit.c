@@ -265,13 +265,7 @@ static int graphkeys_view_selected_exec(bContext *C, wmOperator *op)
 	return graphkeys_viewall(C, true, include_handles, smooth_viewtx);
 }
 
-static int graphkeys_view_frame_exec(bContext *C, wmOperator *op)
-{
-	const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
-	ANIM_center_frame(C, smooth_viewtx);
-	return OPERATOR_FINISHED;
-}
-
+/* ......... */
 
 void GRAPH_OT_view_all(wmOperatorType *ot)
 {
@@ -311,17 +305,26 @@ void GRAPH_OT_view_selected(wmOperatorType *ot)
 	                           "Include handles of keyframes when calculating extents");
 }
 
+/* ********************** View Frame Operator ****************************** */
+
+static int graphkeys_view_frame_exec(bContext *C, wmOperator *op)
+{
+	const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
+	ANIM_center_frame(C, smooth_viewtx);
+	return OPERATOR_FINISHED;
+}
+
 void GRAPH_OT_view_frame(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "View Frame";
 	ot->idname = "GRAPH_OT_view_frame";
 	ot->description = "Reset viewable area to show range around current frame";
-
+	
 	/* api callbacks */
 	ot->exec = graphkeys_view_frame_exec;
-	ot->poll = ED_operator_graphedit_active; /* XXX: unchecked poll to get fsamples working too, but makes modifier damage trickier... */
-
+	ot->poll = ED_operator_graphedit_active;
+	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
@@ -2390,7 +2393,9 @@ static EnumPropertyItem *graph_fmodifier_itemf(bContext *C, PointerRNA *UNUSED(p
 			continue;
 		
 		index = RNA_enum_from_value(rna_enum_fmodifier_type_items, fmi->type);
-		RNA_enum_item_add(&item, &totitem, &rna_enum_fmodifier_type_items[index]);
+		if (index != -1) {  /* Not all types are implemented yet... */
+			RNA_enum_item_add(&item, &totitem, &rna_enum_fmodifier_type_items[index]);
+		}
 	}
 	
 	RNA_enum_item_end(&item, &totitem);
@@ -2642,10 +2647,10 @@ static int graph_driver_vars_copy_exec(bContext *C, wmOperator *op)
 	}
 	
 	/* successful or not? */
-	if (ok == 0)
-		return OPERATOR_CANCELLED;
-	else
+	if (ok)
 		return OPERATOR_FINISHED;
+	else
+		return OPERATOR_CANCELLED;
 }
  
 void GRAPH_OT_driver_variables_copy(wmOperatorType *ot)
@@ -2684,32 +2689,23 @@ static int graph_driver_vars_paste_exec(bContext *C, wmOperator *op)
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_ACTIVE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
-	/* paste modifiers */
+	/* paste variables */
 	for (ale = anim_data.first; ale; ale = ale->next) {
 		FCurve *fcu = (FCurve *)ale->data;
-		bool paste_ok;
-		
-		printf("pasting vars to %p -> %p\n", fcu, fcu->driver);
-		paste_ok = ANIM_driver_vars_paste(op->reports, fcu, replace);
-		
-		if (paste_ok) {
-			//ale->update |= ANIM_UPDATE_DEPS;
-			printf("now we have: %d vars\n",  BLI_listbase_count(&fcu->driver->variables));
-			ok = true;
-		}
+		ok |= ANIM_driver_vars_paste(op->reports, fcu, replace);
 	}
 	
-	// XXX: something causes a crash after adding the copies (to empty list), if we do an update immediately
-	if (ok) {
-		DAG_relations_tag_update(CTX_data_main(C));
-		//ANIM_animdata_update(&ac, &anim_data);
-	}
+	/* cleanup */
 	ANIM_animdata_freelist(&anim_data);
 	
 	/* successful or not? */
 	if (ok) {
+		/* rebuild depsgraph, now that there are extra deps here */
+		DAG_relations_tag_update(CTX_data_main(C));
+		
 		/* set notifier that keyframes have changed */
 		WM_event_add_notifier(C, NC_SCENE | ND_FRAME, CTX_data_scene(C));
+		
 		return OPERATOR_FINISHED;
 	}
 	else {
@@ -2732,9 +2728,8 @@ void GRAPH_OT_driver_variables_paste(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_boolean(ot->srna, "only_active", true, "Only Active", "Only paste F-Modifiers on active F-Curve");
 	RNA_def_boolean(ot->srna, "replace", false, "Replace Existing", 
-	                "Replace existing F-Modifiers, instead of just appending to the end of the existing list");
+	                "Replace existing driver variables, instead of just appending to the end of the existing list");
 }
 
 /* ************************************************************************** */

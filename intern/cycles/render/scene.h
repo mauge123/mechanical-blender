@@ -22,11 +22,10 @@
 
 #include "device_memory.h"
 
-#include "kernel_types.h"
-
 #include "util_param.h"
 #include "util_string.h"
 #include "util_system.h"
+#include "util_texture.h"
 #include "util_thread.h"
 #include "util_types.h"
 #include "util_vector.h"
@@ -110,8 +109,8 @@ public:
 	device_vector<uint> sobol_directions;
 
 	/* cpu images */
-	device_vector<uchar4> tex_image[TEX_EXTENDED_NUM_IMAGES_CPU];
-	device_vector<float4> tex_float_image[TEX_EXTENDED_NUM_FLOAT_IMAGES];
+	device_vector<uchar4> tex_image[TEX_NUM_BYTE_IMAGES_CPU];
+	device_vector<float4> tex_float_image[TEX_NUM_FLOAT_IMAGES_CPU];
 
 	/* opencl images */
 	device_vector<uchar4> tex_image_packed;
@@ -214,6 +213,11 @@ public:
 	void device_free();
 
 protected:
+	/* Check if some heavy data worth logging was updated.
+	 * Mainly used to suppress extra annoying logging.
+	 */
+	bool need_data_update();
+
 	void free_memory(bool final);
 };
 

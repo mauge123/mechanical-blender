@@ -1992,7 +1992,7 @@ void BKE_image_stamp_buf(
 	BLF_wordwrap(mono, width - (BUFF_MARGIN_X * 2));
 
 	BLF_buffer(mono, rectf, rect, width, height, channels, display);
-	BLF_buffer_col(mono, UNPACK4(scene->r.fg_stamp));
+	BLF_buffer_col(mono, scene->r.fg_stamp);
 	pad = BLF_width_max(mono);
 
 	/* use 'h_fixed' rather than 'h', aligns better */
@@ -4494,13 +4494,17 @@ void BKE_image_get_size(Image *image, ImageUser *iuser, int *width, int *height)
 	ImBuf *ibuf = NULL;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(image, iuser, &lock);
+	if (image != NULL) {
+		ibuf = BKE_image_acquire_ibuf(image, iuser, &lock);
+	}
 
 	if (ibuf && ibuf->x > 0 && ibuf->y > 0) {
 		*width = ibuf->x;
 		*height = ibuf->y;
 	}
-	else if (image->type == IMA_TYPE_R_RESULT && iuser != NULL && iuser->scene != NULL) {
+	else if (image != NULL && image->type == IMA_TYPE_R_RESULT &&
+	         iuser != NULL && iuser->scene != NULL)
+	{
 		Scene *scene = iuser->scene;
 		*width = (scene->r.xsch * scene->r.size) / 100;
 		*height = (scene->r.ysch * scene->r.size) / 100;
@@ -4514,7 +4518,9 @@ void BKE_image_get_size(Image *image, ImageUser *iuser, int *width, int *height)
 		*height = IMG_SIZE_FALLBACK;
 	}
 
-	BKE_image_release_ibuf(image, ibuf, lock);
+	if (image != NULL) {
+		BKE_image_release_ibuf(image, ibuf, lock);
+	}
 }
 
 void BKE_image_get_size_fl(Image *image, ImageUser *iuser, float size[2])
