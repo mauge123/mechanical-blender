@@ -37,6 +37,8 @@
 
 #include "intern/bmesh_operators_private.h" /* own include */
 
+#define ELE_NEW 1
+
 void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 {
 	BMReference *erf;
@@ -84,7 +86,10 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 
 	erf = BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, NULL, 0);
 
+	BMO_elem_flag_enable(bm, erf, ELE_NEW);
 	BM_elem_flag_enable(erf, BM_ELEM_SELECT);
+
+	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "reference.out", BM_REFERENCE, ELE_NEW);
 
 	BM_mesh_select_mode_flush(bm); // Will update counters
 

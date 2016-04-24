@@ -26,6 +26,7 @@
 set(SRC
 	intern/mesh_dimensions.c
 	intern/mechanical_utils.c
+	intern/mesh_references.c
 )
 
 set(INC

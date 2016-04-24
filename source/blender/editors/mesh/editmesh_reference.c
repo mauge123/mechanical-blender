@@ -55,7 +55,9 @@
 
 #include "BLI_string.h"
 
-#include "mesh_dimensions.h"
+#include "../editors/transform/transform.h"
+
+#include "mesh_references.h"
 
 
 static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
@@ -68,6 +70,10 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
+	BMReference *erf = NULL;
+
+	TransformOrientation *ts;
+
 	BMOperator bmop;
 	char op_str [255] = {0};
 
@@ -79,9 +85,15 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 
 	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, mat, dia);
 
-
-
 	BMO_op_exec(em->bm, &bmop);
+
+	erf = BMO_slot_buffer_get_first(bmop.slots_out, "reference.out");
+
+	if (erf) {
+		float pmat[3][3];
+		reference_plane_matrix(erf,pmat);
+		ts = addMatrixSpace(C, pmat, erf->name, true);
+	}
 
 	if (!EDBM_op_finish(em, &bmop, op, true)) {
 		return OPERATOR_CANCELLED;

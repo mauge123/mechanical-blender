@@ -35,6 +35,8 @@
 #include "BLI_stackdefines.h"
 
 #include "BLT_translation.h"
+#include "BLI_path_util.h"
+#include "BLI_string.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_mesh.h"
@@ -3189,6 +3191,20 @@ BMDim *BM_dim_create(
 	return edm;
 }
 
+static bool unique_name_reference_check(void *arg, const char *name)
+{
+	BMReference *erf;
+	BMIter iter;
+	BMesh *bm = arg;
+
+	BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+		if (strcmp(erf->name, name) == 0) {
+			return true;
+		}
+	}
+	return false;
+
+}
 
 /**
  * \brief Main function for creating a new dimension.
@@ -3200,6 +3216,7 @@ BMReference *BM_reference_plane_create(
         const BMReference *UNUSED(d_example), const eBMCreateFlag UNUSED(create_flag))
 {
 	BMReference *erf = 	BLI_mempool_alloc(bm->ppool);
+	char def_name[50];
 
 	/* --- assign all members --- */
 	erf->head.data = NULL;
@@ -3225,15 +3242,18 @@ BMReference *BM_reference_plane_create(
 	bm->totref++;
 
 	erf->type = BM_REFERENCE_TYPE_PLANE;
+	erf->name[0] = '\0';
 	copy_v3_v3(erf->v1,v1);
 	copy_v3_v3(erf->v2,v2);
 	copy_v3_v3(erf->v3,v3);
 	copy_v3_v3(erf->v4,v4);
 	if(name == NULL) {
-		strcpy(erf->name, "Reference");
+		BLI_strncpy(def_name, "Reference", 50);
 	} else {
-		strcpy(erf->name, name);
+		BLI_strncpy(def_name, name, 50);
 	}
+
+	BLI_uniquename_cb(unique_name_reference_check, bm, def_name, '.', erf->name, 50);
 
 	return erf;
 }
