@@ -82,7 +82,7 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 
 	BM_mesh_elem_hflag_disable_all(bm, BM_ALL_NOLOOP, BM_ELEM_SELECT,true);
 
-	erf = BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, 0);
+	erf = BM_reference_plane_create(bm, v1, v2, v3, v4, NULL, NULL, 0);
 
 	BM_elem_flag_enable(erf, BM_ELEM_SELECT);
 

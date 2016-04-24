@@ -3196,7 +3196,7 @@ BMDim *BM_dim_create(
  * \note base on BM_edge_create function
  */
 BMReference *BM_reference_plane_create(
-        BMesh *bm, float *v1, float *v2, float *v3, float *v4,
+        BMesh *bm, float *v1, float *v2, float *v3, float *v4, char *name,
         const BMReference *UNUSED(d_example), const eBMCreateFlag UNUSED(create_flag))
 {
 	BMReference *erf = 	BLI_mempool_alloc(bm->ppool);
@@ -3229,6 +3229,11 @@ BMReference *BM_reference_plane_create(
 	copy_v3_v3(erf->v2,v2);
 	copy_v3_v3(erf->v3,v3);
 	copy_v3_v3(erf->v4,v4);
+	if(name == NULL) {
+		strcpy(erf->name, "Reference");
+	} else {
+		strcpy(erf->name, name);
+	}
 
 	return erf;
 }

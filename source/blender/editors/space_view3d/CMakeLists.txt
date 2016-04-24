@@ -94,6 +94,7 @@ if(WITH_MECHANICAL)
 	list(APPEND INC
 		../../mechanical
 	)
+	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 	add_definitions(-DWITH_MECHANICAL_3D_VIEW_NUM_INPUT)
 	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)

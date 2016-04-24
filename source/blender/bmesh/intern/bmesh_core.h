@@ -134,7 +134,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *d);
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 BMReference *BM_reference_plane_create(
-        BMesh *bm, float *v1, float *v2, float *v3, float *v4,
+        BMesh *bm, float *v1, float *v2, float *v3, float *v4, char *name,
         const BMReference *d_example, const eBMCreateFlag create_flag);
 #endif
 

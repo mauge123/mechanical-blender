@@ -440,7 +440,7 @@ static void stats_string(Scene *scene)
 	ofs = 0;
 
 #ifdef WITH_MECHANICAL
-	ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs, "Mechanical -  ", versionstr);
+	ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs, "Mechanical - ");
 #endif
 
 	ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs, "%s | ", versionstr);

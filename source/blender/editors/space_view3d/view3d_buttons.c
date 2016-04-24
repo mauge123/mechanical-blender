@@ -1289,6 +1289,13 @@ static void do_view3d_region_buttons(bContext *C, void *UNUSED(index), int event
 	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
 }
 
+#ifdef WITH_MECHANICAL
+static int view3d_panel_editmode_poll(const bContext *C, PanelType *UNUSED(pt))
+{
+	return (CTX_data_edit_object(C) != NULL);
+}
+#endif
+
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void do_view3d_mesh_dimensions_buttons(bContext *C, void *UNUSED(index), int event)
 {
@@ -1314,12 +1321,6 @@ static void do_view3d_mesh_dimensions_buttons(bContext *C, void *UNUSED(index), 
 	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
 }
 
-
-static int view3d_panel_mesh_dimensions_poll(const bContext *C, PanelType *UNUSED(pt))
-{
-	return (CTX_data_edit_object(C) != NULL);
-}
-
 static void view3d_panel_mesh_dimensions(const bContext *C, Panel *pa)
 {
 	uiBlock *block;
@@ -1340,6 +1341,52 @@ static void view3d_panel_mesh_dimensions(const bContext *C, Panel *pa)
 		v3d_mesh_dimensions_buts (scene, col, v3d, ob, lim);
 	}
 
+}
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void view3d_panel_mesh_references(const bContext *C, Panel *pa){
+	uiBlock *block;
+	Scene *scene = CTX_data_scene(C);
+	Object *obedit = CTX_data_edit_object(C);
+	Object *ob = scene->basact->object;
+
+	block = uiLayoutGetBlock(pa->layout);
+
+	if (ob == obedit) {
+		int totref=0;
+		BMReference *erf_sel;
+		int yi = 200;
+		const int buth = 20 * UI_DPI_FAC;
+		const int but_margin = 2;
+
+		if (ob->type == OB_MESH) {
+			Mesh *me = ob->data;
+			BMEditMesh *em = me->edit_btmesh;
+			BMesh *bm = em->bm;
+			BMReference *erf;
+			BMIter iter;
+
+			if (bm->totref) {
+				BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+					if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+						totref++;
+						erf_sel = erf;
+					}
+			    }
+			}
+		}
+
+		if (totref) {
+
+			uiDefButC(block, UI_BTYPE_TEXT, 0, "Name: ",0, yi -= buth + but_margin, 200, buth,
+				erf_sel->name, 0, 50, 0, 0, TIP_("Reference name"));
+
+		} else {
+			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("No Reference selected"), 0, yi -= buth + but_margin, 200, 20, NULL, 0, 0, 0, 0, "");
+		}
+
+	}
 }
 #endif
 
@@ -1405,10 +1452,24 @@ void view3d_buttons_register(ARegionType *art)
 	strcpy(pt->label, N_("Dimensions"));  /* XXX C panels not  available through RNA (bpy.types)! */
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = view3d_panel_mesh_dimensions;
-	pt->poll = view3d_panel_mesh_dimensions_poll;
+	pt->poll = view3d_panel_editmode_poll;
 	BLI_addtail(&art->paneltypes, pt);
 
 #endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	// The name, set on BM, is not avaliable on python
+
+	pt = MEM_callocN(sizeof(PanelType), "spacetype mesh references panel object");
+	strcpy(pt->idname, "VIEW3D_PT_mesh_references");
+	strcpy(pt->label, N_("References"));  /* XXX C panels not  available through RNA (bpy.types)! */
+	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+	pt->draw = view3d_panel_mesh_references;
+	pt->poll = view3d_panel_editmode_poll;
+	BLI_addtail(&art->paneltypes, pt);
+
+#endif
+
 
 	pt = MEM_callocN(sizeof(PanelType), "spacetype view3d panel vgroup");
 	strcpy(pt->idname, "VIEW3D_PT_vgroup");

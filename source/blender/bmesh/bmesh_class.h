@@ -197,7 +197,7 @@ typedef struct BMDim {
 typedef struct BMReference {
 	BMHeader head;
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
-
+	char name[50];
 
 	short type;
 
