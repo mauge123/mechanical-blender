@@ -33,6 +33,8 @@
 #include "BLI_math.h"
 #include "BLI_alloca.h"
 #include "BLI_memarena.h"
+// WITH_MECHANICAL_BLENDER_D1669
+#include "BLI_polyinset.h"
 #include "BKE_customdata.h"
 
 #include "bmesh.h"
@@ -259,7 +261,114 @@ static void bm_loop_customdata_merge(
 
 /* -------------------------------------------------------------------- */
 /* Inset Individual */
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+static void bmo_face_inset_individual(
+        BMesh *bm, BMFace *f, MemArena *interp_arena,
+        const float thickness, const float depth,
+	const bool use_even_offset, const bool use_relative_offset, const bool use_interpolate,
+	const bool use_fix_overlaps)
+{
+	BMVert **verts, **face_verts;
+	float (*coords_orig)[3];
+	BMLoop *l_iter, *l_first;
 
+	BMFace *fnew;
+	BMIter iter;
+	unsigned int i, flags;
+	float th;
+	MemArena *inset_arena;
+	InsetResult ir;
+	InsetFace *insetf;
+	BMFace **new_inner_faces = NULL;
+	int flen = f->len;
+	int j, n;
+
+	(void) interp_arena; /* TODO: pass in inset_arena from caller and replace interp_arena with it */
+	inset_arena = BLI_memarena_new(BLI_POLYINSET_ARENA_SIZE, __func__);
+	coords_orig = BLI_memarena_alloc(inset_arena, sizeof(coords_orig[0]) * flen);
+
+	l_first = BM_FACE_FIRST_LOOP(f);
+	l_iter = l_first;
+	i = 0;
+	do {
+		copy_v3_v3(coords_orig[i], l_iter->v->co);
+	} while ((void)i++, ((l_iter = l_iter->next) != l_first));
+
+	flags = (use_even_offset ? INSET_EVEN_OFFSET : 0) | (use_relative_offset ? INSET_RELATIVE_OFFSET : 0);
+	if (use_fix_overlaps)
+		flags |= INSET_CLAMPED;
+
+	th = BLI_polyinset3d((const float(*)[3])coords_orig, f->len, thickness, depth, flags, &ir, inset_arena);
+
+	/* deselect face, flusing downwards, so at end only the new face is selected */
+	BM_face_select_set(bm, f, false);
+    
+	/* gather / make needed BMVerts */
+	verts = BLI_memarena_alloc(inset_arena, sizeof(BMVert *) * ir.vert_tot);
+	face_verts = BLI_memarena_alloc(inset_arena, sizeof(BMVert *) * ir.vert_tot); /* overestimate max size of face */
+
+	l_first = BM_FACE_FIRST_LOOP(f);
+	l_iter = l_first;
+	i = 0;
+
+	do {
+		verts[i] = l_iter->v;
+	} while (i++, ((l_iter = l_iter->next) != l_first));
+
+	for ( ; i < ir.vert_tot; i++) {
+		verts[i] = BM_vert_create(bm, ir.vert_coords[i], verts[i - flen], BM_CREATE_NOP);
+	}
+	    
+	/* make new faces */
+	if (ir.inner_tot > 0)
+		new_inner_faces = BLI_memarena_calloc(inset_arena, ir.inner_tot * sizeof(*new_inner_faces));
+	
+	for (i = 0; i < ir.poly_tot; i++) {
+		insetf = &ir.polys[i];
+		n = insetf->vert_tot;
+		BLI_assert(n <= ir.vert_tot);
+		for (j = 0; j < n; j++) {
+			face_verts[j] = verts[insetf->vert_indices[j]];
+ 		}
+        
+		fnew = BM_face_create_verts(bm, face_verts, n, f, BM_CREATE_NOP, true);
+		if (use_interpolate) {
+			BM_ITER_ELEM (l_iter, &iter, fnew, BM_LOOPS_OF_FACE) {
+				BM_loop_interp_from_face(bm, l_iter, f, true, true);
+			}
+		}
+
+		if (i >= ir.poly_tot - ir.inner_tot) {
+			BM_face_select_set(bm, fnew, true);
+				new_inner_faces[i - (ir.poly_tot - ir.inner_tot)] = fnew;
+		}
+	}
+
+	BM_face_kill(bm, f);
+ 
+	if (use_fix_overlaps && th > 0 && th < thickness && ir.inner_tot > 0) {
+		float thickness_left = thickness - th;
+		float depth_left = depth - (th / thickness) * depth;
+		for (i = 0; i < ir.inner_tot; i++) {
+			bmo_face_inset_individual(bm, new_inner_faces[i], interp_arena, thickness_left,
+				depth_left, use_even_offset, use_relative_offset, use_interpolate, use_fix_overlaps);
+		}
+	}
+
+#if 0
+/* IS THIS NEEDED? */
+/* update the coords and vertex normals */
+	l_iter = l_first;
+	i = 0;
+	do {
+		copy_v3_v3(l_iter->v->co, coords[i]);
+		copy_v3_v3(l_iter->v->no, f->no);
+	} while ((void)i++, ((l_iter = l_iter->next) != l_first));
+#endif
+
+	BLI_memarena_free(inset_arena);
+}
+#else
 static void bmo_face_inset_individual(
         BMesh *bm, BMFace *f, MemArena *interp_arena,
         const float thickness, const float depth,
@@ -405,6 +514,7 @@ static void bmo_face_inset_individual(
 		bm_interp_face_free(iface, bm);
 	}
 }
+#endif
 
 
 /**
@@ -425,6 +535,9 @@ void bmo_inset_individual_exec(BMesh *bm, BMOperator *op)
 	const bool use_even_offset = BMO_slot_bool_get(op->slots_in, "use_even_offset");
 	const bool use_relative_offset = BMO_slot_bool_get(op->slots_in, "use_relative_offset");
 	const bool use_interpolate = BMO_slot_bool_get(op->slots_in, "use_interpolate");
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+	const bool use_fix_overlaps = BMO_slot_bool_get(op->slots_in, "use_fix_overlaps");
+#endif
 
 	/* Only tag faces in slot */
 	BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
@@ -436,10 +549,17 @@ void bmo_inset_individual_exec(BMesh *bm, BMOperator *op)
 	}
 
 	BMO_ITER (f, &oiter, op->slots_in, "faces", BM_FACE) {
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+		bmo_face_inset_individual(
+		        bm, f, interp_arena,
+		        thickness, depth,
+		        use_even_offset, use_relative_offset, use_interpolate, use_fix_overlaps);
+#else
 		bmo_face_inset_individual(
 		        bm, f, interp_arena,
 		        thickness, depth,
 		        use_even_offset, use_relative_offset, use_interpolate);
+#endif
 
 		if (use_interpolate) {
 			BLI_memarena_clear(interp_arena);

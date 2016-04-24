@@ -93,6 +93,8 @@ set(SRC
 	intern/path_util.c
 	intern/polyfill2d.c
 	intern/polyfill2d_beautify.c
+## WITH_MECHANICAL_BLENDER_D1669
+	intern/polyinset.c
 	intern/quadric.c
 	intern/rand.c
 	intern/rct.c
@@ -176,6 +178,8 @@ set(SRC
 	BLI_path_util.h
 	BLI_polyfill2d.h
 	BLI_polyfill2d_beautify.h
+## WITH_MECHANICAL_BLENDER_D1669
+	BLI_polyinset.h
 	BLI_quadric.h
 	BLI_rand.h
 	BLI_rect.h

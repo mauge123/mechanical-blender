@@ -1862,6 +1862,9 @@ static BMOpDefine bmo_inset_individual_def = {
 	 {"use_even_offset", BMO_OP_SLOT_BOOL},
 	 {"use_interpolate", BMO_OP_SLOT_BOOL},
 	 {"use_relative_offset", BMO_OP_SLOT_BOOL},
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+	 {"use_fix_overlaps", BMO_OP_SLOT_BOOL},
+#endif
 	 {{'\0'}},
 	},
 	/* slots_out */
@@ -1891,6 +1894,7 @@ static BMOpDefine bmo_inset_region_def = {
 	 {"thickness", BMO_OP_SLOT_FLT},
 	 {"depth", BMO_OP_SLOT_FLT},
 	 {"use_outset", BMO_OP_SLOT_BOOL},
+	 {"use_fix_overlaps", BMO_OP_SLOT_BOOL},
 	 {{'\0'}},
 	},
 	/* slots_out */

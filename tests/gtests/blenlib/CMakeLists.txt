@@ -47,6 +47,8 @@ else()
 	BLENDER_TEST(BLI_path_util "bf_blenlib;extern_wcwidth;${ZLIB_LIBRARIES}")
 endif()
 BLENDER_TEST(BLI_polyfill2d "bf_blenlib;bf_intern_eigen")
+## WITH_MECHANICAL_BLENDER_D1669
+BLENDER_TEST(BLI_polyinset "bf_blenlib;bf_intern_eigen")
 BLENDER_TEST(BLI_listbase "bf_blenlib")
 BLENDER_TEST(BLI_hash_mm2a "bf_blenlib")
 BLENDER_TEST(BLI_ghash "bf_blenlib")

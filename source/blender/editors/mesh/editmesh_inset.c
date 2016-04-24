@@ -204,6 +204,9 @@ static bool edbm_inset_calc(wmOperator *op)
 	const bool use_select_inset    = RNA_boolean_get(op->ptr, "use_select_inset"); /* not passed onto the BMO */
 	const bool use_individual      = RNA_boolean_get(op->ptr, "use_individual");
 	const bool use_interpolate     = RNA_boolean_get(op->ptr, "use_interpolate");
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+	const bool use_fix_overlaps    = RNA_boolean_get(op->ptr, "use_fix_overlaps");
+#endif
 
 	opdata = op->customdata;
 	em = opdata->em;
@@ -213,18 +216,34 @@ static bool edbm_inset_calc(wmOperator *op)
 	}
 
 	if (use_individual) {
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+		EDBM_op_init(em, &bmop, op,
+		             "inset_individual faces=%hf use_even_offset=%b  use_relative_offset=%b "
+		             "use_interpolate=%b use_fix_overlaps=%b thickness=%f depth=%f",
+		             BM_ELEM_SELECT, use_even_offset, use_relative_offset, use_interpolate,
+		             use_fix_overlaps, thickness, depth);
+#else
 		EDBM_op_init(em, &bmop, op,
 		             "inset_individual faces=%hf use_even_offset=%b  use_relative_offset=%b "
 		             "use_interpolate=%b thickness=%f depth=%f",
 		             BM_ELEM_SELECT, use_even_offset, use_relative_offset, use_interpolate,
 		             thickness, depth);
+#endif
 	}
 	else {
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+		EDBM_op_init(em, &bmop, op,
+		             "inset_region faces=%hf use_boundary=%b use_even_offset=%b use_relative_offset=%b "
+		             "use_interpolate=%b thickness=%f depth=%f use_outset=%b use_edge_rail=%b use_fix_overlaps=%b",
+		             BM_ELEM_SELECT, use_boundary, use_even_offset, use_relative_offset, use_interpolate,
+		             thickness, depth, use_outset, use_edge_rail, use_fix_overlaps);
+#else
 		EDBM_op_init(em, &bmop, op,
 		             "inset_region faces=%hf use_boundary=%b use_even_offset=%b use_relative_offset=%b "
 		             "use_interpolate=%b thickness=%f depth=%f use_outset=%b use_edge_rail=%b",
 		             BM_ELEM_SELECT, use_boundary, use_even_offset, use_relative_offset, use_interpolate,
 		             thickness, depth, use_outset, use_edge_rail);
+#endif
 
 		if (use_outset) {
 			BMO_slot_buffer_from_enabled_hflag(em->bm, &bmop, bmop.slots_in, "faces_exclude", BM_FACE, BM_ELEM_HIDDEN);
@@ -232,7 +251,14 @@ static bool edbm_inset_calc(wmOperator *op)
 	}
 	BMO_op_exec(em->bm, &bmop);
 
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+	if (use_individual) {
+		/* HWT TODO: figure out what to do here; if we deleted all original faces, there's a problem with buffer slot code below */
+	}
+ 	else if (use_select_inset) {
+#else
 	if (use_select_inset) {
+#endif
 		/* deselect original faces/verts */
 		EDBM_flag_disable_all(em, BM_ELEM_SELECT);
 		BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "faces.out", BM_FACE, BM_ELEM_SELECT, true);
@@ -517,4 +543,7 @@ void MESH_OT_inset(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "use_select_inset", false, "Select Outer", "Select the new inset faces");
 	RNA_def_boolean(ot->srna, "use_individual", false, "Individual", "Individual Face Inset");
 	RNA_def_boolean(ot->srna, "use_interpolate", true, "Interpolate", "Blend face data across the inset");
+#ifdef WITH_MECHANICAL_BLENDER_D1669
+	RNA_def_boolean(ot->srna, "use_fix_overlaps", true, "Fix Overlaps", "Fix self-overlaps by changing topology");
+#endif
 }
