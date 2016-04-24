@@ -3249,11 +3249,12 @@ BMReference *BM_reference_plane_create(
 	copy_v3_v3(erf->v4,v4);
 	if(name == NULL) {
 		BLI_strncpy(def_name, "Reference", 50);
+		BLI_uniquename_cb(unique_name_reference_check, bm, def_name, '.', erf->name, 50);
 	} else {
-		BLI_strncpy(def_name, name, 50);
+		BLI_strncpy(erf->name, name, 50);
 	}
 
-	BLI_uniquename_cb(unique_name_reference_check, bm, def_name, '.', erf->name, 50);
+
 
 	return erf;
 }
