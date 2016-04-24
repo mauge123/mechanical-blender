@@ -56,6 +56,7 @@ if(WITH_INTERNATIONAL)
 endif()
 
 if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 endif()
 add_definitions(${GL_DEFINITIONS})

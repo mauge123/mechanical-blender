@@ -439,6 +439,10 @@ static void stats_string(Scene *scene)
 	s = stats->infostr;
 	ofs = 0;
 
+#ifdef WITH_MECHANICAL
+	ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs, "Mechanical -  ", versionstr);
+#endif
+
 	ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs, "%s | ", versionstr);
 
 	if (scene->obedit) {
