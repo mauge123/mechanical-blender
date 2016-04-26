@@ -164,6 +164,13 @@ static EnumPropertyItem transform_orientation_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
+
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static EnumPropertyItem reference_planes_items[] = {
+	{0, "REFERENCE_PLANES", 0, "None", ""},
+    {0, NULL, 0, NULL, NULL}
+};
+
 #ifndef RNA_RUNTIME
 static EnumPropertyItem autosnap_items[] = {
 	{SACTSNAP_OFF, "NONE", 0, "No Auto-Snap", ""},
@@ -263,6 +270,7 @@ EnumPropertyItem rna_enum_file_sort_items[] = {
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_icons.h"
+#include "BKE_editmesh.h"
 
 #include "ED_buttons.h"
 #include "ED_fileselect.h"
@@ -456,6 +464,47 @@ EnumPropertyItem *rna_TransformOrientation_itemf(bContext *C, PointerRNA *ptr, P
 
 	return item;
 }
+
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	Scene *scene = NULL;
+	EnumPropertyItem tmp = {0, "", 0, "", ""};
+	EnumPropertyItem *item = NULL;
+	int i = 0, totitem = 0;
+
+	RNA_enum_items_add(&item, &totitem, reference_planes_items);
+
+	if (ptr->type == &RNA_SpaceView3D)
+		scene = ((bScreen *)ptr->id.data)->scene;
+	else
+		scene = CTX_data_scene(C);  /* can't use scene from ptr->id.data because that enum is also used by operators */
+
+	if (scene) {
+		Object *ob = OBACT;
+		Object *obedit = scene->obedit;
+		if (obedit) {
+			BMEditMesh *em = BKE_editmesh_from_object(ob);
+			BMReference *erf = NULL;
+			BMIter iter;
+			if (em->bm->totref > 0) {
+				RNA_enum_item_add_separator(&item, &totitem);
+			}
+			BM_ITER_MESH_INDEX (erf, &iter, em->bm, BM_REFERENCES_OF_MESH, i) {
+				tmp.identifier = erf->name;
+				tmp.name = erf->name;
+				tmp.value = i+1;
+				RNA_enum_item_add(&item, &totitem, &tmp);
+			}
+		}
+	}
+
+	RNA_enum_item_end(&item, &totitem);
+	*r_free = true;
+
+	return item;
+}
+
 
 /* Space 3D View */
 static void rna_SpaceView3D_lock_camera_and_layers_set(PointerRNA *ptr, int value)
@@ -2631,6 +2680,15 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "TransformOrientation");
 	RNA_def_property_pointer_funcs(prop, "rna_CurrentOrientation_get", NULL, NULL, NULL);
 	RNA_def_property_ui_text(prop, "Current Transform Orientation", "Current transformation orientation");
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	prop = RNA_def_property(srna, "reference_plane", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "refplane");
+	RNA_def_property_enum_items(prop, reference_planes_items);
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_ReferencePlane_itemf");
+	RNA_def_property_ui_text(prop, "Reference Planes", "Reference Planes");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+#endif
 
 	prop = RNA_def_property(srna, "lock_camera_and_layers", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "scenelock", 1);

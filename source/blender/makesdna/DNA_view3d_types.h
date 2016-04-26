@@ -237,6 +237,11 @@ typedef struct View3D {
 	float stereo3d_convergence_factor;
 	float stereo3d_volume_alpha;
 	float stereo3d_convergence_alpha;
+
+	// WITH_MECHANICAL_MESH_REFERENCE_PLANES
+	int refplane;
+	char pad5[4];
+
 } View3D;
 
 

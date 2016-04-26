@@ -380,6 +380,12 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		}
 		uiItemR(row, &v3dptr, "transform_orientation", 0, "", ICON_NONE);
 	}
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if (obedit) {
+		row = uiLayoutRow(layout, true);
+		uiItemR(row, &v3dptr, "reference_plane", 0, "", ICON_NONE);
+	}
+#endif
 
 	if (obedit == NULL && v3d->localvd == NULL) {
 		unsigned int ob_lay = ob ? ob->lay : 0;
