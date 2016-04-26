@@ -1036,9 +1036,12 @@ static int transformEventCommon(TransInfo *t, const wmEvent *event){
 				handled = true;
 				break;
 			case TFM_MODAL_SNAP_TOGGLE:
+#if 0
+				/* Disabled as conflics with TFM_MODAL_SNAP_ELEMENT_SELECT */
 				t->modifiers ^= MOD_SNAP;
 				t->redraw |= TREDRAW_HARD;
 				handled = true;
+#endif
 				break;
 		}
 	} else if (event->val == KM_PRESS) {
