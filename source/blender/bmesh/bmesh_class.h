@@ -23,6 +23,8 @@
 #ifndef __BMESH_CLASS_H__
 #define __BMESH_CLASS_H__
 
+#include "DNA_defs.h"
+
 /** \file blender/bmesh/bmesh_class.h
  *  \ingroup bmesh
  */
@@ -197,7 +199,7 @@ typedef struct BMDim {
 typedef struct BMReference {
 	BMHeader head;
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
-	char name[50];
+	char name[MAX_NAME];
 
 	short type;
 

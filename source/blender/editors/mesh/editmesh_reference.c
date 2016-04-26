@@ -80,6 +80,7 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 	WM_operator_view3d_unit_defaults(C, op);
 	ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL);
 	dia = ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
+	bool create_ts = RNA_boolean_get(op->ptr,"create_ts");
 
 	sprintf(op_str,"create_reference_plane %s %s %s", "verts=%hv", "matrix=%m4", "dia=%f");
 
@@ -89,7 +90,7 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 
 	erf = BMO_slot_buffer_get_first(bmop.slots_out, "reference.out");
 
-	if (erf) {
+	if (erf && create_ts) {
 		float pmat[3][3];
 		reference_plane_matrix(erf,pmat);
 		ts = addMatrixSpace(C, pmat, erf->name, true);
@@ -116,6 +117,8 @@ void MESH_OT_mechanical_reference_plane_add(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_boolean(ot->srna,"create_ts",false,"Create transform orientation","creates a tranform orientation");
 
 	ED_object_add_generic_props(ot,false);
 }

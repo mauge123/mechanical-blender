@@ -78,4 +78,8 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_CREATE_OBJECT_W_CUSTOM_ORIENTATION)
+endif()
+
 blender_add_lib(bf_editor_object "${SRC}" "${INC}" "${INC_SYS}")

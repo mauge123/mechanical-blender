@@ -38,6 +38,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_defs.h"
 
 #include "BLI_math.h"
 #include "BLI_listbase.h"
@@ -58,6 +59,8 @@
 #include "ED_armature.h"
 
 #include "transform.h"
+
+#include "mesh_references.h"
 
 /* *********************** TransSpace ************************** */
 
@@ -220,6 +223,37 @@ static TransformOrientation *createMeshSpace(bContext *C, ReportList *reports,
 				name = "Face";
 			}
 			break;
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		case ORIENTATION_REFERENCE_PLANE:
+		{
+			Scene *scene = CTX_data_scene(C);
+			Object *ob = OBACT;
+			BMEditMesh *em = BKE_editmesh_from_object(ob);
+
+			// Get the reference name
+			BMReference *erf = NULL;
+			BMIter iter;
+			BM_ITER_MESH (erf, &iter, em->bm, BM_REFERENCES_OF_MESH) {
+				if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+					break;
+				}
+			}
+			if (erf) {
+				reference_plane_matrix(erf,mat);
+
+				if (name[0] == 0) {
+					if (erf->name[0]) {
+						BLI_strncpy(name,erf->name,MAX_NAME);
+					} else {
+						name = "Reference";
+					}
+				}
+			} else {
+				BLI_assert(0);
+			}
+			break;
+		}
+#endif
 		default:
 			return NULL;
 	}
@@ -808,6 +842,12 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 					normalize_v3(normal);
 					result = ORIENTATION_VERT;
 				}
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+				else if (em->bm->totrefsel == 1) {
+					// Matrix will be get later
+					result = ORIENTATION_REFERENCE_PLANE;
+				}
+#endif
 			}
 
 			/* not needed but this matches 2.68 and older behavior */
