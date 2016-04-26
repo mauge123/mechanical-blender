@@ -113,6 +113,8 @@
 
 #include "object_intern.h"
 
+#include "../editors/transform/transform.h"
+
 /* this is an exact copy of the define in rna_lamp.c
  * kept here because of linking order.
  * Icons are only defined here */
@@ -227,10 +229,24 @@ float ED_object_new_primitive_matrix(
 	View3D *v3d = CTX_wm_view3d(C);
 	float mat[3][3], rmat[3][3], cmat[3][3], imat[3][3];
 
+#ifdef WITH_MECHANICAL_CREATE_OBJECT_W_CUSTOM_ORIENTATION
+	float ts_mat[3][3];
+	char ts_name[MAX_NAME];
+	int orientation = v3d->twmode - V3D_MANIP_CUSTOM;
+#endif
+
 	unit_m4(primmat);
 
 	eul_to_mat3(rmat, rot);
 	invert_m3(rmat);
+
+#ifdef WITH_MECHANICAL_CREATE_OBJECT_W_CUSTOM_ORIENTATION
+	if (orientation >= 0 && applyTransformOrientation(C,ts_mat,ts_name,orientation)){
+		invert_m3(ts_mat);
+		mul_m3_m3m3(mat, rmat, ts_mat);
+		copy_m3_m3(rmat,mat);
+	}
+#endif
 
 	/* inverse transform for initial rotation and object */
 	copy_m3_m4(mat, obedit->obmat);
