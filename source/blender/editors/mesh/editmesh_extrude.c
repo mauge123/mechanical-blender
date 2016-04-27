@@ -52,6 +52,8 @@
 #include "ED_transform.h"
 #include "ED_view3d.h"
 
+#include "mesh_references.h"
+
 #include "mesh_intern.h"  /* own include */
 
 static void edbm_extrude_edge_exclude_mirror(
@@ -585,7 +587,22 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 		copy_v3_v3(min, cent);
 
 		mul_m4_v3(vc.obedit->obmat, min);  /* view space */
+#ifdef WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
+		if (vc.obedit) {
+			BMReference *erf = BM_reference_at_index_find(vc.em->bm,vc.v3d->refplane-1);
+			if (erf && reference_plane_project_input (erf, vc.ar, vc.v3d, event->mval, min)) {
+				// Ok
+			} else {
+				ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+			}
+		} else {
+			ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+		}
+#else
 		ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+#endif
+
+
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
 
 		sub_v3_v3(min, cent);
@@ -632,10 +649,22 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 		const float *curs = ED_view3d_cursor3d_get(vc.scene, vc.v3d);
 		BMOperator bmop;
 		BMOIter oiter;
-		
-		copy_v3_v3(min, curs);
-		ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
 
+		copy_v3_v3(min, curs);
+#ifdef WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
+		if (vc.obedit) {
+			BMReference *erf = BM_reference_at_index_find(vc.em->bm,vc.v3d->refplane-1);
+			if (erf && reference_plane_project_input (erf, vc.ar, vc.v3d, event->mval, min)) {
+				// Ok
+			} else {
+				ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+			}
+		} else {
+			ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+		}
+#else
+		ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+#endif
 		invert_m4_m4(vc.obedit->imat, vc.obedit->obmat);
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
 		
