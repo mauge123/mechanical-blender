@@ -89,6 +89,7 @@
 #include "BLT_translation.h"
 
 #include "transform.h"
+#include "mesh_references.h"
 
 /* Disabling, since when you type you know what you are doing, and being able to set it to zero is handy. */
 // #define USE_NUM_NO_ZERO
@@ -2575,7 +2576,18 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 		if (t->spacetype == SPACE_VIEW3D) {
 			float p[3] = {0,0,0};
-			ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+// WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
+			if (t->obedit) {
+				BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
+				BMReference *erf = BM_reference_at_index_find(bm,((View3D*)t->view)->refplane-1);
+				if (erf && reference_plane_project_input (erf, t->ar, t->view, event->mval, t->iloc)) {
+					// Ok
+				} else {
+					ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+				}
+			} else {
+				ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+			}
 		}
 #endif
 

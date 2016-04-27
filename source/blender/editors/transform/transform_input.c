@@ -30,6 +30,9 @@
 
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
+#include "DNA_view3d_types.h"
+
+#include "BKE_editmesh.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -37,6 +40,7 @@
 #include "WM_types.h"
 
 #include "transform.h"
+#include "mesh_references.h"
 
 #include "MEM_guardedalloc.h" 
 
@@ -47,9 +51,21 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 	if (t->spacetype == SPACE_VIEW3D){
 		float p[3] = {0,0,0};
-		float fmval[3] = {(double) mval[0], (double) mval[1]};
+		float fmval[2] = {(float) mval[0], (float) mval[1]};
+		int imval[2] = {(int) mval[0], (int) mval[1]};
 		float vec[3];
-		ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+// WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
+		if (t->obedit) {
+			BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
+			BMReference *erf = BM_reference_at_index_find(bm,((View3D*)t->view)->refplane-1);
+			if (erf && reference_plane_project_input (erf, t->ar, t->view, imval, vec)) {
+				// Ok
+			} else {
+				ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+			}
+		} else {
+			ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+		}
 		sub_v3_v3v3(output, vec, t->iloc);
 	} else {
 		convertViewVec(t, output, mval[0] - mi->imval[0], mval[1] - mi->imval[1]);
