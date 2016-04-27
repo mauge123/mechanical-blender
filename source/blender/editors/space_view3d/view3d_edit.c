@@ -89,6 +89,7 @@
 
 #include "bmesh.h"
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
 
 
 #include "view3d_intern.h"  /* own include */
@@ -4649,6 +4650,21 @@ void ED_view3d_cursor3d_position(bContext *C, float fp[3], const int mval[2])
 	 * but this is called from areas that aren't already dealing with the viewport */
 	if (rv3d == NULL)
 		return;
+
+#ifdef WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
+	if (v3d->refplane > 0) {
+		Object *obedit = CTX_data_edit_object(C);
+		if (obedit) {
+			BMesh *bm = BKE_editmesh_from_object(obedit)->bm;
+			BMReference *erf = BM_reference_at_index_find(bm,v3d->refplane-1);
+			if (erf) {
+				if (reference_plane_project_input (erf, ar, v3d, mval, fp)) {
+					return;
+				}
+			}
+		}
+	}
+#endif
 
 	ED_view3d_calc_zfac(rv3d, fp, &flip);
 	

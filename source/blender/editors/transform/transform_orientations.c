@@ -243,7 +243,7 @@ static TransformOrientation *createMeshSpace(bContext *C, ReportList *reports,
 
 				if (name[0] == 0) {
 					if (erf->name[0]) {
-						BLI_strncpy(name,erf->name,MAX_NAME);
+						BLI_strncpy((char*)name,erf->name,MAX_NAME);
 					} else {
 						name = "Reference";
 					}

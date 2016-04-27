@@ -72,8 +72,6 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 
 	BMReference *erf = NULL;
 
-	TransformOrientation *ts;
-
 	BMOperator bmop;
 	char op_str [255] = {0};
 
@@ -93,7 +91,7 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 	if (erf && create_ts) {
 		float pmat[3][3];
 		reference_plane_matrix(erf,pmat);
-		ts = addMatrixSpace(C, pmat, erf->name, true);
+		addMatrixSpace(C, pmat, erf->name, true);
 	}
 
 	if (!EDBM_op_finish(em, &bmop, op, true)) {
