@@ -4474,6 +4474,11 @@ static void set_default_ccgdm_callbacks(CCGDerivedMesh *ccgdm)
 	ccgdm->dm.copy_gpu_data = ccgDM_copy_gpu_data;
 
 	ccgdm->dm.release = ccgDM_release;
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	ccgdm->dm.foreachMappedDim = NULL;
+#endif
+
 }
 
 static void create_ccgdm_maps(CCGDerivedMesh *ccgdm,

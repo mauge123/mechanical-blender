@@ -2813,14 +2813,13 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 
 static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected) {
 
-	float start[3], end[3], vr1[3], vr2[3], txt_pos[3], pos[3], pos_tmp[3];
+	float start[3], end[3], vr1[3], vr2[3], txt_pos[3], pos[3];
 	float axis[3];
 	float lpos;
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 	float dim_angle, step;
-	float rmat[4][4];
 
 	get_dimension_theme_values(selected, col, tcol);
 
@@ -3003,6 +3002,11 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
                           RegionView3D* UNUSED(rv3d), Object* obedit)
 {
+	if (!dm->foreachMappedDim) {
+		// Set to NULL on ccgdm->dm
+		return;
+	}
+
 	drawDMDims_userData data;
 	data.sel = sel;
 	data.edm_act = edm_act;
@@ -3746,7 +3750,7 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes(Scene *scene, DerivedMesh *dm)
+static void draw_em_reference_planes(Scene *UNUSED(scene), DerivedMesh *dm)
 {
 	draw_dm_reference_planes(dm);
 }
@@ -8881,8 +8885,8 @@ static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 }
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
-							  Object *ob, DerivedMesh *dm)
+static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *UNUSED(scene), View3D *UNUSED(v3d),
+							  Object *UNUSED(ob), DerivedMesh *dm)
 {
 	dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
 }
