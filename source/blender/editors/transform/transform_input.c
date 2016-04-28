@@ -58,7 +58,7 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 		if (t->obedit) {
 			BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
 			BMReference *erf = BM_reference_at_index_find(bm,((View3D*)t->view)->refplane-1);
-			if (erf && reference_plane_project_input (erf, t->ar, t->view, imval, vec)) {
+			if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, imval, vec)) {
 				// Ok
 			} else {
 				ED_view3d_win_to_3d(t->ar, p, fmval, vec);

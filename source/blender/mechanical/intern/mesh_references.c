@@ -3,6 +3,7 @@
 #include "BLI_math.h"
 
 #include "DNA_mesh_types.h"
+#include "DNA_object_types.h"
 
 #include "ED_mesh.h"
 #include "ED_view3d.h"
@@ -30,7 +31,7 @@ void reference_plane_matrix (BMReference *erf, float mat[3][3]) {
 	normalize_m3(mat);
 }
 
-bool reference_plane_project_input (BMReference *erf, ARegion *ar, View3D *v3d, const int mval[2], float r_co[3]) {
+bool reference_plane_project_input (Object *ob, BMReference *erf, ARegion *ar, View3D *v3d, const int mval[2], float r_co[3]) {
 
 	float ray_origin[3], ray_normal[3], ray_start[3];
 	float dist = 0.0f;
@@ -43,10 +44,34 @@ bool reference_plane_project_input (BMReference *erf, ARegion *ar, View3D *v3d, 
 		return false;
 	}
 
-	if (isect_ray_tri_epsilon_v3(ray_origin, ray_normal, erf->v1, erf->v2, erf->v3, &dist, NULL, FLT_EPSILON)
-	    || isect_ray_tri_epsilon_v3(ray_origin, ray_normal, erf->v1, erf->v3, erf->v4, &dist, NULL, FLT_EPSILON)) {
+	float imat[4][4];
+	float timat[3][3]; /* transpose inverse matrix for normals */
+	float ray_start_local[3], ray_normal_local[3],ray_org_local[3];
 
-		madd_v3_v3v3fl(r_co,ray_origin,ray_normal,dist);
+	invert_m4_m4(imat, ob->obmat);
+	transpose_m3_m4(timat, imat);
+
+	copy_v3_v3(ray_start_local, ray_start);
+	copy_v3_v3(ray_normal_local, ray_normal);
+	copy_v3_v3(ray_org_local, ray_origin);
+
+	mul_m4_v3(imat, ray_org_local);
+	mul_m4_v3(imat, ray_start_local);
+	mul_mat3_m4_v3(imat, ray_normal_local);
+
+	if (!((RegionView3D *)ar->regiondata)->is_persp) {
+		/* We pass a temp ray_start, set from plane dimensions, to avoid precision issues with very far
+		 * away ray_start values (as returned in case of ortho view3d).
+		 */
+		madd_v3_v3v3fl(ray_start_local, ray_org_local, ray_normal_local,
+		               -len_v3v3(erf->v1, erf->v3));
+	}
+
+
+	if (isect_ray_tri_epsilon_v3(ray_start_local, ray_normal_local, erf->v1, erf->v2, erf->v3, &dist, NULL, FLT_EPSILON)
+	    || isect_ray_tri_epsilon_v3(ray_start_local, ray_normal_local, erf->v1, erf->v3, erf->v4, &dist, NULL, FLT_EPSILON)) {
+
+		madd_v3_v3v3fl(r_co,ray_start_local,ray_normal_local,dist);
 	} else {
 		return false;
 	}

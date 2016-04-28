@@ -590,7 +590,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 #ifdef WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
 		if (vc.obedit) {
 			BMReference *erf = BM_reference_at_index_find(vc.em->bm,vc.v3d->refplane-1);
-			if (erf && reference_plane_project_input (erf, vc.ar, vc.v3d, event->mval, min)) {
+			if (erf && reference_plane_project_input (vc.obedit, erf, vc.ar, vc.v3d, event->mval, min)) {
 				// Ok
 			} else {
 				ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
@@ -654,7 +654,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 #ifdef WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
 		if (vc.obedit) {
 			BMReference *erf = BM_reference_at_index_find(vc.em->bm,vc.v3d->refplane-1);
-			if (erf && reference_plane_project_input (erf, vc.ar, vc.v3d, event->mval, min)) {
+			if (erf && reference_plane_project_input (vc.obedit, erf, vc.ar, vc.v3d, event->mval, min)) {
 				// Ok
 			} else {
 				ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);

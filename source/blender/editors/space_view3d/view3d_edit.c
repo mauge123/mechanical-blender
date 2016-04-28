@@ -4658,7 +4658,7 @@ void ED_view3d_cursor3d_position(bContext *C, float fp[3], const int mval[2])
 			BMesh *bm = BKE_editmesh_from_object(obedit)->bm;
 			BMReference *erf = BM_reference_at_index_find(bm,v3d->refplane-1);
 			if (erf) {
-				if (reference_plane_project_input (erf, ar, v3d, mval, fp)) {
+				if (reference_plane_project_input (obedit, erf, ar, v3d, mval, fp)) {
 					return;
 				}
 			}

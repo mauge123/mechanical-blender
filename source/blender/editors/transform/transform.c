@@ -2580,7 +2580,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			if (t->obedit) {
 				BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
 				BMReference *erf = BM_reference_at_index_find(bm,((View3D*)t->view)->refplane-1);
-				if (erf && reference_plane_project_input (erf, t->ar, t->view, event->mval, t->iloc)) {
+				if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, event->mval, t->iloc)) {
 					// Ok
 				} else {
 					ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
