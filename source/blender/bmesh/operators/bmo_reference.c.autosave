@@ -74,6 +74,7 @@ void bmo_create_reference_plane_exec(BMesh *bm, BMOperator *op)
 		mul_m4_v3(mat, v3);
 		mul_m4_v3(mat, v4);
 	} else if (op_verts_slot->len == 2) {
+		// Two Points: align X, maintain Z
 		float x[3], y[3], z[3], mid[3];
 		v[0] = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT);
 		v[1] = BMO_iter_step(&siter);
