@@ -3028,13 +3028,21 @@ static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void draw_em_reference_planes__mapFunc(void *userData, int index, BMReference *erf)
 {
+	View3D *v3d = userData;
+
 	// May be set to other values
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glEnable (GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
-		glColor4f(1.0f,1.0f,1.0f,0.5f);
-	} else {
+		if (v3d->refplane-1 == index) {
+			glColor4f(0.8f,0.8f,1.0f,0.5f);
+		} else {
+			glColor4f(0.8f,0.8f,0.8f,0.5f);
+		}
+	} else if (v3d->refplane-1 == index) {
+		glColor4f(0.0f,0.0f,0.2f,0.5f);
+    }else {
 		glColor4f(0.0f,0.0f,0.0f,0.5f);
 	}
 
@@ -3047,9 +3055,9 @@ static void draw_em_reference_planes__mapFunc(void *userData, int index, BMRefer
 	glDisable(GL_BLEND);
 }
 
-static void draw_dm_reference_planes(DerivedMesh *dm)
+static void draw_dm_reference_planes(DerivedMesh *dm, Scene *UNUSED(scene), View3D *v3d)
 {
-	dm->foreachMappedReference(dm, draw_em_reference_planes__mapFunc, NULL, DM_FOREACH_NOP);
+	dm->foreachMappedReference(dm, draw_em_reference_planes__mapFunc, v3d, DM_FOREACH_NOP);
 }
 #endif
 
@@ -3750,9 +3758,9 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes(Scene *UNUSED(scene), DerivedMesh *dm)
+static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
 {
-	draw_dm_reference_planes(dm);
+	draw_dm_reference_planes(dm, scene, v3d);
 }
 #endif
 
@@ -4410,7 +4418,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-			draw_em_reference_planes(scene, cageDM);
+			draw_em_reference_planes(scene, v3d, cageDM);
 #endif
 		}
 	}
