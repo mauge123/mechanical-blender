@@ -1070,6 +1070,17 @@ static void bmo_slot_buffer_from_flag(
 			}
 		}
 #endif
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		if (htype & BM_DIM) {
+			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+				if (BMO_elem_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+					ele_array[i] = ele;
+					i++;
+				}
+			}
+		}
+#endif
+
 	}
 	else {
 		slot->len = 0;
