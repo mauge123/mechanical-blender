@@ -243,6 +243,15 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	float axis[3], ncenter[3], v[3], pp[3];
 	float d; //Difential to move
 
+	float p[3], r[3];
+	float d_dir[3]; // Dimension dir
+
+	float constraint_axis[3];
+	float ccenter1[3],ccenter2[3];
+	float r_constraint, r_constraint_c;
+
+	bool do_axis = false;
+
 	BMIter iter;
 	BMVert* eve;
 
@@ -261,24 +270,70 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		return;
 	}
 
+	// Get Dimension dir
+	if (edm->dir == 1) {
+		copy_v3_v3(p, edm->v[2]->co);
+		sub_v3_v3v3(r, edm->v[2]->co, edm->center);
+	} else if (edm->dir == -1) {
+		copy_v3_v3(p, edm->v[0]->co);
+		sub_v3_v3v3(r, edm->v[0]->co, edm->center);
+	}
+	cross_v3_v3v3(d_dir,axis,r);
+	normalize_v3(d_dir);
+
 	tag_vertexs_affected_by_dimension (bm, edm);
 
 	if (constraints & DIM_PLANE_CONSTRAINT) {
-		float p[3], r[3], d_dir[3];
-		if (edm->dir == 1) {
-			copy_v3_v3(p, edm->v[2]->co);
-			sub_v3_v3v3(r, edm->v[2]->co, edm->center);
-		} else if (edm->dir == -1) {
-			copy_v3_v3(p, edm->v[0]->co);
-			sub_v3_v3v3(r, edm->v[0]->co, edm->center);
-		}
-		cross_v3_v3v3(d_dir,axis,r);
-		normalize_v3(d_dir);
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
 	}
 
+	int i = (edm->dim_type == DIM_TYPE_ANGLE_3P) ? 3 : 4;
+	float r1[3],r2[3];
+	if (
+		(edm->totverts >= i+2) &&
+		(center_of_3_points (ccenter1,edm->v[0]->co, edm->v[i]->co, edm->v[i+1]->co)))
+	{
+		/* We have information to get an axis */
+		sub_v3_v3v3(r1, edm->v[0]->co, ccenter1);
+		sub_v3_v3v3(r2, edm->v[i]->co, ccenter1);
+		cross_v3_v3v3(constraint_axis,r1,r2);
+		normalize_v3(constraint_axis);
+		r_constraint = len_v3v3(ccenter1,edm->v[0]->co);
+
+
+		v_perpendicular_to_axis (ccenter2, ccenter1, edm->center, constraint_axis);
+		sub_v3_v3v3(ccenter2, edm->center, ccenter2);
+		r_constraint_c = len_v3v3(ccenter2,edm->center);
+
+		do_axis = true;
+
+	}
+
+	if (constraints & DIM_AXIS_CONSTRAINT && do_axis) {
+		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+			float delta = fabs(point_dist_to_axis (ccenter1, constraint_axis,eve->co));
+			if ((delta - r_constraint)< DIM_CONSTRAINT_PRECISION)
+			{
+				BM_elem_flag_enable(eve, BM_ELEM_TAG);
+			}
+		}
+
+	}
+
+
 	// Untag dimensions vertex
 	untag_dimension_necessary_verts(edm);
+
+	if (!do_axis) {
+		// Untag vertex not in plane
+		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+			if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
+				if (!point_on_plane (edm->center,d_dir,eve->co)) {
+					BM_elem_flag_disable(eve, BM_ELEM_TAG);
+				}
+			}
+		}
+	}
 
 	if (edm->dir == 1) {
 		apply_dimension_angle_exec(bm,edm->v[2],edm->center, axis,d,constraints);
@@ -298,13 +353,29 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
 
-			sub_v3_v3v3(v,eve->co, edm->center);
+			if (do_axis && (fabs(point_dist_to_axis (ccenter1, constraint_axis,eve->co) - r_constraint))< DIM_CONSTRAINT_OVERRIDE)
+			{
+				float naxis[3];
 
-			project_v3_v3v3(ncenter,v, axis);
-			add_v3_v3(ncenter,edm->center);
+				sub_v3_v3v3(v,eve->co, ccenter2);
+				v_perpendicular_to_axis(ncenter,ccenter2,v,constraint_axis);
+				normalize_v3(ncenter);
+				mul_v3_fl(ncenter,r_constraint_c);
+				add_v3_v3(ncenter,ccenter2);
+				normal_tri_v3(naxis,ccenter1,ccenter2,ncenter);
 
-			apply_dimension_angle_exec(bm, eve,ncenter, axis,d,constraints);
+				apply_dimension_angle_exec(bm, eve,ncenter, naxis,d,constraints);
 
+			} else {
+
+				sub_v3_v3v3(v,eve->co, edm->center);
+	
+				project_v3_v3v3(ncenter,v, axis);
+				add_v3_v3(ncenter,edm->center);
+	
+				apply_dimension_angle_exec(bm, eve,ncenter, axis,d,constraints);
+			}
+	
 			// Reset tag
 			BM_elem_flag_disable(eve, BM_ELEM_TAG);
 		}
@@ -400,46 +471,6 @@ void mid_of_2_points (float *mid, float *p1, float *p2) {
 	sub_v3_v3v3(mid, p2, p1);
 	mul_v3_fl(mid,0.5);
 	add_v3_v3(mid, p1);
-}
-
-int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
-	int res=0;
-
-	float m[3], pm[3], mm[3];
-	float r[3], pr[3], mr[3];
-	float p21[3], p31[3];
-	float p[3]; //Plane vector
-
-	float r1[3],r2[3]; //isect results
-
-	sub_v3_v3v3(m,p2,p1);
-	sub_v3_v3v3(r,p3,p1);
-
-	// Plane vector
-	cross_v3_v3v3(p,m,r);
-
-	// Perpendicular vectors
-	cross_v3_v3v3(pm,m,p);
-	cross_v3_v3v3(pr,r,p);
-
-	// Midpoints
-	mid_of_2_points(mm,p2,p1);
-	mid_of_2_points(mr,p3,p1);
-
-	//Second point
-	add_v3_v3v3(p21,mm,pm);
-	add_v3_v3v3(p31,mr,pr);
-
-	if ((res = isect_line_line_v3(mm, p21, mr, p31,r1,r2)) == 1) {
-		// One intersection: Ok
-		copy_v3_v3(center,r1);
-		return 1;
-	} else if (res == 2 && len_v3v3(r1,r2) < DIM_CONSTRAINT_PRECISION) {
-		copy_v3_v3(center,r1);
-		return 1;
-	} else {
-		return 0;
-	}
 }
 
 static void set_dimension_angle_start_end(BMDim *edm, float *a, float *b) {

@@ -69,6 +69,6 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 
 	BMO_elem_flag_enable(bm, d, EXT_KEEP);
 	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
-
+	BMO_elem_flag_disable(bm, d, EXT_KEEP);
 
 }

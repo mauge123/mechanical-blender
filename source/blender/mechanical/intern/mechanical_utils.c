@@ -106,6 +106,14 @@ float point_dist_to_plane (float *c, float *a, float *p){
 	return len_v3(m);
 }
 
+float point_dist_to_axis (float *c, float *a, float *p) {
+	float r[3],m[3];
+	sub_v3_v3v3(r,p,c);
+	project_v3_v3v3(m,r,a);
+	sub_v3_v3(m,r);
+	return len_v3(m);
+}
+
 /**
  * @brief point_dist_to_plane
  * @param c reference point (on plane)
@@ -124,3 +132,45 @@ void v_perpendicular_to_axis(float *r, float *c, float *p, float *a) {
 	project_v3_v3v3(m,r,a);
 	sub_v3_v3(r,m);
 }
+
+
+int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
+	int res=0;
+
+	float m[3], pm[3], mm[3];
+	float r[3], pr[3], mr[3];
+	float p21[3], p31[3];
+	float p[3]; //Plane vector
+
+	float r1[3],r2[3]; //isect results
+
+	sub_v3_v3v3(m,p2,p1);
+	sub_v3_v3v3(r,p3,p1);
+
+	// Plane vector
+	cross_v3_v3v3(p,m,r);
+
+	// Perpendicular vectors
+	cross_v3_v3v3(pm,m,p);
+	cross_v3_v3v3(pr,r,p);
+
+	// Midpoints
+	mid_of_2_points(mm,p2,p1);
+	mid_of_2_points(mr,p3,p1);
+
+	//Second point
+	add_v3_v3v3(p21,mm,pm);
+	add_v3_v3v3(p31,mr,pr);
+
+	if ((res = isect_line_line_v3(mm, p21, mr, p31,r1,r2)) == 1) {
+		// One intersection: Ok
+		copy_v3_v3(center,r1);
+		return 1;
+	} else if (res == 2 && len_v3v3(r1,r2) < DIM_CONSTRAINT_PRECISION) {
+		copy_v3_v3(center,r1);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+

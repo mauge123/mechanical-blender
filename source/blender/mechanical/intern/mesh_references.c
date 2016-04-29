@@ -80,9 +80,5 @@ bool reference_plane_project_input (Object *ob, BMReference *erf, ARegion *ar, V
 }
 
 void reference_plane_normal (BMReference *erf, float *r) {
-	float a[3],b[3];
-	sub_v3_v3v3(a, erf->v2, erf->v1);
-	sub_v3_v3v3(b, erf->v3, erf->v1);
-	cross_v3_v3v3(r,a,b);
-	normalize_v3(r);
+	normal_tri_v3(r,erf->v1,erf->v2,erf->v3);
 }

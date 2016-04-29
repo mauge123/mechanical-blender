@@ -30,7 +30,6 @@ void select_dimension_data (BMDim *edm, void *context);
 
 /* Common use */
 void mid_of_2_points(float *mid, float *p1, float *p2);
-int center_of_3_points(float *center, float *p1, float *p2, float *p3);
 
 bool valid_constraint_setting(BMDim *edm, int constraint);
 
