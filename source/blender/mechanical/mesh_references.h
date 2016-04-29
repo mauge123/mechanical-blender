@@ -9,6 +9,7 @@
 
 void reference_plane_matrix (BMReference *erf, float mat[3][3]);
 bool reference_plane_project_input (Object *ob, BMReference *erf, ARegion *ar, View3D *v3d, const int mval[2], float r_co[3]);
+void reference_plane_normal (BMReference *erf, float *r);
 
 #endif //MESH_REFERENCES_H
 

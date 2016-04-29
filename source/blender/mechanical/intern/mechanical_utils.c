@@ -92,6 +92,32 @@ bool point_on_axis (float *c, float*a, float *p) {
 }
 
 
+/**
+ * @brief point_dist_to_plane
+ * @param c reference point (on plane)
+ * @param a axis
+ * @param p point
+ * @return distance perp to plane
+ */
+float point_dist_to_plane (float *c, float *a, float *p){
+	float r[3],m[3];
+	sub_v3_v3v3(r,p,c);
+	project_v3_v3v3(m,r,a);
+	return len_v3(m);
+}
+
+/**
+ * @brief point_dist_to_plane
+ * @param c reference point (on plane)
+ * @param a axis
+ * @param p point
+ * @return true if distance to plane is 0
+ */
+bool point_on_plane (float *c, float *a, float *p) {
+	return fabs(point_dist_to_plane(c,a,p))<DIM_CONSTRAINT_PRECISION;
+}
+
+
 void v_perpendicular_to_axis(float *r, float *c, float *p, float *a) {
 	float m[3];
 	sub_v3_v3v3(r,p,c);

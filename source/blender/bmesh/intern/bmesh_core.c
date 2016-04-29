@@ -45,6 +45,8 @@
 #include "intern/bmesh_private.h"
 
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
+#include "mechanical_utils.h"
 
 
 /* use so valgrinds memcheck alerts us when undefined index is used.
@@ -3078,6 +3080,9 @@ BMDim *BM_dim_create(
         const BMDim *d_example, const eBMCreateFlag create_flag)
 {
 	BMDim *edm;
+	BMReference *erf;
+	BMIter iter;
+
 	float vect[3], no1[3], no2[3];
 
 	BLI_assert((d_example == NULL) || (d_example->head.htype == BM_DIM));
@@ -3127,7 +3132,18 @@ BMDim *BM_dim_create(
 			BLI_assert (edm->v[0]  != edm->v[1]);
 
 			sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
-			cross_v3_v3v3(no1,vect, edm->v[0]->no);
+
+			// If they are on ref plane, apply normal
+			BM_ITER_MESH(erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+				reference_plane_normal(erf, no1);
+				if (point_on_plane(erf->v1,no1,edm->v[0]->co) && point_on_plane(erf->v1,no1,edm->v[1]->co)){
+					break;
+				}
+			}
+			if (!erf) {
+				cross_v3_v3v3(no1,vect, edm->v[0]->no);
+			}
+
 			cross_v3_v3v3(no2,no1,vect);
 			normalize_v3(no2);
 
