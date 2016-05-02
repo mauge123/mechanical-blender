@@ -1905,6 +1905,7 @@ class VIEW3D_MT_particle(Menu):
         if particle_edit.select_mode == 'POINT':
             layout.operator("particle.subdivide")
 
+        layout.operator("particle.unify_length")
         layout.operator("particle.rekey")
         layout.operator("particle.weight_set")
 
@@ -1924,6 +1925,7 @@ class VIEW3D_MT_particle_specials(Menu):
         layout.operator("particle.rekey")
         layout.operator("particle.delete")
         layout.operator("particle.remove_doubles")
+        layout.operator("particle.unify_length")
 
         if particle_edit.select_mode == 'POINT':
             layout.operator("particle.subdivide")
@@ -2635,7 +2637,7 @@ def draw_curve(self, context):
     layout.operator("curve.separate")
     layout.operator("curve.make_segment")
     layout.operator("curve.cyclic_toggle")
-    layout.operator("curve.delete", text="Delete...")
+    layout.menu("VIEW3D_MT_edit_curve_delete")
 
     layout.separator()
 
@@ -2704,6 +2706,19 @@ class VIEW3D_MT_edit_curve_specials(Menu):
         layout.operator("curve.smooth_weight")
         layout.operator("curve.smooth_radius")
         layout.operator("curve.smooth_tilt")
+
+
+class VIEW3D_MT_edit_curve_delete(Menu):
+    bl_label = "Delete"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator_enum("curve.delete", "type")
+
+        layout.separator()
+
+        layout.operator("curve.dissolve_verts")
 
 
 class VIEW3D_MT_edit_curve_showhide(ShowHideMenu, Menu):

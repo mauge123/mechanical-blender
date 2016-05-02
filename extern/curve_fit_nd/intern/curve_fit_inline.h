@@ -80,6 +80,22 @@ MINLINE void copy_vnvn(
 	}
 }
 
+MINLINE void copy_vnfl_vndb(
+        float v0[], const double v1[], const uint dims)
+{
+	for (uint j = 0; j < dims; j++) {
+		v0[j] = (float)v1[j];
+	}
+}
+
+MINLINE void copy_vndb_vnfl(
+        double v0[], const float v1[], const uint dims)
+{
+	for (uint j = 0; j < dims; j++) {
+		v0[j] = (double)v1[j];
+	}
+}
+
 MINLINE double dot_vnvn(
         const double v0[], const double v1[], const uint dims)
 {
@@ -209,6 +225,7 @@ static double len_vn(
 {
 	return sqrt(len_squared_vn(v0, dims));
 }
+#endif
 
 MINLINE double normalize_vn(
         double v0[], const uint dims)
@@ -219,7 +236,6 @@ MINLINE double normalize_vn(
 	}
 	return d;
 }
-#endif
 
 /* v_out = (v0 - v1).normalized() */
 MINLINE double normalize_vn_vnvn(

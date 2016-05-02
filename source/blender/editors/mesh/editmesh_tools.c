@@ -554,7 +554,7 @@ void MESH_OT_edge_collapse(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-static int edbm_add_edge_face__smooth_get(BMesh *bm)
+static bool edbm_add_edge_face__smooth_get(BMesh *bm)
 {
 	BMEdge *e;
 	BMIter iter;
@@ -722,7 +722,7 @@ static int edbm_add_edge_face_exec(bContext *C, wmOperator *op)
 	BMOperator bmop;
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
-	const short use_smooth = edbm_add_edge_face__smooth_get(em->bm);
+	const bool use_smooth = edbm_add_edge_face__smooth_get(em->bm);
 	const int totedge_orig = em->bm->totedge;
 	const int totface_orig = em->bm->totface;
 	/* when this is used to dissolve we could avoid this, but checking isnt too slow */
@@ -3023,7 +3023,7 @@ static Base *mesh_separate_tagged(Main *bmain, Scene *scene, Base *base_old, BMe
 
 	BM_mesh_normals_update(bm_new);
 
-	BM_mesh_bm_to_me(bm_new, base_new->object->data, false);
+	BM_mesh_bm_to_me(bm_new, base_new->object->data, (&(struct BMeshToMeshParams){0}));
 
 	BM_mesh_free(bm_new);
 	((Mesh *)base_new->object->data)->edit_btmesh = NULL;
@@ -3306,7 +3306,7 @@ static int edbm_separate_exec(bContext *C, wmOperator *op)
 
 					bm_old = BM_mesh_create(&bm_mesh_allocsize_default);
 
-					BM_mesh_bm_from_me(bm_old, me, false, false, 0);
+					BM_mesh_bm_from_me(bm_old, me, (&(struct BMeshFromMeshParams){0}));
 
 					switch (type) {
 						case MESH_SEPARATE_MATERIAL:
@@ -3321,7 +3321,7 @@ static int edbm_separate_exec(bContext *C, wmOperator *op)
 					}
 
 					if (retval_iter) {
-						BM_mesh_bm_to_me(bm_old, me, false);
+						BM_mesh_bm_to_me(bm_old, me, (&(struct BMeshToMeshParams){0}));
 
 						DAG_id_tag_update(&me->id, OB_RECALC_DATA);
 						WM_event_add_notifier(C, NC_GEOM | ND_DATA, me);
@@ -3588,7 +3588,7 @@ static int edbm_fill_grid_exec(bContext *C, wmOperator *op)
 	BMOperator bmop;
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
-	const short use_smooth = edbm_add_edge_face__smooth_get(em->bm);
+	const bool use_smooth = edbm_add_edge_face__smooth_get(em->bm);
 	const int totedge_orig = em->bm->totedge;
 	const int totface_orig = em->bm->totface;
 	const bool use_interp_simple = RNA_boolean_get(op->ptr, "use_interp_simple");
