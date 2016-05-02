@@ -2200,6 +2200,8 @@ typedef enum eGPencil_Placement_Flags {
 /* UnitSettings->flag */
 #define	USER_UNIT_OPT_SPLIT		1
 #define USER_UNIT_ROT_RADIANS	2
+// WITH_MECHANICAL_UNIT_FORCE
+#define USER_UNIT_OPT_FORCE_SCALE 4
 
 #ifdef __cplusplus
 }

@@ -2866,6 +2866,12 @@ static void rna_def_unit_settings(BlenderRNA  *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_UNIT_OPT_SPLIT);
 	RNA_def_property_ui_text(prop, "Separate Units", "Display units in pairs (e.g. 1m 0cm)");
 	RNA_def_property_update(prop, NC_WINDOW, NULL);
+
+// WITH_MECHANICAL_UNIT_FORCE
+	prop = RNA_def_property(srna, "force_scale", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_UNIT_OPT_FORCE_SCALE);
+	RNA_def_property_ui_text(prop, "Force Unit Scale", "Show always unit according to scale");
+	RNA_def_property_update(prop, NC_WINDOW, NULL);
 }
 
 void rna_def_render_layer_common(StructRNA *srna, int scene)

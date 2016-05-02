@@ -110,6 +110,10 @@ class SCENE_PT_unit(SceneButtonsPanel, Panel):
         split = col.split(percentage=0.35)
         split.row()
         split.prop(unit, "use_separate")
+        split = col.split(percentage=0.35)
+        split.row()
+        split.prop(unit, "force_scale")
+
 
 
 class SceneKeyingSetsPanel:

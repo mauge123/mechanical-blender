@@ -35,6 +35,9 @@ extern "C" {
 
 /* humanly readable representation of a value in units (used for button drawing) */
 size_t  bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad);
+#ifdef WITH_MECHANICAL_UNIT_FORCE
+size_t  bUnit_AsString_force(char *str, float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad);
+#endif
 
 /* replace units with values, used before python button evaluation */
 bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double scale_pref, int system, int type);

@@ -417,12 +417,25 @@ static size_t unit_as_string(char *str, int len_max, double value, int prec, bUn
 	return i;
 }
 
+
 /* Used for drawing number buttons, try keep fast.
  * Return the length of the generated string.
  */
+#ifdef WITH_MECHANICAL_UNIT_FORCE
 size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad)
 {
+	return bUnit_AsString_force(str, NULL, len_max, value, prec, system, type, split, pad);
+}
+size_t bUnit_AsString_force(char *str,float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad)
+#else
+size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad)
+#endif
+{
 	bUnitCollection *usys = unit_get_system(system, type);
+#ifdef WITH_MECHANICAL_UNIT_FORCE
+	bUnitDef *unit = NULL;
+#endif
+
 
 	if (usys == NULL || usys->units[0].name == NULL)
 		usys = &buDummyCollection;
@@ -449,8 +462,18 @@ size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system
 			return i;
 		}
 	}
-
+#ifdef WITH_MECHANICAL_UNIT_FORCE
+	if (scale_length != NULL) {
+		for (int i =0;i<usys->length;i++){
+			if (usys->units[i].scalar == *scale_length) {
+				unit = &usys->units[i];
+			}
+		}
+	}
+	return unit_as_string(str, len_max, value, prec, usys, unit, pad ? ' ' : '\0');
+#else
 	return unit_as_string(str, len_max, value, prec, usys, NULL, pad ? ' ' : '\0');
+#endif
 }
 
 BLI_INLINE bool isalpha_or_utf8(const int ch)

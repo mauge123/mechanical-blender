@@ -209,6 +209,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 	int totdim;
 	ToolSettings *ts = scene->toolsettings;
 	BMDim *edm_sel;
+	uiBut *but;
 
 	totdim = 0;
 
@@ -250,8 +251,9 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 			// At least one dimension
 			tfp->dimension_value = get_dimension_value(edm_sel);
-			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,
+			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
+			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 
 			tfp->dim_txt_pos= edm_sel->dpos_fact;
 			// Add dimension position
