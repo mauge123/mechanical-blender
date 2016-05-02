@@ -2347,6 +2347,7 @@ class VIEW3D_MT_edit_mesh_select_mode(Menu):
         layout.operator("mesh.select_mode", text="Edge", icon='EDGESEL').type = 'EDGE'
         layout.operator("mesh.select_mode", text="Face", icon='FACESEL').type = 'FACE'
         layout.operator("mesh.select_mode", text="Reference", icon='FACESEL').type = 'REFERENCE'
+        layout.operator("mesh.select_mode", text="Dimension", icon='FACESEL').type = 'DIMENSION'
 
 class VIEW3D_MT_edit_mesh_extrude(Menu):
     bl_label = "Extrude"
