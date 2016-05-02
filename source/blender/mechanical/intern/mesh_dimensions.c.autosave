@@ -313,7 +313,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 		// Opossite directions
 		flip = (dot_v3v3(rcenter1,rcenter2)< 0.5);
-
+		
 		do_axis = true;
 
 	}
