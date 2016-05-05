@@ -2343,6 +2343,7 @@ static int createTransEditDim(TransInfo *t) {
 				case DIM_TYPE_DIAMETER:
 				case DIM_TYPE_RADIUS:
 				case DIM_TYPE_ANGLE_3P:
+				case DIM_TYPE_ANGLE_3P_CON:
 					copy_v3_v3(td->iloc,edm->center);
 					copy_v3_v3(td->center, edm->center);
 					break;

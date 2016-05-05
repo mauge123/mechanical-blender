@@ -3161,8 +3161,12 @@ BMDim *BM_dim_create(
 			normalize_v3(edm->fpos);
 			edm->dpos_fact = 0.5f;
 			break;
-		case DIM_TYPE_ANGLE_3P:
+		case DIM_TYPE_ANGLE_3P_CON:
+			BLI_assert (v_count >= 6);
 		case DIM_TYPE_ANGLE_4P:
+			BLI_assert (v_count >= 4);
+		case DIM_TYPE_ANGLE_3P:
+			BLI_assert (v_count >= 3);
 			copy_v3_v3(edm->center, edm->v[1]->co);
 			//set direction
 			sub_v3_v3v3(edm->fpos,edm->center, edm->v[2]->co);

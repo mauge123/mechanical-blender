@@ -2013,6 +2013,7 @@ void select_dimension_data (BMDim *edm, void *context) {
 		case DIM_TYPE_LINEAR:
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_4P:
+		case DIM_TYPE_ANGLE_3P_CON:
 
 			ED_view3d_project_float_object(vc->ar,edm->start, screen_co_start, flag);
 			ED_view3d_project_float_object(vc->ar,edm->end, screen_co_end, flag);

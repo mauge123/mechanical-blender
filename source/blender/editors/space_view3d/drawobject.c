@@ -100,6 +100,7 @@
 #include "ED_types.h"
 
 #include "mesh_dimensions.h"
+#include "mechanical_utils.h"
 
 #include "UI_resources.h"
 #include "UI_interface_icons.h"
@@ -2910,6 +2911,7 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
 		case DIM_TYPE_ANGLE_3P:
+		case DIM_TYPE_ANGLE_3P_CON:
 			draw_angle_3p_dimension(
 			            CDDM_get_vert(dm,mdm->v[0])->co,
 						CDDM_get_vert(dm,mdm->v[2])->co,
@@ -2951,6 +2953,40 @@ static void draw_dimension_direction_points(BMDim *edm) {
 	}
 }
 
+static void draw_dimension_axis(BMDim *edm) {
+	float axis[3];
+	float center[3], a[3], b[3], m[3];
+
+	BLI_assert (edm->dim_type == DIM_TYPE_ANGLE_3P_CON);
+
+	if (center_of_3_points (center, edm->v[3]->co, edm->v[4]->co, edm->v[5]->co))
+	{
+		normal_tri_v3(axis, edm->v[3]->co, edm->v[4]->co, edm->v[5]->co);
+
+		v_perpendicular_to_axis(a, center, edm->v[0]->co, axis);
+		sub_v3_v3v3(a, edm->v[0]->co, a);
+
+		v_perpendicular_to_axis(b, center, edm->v[2]->co, axis);
+		sub_v3_v3v3(b, edm->v[2]->co, b);
+
+		mid_of_2_points(m,a,b);
+		sub_v3_v3(a,m);
+		mul_v3_fl(a,1.2);
+		add_v3_v3(a,m);
+		sub_v3_v3(b,m);
+		mul_v3_fl(b,1.2);
+		add_v3_v3(b,m);
+
+		glColor3f(1.0f,0,0);
+
+		glBegin(GL_LINE_STRIP);
+			glVertex3fv(a);
+			glVertex3fv(b);
+		glEnd();
+	}
+
+}
+
 /**
  * /Brief Draw dimensions in EditMode
  *
@@ -2984,9 +3020,13 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			break;
 		case DIM_TYPE_ANGLE_3P:
+		case DIM_TYPE_ANGLE_3P_CON:
 			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
 								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 			draw_dimension_direction_points(edm);
+			if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->dim_type == DIM_TYPE_ANGLE_3P_CON) {
+				draw_dimension_axis(edm);
+			}
 			break;
 		case DIM_TYPE_ANGLE_4P:
 			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->center,edm->fpos, edm->dpos_fact,
