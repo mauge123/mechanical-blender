@@ -7,6 +7,7 @@
 #define DIM_AXIS_CONSTRAINT (1 << 1)
 #define DIM_CONSTRAINT_OVERRIDE (1<<2)
 #define DIM_ALLOW_SLIDE_CONSTRAINT (1<<3)
+#define DIM_CONCENTRIC_CONSTRAINT (1<<4)
 
 #include "DNA_scene_types.h"
 

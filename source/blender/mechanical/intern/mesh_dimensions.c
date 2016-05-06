@@ -20,13 +20,16 @@ bool valid_constraint_setting(BMDim *edm, int constraint) {
 	bool ret = false;
 	switch (constraint) {
 		case DIM_PLANE_CONSTRAINT:
-			ret = ELEM(edm->dim_type,DIM_TYPE_LINEAR,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P, DIM_TYPE_ANGLE_3P_CON);
+			ret = ELEM(edm->dim_type,DIM_TYPE_LINEAR,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P);
 			break;
 		case DIM_AXIS_CONSTRAINT:
-			ret = ELEM(edm->dim_type,DIM_TYPE_RADIUS, DIM_TYPE_DIAMETER, DIM_TYPE_ANGLE_3P_CON);
+			ret = ELEM(edm->dim_type,DIM_TYPE_RADIUS, DIM_TYPE_DIAMETER);
 			break;
 		case DIM_ALLOW_SLIDE_CONSTRAINT:
 			ret = ELEM(edm->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P, DIM_TYPE_ANGLE_3P_CON);
+			break;
+		case DIM_CONCENTRIC_CONSTRAINT:
+			ret = (edm->dim_type == DIM_TYPE_ANGLE_3P_CON);
 			break;
 	}
 	return ret;
@@ -311,7 +314,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 	tag_vertexs_affected_by_dimension (bm, edm);
 
-	if (constraints & DIM_PLANE_CONSTRAINT) {
+	if ((constraints & DIM_PLANE_CONSTRAINT) &&  (~constraints &  DIM_CONCENTRIC_CONSTRAINT )) {
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
 	}
 
@@ -349,7 +352,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 		}
 
-		if (constraints & DIM_AXIS_CONSTRAINT && has_axis) {
+		if (constraints & DIM_CONCENTRIC_CONSTRAINT && has_axis) {
 			BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 				float delta = fabs(point_dist_to_axis (ccenter1, constraint_axis,eve->co));
 				if ((delta - r_constraint)< DIM_CONSTRAINT_PRECISION &&

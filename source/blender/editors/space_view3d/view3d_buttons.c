@@ -185,17 +185,22 @@ static int v3d_mesh_constraints_buts(BMDim *edm, int totdim, uiBlock *block,int 
 
 	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_PLANE_CONSTRAINT))), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint"),0, yi -= buth + but_margin, 200, buth,
-		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint"));
+		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint: Coplanar vertexs get same translation"));
 	UI_block_lock_clear(block);
 
 	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_AXIS_CONSTRAINT))), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint"),0, yi -= buth + but_margin, 200, buth,
-		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint"));
+		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint: Vertex to same distance to dimension axis get same translation"));
 	UI_block_lock_clear(block);
 
 	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_ALLOW_SLIDE_CONSTRAINT))), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_ALLOW_SLIDE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Allow Slide"),0, yi -= buth + but_margin, 200, buth,
-		constraints,0.0f,0.0f, 0, 0, TIP_("Allow Slide"));
+		constraints,0.0f,0.0f, 0, 0, TIP_("Allow Slide: Changed vertex by dimension can change position"));
+	UI_block_lock_clear(block);
+
+	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_CONCENTRIC_CONSTRAINT))), "Valid Contraint");
+	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONCENTRIC_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Concetric"),0, yi -= buth + but_margin, 200, buth,
+		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic concentric constraint: Concentric data will be aplied same distance to axis"));
 	UI_block_lock_clear(block);
 
 	return yi;
