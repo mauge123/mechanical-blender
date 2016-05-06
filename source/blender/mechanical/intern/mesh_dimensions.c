@@ -84,12 +84,11 @@ static void apply_dimension_radius_from_center_exec(float* point, float *center,
 	float curr;
 
 	sub_v3_v3v3(v,point, center);
-	curr = len_v3(v);
-
 	project_v3_v3v3(ncenter,v, axis);
 	add_v3_v3(ncenter,center);
 
 	sub_v3_v3v3(v,point, ncenter);
+	curr = len_v3(v);
 
 	normalize_v3(v);
 	mul_v3_fl(v,curr+inc);
