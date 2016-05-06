@@ -129,13 +129,16 @@ BMDim *BM_dim_create(
         const BMDim *d_example, const eBMCreateFlag create_flag);
 
 void BM_dim_kill(BMesh *bm, BMDim *edm);
-void bm_kill_only_dim(BMesh *bm, BMDim *d);
+void bm_kill_only_dim(BMesh *bm, BMDim *edm);
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 BMReference *BM_reference_plane_create(
         BMesh *bm, float *v1, float *v2, float *v3, float *v4, char *name,
         const BMReference *d_example, const eBMCreateFlag create_flag);
+
+void BM_reference_kill(BMesh *bm, BMReference *erf);
+void bm_kill_only_reference(BMesh *bm, BMReference *erf);
 #endif
 
 #ifdef WITH_MECHANICAL

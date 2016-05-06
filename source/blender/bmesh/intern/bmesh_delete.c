@@ -97,7 +97,7 @@ static void bmo_remove_tagged_verts_loose(BMesh *bm, const short oflag)
 	}
 }
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void bmo_remove_tagged_dim(BMesh *bm, const short oflag)
+static void bmo_remove_tagged_dims(BMesh *bm, const short oflag)
 {
 	BMDim *d, *d_next;
 	BMIter iter;
@@ -110,6 +110,19 @@ static void bmo_remove_tagged_dim(BMesh *bm, const short oflag)
 }
 #endif
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+static void bmo_remove_tagged_references(BMesh *bm, const short oflag)
+{
+	BMReference *erf, *erf_next;
+	BMIter iter;
+
+	BM_ITER_MESH_MUTABLE (erf, erf_next, &iter, bm, BM_REFERENCES_OF_MESH) {
+		if (BMO_elem_flag_test(bm, erf, oflag)) {
+			BM_reference_kill(bm, erf);
+		}
+	}
+}
+#endif
 
 
 void BMO_mesh_delete_oflag_tagged(BMesh *bm, const short oflag, const char htype)
@@ -136,6 +149,10 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *d;
 	BMIter diter;
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMDim *erf;
+	BMIter riter;
 #endif
 
 	BMIter eiter;
@@ -232,7 +249,19 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 					BMO_elem_flag_enable(bm, d, oflag);
 				}
 			}
-			bmo_remove_tagged_dim(bm, oflag);
+			bmo_remove_tagged_dims(bm, oflag);
+			break;
+		}
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		case DEL_REFERENCE:
+		{
+			BM_ITER_MESH (erf, &riter, bm, BM_REFERENCES_OF_MESH) {
+				if (!BMO_elem_flag_test(bm, erf, oflag)) {
+					BMO_elem_flag_enable(bm, erf, oflag);
+				}
+			}
+			bmo_remove_tagged_references(bm, oflag);
 			break;
 		}
 #endif

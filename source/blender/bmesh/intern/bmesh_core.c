@@ -1076,7 +1076,14 @@ void BM_dim_kill(BMesh *bm, BMDim *edm)
 {
 	bm_kill_only_dim(bm, edm);
 }
+#endif
 
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+void BM_reference_kill(BMesh *bm, BMReference *erf)
+{
+	bm_kill_only_reference(bm, erf);
+}
 #endif
 
 /********** private disk and radial cycle functions ********** */
@@ -3035,30 +3042,47 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void bm_kill_only_dim(BMesh *bm, BMDim *d)
+void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 {
-	BLI_assert (d);
+	BLI_assert (edm);
 
 	bm->totdim--;
 	bm->elem_index_dirty |= BM_DIM;
 	bm->elem_table_dirty |= BM_DIM;
 
-	MEM_freeN(d->v);
+	MEM_freeN(edm->v);
 
-	BM_select_history_remove(bm, d);
+	BM_select_history_remove(bm, edm);
 
-	if (d->head.data)
-		CustomData_bmesh_free_block(&bm->vdata, &d->head.data);
+	if (edm->head.data)
+		CustomData_bmesh_free_block(&bm->vdata, &edm->head.data);
 
 	if (bm->dtoolflagpool) {
-		BLI_mempool_free(bm->dtoolflagpool, d->oflags);
+		BLI_mempool_free(bm->dtoolflagpool, edm->oflags);
 	}
 
 
-	BLI_mempool_free(bm->dpool, d);
+	BLI_mempool_free(bm->dpool, edm);
 }
-
 #endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+void bm_kill_only_reference(BMesh *bm, BMReference *erf)
+{
+	BLI_assert (erf);
+
+	bm->totref--;
+
+	BM_select_history_remove(bm, erf);
+
+	if (bm->ptoolflagpool) {
+		BLI_mempool_free(bm->dtoolflagpool, erf->oflags);
+	}
+
+	BLI_mempool_free(bm->ppool, erf);
+}
+#endif
+
 
 #ifdef WITH_MECHANICAL
 int order_select_compare (const void *ptr_a,const void *ptr_b) {

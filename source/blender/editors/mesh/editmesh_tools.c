@@ -338,6 +338,9 @@ enum {
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	MESH_DELETE_DIM	      = 5,
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	MESH_DELETE_REFERENCE = 6,
+#endif
 };
 
 static void edbm_report_delete_info(ReportList *reports, BMesh *bm, const int totelem[3])
@@ -382,6 +385,12 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 				return OPERATOR_CANCELLED;
 			break;
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+		case MESH_DELETE_REFERENCE:
+			if (!EDBM_op_callf(em, op, "delete geom=%hv context=%i", BM_ELEM_SELECT, DEL_REFERENCE))  /* Erase DIM */
+				return OPERATOR_CANCELLED;
+			break;
+#endif
 		default:
 			BLI_assert(0);
 			break;
@@ -402,9 +411,12 @@ void MESH_OT_delete(wmOperatorType *ot)
 		{MESH_DELETE_FACE,      "FACE",      0, "Faces", ""},
 		{MESH_DELETE_EDGE_FACE, "EDGE_FACE", 0, "Only Edges & Faces", ""},
 		{MESH_DELETE_ONLY_FACE, "ONLY_FACE", 0, "Only Faces", ""},
-	#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		{MESH_DELETE_DIM,      "DIM",      0, "Dimension", ""},
-	#endif
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	    {MESH_DELETE_REFERENCE,      "REFERENCE",      0, "Reference", ""},
+#endif
 		{0, NULL, 0, NULL, NULL}
 	};
 
