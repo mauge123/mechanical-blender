@@ -2806,7 +2806,7 @@ static void rna_def_mesh_references(BlenderRNA *brna, PropertyRNA *cprop)
 	StructRNA *srna;
 /*	PropertyRNA *prop; */
 
-	FunctionRNA *func;
+/*	FunctionRNA *func; */
 /*	PropertyRNA *parm; */
 
 	RNA_def_property_srna(cprop, "MeshReferences");

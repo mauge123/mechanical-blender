@@ -98,7 +98,7 @@
 #include "bmesh.h"
 #include "intern/bmesh_private.h" /* for element checking */
 
-float get_dimension_value(BMDim *edm);
+#include "mesh_dimensions.h"
 
 /**
  * Currently this is only used for Python scripts
@@ -442,6 +442,7 @@ void BM_mesh_bm_from_me(
 			MEM_freeN (v_arr);
 
 			copy_v3_v3(d->fpos,mdim->fpos);
+			d->dpos_fact = mdim->dpos_fact;
 			d->constraints = mdim->constraints;
 
 			BM_elem_index_set(d, i); /* set_ok */
@@ -453,6 +454,8 @@ void BM_mesh_bm_from_me(
 			if (mdim->flag & SELECT) {
 				BM_dim_select_set(bm, d, true);
 			}
+
+			dimension_data_update(d);
 		}
 
 		bm->elem_index_dirty &= ~BM_DIM; /* added in order, clear dirty flag */
@@ -854,6 +857,7 @@ void BM_mesh_bm_to_me(
 		mdm->constraints = edm->constraints;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		copy_v3_v3(mdm->center, edm->center);
+		mdm->flag = BM_dimension_flag_to_mflag(edm);
 		BM_elem_index_set(edm, i); /* set_inline */
 		/* copy over customdat */
 		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, edm->head.data, i);
