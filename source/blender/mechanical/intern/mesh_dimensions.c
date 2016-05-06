@@ -78,15 +78,40 @@ static void untag_dimension_necessary_verts(BMDim *edm) {
 	}
 }
 
-static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float value, int constraints) {
+
+static void apply_dimension_radius_from_center_exec(float* point, float *center, float *axis, float inc) {
+	float ncenter[3], v[3];
+	float curr;
+
+	sub_v3_v3v3(v,point, center);
+	curr = len_v3(v);
+
+	project_v3_v3v3(ncenter,v, axis);
+	add_v3_v3(ncenter,center);
+
+	sub_v3_v3v3(v,point, ncenter);
+
+	normalize_v3(v);
+	mul_v3_fl(v,curr+inc);
+	add_v3_v3v3(point,ncenter,v);
+}
+
+static void apply_dimension_radius_from_center(BMesh *bm, BMDim *edm, float value, int constraints) {
 
 	BLI_assert (ELEM(edm->dim_type,DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS));
 
 	float axis[3],v[3], ncenter[3], p[3];
 	float curv = get_dimension_value(edm); // Current Value
+	float inc;
 
 	BMIter iter;
 	BMVert* eve;
+
+	if (edm->dim_type == DIM_TYPE_DIAMETER) {
+		curv/=2.0f;
+	}
+	inc = value-curv;
+
 
 	get_dimension_plane(axis, p, edm);
 
@@ -102,7 +127,7 @@ static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float va
 			project_v3_v3v3(ncenter,v, axis);
 			add_v3_v3(ncenter,edm->center);
 
-			if (fabs((len_v3v3 (eve->co, ncenter)*2 - curv)) <  DIM_CONSTRAINT_PRECISION){
+			if (fabs((len_v3v3 (eve->co, ncenter) - curv)) <  DIM_CONSTRAINT_PRECISION){
 				BM_elem_flag_enable(eve, BM_ELEM_TAG);
 			}
 		}
@@ -111,17 +136,7 @@ static void apply_dimension_diameter_from_center(BMesh *bm, BMDim *edm, float va
 	// Update related Verts
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
-			sub_v3_v3v3(v,eve->co, edm->center);
-
-			project_v3_v3v3(ncenter,v, axis);
-			add_v3_v3(ncenter,edm->center);
-
-			sub_v3_v3v3(v,eve->co, ncenter);
-
-			normalize_v3(v);
-			mul_v3_fl(v,value);
-			add_v3_v3v3(eve->co,ncenter,v);
-
+			apply_dimension_radius_from_center_exec(eve->co,edm->center,axis,inc);
 			// Reset tag
 			BM_elem_flag_disable(eve, BM_ELEM_TAG);
 		}
@@ -424,10 +439,10 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts
 			apply_dimension_linear_value(bm,edm,value,constraints);
 			break;
 		case DIM_TYPE_DIAMETER:
-			apply_dimension_diameter_from_center(bm,edm,value/2.0f,constraints);
+			apply_dimension_radius_from_center(bm,edm,value/2.0f,constraints);
 			break;
 		case DIM_TYPE_RADIUS:
-			apply_dimension_diameter_from_center(bm,edm,value,constraints);
+			apply_dimension_radius_from_center(bm,edm,value,constraints);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_4P:
