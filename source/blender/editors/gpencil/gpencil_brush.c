@@ -766,8 +766,9 @@ static void gp_brush_clone_add(bContext *C, tGP_BrushEditData *gso)
 			new_stroke = MEM_dupallocN(gps);
 			
 			new_stroke->points = MEM_dupallocN(gps->points);
-			new_stroke->next = new_stroke->prev = NULL;
+			new_stroke->triangles = MEM_dupallocN(gps->triangles);
 			
+			new_stroke->next = new_stroke->prev = NULL;
 			BLI_addtail(&gpf->strokes, new_stroke);
 			
 			/* Adjust all the stroke's points, so that the strokes
@@ -905,7 +906,7 @@ static void gpencil_toggle_brush_cursor(bContext *C, bool enable)
 static void gpsculpt_brush_header_set(bContext *C, tGP_BrushEditData *gso)
 {
 	const char *brush_name = NULL;
-	char str[256] = "";
+	char str[UI_MAX_DRAW_STR] = "";
 	
 	RNA_enum_name(rna_enum_gpencil_sculpt_brush_items, gso->brush_type, &brush_name);
 	
@@ -1283,6 +1284,12 @@ static bool gpsculpt_brush_apply_standard(bContext *C, tGP_BrushEditData *gso)
 			default:
 				printf("ERROR: Unknown type of GPencil Sculpt brush - %u\n", gso->brush_type);
 				break;
+		}
+		
+		/* Triangulation must be calculated if changed */
+		if (changed) {
+			gps->flag |= GP_STROKE_RECALC_CACHES;
+			gps->tot_triangles = 0;
 		}
 	}
 	CTX_DATA_END;

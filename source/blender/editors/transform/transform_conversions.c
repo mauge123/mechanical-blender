@@ -822,6 +822,7 @@ static void pose_grab_with_ik_clear(Object *ob)
 	bKinematicConstraint *data;
 	bPoseChannel *pchan;
 	bConstraint *con, *next;
+	bool need_dependency_update = false;
 
 	for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
 		/* clear all temporary lock flags */
@@ -836,6 +837,7 @@ static void pose_grab_with_ik_clear(Object *ob)
 				data = con->data;
 				if (data->flag & CONSTRAINT_IK_TEMP) {
 					/* iTaSC needs clear for removed constraints */
+					need_dependency_update = true;
 					BIK_clear_data(ob->pose);
 
 					BLI_remlink(&pchan->constraints, con);
@@ -851,10 +853,10 @@ static void pose_grab_with_ik_clear(Object *ob)
 	}
 
 #ifdef WITH_LEGACY_DEPSGRAPH
-	if (!DEG_depsgraph_use_legacy())
+	if (!DEG_depsgraph_use_legacy() && need_dependency_update)
 #endif
 	{
-		/* TODO(sergey): Consuder doing partial update only. */
+		/* TODO(sergey): Consider doing partial update only. */
 		DAG_relations_tag_update(G.main);
 	}
 }
@@ -7935,7 +7937,9 @@ static void createTransGPencil(bContext *C, TransInfo *t)
 								copy_m3_m3(td->mtx, mtx);
 								unit_m3(td->axismtx); // XXX?
 							}
-							
+							/* Triangulation must be calculated again, so save the stroke for recalc function */
+							td->extra = gps;
+
 							td++;
 							tail++;
 						}

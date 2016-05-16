@@ -995,6 +995,11 @@ class VIEW3D_MT_select_gpencil(Menu):
 
         layout.separator()
 
+        layout.operator("gpencil.select_first")
+        layout.operator("gpencil.select_last")
+
+        layout.separator()
+
         layout.operator("gpencil.select_more")
         layout.operator("gpencil.select_less")
 

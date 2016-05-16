@@ -29,6 +29,10 @@
  *  \ingroup curve_fit
  */
 
+#ifdef _MSC_VER
+#  define _USE_MATH_DEFINES
+#endif
+
 #include <math.h>
 #include <float.h>
 #include <stdbool.h>
@@ -39,11 +43,14 @@
 
 #include "../curve_fit_nd.h"
 
+/* Take curvature into account when calculating the least square solution isn't usable. */
+#define USE_CIRCULAR_FALLBACK
+
 /* avoid re-calculating lengths multiple times */
 #define USE_LENGTH_CACHE
 
 /* store the indices in the cubic data so we can return the original indices,
- * useful when the caller has data assosiated with the curve. */
+ * useful when the caller has data associated with the curve. */
 #define USE_ORIG_INDEX_DATA
 
 typedef unsigned int uint;
@@ -117,6 +124,11 @@ static size_t cubic_alloc_size(const uint dims)
 static Cubic *cubic_alloc(const uint dims)
 {
 	return malloc(cubic_alloc_size(dims));
+}
+
+static void cubic_copy(Cubic *cubic_dst, const Cubic *cubic_src, const uint dims)
+{
+	memcpy(cubic_dst, cubic_src, cubic_alloc_size(dims));
 }
 
 static void cubic_init(
@@ -283,7 +295,7 @@ static void cubic_calc_acceleration(
         double r_v[])
 {
 	CUBIC_VARS_CONST(cubic, dims, p0, p1, p2, p3);
-    const double s = 1.0 - t;
+	const double s = 1.0 - t;
 	for (uint j = 0; j < dims; j++) {
 		r_v[j] = 6.0 * ((p2[j] - 2.0 * p1[j] + p0[j]) * s +
 		                (p3[j] - 2.0 * p2[j] + p1[j]) * t);
@@ -392,12 +404,139 @@ static void points_calc_center_weighted(
 	}
 }
 
+#ifdef USE_CIRCULAR_FALLBACK
+
+/**
+ * Return a scale value, used to calculate how much the curve handles should be increased,
+ *
+ * This works by placing each end-point on an imaginary circle,
+ * the placement on the circle is based on the tangent vectors,
+ * where larger differences in tangent angle cover a larger part of the circle.
+ *
+ * Return the scale representing how much larger the distance around the circle is.
+ */
+static double points_calc_circumference_factor(
+        const double  tan_l[],
+        const double  tan_r[],
+        const uint dims)
+{
+	const double dot = dot_vnvn(tan_l, tan_r, dims);
+	const double len_tangent = dot < 0.0 ? len_vnvn(tan_l, tan_r, dims) : len_negated_vnvn(tan_l, tan_r, dims);
+	if (len_tangent > DBL_EPSILON) {
+		/* only clamp to avoid precision error */
+		double angle = acos(max(-fabs(dot), -1.0));
+		/* Angle may be less than the length when the tangents define >180 degrees of the circle,
+		 * (tangents that point away from each other).
+		 * We could try support this but will likely cause extreme >1 scales which could cause other issues. */
+		// assert(angle >= len_tangent);
+		double factor = (angle / len_tangent);
+		assert(factor < (M_PI / 2) + DBL_EPSILON);
+		return factor;
+	}
+	else {
+		/* tangents are exactly aligned (think two opposite sides of a circle). */
+		return (M_PI / 2);
+	}
+}
+
+/**
+ * Return the value which the distance between points will need to be scaled by,
+ * to define a handle, given both points are on a perfect circle.
+ *
+ * \note the return value will need to be multiplied by 1.3... for correct results.
+ */
+static double points_calc_circle_tangent_factor(
+        const double  tan_l[],
+        const double  tan_r[],
+        const uint dims)
+{
+	const double angle_sin = len_vnvn(tan_l, tan_r, dims) / 2.0;
+	if (angle_sin != 0.0) {
+		const double tan_dot = dot_vnvn(tan_l, tan_r, dims);
+		double scale;
+		if (tan_dot > -1.0) {
+			const double angle = acos(tan_dot) / 2.0;
+			const double angle_cos = cos(angle);
+			scale = (1.0 - angle_cos) / (angle_sin * 2.0);
+		}
+		else {
+			scale = 1.0 / 2.0;
+		}
+		return (scale / angle_sin);
+	}
+	else {
+		return (1.0 / 3.0) * 0.75;
+	}
+}
+
+/**
+ * Calculate the scale the handles, which serves as a best-guess
+ * used as a fallback when the least-square solution fails.
+ */
+static double points_calc_cubic_scale(
+        const double v_l[], const double v_r[],
+        const double  tan_l[],
+        const double  tan_r[],
+        const double coords_length, uint dims)
+{
+	const double len_direct = len_vnvn(v_l, v_r, dims);
+	const double len_circle_factor = points_calc_circle_tangent_factor(tan_l, tan_r, dims);
+
+	/* if this curve is a circle, this value doesn't need modification */
+	const double len_circle_handle = (len_direct * (len_circle_factor / 0.75));
+
+	/* scale by the difference from the circumference distance */
+	const double len_circle = len_direct * points_calc_circumference_factor(tan_l, tan_r, dims);
+	double scale_handle = (coords_length / len_circle);
+
+	/* Could investigate an accurate calculation here,
+	 * though this gives close results */
+	scale_handle = ((scale_handle - 1.0) * 1.75) + 1.0;
+
+	return len_circle_handle * scale_handle;
+}
+
+static void cubic_from_points_fallback(
+        const double *points_offset,
+        const uint    points_offset_len,
+        const double  tan_l[],
+        const double  tan_r[],
+        const uint dims,
+
+        Cubic *r_cubic)
+{
+	const double *p0 = &points_offset[0];
+	const double *p3 = &points_offset[(points_offset_len - 1) * dims];
+
+	double alpha = len_vnvn(p0, p3, dims) / 3.0;
+
+	double *p1 = CUBIC_PT(r_cubic, 1, dims);
+	double *p2 = CUBIC_PT(r_cubic, 2, dims);
+
+	copy_vnvn(CUBIC_PT(r_cubic, 0, dims), p0, dims);
+	copy_vnvn(CUBIC_PT(r_cubic, 3, dims), p3, dims);
+
+#ifdef USE_ORIG_INDEX_DATA
+	r_cubic->orig_span = (points_offset_len - 1);
+#endif
+
+	/* p1 = p0 - (tan_l * alpha_l);
+	 * p2 = p3 + (tan_r * alpha_r);
+	 */
+	msub_vn_vnvn_fl(p1, p0, tan_l, alpha, dims);
+	madd_vn_vnvn_fl(p2, p3, tan_r, alpha, dims);
+}
+#endif  /* USE_CIRCULAR_FALLBACK */
+
 /**
  * Use least-squares method to find Bezier control points for region.
  */
 static void cubic_from_points(
         const double *points_offset,
         const uint    points_offset_len,
+#ifdef USE_CIRCULAR_FALLBACK
+        const double  points_offset_coords_length,
+#endif
         const double *u_prime,
         const double  tan_l[],
         const double  tan_r[],
@@ -471,11 +610,20 @@ static void cubic_from_points(
 	 * so only problems absurd of approximation and not for bugs in the code.
 	 */
 
+	bool use_clamp = true;
+
 	/* flip check to catch nan values */
 	if (!(alpha_l >= 0.0) ||
 	    !(alpha_r >= 0.0))
 	{
+#ifdef USE_CIRCULAR_FALLBACK
+		alpha_l = alpha_r = points_calc_cubic_scale(p0, p3, tan_l, tan_r, points_offset_coords_length, dims);
+#else
 		alpha_l = alpha_r = len_vnvn(p0, p3, dims) / 3.0;
+#endif
+
+		/* skip clamping when we're using default handles */
+		use_clamp = false;
 	}
 
 	double *p1 = CUBIC_PT(r_cubic, 1, dims);
@@ -497,64 +645,69 @@ static void cubic_from_points(
 	/* ------------------------------------
 	 * Clamping (we could make it optional)
 	 */
+	if (use_clamp) {
 #ifdef USE_VLA
-	double center[dims];
+		double center[dims];
 #else
-	double *center = alloca(sizeof(double) * dims);
+		double *center = alloca(sizeof(double) * dims);
 #endif
-	points_calc_center_weighted(points_offset, points_offset_len, dims, center);
+		points_calc_center_weighted(points_offset, points_offset_len, dims, center);
 
-	const double clamp_scale = 3.0;  /* clamp to 3x */
-	double dist_sq_max = 0.0;
+		const double clamp_scale = 3.0;  /* clamp to 3x */
+		double dist_sq_max = 0.0;
 
-	{
-		const double *pt = points_offset;
-		for (uint i = 0; i < points_offset_len; i++, pt += dims) {
+		{
+			const double *pt = points_offset;
+			for (uint i = 0; i < points_offset_len; i++, pt += dims) {
 #if 0
-			double dist_sq_test = sq(len_vnvn(center, pt, dims) * clamp_scale);
+				double dist_sq_test = sq(len_vnvn(center, pt, dims) * clamp_scale);
 #else
-			/* do inline */
-			double dist_sq_test = 0.0;
-			for (uint j = 0; j < dims; j++) {
-				dist_sq_test += sq((pt[j] - center[j]) * clamp_scale);
-			}
+				/* do inline */
+				double dist_sq_test = 0.0;
+				for (uint j = 0; j < dims; j++) {
+					dist_sq_test += sq((pt[j] - center[j]) * clamp_scale);
+				}
 #endif
-			dist_sq_max = max(dist_sq_max, dist_sq_test);
-		}
-	}
-
-	double p1_dist_sq = len_squared_vnvn(center, p1, dims);
-	double p2_dist_sq = len_squared_vnvn(center, p2, dims);
-
-	if (p1_dist_sq > dist_sq_max ||
-	    p2_dist_sq > dist_sq_max)
-	{
-
-		alpha_l = alpha_r = len_vnvn(p0, p3, dims) / 3.0;
-
-		/*
-		 * p1 = p0 - (tan_l * alpha_l);
-		 * p2 = p3 + (tan_r * alpha_r);
-		 */
-		for (uint j = 0; j < dims; j++) {
-			p1[j] = p0[j] - (tan_l[j] * alpha_l);
-			p2[j] = p3[j] + (tan_r[j] * alpha_r);
+				dist_sq_max = max(dist_sq_max, dist_sq_test);
+			}
 		}
 
-		p1_dist_sq = len_squared_vnvn(center, p1, dims);
-		p2_dist_sq = len_squared_vnvn(center, p2, dims);
-	}
+		double p1_dist_sq = len_squared_vnvn(center, p1, dims);
+		double p2_dist_sq = len_squared_vnvn(center, p2, dims);
 
-	/* clamp within the 3x radius */
-	if (p1_dist_sq > dist_sq_max) {
-		isub_vnvn(p1, center, dims);
-		imul_vn_fl(p1, sqrt(dist_sq_max) / sqrt(p1_dist_sq), dims);
-		iadd_vnvn(p1, center, dims);
-	}
-	if (p2_dist_sq > dist_sq_max) {
-		isub_vnvn(p2, center, dims);
-		imul_vn_fl(p2, sqrt(dist_sq_max) / sqrt(p2_dist_sq), dims);
-		iadd_vnvn(p2, center, dims);
+		if (p1_dist_sq > dist_sq_max ||
+		    p2_dist_sq > dist_sq_max)
+		{
+#ifdef USE_CIRCULAR_FALLBACK
+			alpha_l = alpha_r = points_calc_cubic_scale(p0, p3, tan_l, tan_r, points_offset_coords_length, dims);
+#else
+			alpha_l = alpha_r = len_vnvn(p0, p3, dims) / 3.0;
+#endif
+
+			/*
+			 * p1 = p0 - (tan_l * alpha_l);
+			 * p2 = p3 + (tan_r * alpha_r);
+			 */
+			for (uint j = 0; j < dims; j++) {
+				p1[j] = p0[j] - (tan_l[j] * alpha_l);
+				p2[j] = p3[j] + (tan_r[j] * alpha_r);
+			}
+
+			p1_dist_sq = len_squared_vnvn(center, p1, dims);
+			p2_dist_sq = len_squared_vnvn(center, p2, dims);
+		}
+
+		/* clamp within the 3x radius */
+		if (p1_dist_sq > dist_sq_max) {
+			isub_vnvn(p1, center, dims);
+			imul_vn_fl(p1, sqrt(dist_sq_max) / sqrt(p1_dist_sq), dims);
+			iadd_vnvn(p1, center, dims);
+		}
+		if (p2_dist_sq > dist_sq_max) {
+			isub_vnvn(p2, center, dims);
+			imul_vn_fl(p2, sqrt(dist_sq_max) / sqrt(p2_dist_sq), dims);
+			iadd_vnvn(p2, center, dims);
+		}
 	}
 	/* end clamping */
 }
@@ -578,8 +731,10 @@ static void points_calc_coord_length_cache(
 }
 #endif  /* USE_LENGTH_CACHE */
 
-
-static void points_calc_coord_length(
+/**
+ * \return the accumulated length of \a points_offset.
+ */
+static double points_calc_coord_length(
         const double *points_offset,
         const uint    points_offset_len,
         const uint    dims,
@@ -612,6 +767,7 @@ static void points_calc_coord_length(
 	for (uint i = 0; i < points_offset_len; i++) {
 		r_u[i] /= w;
 	}
+	return w;
 }
 
 /**
@@ -624,10 +780,10 @@ static void points_calc_coord_length(
  * \note Return value may be `nan` caller must check for this.
  */
 static double cubic_find_root(
-		const Cubic *cubic,
-		const double p[],
-		const double u,
-		const uint dims)
+        const Cubic *cubic,
+        const double p[],
+        const double u,
+        const uint dims)
 {
 	/* Newton-Raphson Method. */
 	/* all vectors */
@@ -731,6 +887,10 @@ static bool fit_cubic_to_points(
 	}
 
 	double *u = malloc(sizeof(double) * points_offset_len);
+
+#ifdef USE_CIRCULAR_FALLBACK
+	const double points_offset_coords_length  =
+#endif
 	points_calc_coord_length(
 	        points_offset, points_offset_len, dims,
 #ifdef USE_LENGTH_CACHE
@@ -743,12 +903,40 @@ static bool fit_cubic_to_points(
 
 	/* Parameterize points, and attempt to fit curve */
 	cubic_from_points(
-	        points_offset, points_offset_len, u, tan_l, tan_r, dims, r_cubic);
+	        points_offset, points_offset_len,
+#ifdef USE_CIRCULAR_FALLBACK
+	        points_offset_coords_length,
+#endif
+	        u, tan_l, tan_r, dims, r_cubic);
 
 	/* Find max deviation of points to fitted curve */
 	error_max_sq = cubic_calc_error(
 	        r_cubic, points_offset, points_offset_len, u, dims,
 	        &split_index);
+
+	Cubic *cubic_test = alloca(cubic_alloc_size(dims));
+
+#ifdef USE_CIRCULAR_FALLBACK
+	if (!(error_max_sq < error_threshold_sq)) {
+		/* Don't use the cubic calculated above, instead calculate a new fallback cubic,
+		 * since this tends to give more balanced split_index along the curve.
+		 * This is because the attempt to calcualte the cubic may contain spikes
+		 * along the curve which may give a lop-sided maximum distance. */
+		cubic_from_points_fallback(
+		        points_offset, points_offset_len,
+		        tan_l, tan_r, dims, cubic_test);
+		const double error_max_sq_test = cubic_calc_error(
+		        cubic_test, points_offset, points_offset_len, u, dims,
+		        &split_index);
+
+		/* intentionally use the newly calculated 'split_index',
+		 * even if the 'error_max_sq_test' is worse. */
+		if (error_max_sq > error_max_sq_test) {
+			error_max_sq = error_max_sq_test;
+			cubic_copy(r_cubic, cubic_test, dims);
+		}
+	}
+#endif
 
 	*r_error_max_sq = error_max_sq;
 	*r_split_index  = split_index;
@@ -758,8 +946,7 @@ static bool fit_cubic_to_points(
 		return true;
 	}
 	else {
-		Cubic *cubic_test = alloca(cubic_alloc_size(dims));
-		*cubic_test = *r_cubic;
+		cubic_copy(cubic_test, r_cubic, dims);
 
 		/* If error not too large, try some reparameterization and iteration */
 		double *u_prime = malloc(sizeof(double) * points_offset_len);
@@ -771,8 +958,11 @@ static bool fit_cubic_to_points(
 			}
 
 			cubic_from_points(
-			        points_offset, points_offset_len, u_prime,
-			        tan_l, tan_r, dims, cubic_test);
+			        points_offset, points_offset_len,
+#ifdef USE_CIRCULAR_FALLBACK
+			        points_offset_coords_length,
+#endif
+			        u_prime, tan_l, tan_r, dims, cubic_test);
 			error_max_sq = cubic_calc_error(
 			        cubic_test, points_offset, points_offset_len, u_prime, dims,
 			        &split_index);
@@ -781,13 +971,13 @@ static bool fit_cubic_to_points(
 				free(u_prime);
 				free(u);
 
-				*r_cubic = *cubic_test;
+				cubic_copy(r_cubic, cubic_test, dims);
 				*r_error_max_sq = error_max_sq;
 				*r_split_index  = split_index;
 				return true;
 			}
 			else if (error_max_sq < *r_error_max_sq) {
-				*r_cubic = *cubic_test;
+				cubic_copy(r_cubic, cubic_test, dims);
 				*r_error_max_sq = error_max_sq;
 				*r_split_index = split_index;
 			}

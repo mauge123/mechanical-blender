@@ -63,6 +63,7 @@ struct wmTimer;
 struct ARegion;
 struct ReportList;
 struct EditBone;
+struct SnapObjectContext;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 struct BMDim;
 #endif
@@ -114,7 +115,7 @@ typedef struct TransSnap {
 	/**
 	 * Re-usable snap context data.
 	 */
-	SnapObjectContext *object_context;
+	struct SnapObjectContext *object_context;
 } TransSnap;
 
 typedef struct TransCon {

@@ -64,6 +64,7 @@
 #include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
+#include "ED_transform_snap_object_context.h"
 #include "ED_types.h"
 #include "ED_util.h"
 #include "ED_view3d.h"
@@ -5823,9 +5824,9 @@ static int curve_dissolve_exec(bContext *C, wmOperator *UNUSED(op))
 
 						for (int axis = 0; axis < dims; axis++) {
 							BKE_curve_forward_diff_bezier(
-									bezt_a->vec[1][axis], bezt_a->vec[2][axis],
-									bezt_b->vec[0][axis], bezt_b->vec[1][axis],
-									points_stride + axis, points_stride_len, dims * sizeof(float));
+							        bezt_a->vec[1][axis], bezt_a->vec[2][axis],
+							        bezt_b->vec[0][axis], bezt_b->vec[1][axis],
+							        points_stride + axis, points_stride_len, dims * sizeof(float));
 						}
 
 						points_stride += dims * points_stride_len;
@@ -5845,6 +5846,13 @@ static int curve_dissolve_exec(bContext *C, wmOperator *UNUSED(op))
 					        tan_l, tan_r,
 					        bezt_prev->vec[2], bezt_next->vec[0],
 					        &error_sq_dummy);
+
+					if (!ELEM(bezt_prev->h2, HD_FREE, HD_ALIGN)) {
+						bezt_prev->h2 = (bezt_prev->h2 == HD_VECT) ? HD_FREE : HD_ALIGN;
+					}
+					if (!ELEM(bezt_next->h1, HD_FREE, HD_ALIGN)) {
+						bezt_next->h1 = (bezt_next->h1 == HD_VECT) ? HD_FREE : HD_ALIGN;
+					}
 
 					MEM_freeN(points);
 				}
