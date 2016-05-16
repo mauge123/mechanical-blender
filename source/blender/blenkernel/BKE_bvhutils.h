@@ -89,9 +89,6 @@ typedef struct BVHTreeFromMesh {
 	float sphere_radius;
 
 	/* Private data */
-// WITH_MECHANICAL_REMOVED_FROM_BF_TRUNK
-	void *em_evil;
-
 	bool cached;
 
 } BVHTreeFromMesh;
@@ -155,7 +152,7 @@ BVHTree *bvhtree_from_mesh_looptri_ex(
 
 #ifdef WITH_MECHANICAL_SNAP_TO_PLANE
 BVHTree *bvhtree_from_mesh_plane_looptri(
-        struct BVHTreeFromMesh *data, struct DerivedMesh *mesh, float epsilon, int tree_type, int axis);
+        struct BVHTreeFromEditMesh *data, struct BMEditMesh *em, float epsilon, int tree_type, int axis);
 
 #endif
 
@@ -188,9 +185,6 @@ enum {
 	BVHTREE_FROM_EDGES           = 1,
 	BVHTREE_FROM_FACES           = 2,
 	BVHTREE_FROM_LOOPTRI         = 3,
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BVHTREE_FROM_PLANES_EDITMESH_SNAP    = 4,
-#endif
 };
 
 typedef struct LinkNode BVHCache;

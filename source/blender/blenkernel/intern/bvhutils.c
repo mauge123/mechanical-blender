@@ -195,8 +195,8 @@ static void get_triangle_from_plane_index(BMesh *bm, int index, float *r1, float
 
 static void editmesh_planes_nearest_point(void *userdata, int index, const float co[3], BVHTreeNearest *nearest)
 {
-	const BVHTreeFromMesh *data = (BVHTreeFromMesh *) userdata;
-	BMEditMesh *em = data->em_evil;
+	const BVHTreeFromEditMesh *data = (BVHTreeFromEditMesh *) userdata;
+	BMEditMesh *em = data->em;
 	BMesh *bm = em->bm;
 	float nearest_tmp[3], dist_sq;
 
@@ -310,8 +310,8 @@ static void editmesh_looptri_spherecast(void *userdata, int index, const BVHTree
 #ifdef WITH_MECHANICAL_SNAP_TO_PLANE
 static void editmesh_planes_spherecast(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
 {
-	const BVHTreeFromMesh *data = (BVHTreeFromMesh *) userdata;
-	BMEditMesh *em = data->em_evil;
+	const BVHTreeFromEditMesh *data = (BVHTreeFromEditMesh *) userdata;
+	BMEditMesh *em = data->em;
 	//const BMLoop **ltri = (const BMLoop **)em->looptris[index];
 	BMesh *bm = em->bm;
 	float t0[3], t1[3], t2[3];
@@ -1072,18 +1072,14 @@ static void bvhtree_from_mesh_looptri_setup_data(
 
 #ifdef WITH_MECHANICAL_SNAP_TO_PLANE
 static void bvhtree_from_mesh_plane_looptri_setup_data(
-        BVHTreeFromMesh *data, BVHTree *tree, const bool is_cached,
-        float epsilon, BMEditMesh *em,
-        const MVert *vert, const bool vert_allocated,
-        const MLoop *mloop, const bool loop_allocated,
-        const MLoopTri *looptri, const bool looptri_allocated)
+        BVHTreeFromEditMesh *data, BVHTree *tree,
+        float epsilon, BMEditMesh *em)
 {
 	memset(data, 0, sizeof(*data));
-	data->em_evil = em;
+	data->em = em;
 
 	if (tree) {
 		data->tree = tree;
-		data->cached = is_cached;
 
 		if (em) {
 			data->nearest_callback = editmesh_planes_nearest_point;
@@ -1094,87 +1090,35 @@ static void bvhtree_from_mesh_plane_looptri_setup_data(
 			data->nearest_callback = mesh_looptri_nearest_point;
 			data->raycast_callback = mesh_looptri_spherecast;
 			data->nearest_to_ray_callback = NULL;
-
-			data->vert = vert;
-			data->vert_allocated = vert_allocated;
-			data->loop = mloop;
-			data->loop_allocated = loop_allocated;
-			data->looptri = looptri;
-			data->looptri_allocated = looptri_allocated;
 		}
 
 		data->sphere_radius = epsilon;
 	}
-	else {
-		if (vert_allocated) {
-			MEM_freeN((void *)vert);
-		}
-		if (loop_allocated) {
-			MEM_freeN((void *)mloop);
-		}
-		if (looptri_allocated) {
-			MEM_freeN((void *)looptri);
-		}
-	}
 }
 
 
-BVHTree *bvhtree_from_mesh_plane_looptri(BVHTreeFromMesh *data, DerivedMesh *dm, float epsilon, int tree_type, int axis)
+BVHTree *bvhtree_from_mesh_plane_looptri(BVHTreeFromEditMesh *data, BMEditMesh *em, float epsilon, int tree_type, int axis)
 {
-	BMEditMesh *em = data->em_evil;
 	BMesh *bm = em->bm;
-	const int bvhcache_type = BVHTREE_FROM_PLANES_EDITMESH_SNAP;
 	BVHTree *tree;
-	MVert *mvert = NULL;
-	MLoop *mloop = NULL;
-	const MLoopTri *looptri = NULL;
-	bool vert_allocated = false;
-	bool loop_allocated = false;
-	bool looptri_allocated = false;
 
-	BLI_rw_mutex_lock(&cache_rwlock, THREAD_LOCK_READ);
-	tree = bvhcache_find(&dm->bvhCache, bvhcache_type);
-	BLI_rw_mutex_unlock(&cache_rwlock);
+	int looptri_num;
 
-	if (em == NULL) {
+	if (em) {
+		looptri_num = bm->totref*2;
+	}
+	else {
 		BLI_assert(0);
 	}
 
-	/* Not in cache */
-	if (tree == NULL) {
-		BLI_rw_mutex_lock(&cache_rwlock, THREAD_LOCK_WRITE);
-		tree = bvhcache_find(&dm->bvhCache, bvhcache_type);
-		if (tree == NULL) {
-			int looptri_num;
+	tree = bvhtree_from_mesh_plane_looptri_create_tree(
+			epsilon, tree_type, axis,
+			em, looptri_num);
 
-			if (em) {
-				looptri_num = bm->totref*2;
-			}
-			else {
-				BLI_assert(0);
-			}
-
-			tree = bvhtree_from_mesh_plane_looptri_create_tree(
-			        epsilon, tree_type, axis,
-			        em, looptri_num);
-			if (tree) {
-				/* Save on cache for later use */
-				/* printf("BVHTree built and saved on cache\n"); */
-				bvhcache_insert(&dm->bvhCache, tree, bvhcache_type);
-			}
-		}
-		BLI_rw_mutex_unlock(&cache_rwlock);
-	}
-	else {
-		/* printf("BVHTree is already build, using cached tree\n"); */
-	}
 
 	/* Setup BVHTreeFromMesh */
 	bvhtree_from_mesh_plane_looptri_setup_data(
-	        data, tree, true, epsilon, em,
-	        mvert, vert_allocated,
-	        mloop, loop_allocated,
-	        looptri, looptri_allocated);
+	        data, tree, epsilon, em);
 
 	return data->tree;
 }

@@ -674,16 +674,6 @@ static int dm_looptri_to_poly_index(DerivedMesh *dm, const MLoopTri *lt)
 	return index_mp_to_orig ? index_mp_to_orig[lt->poly] : lt->poly;
 }
 
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-static bool snapDerivedMesh(
-        SnapObjectContext *sctx,
-        Object *ob, DerivedMesh *dm, float obmat[4][4],
-        const float mval[2], float *dist_px, const short snap_to, bool do_bb,
-        const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
-        float *ray_depth, unsigned int ob_index,
-        float r_loc[3], float r_no[3], int *r_index,
-        ListBase *r_hit_list, SnapSelect snap_select, BMEditMesh *em)
-#else
 static bool snapDerivedMesh(
         SnapObjectContext *sctx,
         Object *ob, DerivedMesh *dm, float obmat[4][4],
@@ -692,8 +682,6 @@ static bool snapDerivedMesh(
         float *ray_depth, unsigned int ob_index,
         float r_loc[3], float r_no[3], int *r_index,
         ListBase *r_hit_list)
-{
-#endif
 {
 	ARegion *ar = sctx->v3d_data.ar;
 	bool retval = false;
@@ -789,9 +777,6 @@ static bool snapDerivedMesh(
 
 			int tree_index = -1;
 			switch (snap_to) {
-#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
-				case SCE_SNAP_MODE_PLANE:
-#endif
 				case SCE_SNAP_MODE_FACE:
 					tree_index = 1;
 					break;
@@ -821,10 +806,6 @@ static bool snapDerivedMesh(
 		}
 
 		if (treedata && treedata->tree == NULL) {
-#ifdef WITH_MECHANICAL
-			// em_evil has been removed on blender trunk
-			treedata->em_evil = em;
-#endif
 			switch (snap_to) {
 				case SCE_SNAP_MODE_FACE:
 					bvhtree_from_mesh_looptri(treedata, dm, 0.0f, 4, 6);
@@ -832,10 +813,6 @@ static bool snapDerivedMesh(
 				case SCE_SNAP_MODE_VERTEX:
 					bvhtree_from_mesh_verts(treedata, dm, 0.0f, 2, 6);
 					break;
-#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
-				case SCE_SNAP_MODE_PLANE:
-					bvhtree_from_mesh_plane_looptri(treedata, dm, 0.0f, 4, 6);
-#endif
 			}
 		}
 
@@ -879,9 +856,6 @@ static bool snapDerivedMesh(
 
 		switch (snap_to) {
 			case SCE_SNAP_MODE_FACE:
-#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
-			case SCE_SNAP_MODE_PLANE:
-#endif
 			{
 				if (r_hit_list) {
 					struct RayCastAll_Data data;
@@ -1021,6 +995,13 @@ static bool snapEditMesh(
 			return retval;
 		}
 	}
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
+	if (snap_to == SCE_SNAP_MODE_PLANE) {
+		if (em->bm->totref == 0) {
+			return retval;
+		}
+	}
+#endif
 	else {
 		if (em->bm->totvert == 0) {
 			return retval;
@@ -1069,6 +1050,9 @@ static bool snapEditMesh(
 
 			int tree_index = -1;
 			switch (snap_to) {
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
+				case SCE_SNAP_MODE_PLANE:
+#endif
 				case SCE_SNAP_MODE_FACE:
 					tree_index = 1;
 					break;
@@ -1092,6 +1076,13 @@ static bool snapEditMesh(
 
 		if (treedata && treedata->tree == NULL) {
 			switch (snap_to) {
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
+				case SCE_SNAP_MODE_PLANE:
+				{
+					bvhtree_from_mesh_plane_looptri(treedata, em, 0.0f, 4, 6);
+					break;
+				}
+#endif
 				case SCE_SNAP_MODE_FACE:
 				{
 					BLI_bitmap *looptri_mask = NULL;
@@ -1166,6 +1157,10 @@ static bool snapEditMesh(
 
 		switch (snap_to) {
 			case SCE_SNAP_MODE_FACE:
+#ifdef WITH_MECHANICAL_SNAP_TO_PLANE
+			case SCE_SNAP_MODE_PLANE:
+#endif
+
 			{
 				if (r_hit_list) {
 					struct RayCastAll_Data data;
@@ -1332,19 +1327,12 @@ static bool snapObject(
 			else {
 				dm = mesh_get_derived_final(sctx->scene, ob, CD_MASK_BAREMESH);
 			}
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-			retval = snapDerivedMesh(
-			        sctx, ob, dm, obmat, mval, dist_px, snap_to, true,
-			        ray_start, ray_normal, ray_origin,
-			        ray_depth, ob_index,
-			        r_loc, r_no, r_index, r_hit_list, snap_select, em);
-#else
 			retval = snapDerivedMesh(
 			        sctx, ob, dm, obmat, mval, dist_px, snap_to, true,
 			        ray_start, ray_normal, ray_origin,
 			        ray_depth, ob_index,
 			        r_loc, r_no, r_index, r_hit_list);
-#endif
+
 			dm->release(dm);
 		}
 	}
