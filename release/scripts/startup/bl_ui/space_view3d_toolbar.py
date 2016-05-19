@@ -2001,6 +2001,9 @@ class VIEW3D_PT_tools_mechanical(View3DPanel, Panel):
         col.operator("mesh.mechanical_dimension_angle_3p_add", text = "3 Points angle")
         col.operator("mesh.mechanical_dimension_angle_4p_add", text = "4 Points angle")
 
+        col = layout.column(align=True)
+        col.label(text="References:")
+        col.operator("mesh.mechanical_reference_plane_add", text = "Plane")
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)
