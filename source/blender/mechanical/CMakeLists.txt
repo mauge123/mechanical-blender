@@ -50,5 +50,8 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+if(WITH_PLAYER)
+	add_definitions(-DWITH_PLAYER)
+endif()
 
 blender_add_lib(bf_mechanical "${SRC}" "${INC}" "${INC_SYS}")

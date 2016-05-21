@@ -32,7 +32,10 @@ void reference_plane_matrix (BMReference *erf, float mat[3][3]) {
 }
 
 bool reference_plane_project_input (Object *ob, BMReference *erf, ARegion *ar, View3D *v3d, const int mval[2], float r_co[3]) {
-
+#ifdef WITH_PLAYER
+	// There are link issues on ED_view3d_win_to_ray_ex as is implemented on editors
+	return false;
+#else
 	float ray_origin[3], ray_normal[3], ray_start[3];
 	float dist = 0.0f;
 	float fmval[2] = {(float)mval[0],(float)mval[1]};
@@ -77,6 +80,7 @@ bool reference_plane_project_input (Object *ob, BMReference *erf, ARegion *ar, V
 	}
 
 	return true;
+#endif
 }
 
 void reference_plane_normal (BMReference *erf, float *r) {
