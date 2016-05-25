@@ -46,6 +46,7 @@ set(INC
 
 add_definitions(-DWITH_MECHANICAL)
 add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 
 if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)

@@ -250,7 +250,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
 			if (em) {
-				mechanical_calc_edit_mesh_geometry(em);
+				mechanical_update_mesh_geometry(em);
 			}
 #endif
 			if (em) {

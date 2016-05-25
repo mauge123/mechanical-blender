@@ -168,6 +168,15 @@ BLI_INLINE bool BM_iter_init(BMIter *iter, BMesh *bm, const char itype, void *da
 			iter->data.elem_of_mesh.pooliter.pool = bm->ppool;
 			break;
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+		case BM_GEOMETRY_OF_MESH:
+			BLI_assert(bm != NULL);
+			BLI_assert(data == NULL);
+			iter->begin = (BMIter__begin_cb)bmiter__elem_of_mesh_begin;
+			iter->step  = (BMIter__step_cb)bmiter__elem_of_mesh_step;
+			iter->data.elem_of_mesh.pooliter.pool = bm->gpool;
+			break;
+#endif
 		default:
 			/* should never happen */
 			BLI_assert(0);

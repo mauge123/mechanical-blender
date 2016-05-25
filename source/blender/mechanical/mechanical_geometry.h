@@ -11,6 +11,6 @@
 #define DIM_GEOMETRY_PRECISION 0.01
 
 
-void mechanical_calc_edit_mesh_geometry (BMEditMesh *em);
+void mechanical_update_mesh_geometry(BMEditMesh *em);
 
 #endif // MECHANICAL_GEOMETRY_H

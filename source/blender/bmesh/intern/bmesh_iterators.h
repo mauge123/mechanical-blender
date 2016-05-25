@@ -80,11 +80,14 @@ typedef enum BMIterType {
 	BM_DIMS_OF_MESH = 14,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_REFERENCES_OF_MESH = 15
+	BM_REFERENCES_OF_MESH = 15,
+#endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+	BM_GEOMETRY_OF_MESH = 16
 #endif
 } BMIterType;
 
-#define BM_ITYPE_MAX 15
+#define BM_ITYPE_MAX 16
 
 /* the iterator htype for each iterator */
 extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
@@ -133,12 +136,6 @@ struct BMIter__edge_of_vert {
 	BMVert *vdata;
 	BMEdge *e_first, *e_next;
 };
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-struct BMIter__dim_of_mesh {
-	BMDim *ddata;
-	BMDim *d_first, *d_next;
-};
-#endif
 struct BMIter__face_of_vert {
 	BMVert *vdata;
 	BMLoop *l_first, *l_next;
