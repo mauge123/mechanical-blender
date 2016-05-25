@@ -46,13 +46,10 @@
 
 /* used as an extern, defined in bmesh.h */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512, 512, 32};
-const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512, 512, 32};
-#else
-const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512, 512};
-const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512, 512};
-#endif
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+// WITH_MECHANICAL_GEOMETRY
+const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512, 512, 32, 512};
+const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512, 512, 32, 512};
 #else
 const BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512};
 const BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512};
@@ -75,6 +72,10 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	bm->ppool = BLI_mempool_create(sizeof(BMReference), allocsize->totdim,
 	                               bm_mesh_chunksize_default.totplane, BLI_MEMPOOL_ALLOW_ITER);
+#endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+	bm->gpool = BLI_mempool_create(sizeof(BMElemGeom), allocsize->totgeom,
+	                               bm_mesh_chunksize_default.totgeom, BLI_MEMPOOL_ALLOW_ITER);
 #endif
 
 #ifdef USE_BMESH_HOLES
@@ -183,6 +184,13 @@ void BM_mesh_elem_toolflags_clear(BMesh *bm)
 		bm->ftoolflagpool = NULL;
 	}
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	if (bm->ptoolflagpool) {
+		BLI_mempool_destroy(bm->ptoolflagpool);
+		bm->ptoolflagpool = NULL;
+	}
+#endif
+
 }
 
 /**
@@ -290,6 +298,10 @@ void BM_mesh_data_free(BMesh *bm)
 	if (bm->ftable) MEM_freeN(bm->ftable);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (bm->dtable) MEM_freeN(bm->dtable);
+#endif
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+	BLI_mempool_destroy(bm->gpool);
 #endif
 
 	/* destroy flag pool */

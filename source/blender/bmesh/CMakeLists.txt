@@ -189,6 +189,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_STORE_SELECT_ORDER)
 	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 	add_definitions(-DWITH_MECHANICAL_BLENDER_D1669)
+	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 	list(APPEND SRC
 		operators/bmo_dimensions.c
 		operators/bmo_reference.c

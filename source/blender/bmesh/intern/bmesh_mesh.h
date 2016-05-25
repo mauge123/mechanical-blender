@@ -103,6 +103,9 @@ typedef struct BMAllocTemplate {
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	int totplane;
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+	int totgeom;
+#endif
 } BMAllocTemplate;
 
 extern const BMAllocTemplate bm_mesh_allocsize_default;

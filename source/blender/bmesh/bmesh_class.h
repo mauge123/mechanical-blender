@@ -215,6 +215,29 @@ typedef struct BMReference {
 
 //
 
+// WITH_MECHANICAL_GEOMETRY
+
+/* BMReference->type */
+#define BM_REFERENCE_TYPE_CIRCLE 1
+#define BM_REFERENCE_TYPE_ARC 2
+#define BM_REFERENCE_TYPE_LINE 3
+
+typedef struct BMElemGeom {
+	BMHeader head;
+
+	struct BMVert *(*v);
+	// Number Of verts
+	int totverts;
+	int geometry_type;
+
+	float center[3];
+
+	float start[3];
+	float end[3];
+
+} BMElemGeom;
+
+//
 
 /* can cast BMFace/BMEdge/BMVert, but NOT BMLoop, since these don't have a flag layer */
 typedef struct BMElemF {
@@ -343,6 +366,11 @@ typedef struct BMesh {
 	struct BLI_mempool *ptoolflagpool;
 	int totref;
 	int totrefsel;
+//
+
+// WITH_MECHANICAL_GEOMETRY
+	int totgeom;
+	struct BLI_mempool *gpool;
 //
 
 } BMesh;

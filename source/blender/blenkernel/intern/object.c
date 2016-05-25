@@ -3135,6 +3135,11 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 				if (ob->pose == NULL || (ob->pose->flag & POSE_RECALC))
 					BKE_pose_rebuild(ob, ob->data);
 			}
+#ifdef WITH_MECHANICAL_GEOMETRY
+			{
+
+			}
+#endif
 		}
 
 		/* XXX new animsys warning: depsgraph tag OB_RECALC_DATA should not skip drivers, 

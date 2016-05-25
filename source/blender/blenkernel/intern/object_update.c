@@ -60,6 +60,8 @@
 
 #include "DEG_depsgraph.h"
 
+#include "mechanical_geometry.h"
+
 void get_dimension_mid(float mid[3],BMDim *edm);
 void dimension_data_update(BMDim *edm);
 
@@ -241,12 +243,16 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 
 					}
 
-					dimension_data_update (edm);
+					dimension_data_update(edm);
 
 				}
 			}
 #endif
-
+#ifdef WITH_MECHANICAL_GEOMETRY
+			if (em) {
+				mechanical_calc_edit_mesh_geometry(em);
+			}
+#endif
 			if (em) {
 				makeDerivedMesh(scene, ob, em,  data_mask, false); /* was CD_MASK_BAREMESH */
 			}
