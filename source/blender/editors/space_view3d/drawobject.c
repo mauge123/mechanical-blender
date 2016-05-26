@@ -2662,9 +2662,8 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-
-
-static void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text) {
+static void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text)
+{
 
 	UI_GetThemeColor4ubv(selected ? TH_DIM_SEL : TH_DIM, r_lines);
 	UI_GetThemeColor4ubv(selected ? TH_DIM_TEXT_SEL : TH_DIM_TEXT, r_text);
@@ -2686,7 +2685,8 @@ static void get_dimension_theme_values (int selected, unsigned char *r_lines, un
  * @param end
  * @param txt_pos
  */
-static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected) {
+static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected)
+{
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
@@ -2733,7 +2733,8 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected) {
+static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected)
+{
 
 	float start[3], end[3], vr[3], txt_pos[3];
 	float w,h;
@@ -2778,7 +2779,8 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 }
 
 
-static void draw_radius_dimension(float* center, float *v_dir, float radius, float dpos_fact, int selected) {
+static void draw_radius_dimension(float* center, float *v_dir, float radius, float dpos_fact, int selected)
+{
 
 	float start[3], end[3], vr[3], txt_pos[3];
 	float w,h;
@@ -2822,7 +2824,8 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected) {
+static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected)
+{
 
 	float start[3], end[3], vr1[3], vr2[3], txt_pos[3], pos[3];
 	float axis[3];
@@ -2947,7 +2950,8 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void draw_dimension_direction_points(BMDim *edm) {
+static void draw_dimension_direction_points(BMDim *edm)
+{
 	glPointSize(7);
 	//Draw a big point on Dim diection selected or small point on Dim not selected
 	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
@@ -2963,7 +2967,8 @@ static void draw_dimension_direction_points(BMDim *edm) {
 	}
 }
 
-static void draw_dimension_axis(BMDim *edm) {
+static void draw_dimension_axis(BMDim *edm)
+{
 	float axis[3];
 	float center[3], a[3], b[3], m[3];
 
@@ -2994,7 +2999,6 @@ static void draw_dimension_axis(BMDim *edm) {
 			glVertex3fv(b);
 		glEnd();
 	}
-
 }
 
 /**
