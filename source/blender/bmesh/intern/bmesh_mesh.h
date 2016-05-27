@@ -97,15 +97,12 @@ void BM_mesh_remap(
 
 typedef struct BMAllocTemplate {
 	int totvert, totedge, totloop, totface;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 	int totdim;
-#endif
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	int totplane;
-#endif
-#ifdef WITH_MECHANICAL_GEOMETRY
+// WITH_MECHANICAL_GEOMETRY
 	int totgeom;
-#endif
 } BMAllocTemplate;
 
 extern const BMAllocTemplate bm_mesh_allocsize_default;
