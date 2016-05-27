@@ -68,7 +68,7 @@ static int mechanical_follow_circle(BMEditMesh *em, BMVert *v1, BMVert *v2, BMVe
 		}
 	}
 	if (*r_count > MIN_NUM_VERTS_CIRCLE) {
-		return current ? BM_REFERENCE_TYPE_CIRCLE : BM_REFERENCE_TYPE_ARC;
+		return current ? BM_GEOMETRY_TYPE_CIRCLE : BM_GEOMETRY_TYPE_ARC;
 	} else {
 		return 0;
 	}
@@ -124,8 +124,8 @@ static void mechanical_find_mesh_circles (BMEditMesh *em)
 				}
 			}
 			switch (type) {
-				case BM_REFERENCE_TYPE_CIRCLE:
-				case BM_REFERENCE_TYPE_ARC:
+				case BM_GEOMETRY_TYPE_CIRCLE:
+				case BM_GEOMETRY_TYPE_ARC:
 				{
 					BMElemGeom *egm = 	BLI_mempool_alloc(bm->gpool);
 					bm->totgeom++;
@@ -138,6 +138,7 @@ static void mechanical_find_mesh_circles (BMEditMesh *em)
 				}
 				default:
 					// Not valid
+					BM_elem_flag_disable(e1, BM_ELEM_TAG);
 					break;
 			}
 		}
@@ -191,8 +192,8 @@ static void mechanical_check_mesh_geometry(BMEditMesh *em)
 	BM_ITER_MESH (egm, &iter, bm, BM_GEOMETRY_OF_MESH) {
 		valid = false;
 		switch (egm->geometry_type) {
-			case BM_REFERENCE_TYPE_CIRCLE:
-			case BM_REFERENCE_TYPE_ARC:
+			case BM_GEOMETRY_TYPE_CIRCLE:
+			case BM_GEOMETRY_TYPE_ARC:
 				valid = mechanical_check_circle(em, egm);
 				break;
 		}

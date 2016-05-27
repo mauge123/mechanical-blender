@@ -2661,6 +2661,28 @@ static void draw_dm_verts(BMEditMesh *em, DerivedMesh *dm, const char sel, BMVer
 	glEnd();
 }
 
+#ifdef WITH_MECHANICAL
+/*
+ * angle in degrees
+ *
+ */
+static void mechanical_draw_circle(float center[], float point[], float axis[], float angle)
+{
+	float step = angle/32.0f;
+	float pos[3];
+	glBegin(GL_LINE_STRIP);
+	{
+		for (int i=0;i<=32;i++){
+			rotate_v3_v3v3fl(pos,point,axis, DEG2RAD(step*i));
+			add_v3_v3(pos, center);
+			glVertex3fv(pos);
+		}
+	}
+	glEnd();
+
+}
+#endif
+
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text)
 {
@@ -2868,16 +2890,7 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
 	}
 	glEnd();
 
-	step = dim_angle/32.0f;
-	glBegin(GL_LINE_STRIP);
-	{
-		for (int i=0;i<=32;i++){
-			rotate_v3_v3v3fl(pos,vr1,axis, DEG2RAD(step*i));
-			add_v3_v3(pos, center);
-			glVertex3fv(pos);
-		}
-	}
-	glEnd();
+	mechanical_draw_circle(center,vr1,axis,dim_angle);
 
 	glBegin(GL_LINES);
 	{
@@ -3818,6 +3831,42 @@ static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
 }
 #endif
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+static void draw_em_mesh_geometry_arc(BMElemGeom *egm, float angle)
+{
+	float axis[3];
+	normal_tri_v3(axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
+	mechanical_draw_circle(egm->center, egm->v[0]->co, axis, angle);
+}
+
+static void draw_em_mesh_geometry(BMEditMesh *em)
+{
+	glLineWidth(4.0f);
+	glColor4f(1.0f,0.0f,0.0f,1.0f);
+
+
+	BMElemGeom *egm;
+	BMIter iter;
+	BM_ITER_MESH(egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
+		switch (egm->geometry_type) {
+			case BM_GEOMETRY_TYPE_ARC:
+			{
+				float angle = RAD2DEG(angle_v3v3v3(egm->v[0]->co,egm->center,egm->v[egm->totverts]->co));
+				draw_em_mesh_geometry_arc(egm, angle);
+				break;
+			}
+			case BM_GEOMETRY_TYPE_CIRCLE:
+				draw_em_mesh_geometry_arc(egm, 360.0f);
+				break;
+			case BM_GEOMETRY_TYPE_LINE:
+				break;
+			default:
+				assert(0);
+		}
+	}
+}
+#endif
+
 static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMesh *em, UnitSettings *unit)
 {
 	/* Do not use ascii when using non-default unit system, some unit chars are utf8 (micro, square, etc.).
@@ -4472,8 +4521,17 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-			draw_em_reference_planes(scene, v3d, cageDM);
+			if (em->bm->totref) {
+				draw_em_reference_planes(scene, v3d, cageDM);
+			}
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+			if (em->bm->totgeom) {
+				draw_em_mesh_geometry(em);
+			}
+
+#endif
+
 		}
 	}
 

@@ -217,10 +217,10 @@ typedef struct BMReference {
 
 // WITH_MECHANICAL_GEOMETRY
 
-/* BMReference->type */
-#define BM_REFERENCE_TYPE_CIRCLE 1
-#define BM_REFERENCE_TYPE_ARC 2
-#define BM_REFERENCE_TYPE_LINE 3
+/* BMElemGeom->geomtype */
+#define BM_GEOMETRY_TYPE_CIRCLE 1
+#define BM_GEOMETRY_TYPE_ARC 2
+#define BM_GEOMETRY_TYPE_LINE 3
 
 typedef struct BMElemGeom {
 	BMHeader head;
