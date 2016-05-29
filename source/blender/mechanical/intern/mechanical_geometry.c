@@ -17,11 +17,15 @@ static void mechanical_find_circle_start(BMEditMesh *em,
                                         float center[])
 {
 	BMVert *first = *v1;
-	BMVert *current = *v3;
+	BMVert *current = *v3, *temp;
 	BMesh *bm= em->bm;
 	BMEdge *e, *e_curr = *e2, *e_prev = *e1;
 	BMIter iter;
 	float n_center[3];
+	float dir[3];
+
+	sub_v3_v3v3(dir,(*v2)->co, (*v1)->co);
+	normalize_v3(dir);
 
 	while (current && current != first) {
 		BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
@@ -45,8 +49,12 @@ static void mechanical_find_circle_start(BMEditMesh *em,
 			if (e &&
 				center_of_3_points(n_center, (*v1)->co, (*v2)->co, current->co) &&
 				len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION &&
-			    angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC)
+			    angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
+			    !point_on_axis(first->co,dir,current->co))
 			{
+				*v1 = *v2;
+				*v2 = *v3;
+				*v3 = current;
 				e_prev = e_curr;
 				e_curr = e;
 				// Ok.
@@ -55,28 +63,52 @@ static void mechanical_find_circle_start(BMEditMesh *em,
 			}
 		}
 	}
+
+	// Invert
 	*e2 = e_prev;
 	*e1 = e_curr;
-	if (e_prev->v1 == e_curr->v1) {
-		*v3 = e_prev->v2;
-		*v2 = e_prev->v1;
-		*v1 = e_curr->v2;
+	temp = *v1;
+	*v1 = *v3;
+	*v3 = temp;
+
+}
+
+
+static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
+                                     BMVert* *r_voutput, int* r_vcount)
+{
+	return 0;
+}
+
+static int mechanical_check_edge_line (BMEditMesh *em, BMEdge *e, BMVert* *r_voutput, int* r_vcount) {
+	int type = 0;
+	BMFace *efa = NULL;
+	BMIter iter, f_iter;
+	BMEdge *e2 = NULL;
+	float *prev_fno = NULL;
+
+	BM_ITER_MESH(efa, &iter, em->bm, BM_FACES_OF_MESH) {
+		BM_ITER_ELEM(e2,&f_iter,efa, BM_EDGES_OF_FACE) {
+			if (e2 == e) {
+				if (prev_fno && parallel_v3u_v3u(efa->no,prev_fno)) {
+					break;
+				}
+				prev_fno = efa->no;
+			}
+		}
+		if (e2 != NULL) {
+			break;
+		}
 	}
-	if (e_prev->v1 == e_curr->v2) {
-		*v3 = e_prev->v2;
-		*v2 = e_prev->v1;
-		*v1 = e_curr->v1;
+
+	if (efa == NULL)
+	{
+		type = BM_GEOMETRY_TYPE_LINE;
+		r_voutput[0] = e->v1;
+		r_voutput[1] = e->v2;
+		*r_vcount = 2;
 	}
-	if (e_prev->v2 == e_curr->v1) {
-		*v3 = e_prev->v1;
-		*v2 = e_prev->v2;
-		*v1 = e_curr->v2;
-	}
-	if (e_prev->v2 == e_curr->v2) {
-		*v3 = e_prev->v1;
-		*v2 = e_prev->v2;
-		*v1 = e_curr->v1;
-	}
+	return type;
 }
 
 /**
@@ -91,9 +123,10 @@ static void mechanical_find_circle_start(BMEditMesh *em,
  * @return int type of data, 0 if not valid
  */
 static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
-                                     BMVert* *r_voutput, BMEdge* *r_eoutput,int* r_vcount, int* r_ecount, float r_center[])
+                                     BMVert* *r_voutput, int* r_vcount, float r_center[])
 {
 	float n_center[3];
+	float dir[3];
 	BMEdge *e;
 	BMVert *first;
 	BMVert *current;
@@ -101,11 +134,13 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 	BMesh *bm = em->bm;
 
 	*r_vcount =0;
-	*r_ecount =0;
 
+	sub_v3_v3v3(dir,v2->co,v1->co);
+	normalize_v3(dir);
 
 	if (center_of_3_points(r_center, v1->co, v2->co, v3->co) &&
-		angle_v3v3v3 (v1->co,r_center,v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC) {
+		angle_v3v3v3 (v1->co,r_center,v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
+	    !point_on_axis(v1->co,dir,v3->co)) {
 
 		mechanical_find_circle_start(em, &e1, &e2, &v1, &v2, &v3, r_center);
 
@@ -115,9 +150,6 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 		r_voutput[(*r_vcount)++] = v1;
 		r_voutput[(*r_vcount)++] = v2;
 		r_voutput[(*r_vcount)++] = v3;
-
-		r_eoutput[(*r_ecount)++] = e1;
-		r_eoutput[(*r_ecount)++] = e2;
 
 		BM_elem_flag_enable(e1, BM_ELEM_TAG);
 		BM_elem_flag_enable(e2, BM_ELEM_TAG);
@@ -141,7 +173,6 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 				    angle_v3v3v3 (e->v1->co, r_center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC)
 				{
 					r_voutput[(*r_vcount)++] = current;
-					r_eoutput[(*r_ecount)++] = e;
 					BM_elem_flag_enable(e, BM_ELEM_TAG);
 				} else {
 					current = NULL;
@@ -153,7 +184,18 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 	return 0;
 }
 
-static void mechanical_find_mesh_circles (BMEditMesh *em)
+static int mechanical_geometry_follow_data(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
+             BMVert* *r_voutput, int* r_vcount, float r_center[])
+{
+	int type = 0;
+	type = mechanical_follow_circle(em,e1, e2, v1, v2, v3, r_voutput, r_vcount, r_center);
+	if (type == 0) {
+		type = mechanical_follow_line(em,e1,e2,v1,v2,v3,r_voutput, r_vcount);
+	}
+	return type;
+}
+
+static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 {
 	BMEdge *e1;
 	BMEdge *e2;
@@ -164,8 +206,7 @@ static void mechanical_find_mesh_circles (BMEditMesh *em)
 
 	// Max size is total count of verts
 	BMVert *(*verts) = MEM_callocN(sizeof(BMVert*)*bm->totvert,"mechanical_circle_output");
-	BMEdge *(*edges) = MEM_callocN(sizeof(BMEdge*)*bm->totedge,"mechanical_circle_output");
-	int vcount, ecount;
+	int vcount;
 	float center[3];
 
 	BM_ITER_MESH (e1, &iter1, bm, BM_EDGES_OF_MESH) {
@@ -176,25 +217,32 @@ static void mechanical_find_mesh_circles (BMEditMesh *em)
 			while (!type && (e2 = BM_iter_step(&iter2))) {
 				if (!BM_elem_flag_test (e2, BM_ELEM_TAG)) {
 					if (e2->v1 == e1->v1) {
-						type = mechanical_follow_circle(em,e1, e2, e1->v2, e1->v1, e2->v2,
-														&(*verts), &(*edges), &vcount, &ecount, center);
+						type = mechanical_geometry_follow_data(em,e1, e2, e1->v2, e1->v1, e2->v2,
+														&(*verts), &vcount, center);
 					}else if (e2->v1 == e1->v2) {
-						type = mechanical_follow_circle(em,e1, e2, e1->v1, e1->v2, e2->v2,
-						                                &(*verts), &(*edges), &vcount, &ecount, center);
+						type = mechanical_geometry_follow_data(em,e1, e2, e1->v1, e1->v2, e2->v2,
+						                                &(*verts), &vcount, center);
 					}else if (e2->v2 == e1->v1) {
-						type = mechanical_follow_circle(em,e1, e2, e1->v2, e1->v1, e2->v1,
-						                                &(*verts), &(*edges), &vcount, &ecount, center);
+						type = mechanical_geometry_follow_data(em,e1, e2, e1->v2, e1->v1, e2->v1,
+						                                &(*verts), &vcount, center);
 					}else if (e2->v2 == e1->v2) {
-						type = mechanical_follow_circle(em,e1, e2, e1->v1, e1->v2, e2->v1,
-						                                &(*verts), &(*edges), &vcount, &ecount, center);
+						type = mechanical_geometry_follow_data(em,e1, e2, e1->v1, e1->v2, e2->v1,
+						                                &(*verts), &vcount, center);
 					}
 				}
 			}
+
+			if (e2 == NULL) {
+				// No conection Consider line
+				// Check the face normals
+				type = mechanical_check_edge_line(em, e1, &(*verts), &vcount);
+			}
+
 			switch (type) {
 				case BM_GEOMETRY_TYPE_CIRCLE:
 				case BM_GEOMETRY_TYPE_ARC:
 				{
-					BMElemGeom *egm = 	BLI_mempool_alloc(bm->gpool);
+					BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
 					bm->totgeom++;
 					copy_v3_v3(egm->center,center);
 					egm->totverts = vcount;
@@ -204,6 +252,18 @@ static void mechanical_find_mesh_circles (BMEditMesh *em)
 					normal_tri_v3(egm->axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
 					break;
 				}
+				case BM_GEOMETRY_TYPE_LINE:
+				{
+					BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
+					bm->totgeom++;
+					egm->totverts = vcount;
+					egm->v = MEM_callocN(sizeof(BMVert*)*egm->totverts,"geometry vertex pointer array");
+					egm->geometry_type = type;
+					memcpy(egm->v,verts,egm->totverts*sizeof(BMVert*));
+					sub_v3_v3v3(egm->axis,egm->v[0]->co,egm->v[1]->co);
+					normalize_v3(egm->axis);
+					break;
+				}
 				default:
 					// Not valid
 					break;
@@ -211,7 +271,6 @@ static void mechanical_find_mesh_circles (BMEditMesh *em)
 		}
 	}
 	MEM_freeN(&(*verts));
-	MEM_freeN(&(*edges));
 }
 
 static bool mechanical_check_circle(BMEditMesh *UNUSED(em), BMElemGeom *egm)
@@ -227,7 +286,8 @@ static bool mechanical_check_circle(BMEditMesh *UNUSED(em), BMElemGeom *egm)
 
 	for (i=2;current && i<egm->totverts;i++) {
 		if (center_of_3_points(n_center, v1->co, v2->co, current->co) &&
-			len_v3v3(n_center, egm->center) < DIM_GEOMETRY_PRECISION)
+			len_v3v3(n_center, egm->center) < DIM_GEOMETRY_PRECISION &&
+		    angle_v3v3v3 (egm->v[i]->co,egm->center,egm->v[i-1]->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC)
 		{
 			BM_elem_flag_enable(current, BM_ELEM_TAG);
 			current++;
@@ -243,14 +303,6 @@ static bool mechanical_check_circle(BMEditMesh *UNUSED(em), BMElemGeom *egm)
 	}
 	return (current != NULL);
 }
-
-
-
-static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
-{
-	mechanical_find_mesh_circles(em);
-}
-
 
 static void mechanical_check_mesh_geometry(BMEditMesh *em)
 {

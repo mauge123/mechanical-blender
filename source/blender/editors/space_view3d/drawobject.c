@@ -3857,6 +3857,12 @@ static void draw_em_mesh_geometry(BMEditMesh *em)
 				mechanical_draw_circle(egm->center, r, egm->axis, 360.0f);
 				break;
 			case BM_GEOMETRY_TYPE_LINE:
+				glBegin(GL_LINES);
+				{
+					glVertex3fv(egm->v[0]->co);
+					glVertex3fv(egm->v[egm->totverts-1]->co);
+				}
+				glEnd();
 				break;
 			default:
 				assert(0);
