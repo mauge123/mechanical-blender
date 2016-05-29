@@ -3832,18 +3832,11 @@ static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
 #endif
 
 #ifdef WITH_MECHANICAL_GEOMETRY
-static void draw_em_mesh_geometry_arc(BMElemGeom *egm, float angle)
-{
-	float axis[3];
-	normal_tri_v3(axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
-	mechanical_draw_circle(egm->center, egm->v[0]->co, axis, angle);
-}
-
 static void draw_em_mesh_geometry(BMEditMesh *em)
 {
 	glLineWidth(4.0f);
 	glColor4f(1.0f,0.0f,0.0f,1.0f);
-
+	float r[3];
 
 	BMElemGeom *egm;
 	BMIter iter;
@@ -3851,12 +3844,17 @@ static void draw_em_mesh_geometry(BMEditMesh *em)
 		switch (egm->geometry_type) {
 			case BM_GEOMETRY_TYPE_ARC:
 			{
-				float angle = RAD2DEG(angle_v3v3v3(egm->v[0]->co,egm->center,egm->v[egm->totverts]->co));
-				draw_em_mesh_geometry_arc(egm, angle);
+				float angle = 0;
+				for (int i=0;i<egm->totverts-1;i++) {
+					angle += RAD2DEG(angle_v3v3v3(egm->v[i]->co,egm->center,egm->v[i+1]->co));
+				}
+				sub_v3_v3v3(r, egm->v[0]->co, egm->center);
+				mechanical_draw_circle(egm->center, r, egm->axis, angle);
 				break;
 			}
 			case BM_GEOMETRY_TYPE_CIRCLE:
-				draw_em_mesh_geometry_arc(egm, 360.0f);
+				sub_v3_v3v3(r, egm->v[0]->co, egm->center);
+				mechanical_draw_circle(egm->center, r, egm->axis, 360.0f);
 				break;
 			case BM_GEOMETRY_TYPE_LINE:
 				break;
@@ -4529,9 +4527,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			if (em->bm->totgeom) {
 				draw_em_mesh_geometry(em);
 			}
-
 #endif
-
 		}
 	}
 
