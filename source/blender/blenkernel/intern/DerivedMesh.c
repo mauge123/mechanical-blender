@@ -2130,15 +2130,10 @@ static void mesh_calc_modifiers(
 					DM_add_edge_layer(dm, CD_ORIGINDEX, CD_CALLOC, NULL);
 					DM_add_poly_layer(dm, CD_ORIGINDEX, CD_CALLOC, NULL);
 
-#pragma omp parallel sections if (dm->numVertData + dm->numEdgeData + dm->numPolyData >= BKE_MESH_OMP_LIMIT)
-					{
-#pragma omp section
-						{ range_vn_i(DM_get_vert_data_layer(dm, CD_ORIGINDEX), dm->numVertData, 0); }
-#pragma omp section
-						{ range_vn_i(DM_get_edge_data_layer(dm, CD_ORIGINDEX), dm->numEdgeData, 0); }
-#pragma omp section
-						{ range_vn_i(DM_get_poly_data_layer(dm, CD_ORIGINDEX), dm->numPolyData, 0); }
-					}
+					/* Not worth parallelizing this, gives less than 0.1% overall speedup in best of best cases... */
+					range_vn_i(DM_get_vert_data_layer(dm, CD_ORIGINDEX), dm->numVertData, 0);
+					range_vn_i(DM_get_edge_data_layer(dm, CD_ORIGINDEX), dm->numEdgeData, 0);
+					range_vn_i(DM_get_poly_data_layer(dm, CD_ORIGINDEX), dm->numPolyData, 0);
 				}
 			}
 
@@ -3396,17 +3391,18 @@ void DM_calc_loop_tangents_step_0(
         bool *rcalc_act, bool *rcalc_ren, int *ract_uv_n, int *rren_uv_n,
         char *ract_uv_name, char *rren_uv_name, char *rtangent_mask) {
 	/* Active uv in viewport */
+	int layer_index = CustomData_get_layer_index(loopData, CD_MLOOPUV);
 	*ract_uv_n = CustomData_get_active_layer(loopData, CD_MLOOPUV);
 	ract_uv_name[0] = 0;
 	if (*ract_uv_n != -1) {
-		strcpy(ract_uv_name, loopData->layers[*ract_uv_n].name);
+		strcpy(ract_uv_name, loopData->layers[*ract_uv_n + layer_index].name);
 	}
 
 	/* Active tangent in render */
 	*rren_uv_n = CustomData_get_render_layer(loopData, CD_MLOOPUV);
 	rren_uv_name[0] = 0;
 	if (*rren_uv_n != -1) {
-		strcpy(rren_uv_name, loopData->layers[*rren_uv_n].name);
+		strcpy(rren_uv_name, loopData->layers[*rren_uv_n + layer_index].name);
 	}
 
 	/* If active tangent not in tangent_names we take it into account */
@@ -3756,12 +3752,41 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 		dm->calcLoopTangents(dm, false, (const char (*)[MAX_NAME])tangent_names, tangent_names_count);
 
 	for (b = 0; b < gattribs->totlayer; b++) {
-		if (gattribs->layer[b].type == CD_MTFACE) {
+		int type = gattribs->layer[b].type;
+		layer = -1;
+		if (type == CD_AUTO_FROM_NAME) {
+			/* We need to deduct what exact layer is used.
+			 *
+			 * We do it based on the specified name.
+			 */
+			if (gattribs->layer[b].name[0]) {
+				layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
+				type = CD_TANGENT;
+				if (layer == -1) {
+					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPCOL, gattribs->layer[b].name);
+					type = CD_MCOL;
+				}
+				if (layer == -1) {
+					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
+					type = CD_MTFACE;
+				}
+				if (layer == -1) {
+					continue;
+				}
+			}
+			else {
+				/* Fall back to the UV layer, which matches old behavior. */
+				type = CD_MTFACE;
+			}
+		}
+		if (type == CD_MTFACE) {
 			/* uv coordinates */
-			if (gattribs->layer[b].name[0])
-				layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
-			else
-				layer = CustomData_get_active_layer_index(ldata, CD_MLOOPUV);
+			if (layer == -1) {
+				if (gattribs->layer[b].name[0])
+					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
+				else
+					layer = CustomData_get_active_layer_index(ldata, CD_MLOOPUV);
+			}
 
 			a = attribs->tottface++;
 
@@ -3777,11 +3802,13 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 			attribs->tface[a].gl_index = gattribs->layer[b].glindex;
 			attribs->tface[a].gl_texco = gattribs->layer[b].gltexco;
 		}
-		else if (gattribs->layer[b].type == CD_MCOL) {
-			if (gattribs->layer[b].name[0])
-				layer = CustomData_get_named_layer_index(ldata, CD_MLOOPCOL, gattribs->layer[b].name);
-			else
-				layer = CustomData_get_active_layer_index(ldata, CD_MLOOPCOL);
+		else if (type == CD_MCOL) {
+			if (layer == -1) {
+				if (gattribs->layer[b].name[0])
+					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPCOL, gattribs->layer[b].name);
+				else
+					layer = CustomData_get_active_layer_index(ldata, CD_MLOOPCOL);
+			}
 
 			a = attribs->totmcol++;
 
@@ -3797,13 +3824,14 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 
 			attribs->mcol[a].gl_index = gattribs->layer[b].glindex;
 		}
-		else if (gattribs->layer[b].type == CD_TANGENT) {
+		else if (type == CD_TANGENT) {
 			/* note, even with 'is_editmesh' this uses the derived-meshes loop data */
-
-			if (gattribs->layer[b].name[0])
-				layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
-			else
-				layer = CustomData_get_active_layer_index(&dm->loopData, CD_TANGENT);
+			if (layer == -1) {
+				if (gattribs->layer[b].name[0])
+					layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
+				else
+					layer = CustomData_get_active_layer_index(&dm->loopData, CD_TANGENT);
+			}
 
 			a = attribs->tottang++;
 
@@ -3818,9 +3846,11 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 
 			attribs->tang[a].gl_index = gattribs->layer[b].glindex;
 		}
-		else if (gattribs->layer[b].type == CD_ORCO) {
+		else if (type == CD_ORCO) {
 			/* original coordinates */
-			layer = CustomData_get_layer_index(vdata, CD_ORCO);
+			if (layer == -1) {
+				layer = CustomData_get_layer_index(vdata, CD_ORCO);
+			}
 			attribs->totorco = 1;
 
 			if (layer != -1) {
@@ -3884,17 +3914,17 @@ void DM_draw_attrib_vertex(DMVertexAttribs *attribs, int a, int index, int vert,
 
 	/* vertex colors */
 	for (b = 0; b < attribs->totmcol; b++) {
-		GLubyte col[4];
+		GLfloat col[4];
 
 		if (attribs->mcol[b].array) {
 			const MLoopCol *cp = &attribs->mcol[b].array[loop];
-			copy_v4_v4_uchar(col, &cp->r);
+			rgba_uchar_to_float(col, &cp->r);
 		}
 		else {
-			col[0] = 0; col[1] = 0; col[2] = 0; col[3] = 0;
+			zero_v4(col);
 		}
 
-		glVertexAttrib4ubv(attribs->mcol[b].gl_index, col);
+		glVertexAttrib4fv(attribs->mcol[b].gl_index, col);
 	}
 
 	/* tangent for normal mapping */
