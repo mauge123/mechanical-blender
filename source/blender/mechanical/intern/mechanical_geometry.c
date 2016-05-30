@@ -12,20 +12,18 @@
 #include "mechanical_utils.h"
 #include "mechanical_geometry.h"
 
-static void mechanical_find_circle_start(BMEditMesh *em,
+static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *v2, BMVert *current, void *data);
+
+static void mechanical_find_edge_loop_start(BMEditMesh *em,
                                         BMEdge **e1, BMEdge **e2, BMVert **v1, BMVert **v2, BMVert **v3,
-                                        float center[])
+                                        bool (*mechanical_follow_edge_loop_test_func) (BMEditMesh*, BMEdge*, BMVert*, BMVert*, BMVert*, void *),
+                                        void *data)
 {
 	BMVert *first = *v1;
 	BMVert *current = *v3, *temp;
 	BMesh *bm= em->bm;
 	BMEdge *e, *e_curr = *e2, *e_prev = *e1;
 	BMIter iter;
-	float n_center[3];
-	float dir[3];
-
-	sub_v3_v3v3(dir,(*v2)->co, (*v1)->co);
-	normalize_v3(dir);
 
 	while (current && current != first) {
 		BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
@@ -46,12 +44,7 @@ static void mechanical_find_circle_start(BMEditMesh *em,
 			}
 		}
 		if (current != first) {
-			if (e &&
-				center_of_3_points(n_center, (*v1)->co, (*v2)->co, current->co) &&
-				len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION &&
-			    angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
-			    !point_on_axis(first->co,dir,current->co))
-			{
+			if (e && mechanical_follow_edge_loop_test_func(em, e,*v1,*v2,current,data)) {
 				*v1 = *v2;
 				*v2 = *v3;
 				*v3 = current;
@@ -74,19 +67,13 @@ static void mechanical_find_circle_start(BMEditMesh *em,
 }
 
 
-static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
-                                     BMVert* *r_voutput, int* r_vcount)
-{
-	return 0;
-}
-
-static int mechanical_check_edge_line (BMEditMesh *em, BMEdge *e, BMVert* *r_voutput, int* r_vcount) {
-	int type = 0;
+static bool mechanical_check_edge_line (BMEditMesh *em, BMEdge *e) {
 	BMFace *efa = NULL;
 	BMIter iter, f_iter;
 	BMEdge *e2 = NULL;
 	float *prev_fno = NULL;
 
+	// Check the edge is not shared between coplanar faces
 	BM_ITER_MESH(efa, &iter, em->bm, BM_FACES_OF_MESH) {
 		BM_ITER_ELEM(e2,&f_iter,efa, BM_EDGES_OF_FACE) {
 			if (e2 == e) {
@@ -101,14 +88,69 @@ static int mechanical_check_edge_line (BMEditMesh *em, BMEdge *e, BMVert* *r_vou
 		}
 	}
 
-	if (efa == NULL)
-	{
-		type = BM_GEOMETRY_TYPE_LINE;
-		r_voutput[0] = e->v1;
-		r_voutput[1] = e->v2;
-		*r_vcount = 2;
+	return (efa == NULL);
+}
+
+static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *UNUSED(em), BMEdge *e, BMVert *v1, BMVert *v2, BMVert *current, void *data) {
+	float *center = data;
+	float n_center[3];
+
+	return (center_of_3_points(n_center, v1->co, v2->co, current->co) &&
+	len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION &&
+    angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC);
+}
+
+static bool mechanical_follow_edge_loop_test_line(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *UNUSED(v2), BMVert *current, void *data) {
+	float *dir = data;
+	return point_on_axis(v1->co,dir,current->co) && mechanical_check_edge_line(em,e);
+}
+
+static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
+                                           bool (*mechanical_follow_edge_loop_test_func) (
+                                               BMEditMesh*, BMEdge*, BMVert*, BMVert*, BMVert*, void *
+                                           ),
+                                           BMVert* *r_voutput, int* r_vcount, void *data)
+{
+	BMEdge *e;
+	BMVert *first;
+	BMVert *current;
+	BMIter iter;
+	BMesh *bm = em->bm;
+
+	*r_vcount =0;
+
+	first = v1;
+	current = v3;
+
+	r_voutput[(*r_vcount)++] = v1;
+	r_voutput[(*r_vcount)++] = v2;
+	r_voutput[(*r_vcount)++] = v3;
+
+	BM_elem_flag_enable(e1, BM_ELEM_TAG);
+	BM_elem_flag_enable(e2, BM_ELEM_TAG);
+	while (current && current != first) {
+		BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+			if (BM_elem_flag_test (e, BM_ELEM_TAG)) {
+				continue;
+			}
+			if (e->v1 == current) {
+				current = e->v2;
+				break;
+			} else if (e->v2 == current) {
+				current = e->v1;
+				break;
+			}
+		}
+		if (current != first) {
+			if (e && mechanical_follow_edge_loop_test_func (em, e, v1,v2,current,data)) {
+				r_voutput[(*r_vcount)++] = current;
+				BM_elem_flag_enable(e, BM_ELEM_TAG);
+			} else {
+				current = NULL;
+			}
+		}
 	}
-	return type;
+	return current;
 }
 
 /**
@@ -125,16 +167,7 @@ static int mechanical_check_edge_line (BMEditMesh *em, BMEdge *e, BMVert* *r_vou
 static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
                                      BMVert* *r_voutput, int* r_vcount, float r_center[])
 {
-	float n_center[3];
 	float dir[3];
-	BMEdge *e;
-	BMVert *first;
-	BMVert *current;
-	BMIter iter;
-	BMesh *bm = em->bm;
-
-	*r_vcount =0;
-
 	sub_v3_v3v3(dir,v2->co,v1->co);
 	normalize_v3(dir);
 
@@ -142,47 +175,40 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 		angle_v3v3v3 (v1->co,r_center,v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
 	    !point_on_axis(v1->co,dir,v3->co)) {
 
-		mechanical_find_circle_start(em, &e1, &e2, &v1, &v2, &v3, r_center);
+		mechanical_find_edge_loop_start(em, &e1, &e2, &v1, &v2, &v3,
+		                                mechanical_follow_edge_loop_test_circle, r_center);
 
-		first = v1;
-		current = v3;
-
-		r_voutput[(*r_vcount)++] = v1;
-		r_voutput[(*r_vcount)++] = v2;
-		r_voutput[(*r_vcount)++] = v3;
-
-		BM_elem_flag_enable(e1, BM_ELEM_TAG);
-		BM_elem_flag_enable(e2, BM_ELEM_TAG);
-		while (current && current != first) {
-			BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-				if (BM_elem_flag_test (e, BM_ELEM_TAG)) {
-					continue;
-				}
-				if (e->v1 == current) {
-					current = e->v2;
-					break;
-				} else if (e->v2 == current) {
-					current = e->v1;
-					break;
-				}
-			}
-			if (current != first) {
-				if (e &&
-					center_of_3_points(n_center, v1->co, v2->co, current->co) &&
-					len_v3v3(n_center, r_center) < DIM_GEOMETRY_PRECISION &&
-				    angle_v3v3v3 (e->v1->co, r_center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC)
-				{
-					r_voutput[(*r_vcount)++] = current;
-					BM_elem_flag_enable(e, BM_ELEM_TAG);
-				} else {
-					current = NULL;
-				}
-			}
+		if (mechanical_follow_edge_loop (em, e1, e2, v1, v2, v3,
+		                                 mechanical_follow_edge_loop_test_circle,
+		                                 r_voutput, r_vcount, r_center)) {
+			return BM_GEOMETRY_TYPE_CIRCLE;
+		} else {
+			return BM_GEOMETRY_TYPE_ARC;
 		}
-		return current ? BM_GEOMETRY_TYPE_CIRCLE : BM_GEOMETRY_TYPE_ARC;
+
 	}
 	return 0;
 }
+
+static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
+                                     BMVert* *r_voutput, int* r_vcount)
+{
+	float dir[3];
+
+	sub_v3_v3v3(dir, v2->co, v1->co);
+	normalize_v3(dir);
+
+	if (point_on_axis(v1->co,dir,v3->co) && mechanical_check_edge_line(em,e1) && mechanical_check_edge_line(em,e2)) {
+
+		mechanical_find_edge_loop_start(em, &e1, &e2, &v1, &v2, &v3,
+		                                mechanical_follow_edge_loop_test_line, dir);
+
+		mechanical_follow_edge_loop (em,e1,e2,v1,v2,v3,mechanical_follow_edge_loop_test_line,r_voutput,r_vcount,dir);
+		return BM_GEOMETRY_TYPE_LINE;
+	}
+	return 0;
+}
+
 
 static int mechanical_geometry_follow_data(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
              BMVert* *r_voutput, int* r_vcount, float r_center[])
@@ -235,7 +261,12 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 			if (e2 == NULL) {
 				// No conection Consider line
 				// Check the face normals
-				type = mechanical_check_edge_line(em, e1, &(*verts), &vcount);
+				if (mechanical_check_edge_line(em, e1)) {
+					verts[0] = e1->v1;
+					verts[1] = e1->v2;
+					vcount = 2;
+					type = BM_GEOMETRY_TYPE_LINE;
+				}
 			}
 
 			switch (type) {

@@ -3834,9 +3834,11 @@ static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
 #ifdef WITH_MECHANICAL_GEOMETRY
 static void draw_em_mesh_geometry(BMEditMesh *em)
 {
-	glLineWidth(4.0f);
-	glColor4f(1.0f,0.0f,0.0f,1.0f);
 	float r[3];
+
+	glLineWidth(4.0f);
+	glPointSize(6.0f);
+	glColor4f(1.0f,0.0f,0.0f,1.0f);
 
 	BMElemGeom *egm;
 	BMIter iter;
@@ -3858,6 +3860,12 @@ static void draw_em_mesh_geometry(BMEditMesh *em)
 				break;
 			case BM_GEOMETRY_TYPE_LINE:
 				glBegin(GL_LINES);
+				{
+					glVertex3fv(egm->v[0]->co);
+					glVertex3fv(egm->v[egm->totverts-1]->co);
+				}
+				glEnd();
+				glBegin(GL_POINTS);
 				{
 					glVertex3fv(egm->v[0]->co);
 					glVertex3fv(egm->v[egm->totverts-1]->co);
