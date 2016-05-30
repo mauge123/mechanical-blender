@@ -3772,6 +3772,14 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Is Editmode", "True when used in editmode");
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+	prop = RNA_def_property(srna, "show_mesh_geometry", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "drawflag", ME_DRAW_GEOMETRY);
+	RNA_def_property_ui_text(prop, "Mesh Geometry",
+	                         "Display Mesh Geometry in editmode");
+	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+#endif
+
 	/* pointers */
 	rna_def_animdata_common(srna);
 	rna_def_texmat_common(srna, "rna_Mesh_texspace_editable");

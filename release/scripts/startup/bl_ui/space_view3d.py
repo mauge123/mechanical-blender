@@ -3406,6 +3406,10 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
         if bpy.app.debug:
             layout.prop(mesh, "show_extra_indices")
 
+        col.separator()
+        split = layout.split()
+        col = split.column()
+        col.prop(mesh, "show_mesh_geometry", text="Show Geometry")
 
 class VIEW3D_PT_view3d_meshstatvis(Panel):
     bl_space_type = 'VIEW_3D'

@@ -233,6 +233,9 @@ enum {
 
 /* draw loop normals */
 	ME_DRAW_LNORMALS       = 1 << 18,
+
+// WITH_MECHANICAL_GEOMETRY
+	ME_DRAW_GEOMETRY       = 1 << 19,
 };
 
 /* Subsurf Type */

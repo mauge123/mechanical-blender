@@ -4530,7 +4530,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
-			if (em->bm->totgeom) {
+			if (em->bm->totgeom &&  (me->drawflag & (ME_DRAW_GEOMETRY))) {
 				draw_em_mesh_geometry(em);
 			}
 #endif
