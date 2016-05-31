@@ -293,6 +293,11 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 
 				BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
 				bm->totgeom++;
+
+				egm->head.htype = BM_GEOMETRY;
+				egm->head.hflag = 0;
+				egm->head.bm = bm;
+
 				egm->totverts = vcount;
 				egm->totedges = ecount;
 				egm->v = MEM_callocN(sizeof(BMVert*)*egm->totverts,"geometry vertex pointer array");

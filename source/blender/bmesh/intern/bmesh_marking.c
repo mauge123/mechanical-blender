@@ -47,11 +47,13 @@ static void recount_totsels(BMesh *bm)
 {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	const char iter_types[5] = {BM_VERTS_OF_MESH,
+// WITH_MECHANICAL_GEOMETRY
+	const char iter_types[6] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH,
 								BM_DIMS_OF_MESH,
-								BM_REFERENCES_OF_MESH};
+								BM_REFERENCES_OF_MESH,
+	                            BM_GEOMETRY_OF_MESH};
 	int *tots[5];
 /*
 	const char iter_types[3] = {BM_VERTS_OF_MESH,
@@ -76,10 +78,16 @@ static void recount_totsels(BMesh *bm)
 	tots[4] = &bm->totrefsel;
 #endif
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+	bm->totgeomsel = 0;
+	tots[5] = &bm->totgeomsel;
+#endif
+
 #pragma omp parallel for schedule(static) if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	for (i = 0; i < 5; i++) {
+// WITH_MECHANICAL_GEOMETRY
+	for (i = 0; i < 6; i++) {
 /*
 	for (i = 0; i < 3; i++) {
 */
@@ -308,6 +316,20 @@ void BM_mesh_select_mode_flush_ex(BMesh *bm, const short selectmode)
 		}
 	}
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+	if (selectmode & SCE_SELECT_GEOMETRY) {
+		BMElemGeom *egm;
+		BMIter giter;
+		bool ok = true;
+		BM_ITER_MESH (egm, &giter, bm, BM_GEOMETRY_OF_MESH) {
+			ok = BM_elem_flag_test(egm, BM_ELEM_SELECT);
+			for (int i=0; i<egm->totedges;i++) {
+				BM_elem_flag_set(egm->e[i], BM_ELEM_SELECT, ok);
+			}
+		}
+	}
+#endif
+
 	/* Remove any deselected elements from the BMEditSelection */
 	BM_select_history_validate(bm);
 
@@ -523,6 +545,32 @@ void BM_dim_select_set(BMesh *bm, BMDim *d, const bool select)
 			BM_elem_flag_disable(d, BM_ELEM_SELECT);
 
 			//Do not De-select all vertices: Allows maintain selected if needed
+		}
+
+	}
+}
+#endif
+
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+void BM_geometry_select_set(BMesh *bm, BMElemGeom *egm, const bool select)
+{
+	BLI_assert(egm->head.htype == BM_GEOMETRY);
+
+	if (BM_elem_flag_test(egm, BM_ELEM_HIDDEN)) {
+		return;
+	}
+
+	if (select) {
+		if (!BM_elem_flag_test(egm, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(egm, BM_ELEM_SELECT);
+			bm->totgeomsel += 1;
+		}
+	}
+	else {
+		if (BM_elem_flag_test(egm, BM_ELEM_SELECT)) {
+			bm->totgeomsel -= 1;
+			BM_elem_flag_disable(egm, BM_ELEM_SELECT);
 		}
 
 	}

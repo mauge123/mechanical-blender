@@ -2109,6 +2109,32 @@ static void EDBM_select_pick_edge(BMEditMesh *em, BMEdge *eed, bool extend, bool
 		}
 	}
 }
+
+static void EDBM_select_pick_geometry(BMEditMesh *em, BMElemGeom *egm, bool extend, bool deselect, bool toggle)
+{
+	if (extend) {
+		/* Work-around: deselect first, so we can guarantee it will */
+		/* be active even if it was already selected */
+		BM_select_history_remove(em->bm, egm);
+		BM_geometry_select_set(em->bm, egm, false);
+		BM_select_history_store(em->bm, egm);
+		BM_geometry_select_set(em->bm, egm, true);
+	}
+	else if (deselect) {
+		BM_select_history_remove(em->bm, egm);
+		BM_geometry_select_set(em->bm, egm, false);
+	}
+	else {
+		if (!BM_elem_flag_test(egm, BM_ELEM_SELECT)) {
+			BM_select_history_store(em->bm, egm);
+			BM_geometry_select_set(em->bm, egm, true);
+		}
+		else if (toggle) {
+			BM_select_history_remove(em->bm, egm);
+			BM_geometry_select_set(em->bm, egm, false);
+		}
+	}
+}
 #endif
 
 
@@ -2183,14 +2209,7 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 			BM_ITER_MESH (egm, &iter, vc.em->bm, BM_GEOMETRY_OF_MESH ) {
 				for (i=0; (egm->e[i] != eed) && (i < egm->totedges); i++);
 				if (i < egm->totedges) {
-					// Found: Select Edge
-
-					// First select the picked edge, so it's set as active
-					EDBM_select_pick_edge (vc.em, eed, extend, deselect, toggle);
-
-					for (i=0; i < egm->totedges; i++) {
-						EDBM_select_pick_edge (vc.em, egm->e[i], extend, deselect, false);
-					}
+					EDBM_select_pick_geometry(vc.em, egm, extend, deselect, toggle);
 					break;
 				}
 			}
