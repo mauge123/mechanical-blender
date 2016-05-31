@@ -174,7 +174,7 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
  * @return int type of data, 0 if not valid
  */
 static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
-                                     BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int * r_ecount, float r_center[])
+                                     BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int *r_ecount, float r_center[])
 {
 	int type = 0;
 	float dir[3];
@@ -191,7 +191,7 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 		if (mechanical_follow_edge_loop (em, e1, e2, v1, v2, v3,
 		                                 mechanical_follow_edge_loop_test_circle,
 		                                 r_voutput, r_vcount, r_eoutput, r_ecount, r_center)) {
-			r_ecount++;  //Closing edge
+			(*r_ecount)++;  //Closing edge
 			type = BM_GEOMETRY_TYPE_CIRCLE;
 		} else {
 			type = BM_GEOMETRY_TYPE_ARC;

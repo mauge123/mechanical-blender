@@ -2201,7 +2201,7 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 			}
 		}
 #ifdef WITH_MECHANICAL_GEOMETRY
-		else if (eed && vc.em->selectmode & SCE_SELECT_GEOMETRY) {
+		else if (eed && vc.em->selectmode == SCE_SELECT_GEOMETRY) {
 			BMElemGeom *egm;
 			BMIter iter;
  			int i =0;
