@@ -3137,7 +3137,7 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 			}
 #ifdef WITH_MECHANICAL_GEOMETRY
 			{
-
+				// Nothing. Perfomed on Object_update.c
 			}
 #endif
 		}

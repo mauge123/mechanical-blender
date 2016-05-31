@@ -91,6 +91,7 @@
 
 #include "transform.h"
 #include "mesh_references.h"
+#include "mechanical_geometry.h"
 
 /* Disabling, since when you type you know what you are doing, and being able to set it to zero is handy. */
 // #define USE_NUM_NO_ZERO
@@ -2877,6 +2878,14 @@ int transformEnd(bContext *C, TransInfo *t)
 		if (t->state == TRANS_CONFIRM && (t->flag & T_TRANSFORM_MULTIPLE)) {
 			exit_code |= OPERATOR_REPEAT;
 		}
+#endif
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+		/*
+		 * This may should be perfomed on event processing, but disabled there on G.moving to
+		 * avoid compute on not finished operation
+		 */
+		mechanical_update_mesh_geometry(BKE_editmesh_from_object(t->obedit));
 #endif
 		/* aftertrans does insert keyframes, and clears base flags; doesn't read transdata */
 		special_aftertrans_update(C, t);
