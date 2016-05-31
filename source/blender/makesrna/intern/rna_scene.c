@@ -155,10 +155,12 @@ EnumPropertyItem rna_enum_mesh_select_mode_items[] = {
 	{SCE_SELECT_VERTEX, "VERTEX", ICON_VERTEXSEL, "Vertex", "Vertex selection mode"},
 	{SCE_SELECT_EDGE, "EDGE", ICON_EDGESEL, "Edge", "Edge selection mode"},
 	{SCE_SELECT_FACE, "FACE", ICON_FACESEL, "Face", "Face selection mode"},
-//WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	{SCE_SELECT_REFERENCE, "REFERENCE", ICON_FACESEL, "reference", "Reference selection mode"},
-//WITH_MECHANICAL_MESH_DIMENSIONS
-    {SCE_SELECT_DIMENSION, "DIMENSION", ICON_FACESEL, "dimension", "Dimension selection mode"},
+// WITH_MECHANICAL_MESH_DIMENSIONS
+	{SCE_SELECT_DIMENSION, "DIMENSION", ICON_FACESEL, "dimension", "Dimension selection mode"},
+// WITH_MECHANICAL_GEOMETRY
+	{SCE_SELECT_GEOMETRY, "GEOMETRY", ICON_FACESEL, "geometry", "Geometry selection mode"},
 	{0, NULL, 0, NULL, NULL}
 };
 

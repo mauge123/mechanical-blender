@@ -747,7 +747,7 @@ void BM_mesh_bm_to_me(
 	CustomData_free(&me->pdata, me->totpoly);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (me->totdim) {
-		mdim_pr = CustomData_get_layer(&me->ddata,CD_MDIM);
+		mdim_pr = CustomData_get_layer(&me->ddata, CD_MDIM);
 		for (int n=0;n<me->totdim;mdim_pr++, n++) {
 			MEM_freeN(mdim_pr->v);
 		}

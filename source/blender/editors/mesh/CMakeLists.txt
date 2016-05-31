@@ -85,10 +85,12 @@ if(WITH_FREESTYLE)
 endif()
 
 if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 	add_definitions(-DWITH_MECHANICAL_BLENDER_D1669)
 	add_definitions(-DWITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE)
+	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 
 	list(APPEND INC
 		../../mechanical

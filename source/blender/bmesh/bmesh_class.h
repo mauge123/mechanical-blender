@@ -226,8 +226,11 @@ typedef struct BMElemGeom {
 	BMHeader head;
 
 	struct BMVert *(*v);
+	struct BMEdge *(*e);
 	// Number Of Verts
 	int totverts;
+	int totedges;
+
 	int geometry_type;
 
 	float center[3];

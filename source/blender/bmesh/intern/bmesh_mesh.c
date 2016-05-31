@@ -238,6 +238,7 @@ void BM_mesh_data_free(BMesh *bm)
 	BMEdge *e;
 	BMLoop *l;
 	BMFace *f;
+	BMElemGeom *egm;
 
 	BMIter iter;
 	BMIter itersub;
@@ -301,6 +302,10 @@ void BM_mesh_data_free(BMesh *bm)
 #endif
 
 #ifdef WITH_MECHANICAL_GEOMETRY
+	BM_ITER_MESH (egm, &iter, bm, BM_GEOMETRY_OF_MESH) {
+		MEM_freeN(egm->v);
+		MEM_freeN(egm->e);
+	}
 	BLI_mempool_destroy(bm->gpool);
 #endif
 

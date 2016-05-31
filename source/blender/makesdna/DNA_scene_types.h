@@ -1893,6 +1893,8 @@ extern const char *RE_engine_id_CYCLES;
 #define SCE_SELECT_REFERENCE		8
 // WITH_MECHANICAL_MESH_DIMENSIONS
 #define SCE_SELECT_DIMENSION		16
+// WITH_MECHANICAL_GEOMETRY
+#define SCE_SELECT_GEOMETRY			(SCE_SELECT_EDGE | 32)
 
 /* toolsettings->statvis->type */
 #define SCE_STATVIS_OVERHANG	0

@@ -1523,7 +1523,9 @@ void MESH_OT_select_mode(wmOperatorType *ot)
 		{SCE_SELECT_EDGE,   "EDGE", ICON_EDGESEL, "Edges", ""},
 		{SCE_SELECT_FACE,   "FACE", ICON_FACESEL, "Faces", ""},
 		{SCE_SELECT_REFERENCE,   "REFERENCE", ICON_FACESEL, "References", ""},
-	    {SCE_SELECT_DIMENSION,   "DIMENSION", ICON_FACESEL, "Dimensions", ""},
+		{SCE_SELECT_DIMENSION,   "DIMENSION", ICON_FACESEL, "Dimensions", ""},
+// WITH_MECHANICAL_GEOMETRY
+		{SCE_SELECT_GEOMETRY,   "GEOMETRY", ICON_FACESEL, "GEOMETRY", ""},
 		{0, NULL, 0, NULL, NULL},
 	};
 
@@ -2055,6 +2057,60 @@ void select_dimension_data (BMDim *edm, void *context) {
 }
 #endif
 
+#ifdef WITH_MECHANICAL
+static void EDBM_select_pick_vert(BMEditMesh *em, BMVert *eve, bool extend, bool deselect, bool toggle)
+{
+	if (extend) {
+		/* Work-around: deselect first, so we can guarantee it will */
+		/* be active even if it was already selected */
+		BM_select_history_remove(em->bm, eve);
+		BM_vert_select_set(em->bm, eve, false);
+		BM_select_history_store(em->bm, eve);
+		BM_vert_select_set(em->bm, eve, true);
+	}
+	else if (deselect) {
+		BM_select_history_remove(em->bm, eve);
+		BM_vert_select_set(em->bm, eve, false);
+	}
+	else {
+		if (!BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+			BM_select_history_store(em->bm, eve);
+			BM_vert_select_set(em->bm, eve, true);
+		}
+		else if (toggle) {
+			BM_select_history_remove(em->bm, eve);
+			BM_vert_select_set(em->bm, eve, false);
+		}
+	}
+}
+
+static void EDBM_select_pick_edge(BMEditMesh *em, BMEdge *eed, bool extend, bool deselect, bool toggle)
+{
+	if (extend) {
+		/* Work-around: deselect first, so we can guarantee it will */
+		/* be active even if it was already selected */
+		BM_select_history_remove(em->bm, eed);
+		BM_edge_select_set(em->bm, eed, false);
+		BM_select_history_store(em->bm, eed);
+		BM_edge_select_set(em->bm, eed, true);
+	}
+	else if (deselect) {
+		BM_select_history_remove(em->bm, eed);
+		BM_edge_select_set(em->bm, eed, false);
+	}
+	else {
+		if (!BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
+			BM_select_history_store(em->bm, eed);
+			BM_edge_select_set(em->bm, eed, true);
+		}
+		else if (toggle) {
+			BM_select_history_remove(em->bm, eed);
+			BM_edge_select_set(em->bm, eed, false);
+		}
+	}
+}
+#endif
+
 
 /* ************************************************** */
 /* here actual select happens */
@@ -2118,53 +2174,33 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				}
 			}
 		}
-		else if (eed) {
-			if (extend) {
-				/* Work-around: deselect first, so we can guarantee it will */
-				/* be active even if it was already selected */
-				BM_select_history_remove(vc.em->bm, eed);
-				BM_edge_select_set(vc.em->bm, eed, false);
-				BM_select_history_store(vc.em->bm, eed);
-				BM_edge_select_set(vc.em->bm, eed, true);
-			}
-			else if (deselect) {
-				BM_select_history_remove(vc.em->bm, eed);
-				BM_edge_select_set(vc.em->bm, eed, false);
-			}
-			else {
-				if (!BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
-					BM_select_history_store(vc.em->bm, eed);
-					BM_edge_select_set(vc.em->bm, eed, true);
-				}
-				else if (toggle) {
-					BM_select_history_remove(vc.em->bm, eed);
-					BM_edge_select_set(vc.em->bm, eed, false);
+#ifdef WITH_MECHANICAL_GEOMETRY
+		else if (eed && vc.em->selectmode & SCE_SELECT_GEOMETRY) {
+			BMElemGeom *egm;
+			BMIter iter;
+ 			int i =0;
+			// Look for geom element
+			BM_ITER_MESH (egm, &iter, vc.em->bm, BM_GEOMETRY_OF_MESH ) {
+				for (i=0; (egm->e[i] != eed) && (i < egm->totedges); i++);
+				if (i < egm->totedges) {
+					// Found: Select Edge
+
+					// First select the picked edge, so it's set as active
+					EDBM_select_pick_edge (vc.em, eed, extend, deselect, toggle);
+
+					for (i=0; i < egm->totedges; i++) {
+						EDBM_select_pick_edge (vc.em, egm->e[i], extend, deselect, false);
+					}
+					break;
 				}
 			}
 		}
+#endif
+		else if (eed) {
+			EDBM_select_pick_edge(vc.em,eed,extend,deselect, toggle);
+		}
 		else if (eve) {
-			if (extend) {
-				/* Work-around: deselect first, so we can guarantee it will */
-				/* be active even if it was already selected */
-				BM_select_history_remove(vc.em->bm, eve);
-				BM_vert_select_set(vc.em->bm, eve, false);
-				BM_select_history_store(vc.em->bm, eve);
-				BM_vert_select_set(vc.em->bm, eve, true);
-			}
-			else if (deselect) {
-				BM_select_history_remove(vc.em->bm, eve);
-				BM_vert_select_set(vc.em->bm, eve, false);
-			}
-			else {
-				if (!BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-					BM_select_history_store(vc.em->bm, eve);
-					BM_vert_select_set(vc.em->bm, eve, true);
-				}
-				else if (toggle) {
-					BM_select_history_remove(vc.em->bm, eve);
-					BM_vert_select_set(vc.em->bm, eve, false);
-				}
-			}
+			EDBM_select_pick_vert(vc.em,eve,extend,deselect, toggle);
 		}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		else if (edm) {
@@ -2537,6 +2573,16 @@ bool EDBM_selectmode_toggle(bContext *C, const short selectmode_new,
 		case SCE_SELECT_DIMENSION:
 			if (use_extend == 0 || em->selectmode == 0) {
 				em->selectmode = SCE_SELECT_DIMENSION;
+			}
+			ts->selectmode = em->selectmode;
+			EDBM_selectmode_set(em);
+			ret = true;
+			break;
+#endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+		case SCE_SELECT_GEOMETRY:
+			if (use_extend == 0 || em->selectmode == 0) {
+				em->selectmode = SCE_SELECT_GEOMETRY;
 			}
 			ts->selectmode = em->selectmode;
 			EDBM_selectmode_set(em);

@@ -108,7 +108,7 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
                                            bool (*mechanical_follow_edge_loop_test_func) (
                                                BMEditMesh*, BMEdge*, BMVert*, BMVert*, BMVert*, void *
                                            ),
-                                           BMVert* *r_voutput, int* r_vcount, void *data)
+                                           BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int* r_ecount, void *data)
 {
 	BMEdge *e;
 	BMVert *first;
@@ -116,7 +116,8 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
 	BMIter iter;
 	BMesh *bm = em->bm;
 
-	*r_vcount =0;
+	*r_vcount = 0;
+	*r_ecount = 0;
 
 	first = v1;
 	current = v3;
@@ -124,6 +125,8 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
 	r_voutput[(*r_vcount)++] = v1;
 	r_voutput[(*r_vcount)++] = v2;
 	r_voutput[(*r_vcount)++] = v3;
+	r_eoutput[(*r_ecount)++] = e1;
+	r_eoutput[(*r_ecount)++] = e2;
 
 	BM_elem_flag_enable(e1, BM_ELEM_TAG);
 	BM_elem_flag_enable(e2, BM_ELEM_TAG);
@@ -134,18 +137,24 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
 			}
 			if (e->v1 == current) {
 				BM_elem_flag_enable(e, BM_ELEM_TAG);
+				r_eoutput[(*r_ecount)] = e;
 				current = e->v2;
 				break;
 			} else if (e->v2 == current) {
 				BM_elem_flag_enable(e, BM_ELEM_TAG);
+				r_eoutput[(*r_ecount)] = e;
 				current = e->v1;
 				break;
 			}
 		}
 		if (current != first) {
 			if (e && mechanical_follow_edge_loop_test_func (em, e, v1,v2,current,data)) {
+				(*r_ecount)++;
 				r_voutput[(*r_vcount)++] = current;
 			} else {
+				if (e) {
+					BM_elem_flag_disable(e, BM_ELEM_TAG);
+				}
 				current = NULL;
 			}
 		}
@@ -165,7 +174,7 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
  * @return int type of data, 0 if not valid
  */
 static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
-                                     BMVert* *r_voutput, int* r_vcount, float r_center[])
+                                     BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int * r_ecount, float r_center[])
 {
 	int type = 0;
 	float dir[3];
@@ -181,12 +190,12 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 
 		if (mechanical_follow_edge_loop (em, e1, e2, v1, v2, v3,
 		                                 mechanical_follow_edge_loop_test_circle,
-		                                 r_voutput, r_vcount, r_center)) {
+		                                 r_voutput, r_vcount, r_eoutput, r_ecount, r_center)) {
+			r_ecount++;  //Closing edge
 			type = BM_GEOMETRY_TYPE_CIRCLE;
 		} else {
 			type = BM_GEOMETRY_TYPE_ARC;
 		}
-
 	}
 	if (type && *r_vcount <= 3) {
 		// Invalid, needs more vertices
@@ -198,7 +207,7 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 }
 
 static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
-                                     BMVert* *r_voutput, int* r_vcount)
+                                     BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int* r_ecount)
 {
 	float dir[3];
 
@@ -210,7 +219,7 @@ static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert
 		mechanical_find_edge_loop_start(em, &e1, &e2, &v1, &v2, &v3,
 		                                mechanical_follow_edge_loop_test_line, dir);
 
-		mechanical_follow_edge_loop (em,e1,e2,v1,v2,v3,mechanical_follow_edge_loop_test_line,r_voutput,r_vcount,dir);
+		mechanical_follow_edge_loop(em,e1,e2,v1,v2,v3,mechanical_follow_edge_loop_test_line,r_voutput,r_vcount, r_eoutput, r_ecount,dir);
 		return BM_GEOMETRY_TYPE_LINE;
 	}
 	return 0;
@@ -218,12 +227,12 @@ static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert
 
 
 static int mechanical_geometry_follow_data(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
-             BMVert* *r_voutput, int* r_vcount, float r_center[])
+             BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int* r_ecount, float r_center[])
 {
 	int type = 0;
-	type = mechanical_follow_circle(em,e1, e2, v1, v2, v3, r_voutput, r_vcount, r_center);
+	type = mechanical_follow_circle(em,e1, e2, v1, v2, v3, r_voutput, r_vcount, r_eoutput, r_ecount, r_center);
 	if (type == 0) {
-		type = mechanical_follow_line(em,e1,e2,v1,v2,v3,r_voutput, r_vcount);
+		type = mechanical_follow_line(em,e1,e2,v1,v2,v3,r_voutput, r_vcount, r_eoutput, r_ecount);
 	}
 	return type;
 }
@@ -239,7 +248,8 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 
 	// Max size is total count of verts
 	BMVert *(*verts) = MEM_callocN(sizeof(BMVert*)*bm->totvert,"mechanical_circle_output");
-	int vcount;
+	BMEdge *(*edges) = MEM_callocN(sizeof(BMEdge*)*bm->totedge,"mechanical_circle_output");
+	int vcount, ecount;
 	float center[3];
 
 	BM_ITER_MESH (e1, &iter1, bm, BM_EDGES_OF_MESH) {
@@ -251,16 +261,16 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 				if (!BM_elem_flag_test (e2, BM_ELEM_TAG)) {
 					if (e2->v1 == e1->v1) {
 						type = mechanical_geometry_follow_data(em,e1, e2, e1->v2, e1->v1, e2->v2,
-														&(*verts), &vcount, center);
+														&(*verts), &vcount, &(*edges), &ecount, center);
 					}else if (e2->v1 == e1->v2) {
 						type = mechanical_geometry_follow_data(em,e1, e2, e1->v1, e1->v2, e2->v2,
-						                                &(*verts), &vcount, center);
+						                                &(*verts), &vcount, &(*edges), &ecount, center);
 					}else if (e2->v2 == e1->v1) {
 						type = mechanical_geometry_follow_data(em,e1, e2, e1->v2, e1->v1, e2->v1,
-						                                &(*verts), &vcount, center);
+						                                &(*verts), &vcount, &(*edges), &ecount, center);
 					}else if (e2->v2 == e1->v2) {
 						type = mechanical_geometry_follow_data(em,e1, e2, e1->v1, e1->v2, e2->v1,
-						                                &(*verts), &vcount, center);
+						                                &(*verts), &vcount, &(*edges), &ecount, center);
 					}
 				}
 			}
@@ -271,44 +281,49 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 				if (mechanical_check_edge_line(em, e1)) {
 					verts[0] = e1->v1;
 					verts[1] = e1->v2;
+					edges[0] = e1;
+
 					vcount = 2;
+					ecount = 1;
 					type = BM_GEOMETRY_TYPE_LINE;
 				}
 			}
 
-			switch (type) {
-				case BM_GEOMETRY_TYPE_CIRCLE:
-				case BM_GEOMETRY_TYPE_ARC:
-				{
-					BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
-					bm->totgeom++;
-					copy_v3_v3(egm->center,center);
-					egm->totverts = vcount;
-					egm->v = MEM_callocN(sizeof(BMVert*)*egm->totverts,"geometry vertex pointer array");
-					egm->geometry_type = type;
-					memcpy(egm->v,verts,egm->totverts*sizeof(BMVert*));
-					normal_tri_v3(egm->axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
-					break;
+			if (type) {
+
+				BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
+				bm->totgeom++;
+				egm->totverts = vcount;
+				egm->totedges = ecount;
+				egm->v = MEM_callocN(sizeof(BMVert*)*egm->totverts,"geometry vertex pointer array");
+				egm->e = MEM_callocN(sizeof(BMEdge*)*egm->totedges,"geometry edge pointer array");
+				egm->geometry_type = type;
+				memcpy(egm->v,verts,egm->totverts*sizeof(BMVert*));
+				memcpy(egm->e,edges,egm->totedges*sizeof(BMEdge*));
+
+				switch (type) {
+					case BM_GEOMETRY_TYPE_CIRCLE:
+					case BM_GEOMETRY_TYPE_ARC:
+					{
+						copy_v3_v3(egm->center,center);
+						normal_tri_v3(egm->axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
+						break;
+					}
+					case BM_GEOMETRY_TYPE_LINE:
+					{
+						sub_v3_v3v3(egm->axis,egm->v[0]->co,egm->v[1]->co);
+						normalize_v3(egm->axis);
+						break;
+					}
+					default:
+						// Not valid
+						break;
 				}
-				case BM_GEOMETRY_TYPE_LINE:
-				{
-					BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
-					bm->totgeom++;
-					egm->totverts = vcount;
-					egm->v = MEM_callocN(sizeof(BMVert*)*egm->totverts,"geometry vertex pointer array");
-					egm->geometry_type = type;
-					memcpy(egm->v,verts,egm->totverts*sizeof(BMVert*));
-					sub_v3_v3v3(egm->axis,egm->v[0]->co,egm->v[1]->co);
-					normalize_v3(egm->axis);
-					break;
-				}
-				default:
-					// Not valid
-					break;
 			}
 		}
 	}
 	MEM_freeN(&(*verts));
+	MEM_freeN(&(*edges));
 }
 
 // Does not consider added data expand the geometry , eg lines
@@ -402,6 +417,7 @@ static void mechanical_check_mesh_geometry(BMEditMesh *em)
 		} else {
 			// Remove!
 			MEM_freeN(egm->v);
+			MEM_freeN(egm->e);
 			BLI_mempool_free(bm->gpool, egm);
 			bm->totgeom--;
 		}
