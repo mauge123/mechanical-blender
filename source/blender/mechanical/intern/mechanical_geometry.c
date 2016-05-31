@@ -67,33 +67,23 @@ static void mechanical_find_edge_loop_start(BMEditMesh *em,
 }
 
 
-static bool mechanical_check_edge_line (BMEditMesh *em, BMEdge *e) {
-	BMFace *efa = NULL;
-	BMIter iter, f_iter;
-	BMEdge *e2 = NULL;
+static bool mechanical_check_edge_line (BMEditMesh *UNUSED(em), BMEdge *e) {
+	BMIter iter;
+	BMFace *efa;
 	float *prev_fno = NULL;
-
-	// Check the edge is not shared between coplanar faces
-	BM_ITER_MESH(efa, &iter, em->bm, BM_FACES_OF_MESH) {
-		BM_ITER_ELEM(e2,&f_iter,efa, BM_EDGES_OF_FACE) {
-			if (e2 == e) {
-				if (prev_fno && parallel_v3u_v3u(efa->no,prev_fno)) {
-					break;
-				}
-				if (prev_fno) {
-					float d = dot_v3v3(efa->no, prev_fno);
-					d *= d;
-					if (d > 0.9f) {
-						// Consider tangent faces
-						break;
-					}
-				}
-				prev_fno = efa->no;
-			}
-		}
-		if (e2 != NULL) {
+	BM_ITER_ELEM(efa, &iter, e, BM_FACES_OF_EDGE) {
+		if (prev_fno && parallel_v3u_v3u(efa->no,prev_fno)) {
 			break;
 		}
+		if (prev_fno) {
+			float d = dot_v3v3(efa->no, prev_fno);
+			d *= d;
+			if (d > 0.9f) {
+				// Consider tangent faces
+				break;
+			}
+		}
+		prev_fno = efa->no;
 	}
 
 	return (efa == NULL);
@@ -103,9 +93,10 @@ static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *UNUSED(em), BMEd
 	float *center = data;
 	float n_center[3];
 
-	return (center_of_3_points(n_center, v1->co, v2->co, current->co) &&
-	len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION &&
-    angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC);
+	return ( len_v3v3(current->co,center) > DIM_GEOMETRY_PRECISION &&
+		center_of_3_points(n_center, v1->co, v2->co, current->co) &&
+		len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION &&
+		angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC);
 }
 
 static bool mechanical_follow_edge_loop_test_line(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *UNUSED(v2), BMVert *current, void *data) {
@@ -176,13 +167,14 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
 static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
                                      BMVert* *r_voutput, int* r_vcount, float r_center[])
 {
+	int type = 0;
 	float dir[3];
 	sub_v3_v3v3(dir,v2->co,v1->co);
 	normalize_v3(dir);
 
 	if (center_of_3_points(r_center, v1->co, v2->co, v3->co) &&
 		angle_v3v3v3 (v1->co,r_center,v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
-	    !point_on_axis(v1->co,dir,v3->co)) {
+	    !point_on_axis_strict(v1->co,dir,v3->co)) {
 
 		mechanical_find_edge_loop_start(em, &e1, &e2, &v1, &v2, &v3,
 		                                mechanical_follow_edge_loop_test_circle, r_center);
@@ -190,13 +182,19 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 		if (mechanical_follow_edge_loop (em, e1, e2, v1, v2, v3,
 		                                 mechanical_follow_edge_loop_test_circle,
 		                                 r_voutput, r_vcount, r_center)) {
-			return BM_GEOMETRY_TYPE_CIRCLE;
+			type = BM_GEOMETRY_TYPE_CIRCLE;
 		} else {
-			return BM_GEOMETRY_TYPE_ARC;
+			type = BM_GEOMETRY_TYPE_ARC;
 		}
 
 	}
-	return 0;
+	if (type && *r_vcount <= 3) {
+		// Invalid, needs more vertices
+		type =0;
+		BM_elem_flag_disable(e1, BM_ELEM_TAG);
+		BM_elem_flag_disable(e2, BM_ELEM_TAG);
+	}
+	return type;
 }
 
 static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert *v1, BMVert *v2, BMVert *v3,
@@ -408,7 +406,6 @@ static void mechanical_check_mesh_geometry(BMEditMesh *em)
 			bm->totgeom--;
 		}
 	}
-
 }
 
 void mechanical_update_mesh_geometry(BMEditMesh *em)
@@ -426,6 +423,13 @@ void mechanical_update_mesh_geometry(BMEditMesh *em)
 	mechanical_check_mesh_geometry(em);
 
 	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+
+		if (!mechanical_check_edge_line(em,e)) {
+			// Ignore not valid edges
+			BM_elem_flag_enable(e, BM_ELEM_TAG);
+			continue;
+		}
+
 		// edges verts are set as OK if checked
 		if (BM_elem_flag_test (e->v1, BM_ELEM_TAG)) {
 			BM_elem_flag_enable(e, BM_ELEM_TAG);

@@ -9,8 +9,12 @@
 bool parallel_v3_v3(float *v1, float *v2);
 bool parallel_v3u_v3u(float *v1, float *v2);
 bool perpendicular_v3_v3(float *v1, float *v2);
-bool point_on_axis (float *c, float*a, float *p);
-bool point_on_plane (float *c, float *a, float *p);
+bool point_on_axis(float *c, float*a, float *p);
+bool point_on_plane(float *c, float *a, float *p);
+
+
+bool parallel_v3u_v3u_strict(float *v1, float *v2);
+bool point_on_axis_strict(float *c, float*a, float *p);
 
 void v_perpendicular_to_axis(float *r, float *c, float *p, float *a);
 

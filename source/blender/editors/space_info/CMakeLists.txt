@@ -58,6 +58,7 @@ endif()
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 endif()
 add_definitions(${GL_DEFINITIONS})
 

@@ -73,7 +73,14 @@ bool parallel_v3_v3(float *v1, float *v2) {
 bool parallel_v3u_v3u(float *v1, float *v2) {
 	//return fabs(fabs(dot_v3v3(v1,v2)) - 1) < DIM_CONSTRAINT_PRECISION;
 	float d = dot_v3v3(v1,v2);
-	return ((-DIM_CONSTRAINT_PRECISION < d*d) && (d*d < DIM_CONSTRAINT_PRECISION));
+	d = (d*d-1);
+	return ((-DIM_CONSTRAINT_PRECISION < d) && (d < DIM_CONSTRAINT_PRECISION));
+}
+
+bool parallel_v3u_v3u_strict(float *v1, float *v2) {
+	//return fabs(fabs(dot_v3v3(v1,v2)) - 1) < DIM_CONSTRAINT_PRECISION;
+	float d = dot_v3v3(v1,v2);
+	return (d*d-1) == 0;
 }
 
 bool perpendicular_v3_v3(float *v1, float *v2) {
@@ -91,6 +98,14 @@ bool point_on_axis (float *c, float*a, float *p) {
 	sub_v3_v3v3(v2,p,c);
 	normalize_v3(v2);
 	return parallel_v3u_v3u(a,v2);
+}
+
+
+bool point_on_axis_strict (float *c, float*a, float *p) {
+	float v2[3];
+	sub_v3_v3v3(v2,p,c);
+	normalize_v3(v2);
+	return parallel_v3u_v3u_strict(a,v2);
 }
 
 

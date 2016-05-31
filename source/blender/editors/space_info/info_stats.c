@@ -68,6 +68,9 @@ typedef struct SceneStats {
 	int totbone, totbonesel;
 	int totobj,  totobjsel;
 	int totlamp, totlampsel; 
+	// WITH_MECHANICAL_GEOMETRY
+	int totgeom, totgeomsel;
+
 	int tottri;
 
 	char infostr[MAX_INFO_LEN];
@@ -81,6 +84,8 @@ typedef struct SceneStatsFmt {
 	char totbone[MAX_INFO_NUM_LEN], totbonesel[MAX_INFO_NUM_LEN];
 	char totobj[MAX_INFO_NUM_LEN], totobjsel[MAX_INFO_NUM_LEN];
 	char totlamp[MAX_INFO_NUM_LEN], totlampsel[MAX_INFO_NUM_LEN];
+	// WITH_MECHANICAL_GEOMETRY
+	char totgeom[MAX_INFO_NUM_LEN], totgeomsel[MAX_INFO_NUM_LEN];
 	char tottri[MAX_INFO_NUM_LEN];
 } SceneStatsFmt;
 
@@ -157,6 +162,11 @@ static void stats_object_edit(Object *obedit, SceneStats *stats)
 		
 		stats->totface = em->bm->totface;
 		stats->totfacesel = em->bm->totfacesel;
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+		stats->totgeom = em->bm->totgeom;
+		stats->totgeomsel = em->bm->totgeomsel;
+#endif
 
 		stats->tottri = em->tottri;
 	}
@@ -415,6 +425,10 @@ static void stats_string(Scene *scene)
 
 	SCENE_STATS_FMT_INT(tottri);
 
+// WITH_MECHANICAL_GEOMETRY
+	SCENE_STATS_FMT_INT(totgeom);
+	SCENE_STATS_FMT_INT(totgeomsel);
+
 #undef SCENE_STATS_FMT_INT
 
 
@@ -450,10 +464,19 @@ static void stats_string(Scene *scene)
 			ofs += BLI_strncpy_rlen(s + ofs, IFACE_("(Key) "), MAX_INFO_LEN - ofs);
 
 		if (scene->obedit->type == OB_MESH) {
+#ifdef WITH_MECHANICAL_GEOMETRY
+			ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs,
+			                    IFACE_("Verts:%s/%s | Edges:%s/%s | Faces:%s/%s | Geom:%s/%s Tris:%s"),
+			                    stats_fmt.totvertsel, stats_fmt.totvert, stats_fmt.totedgesel, stats_fmt.totedge,
+			                    stats_fmt.totfacesel, stats_fmt.totface,
+			                    stats_fmt.totgeomsel, stats_fmt.totgeom,
+			                    stats_fmt.tottri);
+#else
 			ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs,
 			                    IFACE_("Verts:%s/%s | Edges:%s/%s | Faces:%s/%s | Tris:%s"),
 			                    stats_fmt.totvertsel, stats_fmt.totvert, stats_fmt.totedgesel, stats_fmt.totedge,
 			                    stats_fmt.totfacesel, stats_fmt.totface, stats_fmt.tottri);
+#endif
 		}
 		else if (scene->obedit->type == OB_ARMATURE) {
 			ofs += BLI_snprintf(s + ofs, MAX_INFO_LEN - ofs, IFACE_("Verts:%s/%s | Bones:%s/%s"), stats_fmt.totvertsel,

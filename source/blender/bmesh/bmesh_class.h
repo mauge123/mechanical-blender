@@ -371,6 +371,7 @@ typedef struct BMesh {
 
 // WITH_MECHANICAL_GEOMETRY
 	int totgeom;
+	int totgeomsel;
 	struct BLI_mempool *gpool;
 //
 
