@@ -80,6 +80,14 @@ static bool mechanical_check_edge_line (BMEditMesh *em, BMEdge *e) {
 				if (prev_fno && parallel_v3u_v3u(efa->no,prev_fno)) {
 					break;
 				}
+				if (prev_fno) {
+					float d = dot_v3v3(efa->no, prev_fno);
+					d *= d;
+					if (d > 0.9f) {
+						// Consider tangent faces
+						break;
+					}
+				}
 				prev_fno = efa->no;
 			}
 		}
@@ -134,9 +142,11 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
 				continue;
 			}
 			if (e->v1 == current) {
+				BM_elem_flag_enable(e, BM_ELEM_TAG);
 				current = e->v2;
 				break;
 			} else if (e->v2 == current) {
+				BM_elem_flag_enable(e, BM_ELEM_TAG);
 				current = e->v1;
 				break;
 			}
@@ -144,7 +154,6 @@ static BMVert* mechanical_follow_edge_loop(BMEditMesh *em, BMEdge *e1, BMEdge *e
 		if (current != first) {
 			if (e && mechanical_follow_edge_loop_test_func (em, e, v1,v2,current,data)) {
 				r_voutput[(*r_vcount)++] = current;
-				BM_elem_flag_enable(e, BM_ELEM_TAG);
 			} else {
 				current = NULL;
 			}
@@ -304,35 +313,73 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 	MEM_freeN(&(*verts));
 }
 
-static bool mechanical_check_circle(BMEditMesh *UNUSED(em), BMElemGeom *egm)
-{
-	BMVert *v1 = egm->v[0];
-	BMVert *v2 = egm->v[1];
-	BMVert *current = egm->v[2];
+// Does not consider added data expand the geometry , eg lines
+static bool mechanical_test_circle(BMVert *v1, BMVert *v2, BMVert *v3, void *data) {
+	float *center = data;
 	float n_center[3];
-	int i;
 
-	BM_elem_flag_enable(v1, BM_ELEM_TAG);
-	BM_elem_flag_enable(v2, BM_ELEM_TAG);
+	return (center_of_3_points(n_center, v1->co, v2->co, v3->co) &&
+	len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION);
+}
 
-	for (i=2;current && i<egm->totverts;i++) {
-		if (center_of_3_points(n_center, v1->co, v2->co, current->co) &&
-			len_v3v3(n_center, egm->center) < DIM_GEOMETRY_PRECISION &&
-		    angle_v3v3v3 (egm->v[i]->co,egm->center,egm->v[i-1]->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC)
-		{
-			BM_elem_flag_enable(current, BM_ELEM_TAG);
-			current++;
-		} else {
-			current = NULL;
+static bool mechanical_test_line(BMVert *v1, BMVert *UNUSED(v2), BMVert *v3, void *data) {
+	float *dir = data;
+	return point_on_axis(v1->co,dir,v3->co);
+
+}
+
+static bool mechanical_check_geometry(BMEditMesh *em, BMElemGeom *egm, bool (*mechanical_geometry_func) (
+                                          BMVert*, BMVert*, BMVert*, void *), void *data)
+{
+	if (egm->totverts > 2) {
+		BMVert *v1 = egm->v[0];
+		BMVert *v2 = egm->v[1];
+		BMVert *current = egm->v[2];
+		int i;
+
+		BM_elem_flag_enable(v1, BM_ELEM_TAG);
+		BM_elem_flag_enable(v2, BM_ELEM_TAG);
+
+		for (i=2;current && i<egm->totverts;i++) {
+			if (mechanical_geometry_func(v1, v2, current, data))
+			{
+				BM_elem_flag_enable(current, BM_ELEM_TAG);
+				current++;
+			} else {
+				current = NULL;
+			}
 		}
-	}
-	if (current == NULL) {
-		//reset
-		for (i=i-1;i>=0;i--) {
-			BM_elem_flag_disable(egm->v[i], BM_ELEM_TAG);
+		if (current) {
+			// check for edge expanding the new geometry
+			BMEdge *e;
+			BMIter iter;
+			BM_ITER_MESH (e, &iter, em->bm, BM_EDGES_OF_MESH) {
+				if (BM_elem_flag_test (e, BM_ELEM_TAG)) {
+					continue;
+				}
+				if (e->v1 == egm->v[0] || e->v1 == egm->v[egm->totverts-1]) {
+					if (mechanical_geometry_func(v1, v2, e->v1, data)) {
+						current =NULL;
+					}
+				} else if (e->v2 == egm->v[0] || e->v2 == egm->v[egm->totverts-1]) {
+					if (mechanical_geometry_func(v1, v2, e->v2, data)) {
+						current =NULL;
+					}
+				}
+			}
 		}
+		if (current == NULL) {
+			//reset
+			for (i=i-1;i>=0;i--) {
+				BM_elem_flag_disable(egm->v[i], BM_ELEM_TAG);
+			}
+		}
+
+		return (current != NULL);
+
+	} else {
+		return false;
 	}
-	return (current != NULL);
 }
 
 static void mechanical_check_mesh_geometry(BMEditMesh *em)
@@ -346,7 +393,10 @@ static void mechanical_check_mesh_geometry(BMEditMesh *em)
 		switch (egm->geometry_type) {
 			case BM_GEOMETRY_TYPE_CIRCLE:
 			case BM_GEOMETRY_TYPE_ARC:
-				valid = mechanical_check_circle(em, egm);
+				valid = mechanical_check_geometry(em, egm, mechanical_test_circle, egm->center);
+				break;
+			case BM_GEOMETRY_TYPE_LINE:
+				valid = mechanical_check_geometry(em, egm, mechanical_test_line, egm->axis);
 				break;
 		}
 		if (valid) {
@@ -360,8 +410,6 @@ static void mechanical_check_mesh_geometry(BMEditMesh *em)
 	}
 
 }
-
-
 
 void mechanical_update_mesh_geometry(BMEditMesh *em)
 {
