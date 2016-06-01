@@ -2885,7 +2885,9 @@ int transformEnd(bContext *C, TransInfo *t)
 		 * This may should be perfomed on event processing, but disabled there on G.moving to
 		 * avoid compute on not finished operation
 		 */
-		mechanical_update_mesh_geometry(BKE_editmesh_from_object(t->obedit));
+		if (t->obedit) {
+			mechanical_update_mesh_geometry(BKE_editmesh_from_object(t->obedit));
+		}
 #endif
 		/* aftertrans does insert keyframes, and clears base flags; doesn't read transdata */
 		special_aftertrans_update(C, t);
