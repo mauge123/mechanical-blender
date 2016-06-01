@@ -255,6 +255,33 @@ void BM_mesh_select_mode_flush_ex(BMesh *bm, const short selectmode)
 	BMIter eiter;
 	BMIter fiter;
 
+#ifdef	WITH_MECHANICAL_GEOMETRY
+	if (selectmode == SCE_SELECT_GEOMETRY) {
+		BMElemGeom *egm;
+		BMIter giter;
+		// Disabled first,  as a vertex can be shared for diferent geom elements
+		BM_ITER_MESH (egm, &giter, bm, BM_GEOMETRY_OF_MESH) {
+			if (!BM_elem_flag_test(egm, BM_ELEM_SELECT)) {
+				for (int i=0; i<egm->totedges;i++) {
+					BM_elem_flag_set(egm->e[i], BM_ELEM_SELECT, false);
+				}for (int i=0; i<egm->totverts;i++) {
+					BM_elem_flag_set(egm->v[i], BM_ELEM_SELECT, false);
+				}
+			}
+		}
+		BM_ITER_MESH (egm, &giter, bm, BM_GEOMETRY_OF_MESH) {
+			if (BM_elem_flag_test(egm, BM_ELEM_SELECT)) {
+				for (int i=0; i<egm->totedges;i++) {
+					BM_elem_flag_set(egm->e[i], BM_ELEM_SELECT, true);
+				}for (int i=0; i<egm->totverts;i++) {
+					BM_elem_flag_set(egm->v[i], BM_ELEM_SELECT, true);
+				}
+			}
+		}
+	}
+#endif
+
+
 	if (selectmode & SCE_SELECT_VERTEX) {
 		/* both loops only set edge/face flags and read off verts */
 #pragma omp parallel sections if (bm->totedge + bm->totface >= BM_OMP_LIMIT)
@@ -315,20 +342,6 @@ void BM_mesh_select_mode_flush_ex(BMesh *bm, const short selectmode)
 			BM_elem_flag_set(f, BM_ELEM_SELECT, ok);
 		}
 	}
-
-#ifdef WITH_MECHANICAL_GEOMETRY
-	if (selectmode & SCE_SELECT_GEOMETRY) {
-		BMElemGeom *egm;
-		BMIter giter;
-		bool ok = true;
-		BM_ITER_MESH (egm, &giter, bm, BM_GEOMETRY_OF_MESH) {
-			ok = BM_elem_flag_test(egm, BM_ELEM_SELECT);
-			for (int i=0; i<egm->totedges;i++) {
-				BM_elem_flag_set(egm->e[i], BM_ELEM_SELECT, ok);
-			}
-		}
-	}
-#endif
 
 	/* Remove any deselected elements from the BMEditSelection */
 	BM_select_history_validate(bm);

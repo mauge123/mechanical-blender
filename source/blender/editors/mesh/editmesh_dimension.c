@@ -55,7 +55,14 @@
 
 #include "mesh_dimensions.h"
 
-static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, wmOperator *op) {
+static int mechanical_add_dimension_from_geometry (int dim_type, BMEditMesh *em, wmOperator *op)
+{
+	// TODO
+	return true;
+}
+
+static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, wmOperator *op)
+{
 
 	BMOperator bmop;
 	char op_str [255] = {0};
@@ -78,8 +85,6 @@ static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, 
 	return true;
 }
 
-
-
 static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 {
 	int ret = OPERATOR_FINISHED;
@@ -89,6 +94,11 @@ static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 
 	int dim_type = RNA_enum_get(op->ptr, "dim_type");
 
+	if (em->bm->totgeomsel > 0) {
+		if (!mechanical_add_dimension_from_geometry(dim_type, em, op)) {
+			ret = OPERATOR_CANCELLED;
+		}
+	}
 
 	if (em->bm->totvertsel >= get_necessary_dimension_verts(dim_type)) {
 		if (!mechanical_add_dimension_from_vertexs(dim_type, em, op)) {
