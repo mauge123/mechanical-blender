@@ -483,7 +483,8 @@ void EDBM_flag_disable_all(BMEditMesh *em, const char hflag)
 {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_mesh_elem_hflag_disable_all(em->bm, BM_REFERENCE | BM_DIM | BM_VERT | BM_EDGE | BM_FACE, hflag, false);
+// WITH_MECHANICAL_MESH_GEOMETRY
+	BM_mesh_elem_hflag_disable_all(em->bm, BM_REFERENCE | BM_DIM | BM_VERT | BM_EDGE | BM_FACE | BM_GEOMETRY, hflag, false);
 /*
 	BM_mesh_elem_hflag_disable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, hflag, false);
 */
@@ -493,7 +494,8 @@ void EDBM_flag_enable_all(BMEditMesh *em, const char hflag)
 {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_mesh_elem_hflag_enable_all(em->bm, BM_REFERENCE | BM_DIM | BM_VERT | BM_EDGE | BM_FACE, hflag, true);
+// WITH_MECHANICAL_MESH_GEOMETRY
+	BM_mesh_elem_hflag_enable_all(em->bm, BM_REFERENCE | BM_DIM | BM_VERT | BM_EDGE | BM_FACE | BM_GEOMETRY, hflag, true);
 /*
 	BM_mesh_elem_hflag_enable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, hflag, true);
 */

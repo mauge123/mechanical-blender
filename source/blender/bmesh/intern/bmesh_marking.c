@@ -1226,14 +1226,16 @@ void BM_mesh_elem_hflag_disable_test(
 {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	const char iter_types[5] = {
+// WITH_MECHANICAL_GEOMETRY
+	const char iter_types[6] = {
 									BM_REFERENCES_OF_MESH,
 									BM_DIMS_OF_MESH,
 									BM_VERTS_OF_MESH,
 									BM_EDGES_OF_MESH,
-									BM_FACES_OF_MESH};
+									BM_FACES_OF_MESH,
+									BM_GEOMETRY_OF_MESH};
 
-	const char flag_types[5] = {BM_REFERENCE, BM_DIM, BM_VERT, BM_EDGE, BM_FACE};
+	const char flag_types[6] = {BM_REFERENCE, BM_DIM, BM_VERT, BM_EDGE, BM_FACE, BM_GEOMETRY};
 /*
 	const char iter_types[3] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
@@ -1272,7 +1274,8 @@ void BM_mesh_elem_hflag_disable_test(
 
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-		for (i = 0; i < 5; i++) {
+// WITH_MECHANICAL_GEOMETRY
+		for (i = 0; i < 6; i++) {
 /*
 		for (i = 0; i < 3; i++) {
 */
@@ -1290,7 +1293,8 @@ void BM_mesh_elem_hflag_disable_test(
 	else {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-		for (i = 0; i < 5; i++) {
+// WITH_MECHANICAL_GEOMETRY
+		for (i = 0; i < 6; i++) {
 /*
 		for (i = 0; i < 3; i++) {
 */
@@ -1329,14 +1333,16 @@ void BM_mesh_elem_hflag_enable_test(
 {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	const char iter_types[5] = {
+// WITH_MECHANICAL_GEOMETRY
+	const char iter_types[6] = {
 								BM_DIMS_OF_MESH,
 								BM_REFERENCES_OF_MESH,
 								BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
-	                            BM_FACES_OF_MESH};
+	                            BM_FACES_OF_MESH,
+								BM_GEOMETRY_OF_MESH};
 
-	const char flag_types[5] = {BM_DIM, BM_REFERENCE, BM_VERT, BM_EDGE, BM_FACE};
+	const char flag_types[6] = {BM_DIM, BM_REFERENCE, BM_VERT, BM_EDGE, BM_FACE, BM_GEOMETRY};
 /*
 	const char iter_types[4] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
@@ -1364,11 +1370,13 @@ void BM_mesh_elem_hflag_enable_test(
 	 * because hidden geometry and different selection modes can give different results,
 	 * we could of course check for no hidden faces and then use quicker method but its not worth it. */
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	for (i = 0; i < 5; i++) {
-#else
+// WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+// WITH_MECHANICAL_GEOMETRY
+	for (i = 0; i < 6; i++) {
+/*
 	for (i = 0; i < 3; i++) {
-#endif
+*/
 		if (htype & flag_types[i]) {
 			ele = BM_iter_new(&iter, bm, iter_types[i], NULL);
 			for ( ; ele; ele = BM_iter_step(&iter)) {
