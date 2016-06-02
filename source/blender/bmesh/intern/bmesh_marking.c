@@ -54,7 +54,7 @@ static void recount_totsels(BMesh *bm)
 								BM_DIMS_OF_MESH,
 								BM_REFERENCES_OF_MESH,
 	                            BM_GEOMETRY_OF_MESH};
-	int *tots[5];
+	int *tots[6];
 /*
 	const char iter_types[3] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
