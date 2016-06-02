@@ -87,12 +87,12 @@ typedef struct Vdata {
 } Vdata;
 
 
-static inline unsigned int next(unsigned int i, unsigned int n)
+static __inline unsigned int next(unsigned int i, unsigned int n)
 {
 	return (i + 1) % n;
 }
 
-static inline unsigned int prev(unsigned int i, unsigned int n)
+static __inline unsigned int prev(unsigned int i, unsigned int n)
 {
 	return (i + n - 1) % n;
 }
@@ -291,7 +291,7 @@ static float isect_inset_rays(
  * Since these are 3D coords, we'll count an intersection as the point of closest approach.
  * Allow for the possibility of no intersection (possible for an 'outset') by returning INFINITE_THICKNESS in that case.
  * If there is an event, return the coordinates of the intersection point in r_isect */
-static inline float edge_event_time(
+static __inline float edge_event_time(
 	const float (*coords)[3],
 	const unsigned int coords_tot,
 	const Vdata *vdata,
