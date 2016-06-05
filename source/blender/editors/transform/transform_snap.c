@@ -1379,6 +1379,31 @@ bool snapCursor(TransInfo *t,  const float mval[2], float *r_dist_p, float r_loc
 }
 #endif
 
+#ifdef WITH_MECHANICAL
+bool snapObjectsTransform(
+        TransInfo *t, const float mval[2],
+        float *dist_px,
+        float r_loc[3], float r_no[3])
+{
+
+	struct SnapObjectParams params;
+
+	if (t->state == TRANS_BASE_POINT || t->state == TRANS_SELECT_CENTER) {
+		params.snap_select = SNAP_SELF;
+	} else {
+		params.snap_select = ((t->options & CTX_GPENCIL_STROKES) != 0) ? SNAP_NOT_ACTIVE : t->tsnap.modeSelect;
+	}
+	params.use_object_edit_cage = (t->flag & T_EDIT) != 0;
+
+
+	return ED_transform_snap_object_project_view3d_ex(
+	        t->tsnap.object_context,
+	        t->scene->toolsettings->snap_mode,
+	        &params,
+	        mval, dist_px, NULL,
+	        r_loc, r_no, NULL);
+}
+#else
 bool snapObjectsTransform(
         TransInfo *t, const float mval[2],
         float *dist_px,
@@ -1394,6 +1419,7 @@ bool snapObjectsTransform(
 	        mval, dist_px, NULL,
 	        r_loc, r_no, NULL);
 }
+#endif
 
 
 /******************** PEELING *********************************/

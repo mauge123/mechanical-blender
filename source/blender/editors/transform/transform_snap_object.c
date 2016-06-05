@@ -961,6 +961,16 @@ static bool snapDerivedMesh(
 	return retval;
 }
 
+#ifdef WITH_MECHANICAL
+static bool snapEditMesh(
+        SnapObjectContext *sctx,
+        Object *ob, BMEditMesh *em, float obmat[4][4],
+        const float mval[2], float *dist_px, const short snap_to,
+        const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
+        float *ray_depth, const unsigned int ob_index,
+        float r_loc[3], float r_no[3], int *r_index,
+        ListBase *r_hit_list, SnapSelect snap_select)
+#else
 static bool snapEditMesh(
         SnapObjectContext *sctx,
         Object *ob, BMEditMesh *em, float obmat[4][4],
@@ -969,6 +979,7 @@ static bool snapEditMesh(
         float *ray_depth, const unsigned int ob_index,
         float r_loc[3], float r_no[3], int *r_index,
         ListBase *r_hit_list)
+#endif
 {
 	ARegion *ar = sctx->v3d_data.ar;
 	bool retval = false;
@@ -1091,7 +1102,11 @@ static bool snapEditMesh(
 				{
 					BLI_bitmap *verts_mask = NULL;
 					int verts_num_active = -1;
+#ifdef WITH_MECHANICAL
+					if (snap_select != SNAP_SELF &&  sctx->callbacks.edit_mesh.test_vert_fn) {
+#else
 					if (sctx->callbacks.edit_mesh.test_vert_fn) {
+#endif
 						verts_mask = BLI_BITMAP_NEW(em->bm->totvert, __func__);
 						verts_num_active = BM_iter_mesh_bitmap_from_filter(
 						        BM_VERTS_OF_MESH, em->bm, verts_mask,
@@ -1228,10 +1243,16 @@ static bool snapEditMesh(
 				for (int i = 0; i < totedge; i++) {
 					BMEdge *eed = BM_edge_at_index(em->bm, i);
 
-					if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN) ||
-						BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) ||
-					    BM_elem_flag_test(eed->v2, BM_ELEM_SELECT)) {
-
+#ifdef WITH_MECHANICAL
+					if (!BM_elem_flag_test(eed, BM_ELEM_HIDDEN) &&
+					    (snap_select == SNAP_SELF || !BM_elem_flag_test(eed->v1, BM_ELEM_SELECT)) &&
+					    (snap_select == SNAP_SELF || !BM_elem_flag_test(eed->v2, BM_ELEM_SELECT)))
+#else
+					if (!BM_elem_flag_test(eed, BM_ELEM_HIDDEN) &&
+					    !BM_elem_flag_test(eed->v1, BM_ELEM_SELECT) &&
+					    !BM_elem_flag_test(eed->v2, BM_ELEM_SELECT))
+#endif
+					{
 						short v1no[3], v2no[3];
 						normal_float_to_short_v3(v1no, eed->v1->no);
 						normal_float_to_short_v3(v2no, eed->v2->no);
@@ -1257,7 +1278,18 @@ static bool snapEditMesh(
 	return retval;
 }
 
-
+#ifdef WITH_MECHANICAL
+static bool snapObject(
+        SnapObjectContext *sctx,
+        Object *ob, float obmat[4][4], bool use_obedit, const short snap_to,
+        const float mval[2], float *dist_px, const unsigned int ob_index,
+        const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
+        float *ray_depth,
+        /* return args */
+        float r_loc[3], float r_no[3], int *r_index,
+        Object **r_ob, float r_obmat[4][4],
+        ListBase *r_hit_list, SnapSelect snap_select)
+#else
 static bool snapObject(
         SnapObjectContext *sctx,
         Object *ob, float obmat[4][4], bool use_obedit, const short snap_to,
@@ -1268,6 +1300,7 @@ static bool snapObject(
         float r_loc[3], float r_no[3], int *r_index,
         Object **r_ob, float r_obmat[4][4],
         ListBase *r_hit_list)
+#endif
 {
 	ARegion *ar = sctx->v3d_data.ar;
 	bool retval = false;
@@ -1277,12 +1310,22 @@ static bool snapObject(
 
 		if (use_obedit) {
 			em = BKE_editmesh_from_object(ob);
+#ifdef WITH_MECHANICAL
+			retval = snapEditMesh(
+			        sctx, ob, em, obmat, mval, dist_px, snap_to,
+			        ray_start, ray_normal, ray_origin,
+			        ray_depth, ob_index,
+			        r_loc, r_no, r_index,
+			        r_hit_list, snap_select);
+#else
 			retval = snapEditMesh(
 			        sctx, ob, em, obmat, mval, dist_px, snap_to,
 			        ray_start, ray_normal, ray_origin,
 			        ray_depth, ob_index,
 			        r_loc, r_no, r_index,
 			        r_hit_list);
+
+#endif
 		}
 		else {
 			/* in this case we want the mesh from the editmesh, avoids stale data. see: T45978.
@@ -1363,16 +1406,27 @@ static bool snapObjectsRay(
 	if (base_act && base_act->object && base_act->object->mode & OB_MODE_PARTICLE_EDIT) {
 		Object *ob = base_act->object;
 
+#ifdef WITH_MECHANICAL
 		retval |= snapObject(
-		        sctx, ob, ob->obmat, true, snap_to,
+		        sctx, ob, ob->obmat, false, snap_to,
+		        mval, dist_px, ob_index++,
+		        ray_start, ray_normal, ray_origin, ray_depth,
+		        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select);
+#else
+		retval |= snapObject(
+		        sctx, ob, ob->obmat, false, snap_to,
 		        mval, dist_px, ob_index++,
 		        ray_start, ray_normal, ray_origin, ray_depth,
 		        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list);
+#endif
 	}
 
 	bool ignore_object_selected = false, ignore_object_active = false;
 	switch (snap_select) {
 		case SNAP_ALL:
+#ifdef WITH_MECHANICAL
+		case SNAP_SELF:
+#endif
 			break;
 		case SNAP_NOT_SELECTED:
 			ignore_object_selected = true;
@@ -1398,11 +1452,20 @@ static bool snapObjectsRay(
 					bool use_obedit_dupli = (obedit && dupli_ob->ob->data == obedit->data);
 					Object *dupli_snap = (use_obedit_dupli) ? obedit : dupli_ob->ob;
 
+#ifdef WITH_MECHANICAL
+					retval |= snapObject(
+					        sctx, dupli_snap, dupli_ob->mat, use_obedit_dupli, snap_to,
+					        mval, dist_px, ob_index++,
+					        ray_start, ray_normal, ray_origin, ray_depth,
+					        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select);
+#else
 					retval |= snapObject(
 					        sctx, dupli_snap, dupli_ob->mat, use_obedit_dupli, snap_to,
 					        mval, dist_px, ob_index++,
 					        ray_start, ray_normal, ray_origin, ray_depth,
 					        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list);
+#endif
+
 				}
 
 				free_object_duplilist(lb);
@@ -1411,11 +1474,19 @@ static bool snapObjectsRay(
 			bool use_obedit = (obedit != NULL) && (ob->data == obedit->data);
 			Object *ob_snap = use_obedit ? obedit : ob;
 
+#ifdef WITH_MECHANICAL
+			retval |= snapObject(
+			        sctx, ob_snap, ob->obmat, use_obedit, snap_to,
+			        mval, dist_px, ob_index++,
+			        ray_start, ray_normal, ray_origin, ray_depth,
+			        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select);
+#else
 			retval |= snapObject(
 			        sctx, ob_snap, ob->obmat, use_obedit, snap_to,
 			        mval, dist_px, ob_index++,
 			        ray_start, ray_normal, ray_origin, ray_depth,
 			        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list);
+#endif
 		}
 	}
 

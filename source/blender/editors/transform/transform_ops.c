@@ -452,7 +452,8 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 	}
 
 	if (t->state == TRANS_RUNNING) {
-		set_trans_object_base_flags(t);
+		// sets flags to that conflicts on edge snap  BA_HAS_RECALC_OB
+		// set_trans_object_base_flags(t);
 	}
 
 	mval[0] = (float) t->mval[0];

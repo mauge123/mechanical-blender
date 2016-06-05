@@ -166,6 +166,9 @@ typedef enum SnapSelect {
 	SNAP_ALL = 0,
 	SNAP_NOT_SELECTED = 1,
 	SNAP_NOT_ACTIVE = 2,
+#ifdef WITH_MECHANICAL
+	SNAP_SELF = 3,
+#endif
 } SnapSelect;
 
 #define SNAP_MIN_DISTANCE 30
