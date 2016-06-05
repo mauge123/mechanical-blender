@@ -218,6 +218,42 @@ void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 	vout = (mat * vec4(vin, 1.0)).xyz;
 }
 
+void point_texco_remap_square(vec3 vin, out vec3 vout)
+{
+	vout = vec3(vin - vec3(0.5, 0.5, 0.5)) * 2.0;
+}
+
+void point_map_to_sphere(vec3 vin, out vec3 vout)
+{
+	float len = length(vin);
+	float v, u;
+	if (len > 0.0) {
+		if (vin.x == 0.0 && vin.y == 0.0)
+			u = 0.0;
+		else
+			u = (1.0 - atan(vin.x, vin.y) / M_PI) / 2.0;
+
+		v = 1.0 - acos(vin.z / len) / M_PI;
+	}
+	else
+		v = u = 0.0;
+
+	vout = vec3(u, v, 0.0);
+}
+
+void point_map_to_tube(vec3 vin, out vec3 vout)
+{
+	float u, v;
+	v = (vin.z + 1.0) * 0.5;
+	float len = sqrt(vin.x * vin.x + vin.y * vin[1]);
+	if (len > 0.0)
+		u = (1.0 - (atan(vin.x / len, vin.y / len) / M_PI)) * 0.5;
+	else
+		v = u = 0.0;
+
+	vout = vec3(u, v, 0.0);
+}
+
 void mapping(vec3 vec, mat4 mat, vec3 minvec, vec3 maxvec, float domin, float domax, out vec3 outvec)
 {
 	outvec = (mat * vec4(vec, 1.0)).xyz;
@@ -2363,6 +2399,17 @@ void generated_from_orco(vec3 orco, out vec3 generated)
 	generated = orco * 0.5 + vec3(0.5);
 }
 
+int floor_to_int(float x)
+{
+	return int(floor(x));
+}
+
+int quick_floor(float x)
+{
+	return int(x) - ((x < 0) ? 1 : 0);
+}
+
+#ifdef BIT_OPERATIONS
 float integer_noise(int n)
 {
 	int nn;
@@ -2372,12 +2419,6 @@ float integer_noise(int n)
 	return 0.5 * (float(nn) / 1073741824.0);
 }
 
-int floor_to_int(float x)
-{
-	return int(floor(x));
-}
-
-#ifdef BIT_OPERATIONS
 uint hash(uint kx, uint ky, uint kz)
 {
 #define rot(x, k) (((x) << (k)) | ((x) >> (32 - (k))))
@@ -2418,9 +2459,9 @@ float bits_to_01(uint bits)
 
 float cellnoise(vec3 p)
 {
-	int ix = floor_to_int(p.x);
-	int iy = floor_to_int(p.y);
-	int iz = floor_to_int(p.z);
+	int ix = quick_floor(p.x);
+	int iy = quick_floor(p.y);
+	int iz = quick_floor(p.z);
 
 	return bits_to_01(hash(uint(ix), uint(iy), uint(iz)));
 }
@@ -2627,9 +2668,6 @@ void node_gamma(vec4 col, float gamma, out vec4 outcol)
 
 void node_attribute(vec3 attr, out vec4 outcol, out vec3 outvec, out float outf)
 {
-	/* TODO(sergey): This needs linearization for vertex color.
-	 * But how to detect cases when input is linear and when it's srgb?
-	 */
 	outcol = vec4(attr, 1.0);
 	outvec = attr;
 	outf = (attr.x + attr.y + attr.z) / 3.0;
@@ -2763,16 +2801,17 @@ void node_tex_checker(vec3 co, vec4 color1, vec4 color2, float scale, out vec4 c
 	p.y = (p.y + 0.000001) * 0.999999;
 	p.z = (p.z + 0.000001) * 0.999999;
 
-	int xi = abs(int(floor(p.x)));
-	int yi = abs(int(floor(p.y)));
-	int zi = abs(int(floor(p.z)));
+	int xi = int(abs(floor(p.x)));
+	int yi = int(abs(floor(p.y)));
+	int zi = int(abs(floor(p.z)));
 
-	bool check = ((xi % 2 == yi % 2) == bool(zi % 2));
+	bool check = ((mod(xi, 2) == mod(yi, 2)) == bool(mod(zi, 2)));
 
 	color = check ? color1 : color2;
 	fac = check ? 1.0 : 0.0;
 }
 
+#ifdef BIT_OPERATIONS
 vec2 calc_brick_texture(vec3 p, float mortar_size, float bias,
                         float brick_width, float row_height,
                         float offset_amount, int offset_frequency,
@@ -2799,6 +2838,7 @@ vec2 calc_brick_texture(vec3 p, float mortar_size, float bias,
 	             x > (brick_width - mortar_size) ||
 	             y > (row_height - mortar_size)) ? 1.0 : 0.0);
 }
+#endif
 
 void node_tex_brick(vec3 co,
                     vec4 color1, vec4 color2,
@@ -2809,6 +2849,7 @@ void node_tex_brick(vec3 co,
                     float squash_amount, float squash_frequency,
                     out vec4 color, out float fac)
 {
+#ifdef BIT_OPERATIONS
 	vec2 f2 = calc_brick_texture(co * scale,
 	                             mortar_size, bias,
 	                             brick_width, row_height,
@@ -2822,6 +2863,10 @@ void node_tex_brick(vec3 co,
 	}
 	color = (f == 1.0) ? mortar : color1;
 	fac = f;
+#else
+	color = vec4(1.0);
+	fac = 1.0;
+#endif
 }
 
 void node_tex_clouds(vec3 co, float size, out vec4 color, out float fac)
@@ -2863,6 +2908,82 @@ void node_tex_environment_empty(vec3 co, out vec4 color)
 void node_tex_image(vec3 co, sampler2D ima, out vec4 color, out float alpha)
 {
 	color = texture2D(ima, co.xy);
+	alpha = color.a;
+}
+
+void node_tex_image_box(vec3 texco,
+                        vec3 nob,
+                        sampler2D ima,
+                        float blend,
+                        out vec4 color,
+                        out float alpha)
+{
+	/* project from direction vector to barycentric coordinates in triangles */
+	nob = vec3(abs(nob.x), abs(nob.y), abs(nob.z));
+	nob /= (nob.x + nob.y + nob.z);
+
+	/* basic idea is to think of this as a triangle, each corner representing
+	 * one of the 3 faces of the cube. in the corners we have single textures,
+	 * in between we blend between two textures, and in the middle we a blend
+	 * between three textures.
+	 *
+	 * the Nxyz values are the barycentric coordinates in an equilateral
+	 * triangle, which in case of blending, in the middle has a smaller
+	 * equilateral triangle where 3 textures blend. this divides things into
+	 * 7 zones, with an if () test for each zone */
+
+	vec3 weight = vec3(0.0, 0.0, 0.0);
+	float limit = 0.5 * (1.0 + blend);
+
+	/* first test for corners with single texture */
+	if (nob.x > limit * (nob.x + nob.y) && nob.x > limit * (nob.x + nob.z)) {
+		weight.x = 1.0;
+	}
+	else if (nob.y > limit * (nob.x + nob.y) && nob.y > limit * (nob.y + nob.z)) {
+		weight.y = 1.0;
+	}
+	else if (nob.z > limit * (nob.x + nob.z) && nob.z > limit * (nob.y + nob.z)) {
+		weight.z = 1.0;
+	}
+	else if (blend > 0.0) {
+		/* in case of blending, test for mixes between two textures */
+		if (nob.z < (1.0 - limit) * (nob.y + nob.x)) {
+			weight.x = nob.x / (nob.x + nob.y);
+			weight.x = clamp((weight.x - 0.5 * (1.0 - blend)) / blend, 0.0, 1.0);
+			weight.y = 1.0 - weight.x;
+		}
+		else if (nob.x < (1.0 - limit) * (nob.y + nob.z)) {
+			weight.y = nob.y / (nob.y + nob.z);
+			weight.y = clamp((weight.y - 0.5 * (1.0 - blend)) / blend, 0.0, 1.0);
+			weight.z = 1.0 - weight.y;
+		}
+		else if (nob.y < (1.0 - limit) * (nob.x + nob.z)) {
+			weight.x = nob.x / (nob.x + nob.z);
+			weight.x = clamp((weight.x - 0.5 * (1.0 - blend)) / blend, 0.0, 1.0);
+			weight.z = 1.0 - weight.x;
+		}
+		else {
+			/* last case, we have a mix between three */
+			weight.x = ((2.0 - limit) * nob.x + (limit - 1.0)) / (2.0 * limit - 1.0);
+			weight.y = ((2.0 - limit) * nob.y + (limit - 1.0)) / (2.0 * limit - 1.0);
+			weight.z = ((2.0 - limit) * nob.z + (limit - 1.0)) / (2.0 * limit - 1.0);
+		}
+	}
+	else {
+		/* Desperate mode, no valid choice anyway, fallback to one side.*/
+		weight.x = 1.0;
+	}
+	color = vec4(0);
+	if (weight.x > 0.0) {
+		color += weight.x * texture2D(ima, texco.yz);
+	}
+	if (weight.y > 0.0) {
+		color += weight.y * texture2D(ima, texco.xz);
+	}
+	if (weight.z > 0.0) {
+		color += weight.z * texture2D(ima, texco.yx);
+	}
+
 	alpha = color.a;
 }
 
@@ -2929,7 +3050,7 @@ void node_tex_magic(vec3 co, float scale, float distortion, float depth, out vec
 		z /= distortion;
 	}
 
-	color = vec4(0.5 - x, 0.5 - y, 0.f - z, 1.0);
+	color = vec4(0.5 - x, 0.5 - y, 0.5 - z, 1.0);
 	fac = (color.x + color.y + color.z) / 3.0;
 }
 

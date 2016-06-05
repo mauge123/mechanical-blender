@@ -86,7 +86,8 @@ static void comp_node_hash_value_free(void *value_v)
 ComponentDepsNode::ComponentDepsNode() :
     entry_operation(NULL),
     exit_operation(NULL),
-    flags(0)
+    flags(0),
+    layers(0)
 {
 	operations_map = BLI_ghash_new(comp_node_hash_key,
 	                               comp_node_hash_key_cmp,
@@ -119,7 +120,10 @@ string ComponentDepsNode::identifier() const
 	char typebuf[7];
 	sprintf(typebuf, "(%d)", type);
 
-	return string(typebuf) + name + " : " + idname;
+	char layers[7];
+	sprintf(layers, "%d", this->layers);
+
+	return string(typebuf) + name + " : " + idname + " (Layers: " + layers + ")";
 }
 
 OperationDepsNode *ComponentDepsNode::find_operation(OperationIDKey key) const
@@ -225,6 +229,14 @@ void ComponentDepsNode::tag_update(Depsgraph *graph)
 	}
 	foreach (OperationDepsNode *op_node, operations) {
 		op_node->tag_update(graph);
+	}
+	// It is possible that tag happens before finalization.
+	if (operations_map != NULL) {
+		GHASH_FOREACH_BEGIN(OperationDepsNode *, op_node, operations_map)
+		{
+			op_node->tag_update(graph);
+		}
+		GHASH_FOREACH_END();
 	}
 }
 
