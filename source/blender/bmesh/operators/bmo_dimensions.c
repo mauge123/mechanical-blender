@@ -50,25 +50,55 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMVert *v;
-	BMVert *(*v_arr);
+	BMIter iter;
+	BMElemGeom *egm;
+	BMVert *(*v_arr) = NULL;
 	BMDim *d;
 	BMOpSlot *op_verts_slot = BMO_slot_get(op->slots_in, "verts");
-
+	BMOpSlot *op_geom_slot = BMO_slot_get(op->slots_in, "geom");
 	int n=0;
 	int type = BMO_slot_int_get(op->slots_in,"dim_type");
 
-	v_arr = MEM_mallocN(sizeof (BMVert*)*op_verts_slot->len,"BMVert temp array");
-
-	for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), n++) {
-		v_arr[n] = v;
+	if (op_geom_slot->len > 0) {
+		// Dimension from Geometry
+		if (type == DIM_TYPE_LINEAR) {
+			for (egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY); egm; egm = BMO_iter_step(&siter)) {
+				if (egm->geometry_type == BM_GEOMETRY_TYPE_LINE)
+				{
+					// Only two vertices
+					v_arr = MEM_mallocN(sizeof (BMVert*)*2, "BMVert temp array");
+					v_arr[0] = egm->v[0];
+					v_arr[1] = egm->v[egm->totverts-1];
+					d = BM_dim_create(bm, v_arr, 2, type, NULL, BM_CREATE_USE_SELECT_ORDER);
+					BMO_elem_flag_enable(bm, d, EXT_KEEP);
+					MEM_freeN (v_arr);
+				}
+			}
+		}
+		else if (ELEM(type, DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS)) {
+			for (egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY); egm; egm = BMO_iter_step(&siter)) {
+				if (ELEM(egm->geometry_type, BM_GEOMETRY_TYPE_ARC, BM_GEOMETRY_TYPE_CIRCLE)) {
+					d = BM_dim_create(bm, egm->v, egm->totverts, type, NULL, BM_CREATE_USE_SELECT_ORDER);
+					BMO_elem_flag_enable(bm, d, EXT_KEEP);
+				}
+			}
+		}
+	} else {
+		// Dimension from Vertices
+		v_arr = MEM_mallocN(sizeof (BMVert*)*op_verts_slot->len, "BMVert temp array");
+		for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), n++) {
+			v_arr[n] = v;
+		}
+		d = BM_dim_create(bm, v_arr,op_verts_slot->len, type, NULL, BM_CREATE_USE_SELECT_ORDER);
+		BMO_elem_flag_enable(bm, d, EXT_KEEP);
+		MEM_freeN (v_arr);
 	}
 
-	d = BM_dim_create(bm, v_arr,op_verts_slot->len,type, NULL, BM_CREATE_USE_SELECT_ORDER);
-
-	MEM_freeN (v_arr);
-
-	BMO_elem_flag_enable(bm, d, EXT_KEEP);
-	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
-	BMO_elem_flag_disable(bm, d, EXT_KEEP);
+	BM_ITER_MESH(d, &iter, bm, BM_DIMS_OF_MESH) {
+		if (BMO_elem_flag_test(bm,d, EXT_KEEP)) {
+			BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
+			BMO_elem_flag_disable(bm, d, EXT_KEEP);
+		}
+	}
 
 }

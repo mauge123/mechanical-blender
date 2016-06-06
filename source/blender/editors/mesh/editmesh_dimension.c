@@ -55,11 +55,6 @@
 
 #include "mesh_dimensions.h"
 
-static int mechanical_add_dimension_from_geometry (int dim_type, BMEditMesh *em, wmOperator *op)
-{
-	// TODO
-	return true;
-}
 
 static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, wmOperator *op)
 {
@@ -67,9 +62,9 @@ static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, 
 	BMOperator bmop;
 	char op_str [255] = {0};
 
-	sprintf(op_str,"create_dimension %s %s", "verts=%hv", "dim_type=%i");
+	sprintf(op_str,"create_dimension %s %s %s", "verts=%hv", "geom=%hg", "dim_type=%i");
 
-	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, dim_type);
+	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, BM_ELEM_SELECT, dim_type);
 
 	/* deselect original verts */
 	BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_in, "verts", BM_VERT, BM_ELEM_SELECT, true);
@@ -93,12 +88,6 @@ static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 	BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
 	int dim_type = RNA_enum_get(op->ptr, "dim_type");
-
-	if (em->bm->totgeomsel > 0) {
-		if (!mechanical_add_dimension_from_geometry(dim_type, em, op)) {
-			ret = OPERATOR_CANCELLED;
-		}
-	}
 
 	if (em->bm->totvertsel >= get_necessary_dimension_verts(dim_type)) {
 		if (!mechanical_add_dimension_from_vertexs(dim_type, em, op)) {

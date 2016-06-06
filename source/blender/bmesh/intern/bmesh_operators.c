@@ -901,6 +901,18 @@ static void bmo_slot_buffer_from_hflag(
 			}
 		}
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+		if (htype & BM_GEOMETRY) {
+			BM_ITER_MESH (ele, &iter, bm, BM_GEOMETRY_OF_MESH) {
+				if ((!respecthide || !BM_elem_flag_test(ele, BM_ELEM_HIDDEN)) &&
+				    BM_elem_flag_test_bool(ele, hflag) == test_for_enabled)
+				{
+					output->data.buf[i] = ele;
+					i++;
+				}
+			}
+		}
+#endif
 
 	}
 	else {
@@ -1976,6 +1988,9 @@ bool BMO_op_vinitf(BMesh *bm, BMOperator *op, const int flag, const char *_fmt, 
 							else if (c == 'v') htype_set = BM_VERT;
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 							else if (c == 'r') htype_set = BM_REFERENCE;
+#endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+							else if (c == 'g') htype_set = BM_GEOMETRY;
 #endif
 							else {
 								break;
