@@ -2110,7 +2110,7 @@ static void EDBM_select_pick_edge(BMEditMesh *em, BMEdge *eed, bool extend, bool
 	}
 }
 
-static void EDBM_select_pick_geometry(BMEditMesh *em, BMElemGeom *egm, bool extend, bool deselect, bool toggle)
+static void EDBM_select_pick_geometry(BMEditMesh *em, BMGeom *egm, bool extend, bool deselect, bool toggle)
 {
 	if (extend) {
 		/* Work-around: deselect first, so we can guarantee it will */
@@ -2202,7 +2202,7 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 		}
 #ifdef WITH_MECHANICAL_GEOMETRY
 		else if (eed && vc.em->selectmode == SCE_SELECT_GEOMETRY) {
-			BMElemGeom *egm;
+			BMGeom *egm;
 			BMIter iter;
  			int i =0;
 			// Look for geom element

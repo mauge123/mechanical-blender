@@ -3840,7 +3840,7 @@ static void draw_em_mesh_geometry(BMEditMesh *em)
 	glPointSize(6.0f);
 	glColor4f(1.0f,0.0f,0.0f,1.0f);
 
-	BMElemGeom *egm;
+	BMGeom *egm;
 	BMIter iter;
 	BM_ITER_MESH(egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
 		switch (egm->geometry_type) {

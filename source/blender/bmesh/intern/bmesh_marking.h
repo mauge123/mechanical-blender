@@ -69,7 +69,7 @@ void BM_dim_select_set(BMesh *bm, BMDim *f, const bool select);
 void BM_reference_select_set(BMesh *bm, BMReference *erf, const bool select);
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
-void BM_geometry_select_set(BMesh *bm, BMElemGeom *egm, const bool select);
+void BM_geometry_select_set(BMesh *bm, BMGeom *egm, const bool select);
 #endif
 
 /* lower level functions which don't do flushing */

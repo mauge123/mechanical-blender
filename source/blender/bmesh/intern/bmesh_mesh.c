@@ -74,7 +74,7 @@ static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 	                               bm_mesh_chunksize_default.totplane, BLI_MEMPOOL_ALLOW_ITER);
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
-	bm->gpool = BLI_mempool_create(sizeof(BMElemGeom), allocsize->totgeom,
+	bm->gpool = BLI_mempool_create(sizeof(BMGeom), allocsize->totgeom,
 	                               bm_mesh_chunksize_default.totgeom, BLI_MEMPOOL_ALLOW_ITER);
 #endif
 
@@ -238,7 +238,7 @@ void BM_mesh_data_free(BMesh *bm)
 	BMEdge *e;
 	BMLoop *l;
 	BMFace *f;
-	BMElemGeom *egm;
+	BMGeom *egm;
 
 	BMIter iter;
 	BMIter itersub;

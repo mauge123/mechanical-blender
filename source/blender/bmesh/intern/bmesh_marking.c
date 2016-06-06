@@ -257,7 +257,7 @@ void BM_mesh_select_mode_flush_ex(BMesh *bm, const short selectmode)
 
 #ifdef	WITH_MECHANICAL_GEOMETRY
 	if (selectmode == SCE_SELECT_GEOMETRY) {
-		BMElemGeom *egm;
+		BMGeom *egm;
 		BMIter giter;
 		// Disabled first,  as a vertex can be shared for diferent geom elements
 		BM_ITER_MESH (egm, &giter, bm, BM_GEOMETRY_OF_MESH) {
@@ -566,7 +566,7 @@ void BM_dim_select_set(BMesh *bm, BMDim *d, const bool select)
 
 
 #ifdef WITH_MECHANICAL_GEOMETRY
-void BM_geometry_select_set(BMesh *bm, BMElemGeom *egm, const bool select)
+void BM_geometry_select_set(BMesh *bm, BMGeom *egm, const bool select)
 {
 	BLI_assert(egm->head.htype == BM_GEOMETRY);
 
@@ -888,7 +888,7 @@ void BM_elem_select_set(BMesh *bm, BMElem *ele, const bool select)
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
 		case BM_GEOMETRY:
-			BM_geometry_select_set(bm, (BMElemGeom *)ele, select);
+			BM_geometry_select_set(bm, (BMGeom *)ele, select);
 			break;
 #endif
 		default:

@@ -291,7 +291,7 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 
 			if (type) {
 
-				BMElemGeom *egm = BLI_mempool_alloc(bm->gpool);
+				BMGeom *egm = BLI_mempool_alloc(bm->gpool);
 				bm->totgeom++;
 
 				egm->head.htype = BM_GEOMETRY;
@@ -346,7 +346,7 @@ static bool mechanical_test_line(BMVert *v1, BMVert *UNUSED(v2), BMVert *v3, voi
 
 }
 
-static bool mechanical_check_geometry(BMEditMesh *em, BMElemGeom *egm, bool (*mechanical_geometry_func) (
+static bool mechanical_check_geometry(BMEditMesh *em, BMGeom *egm, bool (*mechanical_geometry_func) (
                                           BMVert*, BMVert*, BMVert*, void *), void *data)
 {
 	if (egm->totverts > 2) {
@@ -402,15 +402,15 @@ static bool mechanical_check_geometry(BMEditMesh *em, BMElemGeom *egm, bool (*me
 
 static void mechanical_check_mesh_geometry(BMEditMesh *em)
 {
-	BMElemGeom *egm;
+	BMGeom *egm;
 
-	BMElemGeom *(*rem_egm);
+	BMGeom *(*rem_egm);
 	int rem_egm_count =0;
 	BMIter iter;
 	BMesh *bm = em->bm;
 	bool valid;
 
-	rem_egm = MEM_callocN(sizeof (BMElemGeom*)*BLI_mempool_count(bm->gpool), "geometry to be removed");
+	rem_egm = MEM_callocN(sizeof (BMGeom*)*BLI_mempool_count(bm->gpool), "geometry to be removed");
 
 	BM_ITER_MESH (egm, &iter, bm, BM_GEOMETRY_OF_MESH) {
 		valid = false;

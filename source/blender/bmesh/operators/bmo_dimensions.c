@@ -49,7 +49,7 @@ enum {
 static BMVert** create_dimension_from_geometry_4p_angle(BMesh *UNUSED(bm), BMOperator *op){
 	BMOIter siter;
 	BMVert *(*v_arr) = NULL;
-	BMElemGeom *egm, *egm2;
+	BMGeom *egm, *egm2;
 
 	egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY);
 	egm2 = BMO_iter_step(&siter);
@@ -71,7 +71,7 @@ static BMVert** create_dimension_from_geometry_3p_angle(BMesh *UNUSED(bm), BMOpe
 
 	BMOIter siter;
 	BMVert *(*v_arr) = NULL;
-	BMElemGeom *egm, *egm2;
+	BMGeom *egm, *egm2;
 
 	egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY);
 	egm2 = BMO_iter_step(&siter);
@@ -116,7 +116,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 	BMOIter siter;
 	BMVert *v;
 	BMIter iter;
-	BMElemGeom *egm;
+	BMGeom *egm;
 	BMVert *(*v_arr) = NULL;
 	BMDim *d;
 	BMOpSlot *op_verts_slot = BMO_slot_get(op->slots_in, "verts");
