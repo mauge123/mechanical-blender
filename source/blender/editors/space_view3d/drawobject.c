@@ -3962,8 +3962,13 @@ static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMe
 					}
 
 					if (unit->system) {
+#ifdef WITH_MECHANICAL_UNIT_FORCE
+						numstr_len = bUnit_AsString_force(numstr, bUnit_GetScaleLength(unit, B_UNIT_LENGTH), sizeof(numstr), len_v3v3(v1, v2) * unit->scale_length, 3,
+														unit->system, B_UNIT_LENGTH, do_split, false);
+#else
 						numstr_len = bUnit_AsString(numstr, sizeof(numstr), len_v3v3(v1, v2) * unit->scale_length, 3,
-						                            unit->system, B_UNIT_LENGTH, do_split, false);
+													unit->system, B_UNIT_LENGTH, do_split, false);
+#endif
 					}
 					else {
 						numstr_len = BLI_snprintf_rlen(numstr, sizeof(numstr), conv_float, len_v3v3(v1, v2));

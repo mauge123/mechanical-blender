@@ -35,6 +35,8 @@
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
 
+#include "DNA_scene_types.h"
+
 #include "BKE_unit.h"  /* own include */
 
 #ifdef WIN32
@@ -425,6 +427,14 @@ static size_t unit_as_string(char *str, int len_max, double value, int prec, con
  * Return the length of the generated string.
  */
 #ifdef WITH_MECHANICAL_UNIT_FORCE
+float* bUnit_GetScaleLength(UnitSettings *unit, int unit_type){
+	float *scale_length = NULL;
+	if (unit->flag & USER_UNIT_OPT_FORCE_SCALE && (unit_type == B_UNIT_LENGTH)) {
+		scale_length = &unit->scale_length;
+	}
+	return scale_length;
+}
+
 size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad)
 {
 	return bUnit_AsString_force(str, NULL, len_max, value, prec, system, type, split, pad);

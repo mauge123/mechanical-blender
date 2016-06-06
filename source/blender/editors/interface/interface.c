@@ -2090,11 +2090,7 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 	}
 
 #ifdef WITH_MECHANICAL_UNIT_FORCE
-	float *scale_length = NULL;
-	if (unit->flag & USER_UNIT_OPT_FORCE_SCALE && (RNA_SUBTYPE_UNIT_VALUE(unit_type) == B_UNIT_LENGTH)) {
-		scale_length = &unit->scale_length;
-	}
-	bUnit_AsString_force(str, scale_length, len_max, ui_get_but_scale_unit(but, value), precision,
+	bUnit_AsString_force(str, bUnit_GetScaleLength(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)), len_max, ui_get_but_scale_unit(but, value), precision,
 	               unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type), do_split, pad);
 #else
 	bUnit_AsString(str, len_max, ui_get_but_scale_unit(but, value), precision,
