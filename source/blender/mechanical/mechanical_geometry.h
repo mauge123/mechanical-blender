@@ -11,6 +11,11 @@
 #define DIM_GEOMETRY_PRECISION 0.01
 
 
+typedef struct test_circle_data {
+	float center[3];
+	float angle;
+}test_circle_data;
+
 void mechanical_update_mesh_geometry(BMEditMesh *em);
 
 #endif // MECHANICAL_GEOMETRY_H

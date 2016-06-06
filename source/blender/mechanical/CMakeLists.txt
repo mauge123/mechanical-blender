@@ -24,6 +24,7 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(SRC
+	intern/prec_math.c
 	intern/mesh_dimensions.c
 	intern/mechanical_utils.c
 	intern/mesh_references.c

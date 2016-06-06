@@ -11,6 +11,8 @@
 
 #include "mechanical_utils.h"
 #include "mechanical_geometry.h"
+#include "prec_math.h"
+
 
 static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *v2, BMVert *current, void *data);
 
@@ -90,7 +92,8 @@ static bool mechanical_check_edge_line (BMEditMesh *UNUSED(em), BMEdge *e) {
 }
 
 static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *UNUSED(em), BMEdge *e, BMVert *v1, BMVert *v2, BMVert *current, void *data) {
-	float *center = data;
+	test_circle_data *cdata = data;
+	float *center = cdata->center;
 	float n_center[3];
 
 	return ( len_v3v3(current->co,center) > DIM_GEOMETRY_PRECISION &&
@@ -180,24 +183,31 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 	float dir[3];
 	sub_v3_v3v3(dir,v2->co,v1->co);
 	normalize_v3(dir);
+	float a1, a2;
+	test_circle_data cdata;
 
 	if (center_of_3_points(r_center, v1->co, v2->co, v3->co) &&
-		angle_v3v3v3 (v1->co,r_center,v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
+		(a1 = angle_v3v3v3 (v1->co,r_center,v2->co)) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
+	    (a2 = angle_v3v3v3 (v2->co,r_center,v3->co)) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
+	    fabs(a1 - a2) < DIM_GEOMETRY_PRECISION &&
 	    !point_on_axis_strict(v1->co,dir,v3->co)) {
 
+		copy_v3_v3(cdata.center, r_center);
+		cdata.angle = a1;
+
 		mechanical_find_edge_loop_start(em, &e1, &e2, &v1, &v2, &v3,
-		                                mechanical_follow_edge_loop_test_circle, r_center);
+		                                mechanical_follow_edge_loop_test_circle, &cdata);
 
 		if (mechanical_follow_edge_loop (em, e1, e2, v1, v2, v3,
 		                                 mechanical_follow_edge_loop_test_circle,
-		                                 r_voutput, r_vcount, r_eoutput, r_ecount, r_center)) {
+		                                 r_voutput, r_vcount, r_eoutput, r_ecount, &cdata)) {
 			(*r_ecount)++;  //Closing edge
 			type = BM_GEOMETRY_TYPE_CIRCLE;
 		} else {
 			type = BM_GEOMETRY_TYPE_ARC;
 		}
 	}
-	if (type && *r_vcount <= 3) {
+	if (*r_vcount <= 3) {
 		// Invalid, needs more vertices
 		type =0;
 		BM_elem_flag_disable(e1, BM_ELEM_TAG);
@@ -211,7 +221,7 @@ static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert
 {
 	float dir[3];
 
-	sub_v3_v3v3(dir, v2->co, v1->co);
+	sub_v3_v3v3_prec(dir, v2->co, v1->co);
 	normalize_v3(dir);
 
 	if (point_on_axis(v1->co,dir,v3->co) && mechanical_check_edge_line(em,e1) && mechanical_check_edge_line(em,e2)) {
