@@ -878,6 +878,11 @@ void BM_elem_select_set(BMesh *bm, BMElem *ele, const bool select)
 			BM_reference_select_set(bm, (BMReference *)ele, select);
 			break;
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+		case BM_GEOMETRY:
+			BM_geometry_select_set(bm, (BMElemGeom *)ele, select);
+			break;
+#endif
 		default:
 			BLI_assert(0);
 			break;

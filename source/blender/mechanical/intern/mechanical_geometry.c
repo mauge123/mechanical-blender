@@ -403,9 +403,15 @@ static bool mechanical_check_geometry(BMEditMesh *em, BMElemGeom *egm, bool (*me
 static void mechanical_check_mesh_geometry(BMEditMesh *em)
 {
 	BMElemGeom *egm;
+
+	BMElemGeom *(*rem_egm);
+	int rem_egm_count =0;
 	BMIter iter;
 	BMesh *bm = em->bm;
 	bool valid;
+
+	rem_egm = MEM_callocN(sizeof (BMElemGeom*)*BLI_mempool_count(bm->gpool), "geometry to be removed");
+
 	BM_ITER_MESH (egm, &iter, bm, BM_GEOMETRY_OF_MESH) {
 		valid = false;
 		switch (egm->geometry_type) {
@@ -421,12 +427,24 @@ static void mechanical_check_mesh_geometry(BMEditMesh *em)
 			// Edges will be tagged according to vertex
 		} else {
 			// Remove!
+#if 0
+			/* Causes assert faling as changes pool count*/
 			MEM_freeN(egm->v);
 			MEM_freeN(egm->e);
 			BLI_mempool_free(bm->gpool, egm);
 			bm->totgeom--;
+#endif
+			rem_egm[rem_egm_count++] = egm;
 		}
 	}
+
+	for (int i=0;i<rem_egm_count;i++){
+		MEM_freeN(rem_egm[i]->v);
+		MEM_freeN(rem_egm[i]->e);
+		BLI_mempool_free(bm->gpool, rem_egm[i]);
+		bm->totgeom--;
+	}
+	MEM_freeN(rem_egm);
 }
 
 void mechanical_update_mesh_geometry(BMEditMesh *em)
