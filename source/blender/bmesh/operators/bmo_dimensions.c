@@ -46,6 +46,71 @@ enum {
 };
 
 
+static BMVert** create_dimension_from_geometry_4p_angle(BMesh *UNUSED(bm), BMOperator *op){
+	BMOIter siter;
+	BMVert *(*v_arr) = NULL;
+	BMElemGeom *egm, *egm2;
+
+	egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY);
+	egm2 = BMO_iter_step(&siter);
+	if (egm && egm2 &&
+	    egm->geometry_type == BM_GEOMETRY_TYPE_LINE &&
+	    egm2->geometry_type == BM_GEOMETRY_TYPE_LINE)
+	{
+		v_arr = MEM_mallocN(sizeof (BMVert*)*4, "BMVert temp array");
+		v_arr[0] = egm->v[0];
+		v_arr[1] = egm->v[egm->totverts-1];
+		v_arr[2] = egm2->v[0];
+		v_arr[3] = egm2->v[egm2->totverts-1];
+	}
+	return v_arr;
+
+}
+
+static BMVert** create_dimension_from_geometry_3p_angle(BMesh *UNUSED(bm), BMOperator *op){
+
+	BMOIter siter;
+	BMVert *(*v_arr) = NULL;
+	BMElemGeom *egm, *egm2;
+
+	egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY);
+	egm2 = BMO_iter_step(&siter);
+	if (egm && egm2 &&
+	    egm->geometry_type == BM_GEOMETRY_TYPE_LINE &&
+	    egm2->geometry_type == BM_GEOMETRY_TYPE_LINE)
+	{
+		BMVert *v1_1 = egm->v[0];
+		BMVert *v1_2 = egm->v[egm->totverts-1];
+		BMVert *v2_1 = egm2->v[0];
+		BMVert *v2_2 = egm2->v[egm2->totverts-1];
+		if (v1_1 == v2_1) {
+			v_arr = MEM_mallocN(sizeof (BMVert*)*3, "BMVert temp array");
+			v_arr[0] = v1_2;
+			v_arr[1] = v1_1;
+			v_arr[2] = v2_2;
+		} else if (v1_1 == v2_2) {
+			v_arr = MEM_mallocN(sizeof (BMVert*)*3, "BMVert temp array");
+			v_arr[0] = v1_2;
+			v_arr[1] = v1_1;
+			v_arr[2] = v2_1;
+		}else if (v1_2 == v2_1) {
+			v_arr = MEM_mallocN(sizeof (BMVert*)*3, "BMVert temp array");
+			v_arr[0] = v1_1;
+			v_arr[1] = v1_2;
+			v_arr[2] = v2_2;
+		}
+		else if (v1_2 == v2_2) {
+			v_arr = MEM_mallocN(sizeof (BMVert*)*3, "BMVert temp array");
+			v_arr[0] = v1_1;
+			v_arr[1] = v1_2;
+			v_arr[2] = v2_1;
+		}
+	}
+	return v_arr;
+
+}
+
+
 void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
@@ -59,6 +124,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 	int n=0;
 	int type = BMO_slot_int_get(op->slots_in,"dim_type");
 
+// WITH_MECHANICAL_GEOMETRY
 	if (op_geom_slot->len > 0) {
 		// Dimension from Geometry
 		if (type == DIM_TYPE_LINEAR) {
@@ -69,7 +135,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 					v_arr = MEM_mallocN(sizeof (BMVert*)*2, "BMVert temp array");
 					v_arr[0] = egm->v[0];
 					v_arr[1] = egm->v[egm->totverts-1];
-					d = BM_dim_create(bm, v_arr, 2, type, NULL, BM_CREATE_USE_SELECT_ORDER);
+					d = BM_dim_create(bm, v_arr, 2, type, NULL, BM_CREATE_NOP);
 					BMO_elem_flag_enable(bm, d, EXT_KEEP);
 					MEM_freeN (v_arr);
 				}
@@ -78,9 +144,24 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		else if (ELEM(type, DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS)) {
 			for (egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY); egm; egm = BMO_iter_step(&siter)) {
 				if (ELEM(egm->geometry_type, BM_GEOMETRY_TYPE_ARC, BM_GEOMETRY_TYPE_CIRCLE)) {
-					d = BM_dim_create(bm, egm->v, egm->totverts, type, NULL, BM_CREATE_USE_SELECT_ORDER);
+					d = BM_dim_create(bm, egm->v, egm->totverts, type, NULL, BM_CREATE_NOP);
 					BMO_elem_flag_enable(bm, d, EXT_KEEP);
 				}
+			}
+		}else if (type == DIM_TYPE_ANGLE_3P) {
+			v_arr = create_dimension_from_geometry_3p_angle (bm, op);
+			if (v_arr) {
+				d = BM_dim_create(bm, v_arr, 3, type, NULL, BM_CREATE_NOP);
+				BMO_elem_flag_enable(bm, d, EXT_KEEP);
+				MEM_freeN (v_arr);
+			}
+		}
+		else if (type == DIM_TYPE_ANGLE_4P) {
+			v_arr = create_dimension_from_geometry_4p_angle (bm, op);
+			if (v_arr) {
+				d = BM_dim_create(bm, v_arr, 4, type, NULL, BM_CREATE_NOP);
+				BMO_elem_flag_enable(bm, d, EXT_KEEP);
+				MEM_freeN (v_arr);
 			}
 		}
 	} else {
