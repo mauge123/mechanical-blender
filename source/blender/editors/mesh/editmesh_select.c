@@ -1073,7 +1073,7 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 		eve = EDBM_vert_find_nearest_ex(vc, &dist, true, use_cycle);
 	}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if (dist > 0.0f && em->selectmode & (SCE_SELECT_VERTEX | SCE_SELECT_DIMENSION)) {
+	if (dist > 0.0f && em->selectmode & (SCE_SELECT_VERTEX | SCE_SELECT_DIMENSION | SCE_SELECT_GEOMETRY)) {
 		edm = EDBM_dim_find_nearest_ex(vc, &dist,true,use_cycle);
 	}
 #endif
