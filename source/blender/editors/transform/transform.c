@@ -564,7 +564,7 @@ void removeAspectRatio(TransInfo *t, float vec[2])
 	}
 }
 
-static void viewRedrawForce(const bContext *C, TransInfo *t)
+void viewRedrawForce(const bContext *C, TransInfo *t)
 {
 	if (t->options & CTX_GPENCIL_STROKES) {
 		WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);

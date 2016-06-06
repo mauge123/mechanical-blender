@@ -801,6 +801,9 @@ void postTrans(struct bContext *C, TransInfo *t);
 void resetTransModal(TransInfo *t);
 void resetTransRestrictions(TransInfo *t);
 
+// WITH MECHANICAL
+void viewRedrawForce(const struct bContext *C, TransInfo *t);
+
 void drawLine(TransInfo *t, const float center[3], const float dir[3], char axis, short options);
 
 /* DRAWLINE options flags */

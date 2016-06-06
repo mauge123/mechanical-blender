@@ -480,6 +480,7 @@ static int transform_modal_select_one_point(bContext *C, wmOperator *op, const w
 			exit_code &= ~OPERATOR_PASS_THROUGH; /* preventively remove passthrough */
 		}
 	} else {
+			viewRedrawForce(C, t);
 			ED_area_headerprint(t->sa, str);
 	}
 
@@ -526,7 +527,7 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
 		restoreTransObjects(t);
 		// Remove flags to allow object snap referencer over object
 		clear_trans_object_base_flags(t);
-		select_transform_modal_func (op->type,t);
+		select_transform_modal_func(op->type, t);
 	} else {
 		transformApply(C, t);
 	}
