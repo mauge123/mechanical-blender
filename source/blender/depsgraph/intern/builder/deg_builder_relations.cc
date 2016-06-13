@@ -266,6 +266,13 @@ void DepsgraphRelationBuilder::build_scene(Main *bmain, Scene *scene)
 	for (Base *base = (Base *)scene->base.first; base; base = base->next) {
 		Object *ob = base->object;
 
+		/* Object that this is a proxy for.
+		 * Just makes sure backlink is correct.
+		 */
+		if (ob->proxy) {
+			ob->proxy->proxy_from = ob;
+		}
+
 		/* object itself */
 		build_object(bmain, scene, ob);
 
@@ -432,7 +439,6 @@ void DepsgraphRelationBuilder::build_object(Main *bmain, Scene *scene, Object *o
 				build_obdata_geom(bmain, scene, ob);
 				break;
 			}
-
 
 			case OB_ARMATURE: /* Pose */
 				if (ob->id.lib != NULL && ob->proxy_from != NULL) {
@@ -1310,11 +1316,12 @@ void DepsgraphRelationBuilder::build_ik_pose(Object *ob,
 
 			OperationKey done_key(&ob->id, DEPSNODE_TYPE_BONE, parchan->name, DEG_OPCODE_BONE_DONE);
 			add_relation(solver_key, done_key, DEPSREL_TYPE_TRANSFORM, "IK Chain Result");
+		} else {
+			OperationKey final_transforms_key(&ob->id, DEPSNODE_TYPE_BONE, parchan->name, DEG_OPCODE_BONE_DONE);
+			add_relation(solver_key, final_transforms_key, DEPSREL_TYPE_TRANSFORM, "IK Solver Result");
 		}
 		parchan->flag |= POSE_DONE;
 
-		OperationKey final_transforms_key(&ob->id, DEPSNODE_TYPE_BONE, parchan->name, DEG_OPCODE_BONE_DONE);
-		add_relation(solver_key, final_transforms_key, DEPSREL_TYPE_TRANSFORM, "IK Solver Result");
 
 		root_map->add_bone(parchan->name, rootchan->name);
 
