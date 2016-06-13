@@ -565,6 +565,35 @@ static void bm_face_attrs_copy(
 	target_face->mat_nr = source_face->mat_nr;
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void bm_dim_attrs_copy(
+        BMesh *source_mesh, BMesh *target_mesh,
+        const BMDim *source_dim, BMDim *target_dim)
+{
+	if ((source_mesh == target_mesh) && (source_dim == target_dim)) {
+		BLI_assert(!"BMDim: source and targer match");
+		return;
+	}
+	CustomData_bmesh_free_block_data(&target_mesh->ddata, target_dim->head.data);
+	CustomData_bmesh_copy_data(&source_mesh->ddata, &target_mesh->ddata,
+	                           source_dim->head.data, &target_dim->head.data);
+}
+#endif
+
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+static void bm_geom_attrs_copy(
+        BMesh *source_mesh, BMesh *target_mesh,
+        const BMGeom *source_geom, BMGeom *target_geom)
+{
+	if ((source_mesh == target_mesh) && (source_geom == target_geom)) {
+		BLI_assert(!"BMGeom: source and targer match");
+		return;
+	}
+	// No customData
+}
+#endif
+
 /* BMESH_TODO: Special handling for hide flags? */
 /* BMESH_TODO: swap src/dst args, everywhere else in bmesh does other way round */
 
@@ -614,6 +643,16 @@ void BM_elem_attrs_copy_ex(
 		case BM_FACE:
 			bm_face_attrs_copy(bm_src, bm_dst, (const BMFace *)ele_src, (BMFace *)ele_dst);
 			break;
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case BM_DIM:
+			bm_dim_attrs_copy(bm_src, bm_dst, (const BMDim *)ele_src, (BMDim *)ele_dst);
+			break;
+#endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+		case BM_GEOMETRY:
+			bm_geom_attrs_copy(bm_src, bm_dst, (const BMGeom *)ele_src, (BMGeom *)ele_dst);
+			break;
+#endif
 		default:
 			BLI_assert(0);
 			break;

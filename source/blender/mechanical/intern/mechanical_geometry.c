@@ -96,9 +96,9 @@ static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *UNUSED(em), BMEd
 	float *center = cdata->center;
 	float n_center[3];
 
-	return ( len_v3v3(current->co,center) > DIM_GEOMETRY_PRECISION &&
+	return ( !eq_v3v3_prec(current->co,center) &&
 		center_of_3_points(n_center, v1->co, v2->co, current->co) &&
-		len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION &&
+		eq_v3v3_prec(n_center, center) &&
 		angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC);
 }
 
@@ -185,12 +185,14 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 	normalize_v3(dir);
 	float a1, a2;
 	test_circle_data cdata;
+	*r_vcount = 0;
+	*r_ecount = 0;
 
 	if (center_of_3_points(r_center, v1->co, v2->co, v3->co) &&
 		(a1 = angle_v3v3v3 (v1->co,r_center,v2->co)) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
 	    (a2 = angle_v3v3v3 (v2->co,r_center,v3->co)) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC &&
-	    fabs(a1 - a2) < DIM_GEOMETRY_PRECISION &&
-	    !point_on_axis_strict(v1->co,dir,v3->co)) {
+	    eq_ff_prec(a1,a2) &&
+	    !point_on_axis_prec(v1->co,dir,v3->co)) {
 
 		copy_v3_v3(cdata.center, r_center);
 		cdata.angle = a1;
@@ -259,7 +261,7 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 	// Max size is total count of verts
 	BMVert *(*verts) = MEM_callocN(sizeof(BMVert*)*bm->totvert,"mechanical_circle_output");
 	BMEdge *(*edges) = MEM_callocN(sizeof(BMEdge*)*bm->totedge,"mechanical_circle_output");
-	int vcount, ecount;
+	int vcount=0, ecount=0;
 	float center[3];
 
 	BM_ITER_MESH (e1, &iter1, bm, BM_EDGES_OF_MESH) {
@@ -347,7 +349,7 @@ static bool mechanical_test_circle(BMVert *v1, BMVert *v2, BMVert *v3, void *dat
 	float n_center[3];
 
 	return (center_of_3_points(n_center, v1->co, v2->co, v3->co) &&
-	len_v3v3(n_center, center) < DIM_GEOMETRY_PRECISION);
+			eq_v3v3_prec(n_center, center));
 }
 
 static bool mechanical_test_line(BMVert *v1, BMVert *UNUSED(v2), BMVert *v3, void *data) {

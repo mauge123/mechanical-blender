@@ -102,7 +102,7 @@ bool point_on_axis (float *c, float *a, float *p) {
 }
 
 
-bool point_on_axis_strict (float *c, float*a, float *p) {
+bool point_on_axis_prec(float *c, float*a, float *p) {
 	float v2[3];
 	sub_v3_v3v3(v2,p,c);
 	normalize_v3(v2);

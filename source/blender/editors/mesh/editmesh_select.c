@@ -1073,8 +1073,9 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 		eve = EDBM_vert_find_nearest_ex(vc, &dist, true, use_cycle);
 	}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if (dist > 0.0f && em->selectmode & (SCE_SELECT_VERTEX | SCE_SELECT_DIMENSION | SCE_SELECT_GEOMETRY)) {
-		edm = EDBM_dim_find_nearest_ex(vc, &dist,true,use_cycle);
+	// Allow dimension pick in all modes.
+	if (dist > 0.0f) {
+		edm = EDBM_dim_find_nearest_ex(vc, &dist, true, use_cycle);
 	}
 #endif
 
@@ -2112,25 +2113,20 @@ static void EDBM_select_pick_edge(BMEditMesh *em, BMEdge *eed, bool extend, bool
 
 static void EDBM_select_pick_geometry(BMEditMesh *em, BMGeom *egm, bool extend, bool deselect, bool toggle)
 {
+	/*
+	 *  Geometry can change on recalc, cannot store history at this moment
+	 */
 	if (extend) {
-		/* Work-around: deselect first, so we can guarantee it will */
-		/* be active even if it was already selected */
-		BM_select_history_remove(em->bm, egm);
-		BM_geometry_select_set(em->bm, egm, false);
-		BM_select_history_store(em->bm, egm);
 		BM_geometry_select_set(em->bm, egm, true);
 	}
 	else if (deselect) {
-		BM_select_history_remove(em->bm, egm);
 		BM_geometry_select_set(em->bm, egm, false);
 	}
 	else {
 		if (!BM_elem_flag_test(egm, BM_ELEM_SELECT)) {
-			BM_select_history_store(em->bm, egm);
 			BM_geometry_select_set(em->bm, egm, true);
 		}
 		else if (toggle) {
-			BM_select_history_remove(em->bm, egm);
 			BM_geometry_select_set(em->bm, egm, false);
 		}
 	}
