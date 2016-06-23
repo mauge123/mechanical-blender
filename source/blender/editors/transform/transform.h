@@ -371,6 +371,13 @@ typedef struct MouseInput {
 		double prev[2];
 		double accum[2];
 	} virtual_mval;
+
+// WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+	/**
+	 * @brief precision_start
+	 * exit transform modal cannot work with virutal mval
+	 */
+	int precision_start[2];
 } MouseInput;
 
 typedef struct TransCustomData {

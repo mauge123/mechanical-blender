@@ -410,6 +410,10 @@ void applyMouseInput(TransInfo *t, MouseInput *mi, const int mval[2], float outp
 	double mval_db[2];
 
 	if (mi->use_virtual_mval) {
+#ifdef WITH_MECHANICAL
+		// virtual m_val dues to bad results on scene movements, selected elements can move out of view during scene movements
+		BLI_assert(false);
+#endif
 		/* update accumulator */
 		double mval_delta[2];
 
@@ -433,6 +437,14 @@ void applyMouseInput(TransInfo *t, MouseInput *mi, const int mval[2], float outp
 	else {
 		mval_db[0] = mval[0];
 		mval_db[1] = mval[1];
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+		if (mi->precision) {
+			int m_delta[2];
+			sub_v2_v2v2_int(m_delta,mval, mi->precision_start);
+			mval_db[0] -= ((double)m_delta[0])*(1.0-mi->precision_factor);
+			mval_db[1] -= ((double)m_delta[1])*(1.0-mi->precision_factor);
+		}
+#endif
 	}
 
 
@@ -455,6 +467,11 @@ eRedrawFlag handleMouseInput(TransInfo *t, MouseInput *mi, const wmEvent *event)
 			if (event->val == KM_PRESS) {
 				t->modifiers |= MOD_PRECISION;
 				/* shift is modifier for higher precision transforn */
+#ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
+				if (!mi->precision) {
+					copy_v2_v2_int(mi->precision_start, event->mval);
+				}
+#endif
 				mi->precision = 1;
 				redraw = TREDRAW_HARD;
 			}
