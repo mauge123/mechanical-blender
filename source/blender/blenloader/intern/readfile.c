@@ -880,8 +880,6 @@ static void decode_blender_header(FileData *fd)
 	
 	if (readsize == sizeof(header)) {
 		if (STREQLEN(header, "BLENDER", 7)) {
-			int remove_this_endian_test = 1;
-			
 			fd->flags |= FD_FLAGS_FILE_OK;
 			
 			/* what size are pointers in the file ? */
@@ -900,7 +898,7 @@ static void decode_blender_header(FileData *fd)
 			/* is the file saved in a different endian
 			 * than we need ?
 			 */
-			if (((((char *)&remove_this_endian_test)[0] == 1) ? L_ENDIAN : B_ENDIAN) != ((header[8] == 'v') ? L_ENDIAN : B_ENDIAN)) {
+			if (((header[8] == 'v') ? L_ENDIAN : B_ENDIAN) != ENDIAN_ORDER) {
 				fd->flags |= FD_FLAGS_SWITCH_ENDIAN;
 			}
 			
@@ -1326,6 +1324,7 @@ bool BLO_has_bfile_extension(const char *str)
  *
  * \param path the full path to explode.
  * \param r_dir the string that'll contain path up to blend file itself ('library' path).
+ *              WARNING! Must be FILE_MAX_LIBEXTRA long (it also stores group and name strings)!
  * \param r_group the string that'll contain 'group' part of the path, if any. May be NULL.
  * \param r_name the string that'll contain data's name part of the path, if any. May be NULL.
  * \return true if path contains a blend file.
@@ -6464,7 +6463,7 @@ static void *restore_pointer_by_name_main(Main *mainp, ID *id, ePointerUserMode 
  * - USER_IGNORE: no usercount change
  * - USER_REAL: ensure a real user (even if a fake one is set)
  * \param id_map: lookup table, use when performing many lookups.
- * this could be made an optional agument (falling back to a full lookup),
+ * this could be made an optional argument (falling back to a full lookup),
  * however at the moment it's always available.
  */
 static void *restore_pointer_by_name(struct IDNameLib_Map *id_map, ID *id, ePointerUserMode user)

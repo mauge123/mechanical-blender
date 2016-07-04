@@ -8956,7 +8956,7 @@ static DMDrawOption bbs_mesh_solid_plane_setSolidDrawOptions(void *userData, int
 	BMReference *erf = userData;
 
 	if (!BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
-		WM_framebuffer_index_set(index + 1);
+		// WM_framebuffer_index_set(index + 1);
 		return DM_DRAW_OPTION_NORMAL;
 	}
 	else {
