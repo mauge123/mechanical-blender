@@ -54,6 +54,10 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 		float fmval[2] = {(float) mval[0], (float) mval[1]};
 		int imval[2] = {(int) mval[0], (int) mval[1]};
 		float vec[3];
+
+#ifdef WITH_MECHANICAL_GRAB_FIX
+		getViewDepthPoint(t->ar, imval, p);
+#endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
 		if (t->obedit) {
 			BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;

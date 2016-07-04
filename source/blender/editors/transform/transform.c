@@ -2576,6 +2576,9 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 		if (t->spacetype == SPACE_VIEW3D) {
 			float p[3] = {0,0,0};
+#ifdef WITH_MECHANICAL_GRAB_FIX
+			getViewDepthPoint(t->ar,event->mval,p);
+#endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
 			if (t->obedit) {
 				BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
@@ -9034,6 +9037,19 @@ bool checkUseAxisMatrix(TransInfo *t)
 
 	return false;
 }
+
+#ifdef WITH_MECHANICAL_GRAB_FIX
+void getViewDepthPoint (const ARegion *ar, int imval[2], float *r_loc)
+{
+	float fmval[2] = {(float) imval[0], (float) imval[1]};
+	float dir[3];
+	RegionView3D *rv3d = ar->regiondata;
+
+	ED_view3d_win_to_vector(ar, fmval, dir);
+	mul_v3_fl(dir, 5.0f);
+	add_v3_v3v3(r_loc,rv3d->viewinv[3], dir);
+}
+#endif
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MATCH
 static void initMatch(TransInfo *t)

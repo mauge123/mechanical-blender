@@ -896,6 +896,10 @@ void set_trans_object_base_flags(TransInfo *t);
 bool snapCursor(TransInfo *t,  const float mval[2], float *r_dist_p, float r_loc[3]);
 #endif
 
+#ifdef WITH_MECHANICAL_GRAB_FIX
+void getViewDepthPoint(const ARegion *ar, int mval[2], float *r_loc);
+#endif
+
 #define TRANSFORM_DIST_MAX_PX 1000.0f
 #define TRANSFORM_SNAP_MAX_PX 100.0f
 #define TRANSFORM_DIST_INVALID -FLT_MAX
