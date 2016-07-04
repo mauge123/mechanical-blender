@@ -4328,7 +4328,7 @@ uiBut *uiDefSearchBut(uiBlock *block, void *arg, int retval, int icon, int maxle
 
 
 /**
- * \param sfunc, bfunc: both get it as \a arg.
+ * \param search_func, bfunc: both get it as \a arg.
  * \param arg: user value,
  * \param  active: when set, button opens with this item visible and selected.
  */

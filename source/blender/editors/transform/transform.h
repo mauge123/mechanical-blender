@@ -640,6 +640,10 @@ typedef struct TransInfo {
 #define TARGET_FIXED	16
 #define MULTI_TARGETS	32
 
+/* Hard min/max for proportional size. */
+#define T_PROP_SIZE_MIN 1e-6f
+#define T_PROP_SIZE_MAX 1e12f
+
 bool initTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op, const struct wmEvent *event, int mode);
 void saveTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op);
 int  transformEvent(TransInfo *t, const struct wmEvent *event);
