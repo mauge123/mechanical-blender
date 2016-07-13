@@ -5322,7 +5322,12 @@ static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent 
 
 	int ret=OPERATOR_PASS_THROUGH;
 
-	if (event->type == MIDDLEMOUSE && event->val == KM_PRESS) {
+	if (event->type == PADENTER && !hasNumInput(num)) {
+		// First step to enter modal, do nothing
+		ret = OPERATOR_RUNNING_MODAL;
+		ED_area_headerprint(sa, IFACE_("Enter Dimension value"));
+	}
+	else if (event->type == MIDDLEMOUSE && event->val == KM_PRESS) {
 		// Allow navigation
 		ret=OPERATOR_PASS_THROUGH;
 	}

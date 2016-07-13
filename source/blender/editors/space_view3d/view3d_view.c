@@ -643,18 +643,6 @@ int ED_operator_rv3d_user_region_poll(bContext *C)
 	View3D *v3d_dummy;
 	ARegion *ar_dummy;
 
-#ifdef WITH_MECHANICAL_3D_VIEW_NUM_INPUT
-	Scene *scene = CTX_data_scene(C);
-	Object *obedit = scene->obedit;
-	if (obedit) {
-		Mesh *me = obedit->data;
-		BMesh *bm = me->edit_btmesh->bm;
-		if (get_selected_dimension(bm)) {
-			return 0;
-		}
-	}
-#endif
-
 	return ED_view3d_context_user_region(C, &v3d_dummy, &ar_dummy);
 }
 

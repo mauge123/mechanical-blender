@@ -336,17 +336,8 @@ void view3d_keymap(wmKeyConfig *keyconf)
  * This keymaps will be executed when previous is poll out
  *
  */
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD0, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD1, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD2, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD3, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD4, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD5, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD6, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD7, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD8, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PAD9, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PADPERIOD, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "VIEW3D_OT_dim_value_num_input", PADENTER, KM_PRESS, 0, 0);
+
 #endif
 
 	RNA_enum_set(WM_keymap_add_item(keymap, "VIEW3D_OT_view_pan", WHEELUPMOUSE, KM_PRESS, KM_CTRL, 0)->ptr, "type", V3D_VIEW_PANRIGHT);
