@@ -3002,6 +3002,33 @@ static void draw_dimension_axis(BMDim *edm)
 	}
 }
 
+bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
+{
+	float vect[3], vect2[3], viewUni[3];
+	normalize_v3_v3(viewUni, rv3d->persinv[2]);
+	Mesh *me = obedit->data;
+
+	switch (edm->dim_type) {
+		case DIM_TYPE_LINEAR:
+			sub_v3_v3v3(vect, edm->v[0]->co, edm->v[1]->co);
+			if (parallel_v3_v3(vect, viewUni) && rv3d->is_persp != 1 && !(me->drawflag & ME_PERP_VISIBILITY) ){
+					return false;
+			}
+			break;
+		case DIM_TYPE_DIAMETER:
+		case DIM_TYPE_RADIUS:
+		case DIM_TYPE_ANGLE_3P:
+		case DIM_TYPE_ANGLE_3P_CON:
+		case DIM_TYPE_ANGLE_4P:
+			get_dimension_plane(vect, vect2, edm);
+			if ((perpendicular_v3_v3(vect, viewUni) || perpendicular_v3_v3(vect2, viewUni)) && !(me->drawflag & ME_PERP_VISIBILITY)){
+				return false;
+			}
+			break;
+	}
+	return true;
+}
+
 /**
  * /Brief Draw dimensions in EditMode
  *
@@ -3013,6 +3040,8 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 	BMDim *edm = BM_dim_at_index(em->bm, index);
 	Object *obedit = data->obedit;
 	Scene *scene = data->scene;
+	RegionView3D *rv3d = data->ar->regiondata;
+
 
 	if (scene->obedit != obedit) {
 		// Draw only on active element
@@ -3020,42 +3049,48 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 	}
 
 
-	switch (edm->dim_type) {
-		case DIM_TYPE_LINEAR:
-			draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
-								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
-			draw_dimension_direction_points(edm);
+	if(check_dim_visibility(edm, rv3d, obedit)){
+
+		switch (edm->dim_type) {
+			case DIM_TYPE_LINEAR:
+				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
+										   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_dimension_direction_points(edm);
+
 			break;
-		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
-			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
-			break;
-		case DIM_TYPE_RADIUS:
-			draw_radius_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
-			                         BM_elem_flag_test(edm, BM_ELEM_SELECT));
-			break;
-		case DIM_TYPE_ANGLE_3P:
-		case DIM_TYPE_ANGLE_3P_CON:
-			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
-								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
-			draw_dimension_direction_points(edm);
-			if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->dim_type == DIM_TYPE_ANGLE_3P_CON) {
-				draw_dimension_axis(edm);
-			}
-			break;
-		case DIM_TYPE_ANGLE_4P:
-			draw_angle_3p_dimension(edm->v[0]->co,edm->v[2]->co,edm->center,edm->fpos, edm->dpos_fact,
-								   BM_elem_flag_test(edm, BM_ELEM_SELECT));
-			draw_dimension_direction_points(edm);
-			break;
-		default:
-			BLI_assert(0);
+			case DIM_TYPE_DIAMETER:
+
+				draw_diameter_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				break;
+			case DIM_TYPE_RADIUS:
+
+				draw_radius_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				break;
+			case DIM_TYPE_ANGLE_3P:
+			case DIM_TYPE_ANGLE_3P_CON:
+				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->fpos, edm->dpos_fact,
+									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_dimension_direction_points(edm);
+				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->dim_type == DIM_TYPE_ANGLE_3P_CON) {
+					draw_dimension_axis(edm);
+				}
+				break;
+			case DIM_TYPE_ANGLE_4P:
+				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->center, edm->fpos, edm->dpos_fact,
+									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_dimension_direction_points(edm);
+				break;
+			default:
+				BLI_assert(0);
 		}
+	}
 }
 
 
 static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
-                          RegionView3D* UNUSED(rv3d), Object* obedit)
+						  RegionView3D*  UNUSED(rv3d), Object* obedit)
 {
 	if (!dm->foreachMappedDim) {
 		// Set to NULL on ccgdm->dm
