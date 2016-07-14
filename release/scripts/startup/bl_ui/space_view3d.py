@@ -3414,6 +3414,7 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
         split = layout.split()
         col = split.column()
         col.prop(mesh, "show_mesh_geometry", text="Show Geometry")
+        col.prop(mesh, "dim_perpendicular_visibility", text="Show Dimensions on Perpendicular View")
 
 class VIEW3D_PT_view3d_meshstatvis(Panel):
     bl_space_type = 'VIEW_3D'

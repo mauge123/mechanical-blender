@@ -3778,6 +3778,13 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Mesh Geometry",
 	                         "Display Mesh Geometry in editmode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+
+	prop = RNA_def_property(srna, "dim_perpendicular_visibility", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "drawflag", ME_PERP_VISIBILITY);
+	RNA_def_property_ui_text(prop, "Dimension Visibility",
+							 "Show Dimensions on Perpendicular View");
+	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+
 #endif
 
 	/* pointers */
