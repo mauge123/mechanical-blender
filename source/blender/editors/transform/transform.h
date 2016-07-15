@@ -887,7 +887,7 @@ void change_transform_step (TransInfo *t, int state);
 #ifdef WITH_MECHANICAL_ROTATE_W_BASE_POINT
 void rotate_using_result(TransInfo *t);
 #endif
-void setTargetSnapFunc (TransInfo *t, int target_element);
+void setTargetSnapFunc(TransInfo *t, int target_element);
 #endif
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
@@ -901,7 +901,7 @@ bool snapCursor(TransInfo *t,  const float mval[2], float *r_dist_p, float r_loc
 #endif
 
 #ifdef WITH_MECHANICAL_GRAB_FIX
-void getViewDepthPoint(const ARegion *ar, int mval[2], float *r_loc);
+void getViewDepthPoint(TransInfo *t, float *r_loc);
 #endif
 
 #define TRANSFORM_DIST_MAX_PX 1000.0f

@@ -2586,7 +2586,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		if (t->spacetype == SPACE_VIEW3D) {
 			float p[3] = {0,0,0};
 #ifdef WITH_MECHANICAL_GRAB_FIX
-			getViewDepthPoint(t->ar,event->mval,p);
+			getViewDepthPoint(t, p);
 #endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
 			if (t->obedit) {
@@ -9048,15 +9048,10 @@ bool checkUseAxisMatrix(TransInfo *t)
 }
 
 #ifdef WITH_MECHANICAL_GRAB_FIX
-void getViewDepthPoint (const ARegion *ar, int imval[2], float *r_loc)
+void getViewDepthPoint(TransInfo *t, float *r_loc)
 {
-	float fmval[2] = {(float) imval[0], (float) imval[1]};
-	float dir[3];
-	RegionView3D *rv3d = ar->regiondata;
 
-	ED_view3d_win_to_vector(ar, fmval, dir);
-	mul_v3_fl(dir, 5.0f);
-	add_v3_v3v3(r_loc,rv3d->viewinv[3], dir);
+	calculateCenterMedian(t, r_loc);
 }
 #endif
 

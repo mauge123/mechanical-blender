@@ -56,7 +56,7 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 		float vec[3];
 
 #ifdef WITH_MECHANICAL_GRAB_FIX
-		getViewDepthPoint(t->ar, imval, p);
+		getViewDepthPoint(t, p);
 #endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
 		if (t->obedit) {
