@@ -96,7 +96,7 @@ BMVert *BM_vert_create(
 	}
 
 	/* 'v->no' is handled by BM_elem_attrs_copy */
-	if (co) {
+		if (co) {
 		copy_v3_v3(v->co, co);
 	}
 	else {
@@ -3059,7 +3059,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 		CustomData_bmesh_free_block(&bm->vdata, &edm->head.data);
 
 	if (bm->dtoolflagpool) {
-		BLI_mempool_free(bm->dtoolflagpool, edm->oflags);
+		BLI_mempool_free(bm->dtoolflagpool, ((BMVert_OFlag *)edm)->oflags);
 	}
 
 
@@ -3077,7 +3077,7 @@ void bm_kill_only_reference(BMesh *bm, BMReference *erf)
 	BM_select_history_remove(bm, erf);
 
 	if (bm->ptoolflagpool) {
-		BLI_mempool_free(bm->dtoolflagpool, erf->oflags);
+		BLI_mempool_free(bm->dtoolflagpool, ((BMVert_OFlag *)erf)->oflags);
 	}
 
 	BLI_mempool_free(bm->ppool, erf);
@@ -3104,7 +3104,7 @@ BMDim *BM_dim_create(
         BMesh *bm, BMVert *(*v), int v_count, int dim_type,
         const BMDim *d_example, const eBMCreateFlag create_flag)
 {
-	BMDim *edm;
+	BMDim *edm = BLI_mempool_alloc(bm->dpool);
 	BMReference *erf;
 	BMIter iter;
 
@@ -3114,10 +3114,8 @@ BMDim *BM_dim_create(
 	BLI_assert(!(create_flag & 1));
 
 
-	edm = BLI_mempool_alloc(bm->dpool);
 
-
-	/* --- assign all members --- */
+	/* --- assignBLI_mempool_alloc(bm->dpool);BLI_mempool_alloc(bm->dpool); all members --- */
 	edm->head.data = NULL;
 
 #ifdef USE_DEBUG_INDEX_MEMCHECK
@@ -3134,7 +3132,11 @@ BMDim *BM_dim_create(
 #endif
 
 	/* allocate flags */
-	edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	//edm->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	/* allocate flags */
+	if (bm->use_toolflags) {
+		((BMDim_OFlag *)edm)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	}
 
 	edm->dim_type = dim_type;
 	edm->constraints = 0;
@@ -3280,7 +3282,10 @@ BMReference *BM_reference_plane_create(
 #endif
 
 	/* allocate flags */
-	erf->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+//	erf->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	if (bm->use_toolflags) {
+		((BMReference_OFlag *)erf)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+	}
 
 	/* --- done --- */
 

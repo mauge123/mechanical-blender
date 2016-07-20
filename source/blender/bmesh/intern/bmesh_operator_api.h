@@ -80,6 +80,8 @@ BLI_INLINE BMFlagLayer *BMO_elem_flag_from_header(BMHeader *ele_head)
 	switch (ele_head->htype) {
 		case BM_VERT: return ((BMVert_OFlag *)ele_head)->oflags;
 		case BM_EDGE: return ((BMEdge_OFlag *)ele_head)->oflags;
+		case BM_DIM:  return ((BMDim_OFlag *) ele_head)->oflags;
+		case BM_REFERENCE: return ((BMReference_OFlag *)ele_head)->oflags;
 		default:      return ((BMFace_OFlag *)ele_head)->oflags;
 	}
 }
@@ -115,10 +117,24 @@ BLI_INLINE BMFlagLayer *BMO_elem_flag_from_header(BMHeader *ele_head)
 #define _BMO_CAST_V_CONST(e) (BM_CHECK_TYPE_VERT(e), (const BMVert_OFlag *)e)
 #define _BMO_CAST_E_CONST(e) (BM_CHECK_TYPE_EDGE(e), (const BMEdge_OFlag *)e)
 #define _BMO_CAST_F_CONST(e) (BM_CHECK_TYPE_FACE(e), (const BMFace_OFlag *)e)
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#define _BMO_CAST_D_CONST(e) (BM_CHECK_TYPE_DIM(e),   (const BMDim_OFlag *)e)
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#define _BMO_CAST_P_CONST(e) (BM_CHECK_TYPE_REFERENCE(e),   (const BMReference_OFlag *)e)
+#endif
+
 #define _BMO_CAST_V(e) (BM_CHECK_TYPE_VERT_NONCONST(e), (BMVert_OFlag *)e)
 #define _BMO_CAST_E(e) (BM_CHECK_TYPE_EDGE_NONCONST(e), (BMEdge_OFlag *)e)
 #define _BMO_CAST_F(e) (BM_CHECK_TYPE_FACE_NONCONST(e), (BMFace_OFlag *)e)
 #endif
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#define _BMO_CAST_D(e) (BM_CHECK_TYPE_DIM_NONCONST(e),  (BMDim_OFlag *)e)
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#define _BMO_CAST_P(e) (BM_CHECK_TYPE_REFERENCE_NONCONST(e), (BMReference_OFlag *)e)
+#endif
+
 
 #define BMO_vert_flag_test(     bm, e, oflag)      _bmo_elem_flag_test     (bm, _BMO_CAST_V_CONST(e)->oflags, oflag)
 #define BMO_vert_flag_test_bool(bm, e, oflag)      _bmo_elem_flag_test_bool(bm, _BMO_CAST_V_CONST(e)->oflags, oflag)
@@ -140,6 +156,24 @@ BLI_INLINE BMFlagLayer *BMO_elem_flag_from_header(BMHeader *ele_head)
 #define BMO_face_flag_disable(  bm, e, oflag)      _bmo_elem_flag_disable  (bm, _BMO_CAST_F(e)->oflags, oflag)
 #define BMO_face_flag_set(      bm, e, oflag, val) _bmo_elem_flag_set      (bm, _BMO_CAST_F(e)->oflags, oflag, val)
 #define BMO_face_flag_toggle(   bm, e, oflag)      _bmo_elem_flag_toggle   (bm, _BMO_CAST_F(e)->oflags, oflag)
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#define BMO_dim_flag_test(     bm, e, oflag)      _bmo_elem_flag_test     (bm, _BMO_CAST_D_CONST(e)->oflags, oflag)
+#define BMO_dim_flag_test_bool(bm, e, oflag)      _bmo_elem_flag_test_bool(bm, _BMO_CAST_D_CONST(e)->oflags, oflag)
+#define BMO_dim_flag_enable(   bm, e, oflag)      _bmo_elem_flag_enable   (bm, _BMO_CAST_D(e)->oflags, oflag)
+#define BMO_dim_flag_disable(  bm, e, oflag)      _bmo_elem_flag_disable  (bm, _BMO_CAST_D(e)->oflags, oflag)
+#define BMO_dim_flag_set(      bm, e, oflag, val) _bmo_elem_flag_set      (bm, _BMO_CAST_D(e)->oflags, oflag, val)
+#define BMO_dim_flag_toggle(   bm, e, oflag)      _bmo_elem_flag_toggle   (bm, _BMO_CAST_D(e)->oflags, oflag)
+#endif
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#define BMO_reference_flag_test(     bm, e, oflag)      _bmo_elem_flag_test     (bm, _BMO_CAST_P_CONST(e)->oflags, oflag)
+#define BMO_reference_flag_test_bool(bm, e, oflag)      _bmo_elem_flag_test_bool(bm, _BMO_CAST_P_CONST(e)->oflags, oflag)
+#define BMO_reference_flag_enable(   bm, e, oflag)      _bmo_elem_flag_enable   (bm, _BMO_CAST_P(e)->oflags, oflag)
+#define BMO_reference_flag_disable(  bm, e, oflag)      _bmo_elem_flag_disable  (bm, _BMO_CAST_P(e)->oflags, oflag)
+#define BMO_reference_flag_set(      bm, e, oflag, val) _bmo_elem_flag_set      (bm, _BMO_CAST_P(e)->oflags, oflag, val)
+#define BMO_reference_flag_toggle(   bm, e, oflag)      _bmo_elem_flag_toggle   (bm, _BMO_CAST_P(e)->oflags, oflag)
+#endif
 
 BLI_INLINE short _bmo_elem_flag_test(     BMesh *bm, const BMFlagLayer *oflags, const short oflag);
 BLI_INLINE bool  _bmo_elem_flag_test_bool(BMesh *bm, const BMFlagLayer *oflags, const short oflag);

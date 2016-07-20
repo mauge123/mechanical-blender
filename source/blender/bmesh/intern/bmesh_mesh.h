@@ -105,9 +105,8 @@ void BM_mesh_remap(
         const unsigned int *face_idx);
 
 void BM_mesh_rebuild(
-        BMesh *bm, const struct BMeshCreateParams *params,
-        struct BLI_mempool *vpool, struct BLI_mempool *epool, struct BLI_mempool *lpool, struct BLI_mempool *fpool);
-
+		BMesh *bm, const struct BMeshCreateParams *params,
+		BLI_mempool *vpool_dst, BLI_mempool *epool_dst, BLI_mempool *lpool_dst, BLI_mempool *fpool_dst,  BLI_mempool *dpool_dst,  BLI_mempool *ppool_dst);
 typedef struct BMAllocTemplate {
 	int totvert, totedge, totloop, totface;
 // WITH_MECHANICAL_MESH_DIMENSIONS
