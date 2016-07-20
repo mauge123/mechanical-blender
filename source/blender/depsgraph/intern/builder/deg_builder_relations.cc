@@ -266,18 +266,12 @@ void DepsgraphRelationBuilder::build_scene(Main *bmain, Scene *scene)
 	for (Base *base = (Base *)scene->base.first; base; base = base->next) {
 		Object *ob = base->object;
 
-		/* Object that this is a proxy for.
-		 * Just makes sure backlink is correct.
-		 */
-		if (ob->proxy) {
-			ob->proxy->proxy_from = ob;
-		}
-
 		/* object itself */
 		build_object(bmain, scene, ob);
 
 		/* object that this is a proxy for */
 		if (ob->proxy) {
+			ob->proxy->proxy_from = ob;
 			build_object(bmain, scene, ob->proxy);
 			/* TODO(sergey): This is an inverted relation, matches old depsgraph
 			 * behavior and need to be investigated if it still need to be inverted.
@@ -441,7 +435,7 @@ void DepsgraphRelationBuilder::build_object(Main *bmain, Scene *scene, Object *o
 			}
 
 			case OB_ARMATURE: /* Pose */
-				if (ob->id.lib != NULL && ob->proxy_from != NULL) {
+				if (ID_IS_LINKED_DATABLOCK(ob) && ob->proxy_from != NULL) {
 					build_proxy_rig(ob);
 				}
 				else {
@@ -926,6 +920,12 @@ void DepsgraphRelationBuilder::build_driver(ID *id, FCurve *fcu)
 				}
 			}
 			else {
+				if (dtar->id == id) {
+					/* Ignore input dependency if we're driving properties of the same ID,
+					 * otherwise we'll be ending up in a cyclic dependency here.
+					 */
+					continue;
+				}
 				/* resolve path to get node */
 				RNAPathKey target_key(dtar->id, dtar->rna_path ? dtar->rna_path : "");
 				add_relation(target_key, driver_key, DEPSREL_TYPE_DRIVER_TARGET, "[RNA Target -> Driver]");
@@ -1434,20 +1434,20 @@ void DepsgraphRelationBuilder::build_rig(Scene *scene, Object *ob)
 	}
 
 	/* IK Solvers...
-	* - These require separate processing steps are pose-level
-	*   to be executed between chains of bones (i.e. once the
-	*   base transforms of a bunch of bones is done)
-	*
-	* - We build relations for these before the dependencies
-	*   between ops in the same component as it is necessary
-	*   to check whether such bones are in the same IK chain
-	*   (or else we get weird issues with either in-chain
-	*   references, or with bones being parented to IK'd bones)
-	*
-	* Unsolved Issues:
-	* - Care is needed to ensure that multi-headed trees work out the same as in ik-tree building
-	* - Animated chain-lengths are a problem...
-	*/
+	 * - These require separate processing steps are pose-level
+	 *   to be executed between chains of bones (i.e. once the
+	 *   base transforms of a bunch of bones is done)
+	 *
+	 * - We build relations for these before the dependencies
+	 *   between ops in the same component as it is necessary
+	 *   to check whether such bones are in the same IK chain
+	 *   (or else we get weird issues with either in-chain
+	 *   references, or with bones being parented to IK'd bones)
+	 *
+	 * Unsolved Issues:
+	 * - Care is needed to ensure that multi-headed trees work out the same as in ik-tree building
+	 * - Animated chain-lengths are a problem...
+	 */
 	RootPChanMap root_map;
 	bool pose_depends_on_local_transform = false;
 	for (bPoseChannel *pchan = (bPoseChannel *)ob->pose->chanbase.first; pchan; pchan = pchan->next) {

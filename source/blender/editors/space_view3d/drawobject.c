@@ -1422,8 +1422,8 @@ static void drawlamp(View3D *v3d, RegionView3D *rv3d, Base *base,
 				float blend = z_abs * (1.0f - pow2f(la->spotblend));
 
 				/* hide line if it is zero size or overlaps with outer border,
-				* previously it adjusted to always to show it but that seems
-				* confusing because it doesn't show the actual blend size */
+				 * previously it adjusted to always to show it but that seems
+				 * confusing because it doesn't show the actual blend size */
 				if (blend != 0.0f && blend != z_abs) {
 					circ(0.0f, 0.0f, blend);
 				}
@@ -8016,7 +8016,7 @@ static void draw_object_wire_color(Scene *scene, Base *base, unsigned char r_ob_
 	}
 	else {
 		/* Sets the 'colindex' */
-		if (ob->id.lib) {
+		if (ID_IS_LINKED_DATABLOCK(ob)) {
 			colindex = (base->flag & (SELECT + BA_WAS_SEL)) ? 2 : 1;
 		}
 		/* Sets the 'theme_id' or fallback to wire */
@@ -8772,7 +8772,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				    !(G.f & G_RENDER_OGL))
 				{
 					/* check > 0 otherwise grease pencil can draw into the circle select which is annoying. */
-					drawcentercircle(v3d, rv3d, ob->obmat[3], do_draw_center, ob->id.lib || ob->id.us > 1);
+					drawcentercircle(v3d, rv3d, ob->obmat[3], do_draw_center, ID_IS_LINKED_DATABLOCK(ob) || ob->id.us > 1);
 				}
 			}
 		}

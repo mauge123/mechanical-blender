@@ -97,7 +97,6 @@ typedef struct BMHeader {
 
 typedef struct BMVert {
 	BMHeader head;
-	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 
 	float co[3];  /* vertex coordinates */
 	float no[3];  /* vertex normal */
@@ -110,6 +109,11 @@ typedef struct BMVert {
 	struct BMEdge *e;
 } BMVert;
 
+typedef struct BMVert_OFlag {
+	BMVert base;
+	struct BMFlagLayer *oflags;
+} BMVert_OFlag;
+
 /* disk link structure, only used by edges */
 typedef struct BMDiskLink {
 	struct BMEdge *next, *prev;
@@ -117,7 +121,6 @@ typedef struct BMDiskLink {
 
 typedef struct BMEdge {
 	BMHeader head;
-	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 
 	struct BMVert *v1, *v2;  /* vertices (unordered) */
 
@@ -129,6 +132,11 @@ typedef struct BMEdge {
 	 * relative data: d1 indicates indicates the next/prev edge around vertex v1 and d2 does the same for v2 */
 	BMDiskLink v1_disk_link, v2_disk_link;
 } BMEdge;
+
+typedef struct BMEdge_OFlag {
+	BMEdge base;
+	struct BMFlagLayer *oflags;
+} BMEdge_OFlag;
 
 typedef struct BMLoop {
 	BMHeader head;
@@ -246,10 +254,6 @@ typedef struct BMGeom {
 /* can cast BMFace/BMEdge/BMVert, but NOT BMLoop, since these don't have a flag layer */
 typedef struct BMElemF {
 	BMHeader head;
-
-	/* keep directly after header,
-	 * optional array of flags, only used by the operator stack */
-	struct BMFlagLayer *oflags;
 } BMElemF;
 
 /* can cast anything to this, including BMLoop */
@@ -267,7 +271,6 @@ typedef struct BMLoopList {
 
 typedef struct BMFace {
 	BMHeader head;
-	struct BMFlagLayer *oflags; /* an array of flags, mostly used by the operator stack */
 
 #ifdef USE_BMESH_HOLES
 	int totbounds; /*total boundaries, is one plus the number of holes in the face*/
@@ -280,6 +283,11 @@ typedef struct BMFace {
 	short mat_nr;  /* material index */
 //	short _pad[3];
 } BMFace;
+
+typedef struct BMFace_OFlag {
+	BMFace base;
+	struct BMFlagLayer *oflags;
+} BMFace_OFlag;
 
 typedef struct BMFlagLayer {
 	short f; /* flags */
@@ -324,6 +332,8 @@ typedef struct BMesh {
 
 	/* operator api stuff (must be all NULL or all alloc'd) */
 	struct BLI_mempool *vtoolflagpool, *etoolflagpool, *ftoolflagpool;
+
+	unsigned int use_toolflags : 1;
 
 	int toolflag_index;
 	struct BMOperator *currentop;
@@ -406,10 +416,12 @@ enum {
 /* args for _Generic */
 #define _BM_GENERIC_TYPE_ELEM_NONCONST \
 	void *, BMVert *, BMEdge *, BMLoop *, BMFace *, \
+	BMVert_OFlag *, BMEdge_OFlag *, BMFace_OFlag *, \
 	BMElem *, BMElemF *, BMHeader *
 
 #define _BM_GENERIC_TYPE_ELEM_CONST \
 	const void *, const BMVert *, const BMEdge *, const BMLoop *, const BMFace *, \
+	const BMVert_OFlag *, const BMEdge_OFlag *, const BMFace_OFlag *, \
 	const BMElem *, const BMElemF *, const BMHeader *, \
 	void * const, BMVert * const, BMEdge * const, BMLoop * const, BMFace * const, \
 	BMElem * const, BMElemF * const, BMHeader * const
@@ -422,6 +434,27 @@ enum {
 
 #define BM_CHECK_TYPE_ELEM(ele) \
 	CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST, _BM_GENERIC_TYPE_ELEM_CONST)
+
+/* vert */
+#define _BM_GENERIC_TYPE_VERT_NONCONST BMVert *, BMVert_OFlag *
+#define _BM_GENERIC_TYPE_VERT_CONST const BMVert *, const BMVert_OFlag *
+#define BM_CHECK_TYPE_VERT_CONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_VERT_CONST)
+#define BM_CHECK_TYPE_VERT_NONCONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST)
+#define BM_CHECK_TYPE_VERT(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_VERT_NONCONST, _BM_GENERIC_TYPE_VERT_CONST)
+/* edge */
+#define _BM_GENERIC_TYPE_EDGE_NONCONST BMEdge *, BMEdge_OFlag *
+#define _BM_GENERIC_TYPE_EDGE_CONST const BMEdge *, const BMEdge_OFlag *
+#define BM_CHECK_TYPE_EDGE_CONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_EDGE_CONST)
+#define BM_CHECK_TYPE_EDGE_NONCONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST)
+#define BM_CHECK_TYPE_EDGE(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_EDGE_NONCONST, _BM_GENERIC_TYPE_EDGE_CONST)
+/* face */
+#define _BM_GENERIC_TYPE_FACE_NONCONST BMFace *, BMFace_OFlag *
+#define _BM_GENERIC_TYPE_FACE_CONST const BMFace *, const BMFace_OFlag *
+#define BM_CHECK_TYPE_FACE_CONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_FACE_CONST)
+#define BM_CHECK_TYPE_FACE_NONCONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST)
+#define BM_CHECK_TYPE_FACE(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_FACE_NONCONST, _BM_GENERIC_TYPE_FACE_CONST)
+
+
 
 /* Assignment from a void* to a typed pointer is not allowed in C++,
  * casting the LHS to void works fine though.

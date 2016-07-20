@@ -548,43 +548,68 @@ static int bmo_mesh_flag_count(
         BMesh *bm, const char htype, const short oflag,
         const bool test_for_enabled)
 {
-// WITH_MECHANICAL_MESH_DIMENSIONS
-// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	const char iter_types[5] = {BM_VERTS_OF_MESH,
-	                            BM_EDGES_OF_MESH,
-	                            BM_FACES_OF_MESH,
-	                            BM_DIMS_OF_MESH,
-	                            BM_REFERENCES_OF_MESH};
+	int count_vert = 0, count_edge = 0, count_face = 0, count_dim = 0, count_ref = 0;
 
-	const char flag_types[5] = {BM_VERT, BM_EDGE, BM_FACE, BM_DIM, BM_REFERENCE};
-/*
-	const char iter_types[3] = {BM_VERTS_OF_MESH,
-	                            BM_EDGES_OF_MESH,
-	                            BM_FACES_OF_MESH};
-
-	const char flag_types[3] = {BM_VERT, BM_EDGE, BM_FACE};
-*/
-
-	BMIter iter;
-	int count = 0;
-	BMElemF *ele_f;
-	int i;
-
-// WITH_MECHANICAL_MESH_DIMENSIONS
-// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	for (i = 0; i < 5; i++) {
-/*
- 	for (i = 0; i < 3; i++) {
-*/
-		if (htype & flag_types[i]) {
-			BM_ITER_MESH (ele_f, &iter, bm, iter_types[i]) {
-				if (BMO_elem_flag_test_bool(bm, ele_f, oflag) == test_for_enabled)
-					count++;
+#pragma omp parallel sections if ((bm->totvert + bm->totedge + bm->totface + bm->totdim + bm->totref >= BM_OMP_LIMIT) && \
+								  (ELEM(htype, BM_VERT, BM_EDGE, BM_FACE, BM_DIM, BM_REFERENCE) == 0))
+	{
+#pragma omp section
+		if (htype & BM_VERT) {
+			BMIter iter;
+			BMVert *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_VERTS_OF_MESH) {
+				if (BMO_vert_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
+					count_vert++;
+				}
 			}
 		}
+#pragma omp section
+		if (htype & BM_EDGE) {
+			BMIter iter;
+			BMEdge *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_EDGES_OF_MESH) {
+				if (BMO_edge_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
+					count_edge++;
+				}
+			}
+		}
+#pragma omp section
+		if (htype & BM_FACE) {
+			BMIter iter;
+			BMFace *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_FACES_OF_MESH) {
+				if (BMO_face_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
+					count_face++;
+				}
+			}
+		}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#pragma omp section
+		if (htype & BM_DIM) {
+			BMIter iter;
+			BMDim *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+				if (BMO_dim_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
+					count_dim++;
+				}
+			}
+		}
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#pragma omp section
+			if (htype & BM_REFERENCE) {
+				BMIter iter;
+				BMReference *ele;
+				BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+					if (BMO_reference_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
+						count_ref++;
+					}
+				}
+			}
+#endif
 	}
 
-	return count;
+	return (count_vert + count_edge + count_face + count_dim + count_ref);
 }
 
 
@@ -600,23 +625,56 @@ int BMO_mesh_disabled_flag_count(BMesh *bm, const char htype, const short oflag)
 
 void BMO_mesh_flag_disable_all(BMesh *bm, BMOperator *UNUSED(op), const char htype, const short oflag)
 {
-	const char iter_types[3] = {BM_VERTS_OF_MESH,
-	                            BM_EDGES_OF_MESH,
-	                            BM_FACES_OF_MESH};
 
-	const char flag_types[3] = {BM_VERT, BM_EDGE, BM_FACE};
-
-	BMElemF *ele;
-	int i;
-
-#pragma omp parallel for schedule(static) if (bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT)
-	for (i = 0; i < 3; i++) {
-		if (htype & flag_types[i]) {
+#pragma omp parallel sections if ((bm->totvert + bm->totedge + bm->totface >= BM_OMP_LIMIT) && \
+	                              (ELEM(htype, BM_VERT, BM_EDGE, BM_FACE) == 0))
+	{
+#pragma omp section
+		if (htype & BM_VERT) {
 			BMIter iter;
-			BM_ITER_MESH (ele, &iter, bm, iter_types[i]) {
-				BMO_elem_flag_disable(bm, ele, oflag);
+			BMVert *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_VERTS_OF_MESH) {
+				BMO_vert_flag_disable(bm, ele, oflag);
 			}
 		}
+#pragma omp section
+		if (htype & BM_EDGE) {
+			BMIter iter;
+			BMEdge *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_EDGES_OF_MESH) {
+				BMO_edge_flag_disable(bm, ele, oflag);
+			}
+		}
+#pragma omp section
+		if (htype & BM_FACE) {
+			BMIter iter;
+			BMFace *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_FACES_OF_MESH) {
+				BMO_face_flag_disable(bm, ele, oflag);
+			}
+		}
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+#pragma omp section
+			if (htype & BM_DIM) {
+			BMIter iter;
+			BMDim *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+				BMO_dim_flag_disable(bm, ele, oflag);
+			}
+		}
+#endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+#pragma omp section
+			if (htype & BM_REFERENCE) {
+			BMIter iter;
+			BMReference *ele;
+			BM_ITER_MESH (ele, &iter, bm, BM_REFERENCES_OF_MESH) {
+				BMO_dim_flag_disable(bm, ele, oflag);
+
+			}
+		}
+#endif
+
 	}
 }
 
@@ -1048,7 +1106,7 @@ static void bmo_slot_buffer_from_flag(
 
 		if (htype & BM_VERT) {
 			BM_ITER_MESH (ele, &iter, bm, BM_VERTS_OF_MESH) {
-				if (BMO_elem_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_vert_flag_test_bool(bm, (BMVert *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
@@ -1057,7 +1115,7 @@ static void bmo_slot_buffer_from_flag(
 
 		if (htype & BM_EDGE) {
 			BM_ITER_MESH (ele, &iter, bm, BM_EDGES_OF_MESH) {
-				if (BMO_elem_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_edge_flag_test_bool(bm, (BMEdge *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
@@ -1066,7 +1124,7 @@ static void bmo_slot_buffer_from_flag(
 
 		if (htype & BM_FACE) {
 			BM_ITER_MESH (ele, &iter, bm, BM_FACES_OF_MESH) {
-				if (BMO_elem_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_face_flag_test_bool(bm, (BMFace *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
@@ -1075,7 +1133,7 @@ static void bmo_slot_buffer_from_flag(
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 		if (htype & BM_REFERENCE) {
 			BM_ITER_MESH (ele, &iter, bm, BM_REFERENCES_OF_MESH) {
-				if (BMO_elem_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_reference_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
@@ -1085,7 +1143,7 @@ static void bmo_slot_buffer_from_flag(
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (htype & BM_DIM) {
 			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
-				if (BMO_elem_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_dim_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
@@ -1287,7 +1345,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMVert_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->vtoolflagpool;
@@ -1297,14 +1355,14 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_calloc(newpool);
 				memcpy(ele->oflags, oldflags, old_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMEdge_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->etoolflagpool;
@@ -1313,14 +1371,14 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_calloc(newpool);
 				memcpy(ele->oflags, oldflags, old_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMFace_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->ftoolflagpool;
@@ -1329,7 +1387,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_calloc(newpool);
 				memcpy(ele->oflags, oldflags, old_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
@@ -1337,7 +1395,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMDim_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->dtoolflagpool;
@@ -1346,7 +1404,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_calloc(newpool);
 				memcpy(ele->oflags, oldflags, old_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
@@ -1355,16 +1413,16 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMReference_OFlag *ele;
 			int i;
 
-			BLI_mempool *newpool = bm->ftoolflagpool;
+			BLI_mempool *newpool = bm->ptoolflagpool;
 
 			BM_ITER_MESH_INDEX (ele, &iter, bm, BM_REFERENCES_OF_MESH, i) {
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_calloc(newpool);
 				memcpy(ele->oflags, oldflags, old_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
@@ -1412,7 +1470,7 @@ static void bmo_flag_layer_free(BMesh *bm)
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMVert_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->vtoolflagpool;
@@ -1422,14 +1480,14 @@ static void bmo_flag_layer_free(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_alloc(newpool);
 				memcpy(ele->oflags, oldflags, new_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMEdge_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->etoolflagpool;
@@ -1438,14 +1496,14 @@ static void bmo_flag_layer_free(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_alloc(newpool);
 				memcpy(ele->oflags, oldflags, new_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMFace_OFlag *ele;
 			int i;
 
 			BLI_mempool *newpool = bm->ftoolflagpool;
@@ -1454,7 +1512,7 @@ static void bmo_flag_layer_free(BMesh *bm)
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_alloc(newpool);
 				memcpy(ele->oflags, oldflags, new_totflags_size);
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
@@ -1488,31 +1546,31 @@ static void bmo_flag_layer_clear(BMesh *bm)
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMVert_OFlag *ele;
 			int i;
 			BM_ITER_MESH_INDEX (ele, &iter, bm, BM_VERTS_OF_MESH, i) {
 				ele->oflags[totflags_offset] = zero_flag;
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 			}
 		}
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMEdge_OFlag *ele;
 			int i;
 			BM_ITER_MESH_INDEX (ele, &iter, bm, BM_EDGES_OF_MESH, i) {
 				ele->oflags[totflags_offset] = zero_flag;
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 			}
 		}
 #pragma omp section
 		{
 			BMIter iter;
-			BMElemF *ele;
+			BMFace_OFlag *ele;
 			int i;
 			BM_ITER_MESH_INDEX (ele, &iter, bm, BM_FACES_OF_MESH, i) {
 				ele->oflags[totflags_offset] = zero_flag;
-				BM_elem_index_set(ele, i); /* set_inline */
+				BM_elem_index_set(&ele->base, i); /* set_inline */
 			}
 		}
 	}

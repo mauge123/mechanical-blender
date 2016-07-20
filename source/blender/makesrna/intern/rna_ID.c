@@ -277,11 +277,11 @@ StructRNA *rna_PropertyGroup_refine(PointerRNA *ptr)
 	return ptr->type;
 }
 
-static ID *rna_ID_copy(ID *id)
+static ID *rna_ID_copy(ID *id, Main *bmain)
 {
 	ID *newid;
 
-	if (id_copy(id, &newid, false)) {
+	if (id_copy(bmain, id, &newid, false)) {
 		if (newid) id_us_min(newid);
 		return newid;
 	}
@@ -698,7 +698,7 @@ static void rna_ImagePreview_icon_pixels_float_set(PointerRNA *ptr, const float 
 static int rna_ImagePreview_icon_id_get(PointerRNA *ptr)
 {
 	/* Using a callback here allows us to only generate icon matching that preview when icon_id is requested. */
-	return BKE_icon_preview_ensure((PreviewImage *)(ptr->data));
+	return BKE_icon_preview_ensure(ptr->id.data, (PreviewImage *)(ptr->data));
 }
 static void rna_ImagePreview_icon_reload(PreviewImage *prv)
 {
@@ -981,6 +981,7 @@ static void rna_def_ID(BlenderRNA *brna)
 	/* functions */
 	func = RNA_def_function(srna, "copy", "rna_ID_copy");
 	RNA_def_function_ui_description(func, "Create a copy of this data-block (not supported for all data-blocks)");
+	RNA_def_function_flag(func, FUNC_USE_MAIN);
 	parm = RNA_def_pointer(func, "id", "ID", "", "New copy of the ID");
 	RNA_def_function_return(func, parm);
 

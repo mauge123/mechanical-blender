@@ -93,6 +93,8 @@
 #include "BKE_lamp.h"
 #include "BKE_lattice.h"
 #include "BKE_library.h"
+#include "BKE_library_query.h"
+#include "BKE_library_remap.h"
 #include "BKE_linestyle.h"
 #include "BKE_mesh.h"
 #include "BKE_editmesh.h"
@@ -1092,7 +1094,7 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
 	ModifierData *md;
 	int a;
 
-	obn = BKE_libblock_copy_ex(bmain, &ob->id);
+	obn = BKE_libblock_copy(bmain, &ob->id);
 	
 	if (ob->totcol) {
 		obn->mat = MEM_dupallocN(ob->mat);
@@ -1164,11 +1166,11 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
 
 	copy_object_lod(obn, ob);
 	
-
 	/* Copy runtime surve data. */
 	obn->curve_cache = NULL;
 
-	if (ob->id.lib) {
+	if (ID_IS_LINKED_DATABLOCK(ob)) {
+		BKE_id_expand_local(&obn->id);
 		BKE_id_lib_local_paths(bmain, ob->id.lib, &obn->id);
 	}
 
@@ -1179,121 +1181,54 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
 }
 
 /* copy objects, will re-initialize cached simulation data */
-Object *BKE_object_copy(Object *ob)
+Object *BKE_object_copy(Main *bmain, Object *ob)
 {
-	return BKE_object_copy_ex(G.main, ob, false);
+	return BKE_object_copy_ex(bmain, ob, false);
 }
 
-static void extern_local_object__modifiersForeachIDLink(
-        void *UNUSED(userData), Object *UNUSED(ob), ID **idpoin, int UNUSED(cd_flag))
+void BKE_object_make_local(Main *bmain, Object *ob, const bool force_local)
 {
-	if (*idpoin) {
-		/* intentionally omit ID_OB */
-		if (ELEM(GS((*idpoin)->name), ID_IM, ID_TE)) {
-			id_lib_extern(*idpoin);
-		}
-	}
-}
-
-static void extern_local_object(Object *ob)
-{
-	ParticleSystem *psys;
-
-	id_lib_extern((ID *)ob->data);
-	id_lib_extern((ID *)ob->dup_group);
-	id_lib_extern((ID *)ob->poselib);
-	id_lib_extern((ID *)ob->gpd);
-
-	extern_local_matarar(ob->mat, ob->totcol);
-
-	for (psys = ob->particlesystem.first; psys; psys = psys->next)
-		id_lib_extern((ID *)psys->part);
-
-	modifiers_foreachIDLink(ob, extern_local_object__modifiersForeachIDLink, NULL);
-
-	ob->preview = NULL;
-}
-
-void BKE_object_make_local(Object *ob)
-{
-	Main *bmain = G.main;
-	Scene *sce;
-	Base *base;
 	bool is_local = false, is_lib = false;
 
-	/* - only lib users: do nothing
+	/* - only lib users: do nothing (unless force_local is set)
 	 * - only local users: set flag
 	 * - mixed: make copy
 	 */
 
-	if (ob->id.lib == NULL) return;
-	
-	ob->proxy = ob->proxy_from  = ob->proxy_group = NULL;
-	
-	if (ob->id.us == 1) {
-		id_clear_lib_data(bmain, &ob->id);
-		extern_local_object(ob);
+	if (!ID_IS_LINKED_DATABLOCK(ob)) {
+		return;
 	}
-	else {
-		for (sce = bmain->scene.first; sce && ELEM(0, is_lib, is_local); sce = sce->id.next) {
-			if (BKE_scene_base_find(sce, ob)) {
-				if (sce->id.lib) is_lib = true;
-				else is_local = true;
-			}
-		}
 
-		if (is_local && is_lib == false) {
+	BKE_library_ID_test_usages(bmain, ob, &is_local, &is_lib);
+
+	if (force_local || is_local) {
+		if (!is_lib) {
 			id_clear_lib_data(bmain, &ob->id);
-			extern_local_object(ob);
+			BKE_id_expand_local(&ob->id);
 		}
-		else if (is_local && is_lib) {
-			Object *ob_new = BKE_object_copy(ob);
+		else {
+			Object *ob_new = BKE_object_copy(bmain, ob);
 
 			ob_new->id.us = 0;
-			
-			/* Remap paths of new ID using old library as base. */
-			BKE_id_lib_local_paths(bmain, ob->id.lib, &ob_new->id);
+			ob_new->proxy = ob_new->proxy_from = ob_new->proxy_group = NULL;
 
-			sce = bmain->scene.first;
-			while (sce) {
-				if (sce->id.lib == NULL) {
-					base = sce->base.first;
-					while (base) {
-						if (base->object == ob) {
-							base->object = ob_new;
-							id_us_plus(&ob_new->id);
-							id_us_min(&ob->id);
-						}
-						base = base->next;
-					}
-				}
-				sce = sce->id.next;
-			}
+			BKE_libblock_remap(bmain, ob, ob_new, ID_REMAP_SKIP_INDIRECT_USAGE);
 		}
 	}
 }
 
-/*
- * Returns true if the Object is a from an external blend file (libdata)
- */
+/* Returns true if the Object is from an external blend file (libdata) */
 bool BKE_object_is_libdata(Object *ob)
 {
-	if (!ob) return false;
-	if (ob->proxy) return false;
-	if (ob->id.lib) return true;
-	return false;
+	return (ob && ID_IS_LINKED_DATABLOCK(ob));
 }
 
-/* Returns true if the Object data is a from an external blend file (libdata) */
+/* Returns true if the Object data is from an external blend file (libdata) */
 bool BKE_object_obdata_is_libdata(Object *ob)
 {
-	if (!ob) return false;
-	if (ob->proxy && (ob->data == NULL || ((ID *)ob->data)->lib == NULL)) return false;
-	if (ob->id.lib) return true;
-	if (ob->data == NULL) return false;
-	if (((ID *)ob->data)->lib) return true;
-
-	return false;
+	/* Linked objects with local obdata are forbidden! */
+	BLI_assert(!ob || !ob->data || (ID_IS_LINKED_DATABLOCK(ob) ? ID_IS_LINKED_DATABLOCK(ob->data) : true));
+	return (ob && ob->data && ID_IS_LINKED_DATABLOCK(ob->data));
 }
 
 /* *************** PROXY **************** */
@@ -1340,7 +1275,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
 							/* only on local objects because this causes indirect links
 							 * 'a -> b -> c', blend to point directly to a.blend
 							 * when a.blend has a proxy thats linked into c.blend  */
-							if (ob->id.lib == NULL)
+							if (!ID_IS_LINKED_DATABLOCK(ob))
 								id_lib_extern((ID *)dtar->id);
 						}
 					}
@@ -1358,7 +1293,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
 void BKE_object_make_proxy(Object *ob, Object *target, Object *gob)
 {
 	/* paranoia checks */
-	if (ob->id.lib || target->id.lib == NULL) {
+	if (ID_IS_LINKED_DATABLOCK(ob) || !ID_IS_LINKED_DATABLOCK(target)) {
 		printf("cannot make proxy\n");
 		return;
 	}
@@ -2740,7 +2675,7 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 				printf("recalcob %s\n", ob->id.name + 2);
 			
 			/* handle proxy copy for target */
-			if (ob->id.lib && ob->proxy_from) {
+			if (ID_IS_LINKED_DATABLOCK(ob) && ob->proxy_from) {
 				// printf("ob proxy copy, lib ob %s proxy %s\n", ob->id.name, ob->proxy_from->id.name);
 				if (ob->proxy_from->proxy_group) { /* transform proxy into group space */
 					Object *obg = ob->proxy_from->proxy_group;

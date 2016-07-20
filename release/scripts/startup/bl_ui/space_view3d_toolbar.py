@@ -1532,6 +1532,15 @@ class VIEW3D_PT_sculpt_dyntopo(Panel, View3DPaintPanel):
     def poll(cls, context):
         return (context.sculpt_object and context.tool_settings.sculpt)
 
+    def draw_header(self, context):
+        layout = self.layout
+        layout.operator(
+                "sculpt.dynamic_topology_toggle",
+                icon='CHECKBOX_HLT' if context.sculpt_object.use_dynamic_topology_sculpting else 'CHECKBOX_DEHLT',
+                text="",
+                emboss=False,
+                )
+
     def draw(self, context):
         layout = self.layout
 
@@ -1539,11 +1548,6 @@ class VIEW3D_PT_sculpt_dyntopo(Panel, View3DPaintPanel):
         sculpt = toolsettings.sculpt
         settings = self.paint_settings(context)
         brush = settings.brush
-
-        if context.sculpt_object.use_dynamic_topology_sculpting:
-            layout.operator("sculpt.dynamic_topology_toggle", icon='X', text="Disable Dyntopo")
-        else:
-            layout.operator("sculpt.dynamic_topology_toggle", icon='SCULPT_DYNTOPO', text="Enable Dyntopo")
 
         col = layout.column()
         col.active = context.sculpt_object.use_dynamic_topology_sculpting
@@ -1603,7 +1607,7 @@ class VIEW3D_PT_sculpt_options(Panel, View3DPaintPanel):
 
 class VIEW3D_PT_sculpt_symmetry(Panel, View3DPaintPanel):
     bl_category = "Tools"
-    bl_label = "Symmetry / Lock"
+    bl_label = "Symmetry/Lock"
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod

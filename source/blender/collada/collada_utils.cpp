@@ -357,8 +357,11 @@ void bc_triangulate_mesh(Mesh *me)
 	bool use_beauty  = false;
 	bool tag_only    = false;
 	int  quad_method = MOD_TRIANGULATE_QUAD_SHORTEDGE; /* XXX: The triangulation method selection could be offered in the UI */
-	 
-	BMesh *bm = BM_mesh_create(&bm_mesh_allocsize_default);
+
+	const struct BMeshCreateParams bm_create_params = {0};
+	BMesh *bm = BM_mesh_create(
+	        &bm_mesh_allocsize_default,
+	        &bm_create_params);
 	BMeshFromMeshParams bm_from_me_params = {0};
 	bm_from_me_params.calc_face_normal = true;
 	BM_mesh_bm_from_me(bm, me, &bm_from_me_params);
@@ -370,8 +373,8 @@ void bc_triangulate_mesh(Mesh *me)
 }
 
 /*
-* A bone is a leaf when it has no children or all children are not connected.
-*/
+ * A bone is a leaf when it has no children or all children are not connected.
+ */
 bool bc_is_leaf_bone(Bone *bone)
 {
 	for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
@@ -410,10 +413,10 @@ int bc_set_layer(int bitfield, int layer, bool enable)
 }
 
 /**
-* BoneExtended is a helper class needed for the Bone chain finder
-* See ArmatureImporter::fix_leaf_bones()
-* and ArmatureImporter::connect_bone_chains()
-**/
+ * BoneExtended is a helper class needed for the Bone chain finder
+ * See ArmatureImporter::fix_leaf_bones()
+ * and ArmatureImporter::connect_bone_chains()
+ */
 
 BoneExtended::BoneExtended(EditBone *aBone)
 {
@@ -536,8 +539,8 @@ void BoneExtended::set_bone_layers(std::string layerString, std::vector<std::str
 		}
 
 		/* If numeric layers and labeled layers are used in parallel (unlikely),
-		   we get a potential mixup. Just leave as is for now.
-		*/
+		 * we get a potential mixup. Just leave as is for now.
+		 */
 		this->bone_layers = bc_set_layer(this->bone_layers, pos);
 
 	}
