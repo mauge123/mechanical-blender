@@ -6035,7 +6035,10 @@ int join_curve_exec(bContext *C, wmOperator *op)
 	
 	DAG_relations_tag_update(bmain);   // because we removed object(s), call before editmode!
 
-	DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA);
+	//DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA);
+
+	ED_object_editmode_enter(C, EM_WAITCURSOR);
+	ED_object_editmode_exit(C, EM_FREEDATA | EM_WAITCURSOR | EM_DO_UNDO);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
 

@@ -33,6 +33,8 @@
 #include "DNA_view3d_types.h"
 
 #include "BKE_editmesh.h"
+#include "BKE_DerivedMesh.h"
+#include "BKE_cdderivedmesh.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -59,9 +61,16 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 		getViewDepthPoint(t, p);
 #endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
-		if (t->obedit) {
-			BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
-			BMReference *erf = BM_reference_at_index_find(bm,((View3D*)t->view)->refplane-1);
+		Scene *scene= t->scene;
+		Object *ob = OBACT;
+		DerivedMesh *dm = NULL;
+		BMEditMesh *em = NULL;
+		if (t->obedit && ob->type == OB_MESH) {
+			dm = CDDM_from_mesh(ob->data);
+			em = (dm->type == DM_TYPE_EDITBMESH) ? BKE_editmesh_from_object(ob) : NULL;
+		}
+		if (t->obedit && em) {
+			BMReference *erf = BM_reference_at_index_find(em->bm,((View3D*)t->view)->refplane-1);
 			if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, imval, vec)) {
 				// Ok
 			} else {
@@ -69,6 +78,9 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 			}
 		} else {
 			ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+		}
+		if (dm) {
+			dm->release(dm);
 		}
 		sub_v3_v3v3(output, vec, t->iloc);
 	} else {
