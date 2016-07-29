@@ -67,7 +67,7 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 		BMEditMesh *em = NULL;
 		if (t->obedit && ob->type == OB_MESH) {
 			dm = CDDM_from_mesh(ob->data);
-			em = (dm->type == DM_TYPE_EDITBMESH) ? BKE_editmesh_from_object(ob) : NULL;
+			em = BKE_editmesh_from_object(t->obedit);
 		}
 		if (t->obedit && em) {
 			BMReference *erf = BM_reference_at_index_find(em->bm,((View3D*)t->view)->refplane-1);

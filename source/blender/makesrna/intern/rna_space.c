@@ -485,14 +485,13 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 	if (scene) {
 		Object *ob = OBACT;
 		Object *obedit = scene->obedit;
-		DerivedMesh *dm = NULL;
 		BMEditMesh *em = NULL;
 		if (obedit) {
 			if (ob->type == OB_MESH) {
-					dm = CDDM_from_mesh(ob->data);
-					em = (dm->type == DM_TYPE_EDITBMESH) ? BKE_editmesh_from_object(ob) : NULL;
-			}
-			if (em) {
+				em = BKE_editmesh_from_object(ob);
+				}
+			if(em){
+				BMEditMesh *em = BKE_editmesh_from_object(ob);
 				BMReference *erf = NULL;
 				BMIter iter;
 				if (em->bm->totref > 0) {
@@ -505,19 +504,14 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 					RNA_enum_item_add(&item, &totitem, &tmp);
 				}
 			}
-			if (dm) {
-				dm->release(dm);
-			}
 		}
-
 	}
 
 	RNA_enum_item_end(&item, &totitem);
 	*r_free = true;
 
 	return item;
-}
-
+	}
 
 /* Space 3D View */
 static void rna_SpaceView3D_lock_camera_and_layers_set(PointerRNA *ptr, int value)

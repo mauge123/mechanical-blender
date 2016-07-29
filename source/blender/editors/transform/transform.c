@@ -2590,25 +2590,19 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			getViewDepthPoint(t, p);
 #endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
-			DerivedMesh *dm = NULL;
-			BMEditMesh *em = NULL;
+			BMesh *bm = NULL;
 			Object *ob = CTX_data_active_object(C);
-			if (t->obedit) {
-				if (ob->type == OB_MESH) {
-					dm = CDDM_from_mesh(ob->data);
-					em = (dm->type == DM_TYPE_EDITBMESH) ? BKE_editmesh_from_object(ob) : NULL;
-				}
-				if (em) {
-					//BMesh *bm = BKE_editmesh_from_object(t->obedit)->bm;
-					BMReference *erf = BM_reference_at_index_find(em->bm,((View3D*)t->view)->refplane-1);
+			if (t->obedit && ob->type == OB_MESH) {
+				bm = BKE_editmesh_from_object(t->obedit)->bm;
+				if (bm) {
+					BMReference *erf = BM_reference_at_index_find(bm,((View3D*)t->view)->refplane-1);
 					if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, event->mval, t->iloc)) {
 						// Ok
 					} else {
 						ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
 					}
-				}
-				if (dm) {
-					dm->release(dm);
+				}else{
+					ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
 				}
 			} else {
 				ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
