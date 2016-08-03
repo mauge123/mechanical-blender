@@ -73,7 +73,7 @@ int eq_v3v3_prec(const float fa[3], const float fb[3])
 	v_pre(a,fa);
 	v_pre(b,fb);
 
-	return (a[0] ==  b[0]) && (a[1] == b[1]) && (a[2] - b[2]);
+	return (a[0] ==  b[0]) && (a[1] == b[1]) && (a[2] == b[2]);
 }
 
 int eq_ff_prec(const float fa, const float fb)
