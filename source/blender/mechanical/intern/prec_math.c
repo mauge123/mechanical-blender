@@ -4,8 +4,8 @@
  */
 
 
-#define MECHANICAL_DEC_PRECISION 100
-#define MECHANICAL_DEC_PRECISION_SQ 10000
+#define MECHANICAL_DEC_PRECISION 1000
+#define MECHANICAL_DEC_PRECISION_SQ 1000000
 
 
 #include "prec_math.h"
@@ -13,9 +13,10 @@
 
 
 static void v_pre(int *r, const float *v) {
-	r[0]= (int) (v[0]*MECHANICAL_DEC_PRECISION);
-	r[1]= (int) (v[1]*MECHANICAL_DEC_PRECISION);
-	r[2]= (int) (v[2]*MECHANICAL_DEC_PRECISION);
+
+	r[0]= (int) roundf((v[0]*MECHANICAL_DEC_PRECISION));
+	r[1]= (int) roundf((v[1]*MECHANICAL_DEC_PRECISION));
+	r[2]= (int) roundf((v[2]*MECHANICAL_DEC_PRECISION));
 }
 
 static int f_pre (float f) {
@@ -23,9 +24,9 @@ static int f_pre (float f) {
 }
 
 static void v_to_pre(float *r, const int *v) {
-	r[0]= (v[0]/MECHANICAL_DEC_PRECISION);
-	r[1]= (v[1]/MECHANICAL_DEC_PRECISION);
-	r[2]= (v[2]/MECHANICAL_DEC_PRECISION);
+	r[0]= ((float) v[0]/ (float) MECHANICAL_DEC_PRECISION);
+	r[1]= ((float) v[1]/ (float) MECHANICAL_DEC_PRECISION);
+	r[2]= ((float) v[2]/ (float) MECHANICAL_DEC_PRECISION);
 }
 
 
