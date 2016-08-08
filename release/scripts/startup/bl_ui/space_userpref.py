@@ -574,6 +574,7 @@ class USERPREF_PT_theme(Panel):
             "paint_curve_pivot",
 #WITH_MECHANICAL
             "dimension_text_sel",
+	    "geometry_lines_sel",
             },
         'GRAPH_EDITOR': {
             "handle_vertex_select",

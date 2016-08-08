@@ -320,16 +320,25 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 
 				switch (type) {
 					case BM_GEOMETRY_TYPE_CIRCLE:
+					{
+						copy_v3_v3(egm->center,center);
+						normal_tri_v3(egm->axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
+						break;
+					}
 					case BM_GEOMETRY_TYPE_ARC:
 					{
 						copy_v3_v3(egm->center,center);
 						normal_tri_v3(egm->axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
+						copy_v3_v3(egm->start, egm->v[0]->co);
+						copy_v3_v3(egm->end, egm->v[egm->totverts-1]->co);
 						break;
 					}
 					case BM_GEOMETRY_TYPE_LINE:
 					{
 						sub_v3_v3v3(egm->axis,egm->v[0]->co,egm->v[1]->co);
 						normalize_v3(egm->axis);
+						copy_v3_v3(egm->start, egm->v[0]->co);
+						copy_v3_v3(egm->end, egm->v[egm->totverts-1]->co);
 						break;
 					}
 					default:

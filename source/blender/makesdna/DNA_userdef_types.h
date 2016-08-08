@@ -349,6 +349,10 @@ typedef struct ThemeSpace {
 //WITH_MECHANICAL
 	char dim_lines[4], dim_lines_sel[4];
 	char dim_text[4], dim_text_sel[4];
+
+//WITH GEOMETRY
+	char geom_lines[4], geom_lines_sel[4];
+
 } ThemeSpace;
 
 

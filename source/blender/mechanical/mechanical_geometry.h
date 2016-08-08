@@ -14,5 +14,6 @@ typedef struct test_circle_data {
 }test_circle_data;
 
 void mechanical_update_mesh_geometry(BMEditMesh *em);
+void set_geometry_center (BMEditMesh *em, float center[3]);
 
 #endif // MECHANICAL_GEOMETRY_H

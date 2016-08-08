@@ -1834,6 +1834,20 @@ static void rna_def_userdef_theme_space_view3d(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+	prop = RNA_def_property(srna, "geometry_lines", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "geom_lines");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Geometry", "Color of Geometry");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "geometry_lines_sel", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "geom_lines_sel");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Geometry Select", "Color of selected geometry");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+#endif
+
 }
 
 

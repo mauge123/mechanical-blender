@@ -600,7 +600,7 @@ static int bmo_mesh_flag_count(
 			if (htype & BM_REFERENCE) {
 				BMIter iter;
 				BMReference *ele;
-				BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+				BM_ITER_MESH (ele, &iter, bm, BM_REFERENCES_OF_MESH) {
 					if (BMO_reference_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
 						count_ref++;
 					}

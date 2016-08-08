@@ -58,6 +58,7 @@
 #include "ED_armature.h"
 
 #include "transform.h"
+#include "mesh_dimensions.h"
 
 typedef struct SnapObjectData {
 	enum {
@@ -307,6 +308,130 @@ static bool snapEdge(
 			}
 		}
 	}
+
+	return retval;
+}
+int get_max_geom_points(BMEditMesh *em)
+{
+	BMGeom *egm;
+	BMIter iter;
+	int num=0;
+	BM_ITER_MESH (egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
+		switch (egm->geometry_type) {
+			case BM_GEOMETRY_TYPE_LINE:
+			case BM_GEOMETRY_TYPE_ARC:
+				num=num+3;
+
+			break;
+			case BM_GEOMETRY_TYPE_CIRCLE:
+				num=num+1;
+			break;
+		}
+	}
+	return num;
+}
+
+
+
+
+int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **points) {
+	int max_geom_points= get_max_geom_points(em);
+	int n_geom_points = 0;
+	BMGeom *egm;
+	BMIter iter;
+
+
+	*points = MEM_callocN(sizeof(snap_geom_point)*max_geom_points, "Snap points array");
+	snap_geom_point *p = *points;
+	BM_ITER_MESH (egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
+		switch (egm->geometry_type) {
+			case BM_GEOMETRY_TYPE_LINE:
+				copy_v3_v3(p->v, egm->start);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+				copy_v3_v3(p->v, egm->end);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+				mid_of_2_points(p->v, egm->start, egm->end);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+			break;
+			case BM_GEOMETRY_TYPE_CIRCLE:
+				copy_v3_v3(p->v, egm->center);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+			break;
+			case BM_GEOMETRY_TYPE_ARC:
+				copy_v3_v3(p->v, egm->center);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+				copy_v3_v3(p->v, egm->start);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+				copy_v3_v3(p->v, egm->end);
+				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+					n_geom_points++;
+					p++;
+				}
+
+			break;
+		}
+
+	}
+
+	return n_geom_points;
+
+}
+
+static bool snapGeom(const ARegion *ar, BMEditMesh *em,  const float mval_fl[2], float *dist_px, float r_loc[3], float r_no[3] )
+{
+	snap_geom_point *points, *found = NULL;
+	bool retval = false;
+	int num_geom_points = 0;
+	int i =0;
+
+	float dist = 0;
+
+
+	//**********************
+	num_geom_points = init_geom_snap_data(ar, em, &points);
+
+
+
+	// Search Data
+	for (i=0;i<num_geom_points;i++) {
+
+		dist = len_manhattan_v2v2(mval_fl, points[i].mval);
+
+		if (dist < *dist_px ) {
+			*dist_px = dist;
+			found = &points[i];
+		}
+		if (dist == 0) {
+			break;
+		}
+	}
+
+	if (found) {
+		retval =  true;
+		copy_v3_v3(r_loc, found->v);
+	}
+
+	// Free data
+	MEM_freeN(points);
+
 
 	return retval;
 }
@@ -1009,7 +1134,7 @@ static bool snapEditMesh(
 
 	{
 		const bool do_ray_start_correction = (
-		        ELEM(snap_to, SCE_SNAP_MODE_FACE, SCE_SNAP_MODE_VERTEX) &&
+			ELEM(snap_to, SCE_SNAP_MODE_FACE, SCE_SNAP_MODE_VERTEX, SCE_SNAP_MODE_GEOM) &&
 		        (sctx->use_v3d && !((RegionView3D *)sctx->v3d_data.ar->regiondata)->is_persp));
 
 		float imat[4][4];
@@ -1264,6 +1389,14 @@ static bool snapEditMesh(
 					}
 				}
 
+				break;
+			}
+// WITH_MECHANICAL_GEOMETRY
+
+			case SCE_SNAP_MODE_GEOM:
+			{
+
+				retval |= snapGeom(ar, em, mval, dist_px, r_loc, r_no);
 				break;
 			}
 		}
