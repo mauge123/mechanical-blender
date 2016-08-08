@@ -2670,6 +2670,14 @@ static void mechanical_draw_circle(float center[], float point[], float axis[], 
 
 }
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+static void get_geometry_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text)
+{
+	UI_GetThemeColor4ubv(selected ? TH_GEOM_SEL : TH_GEOM, r_lines);
+
+
+}
+#endif
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 static void get_dimension_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text)
@@ -3853,17 +3861,15 @@ static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
 #endif
 
 #ifdef WITH_MECHANICAL_GEOMETRY
-static void draw_em_mesh_geometry(BMEditMesh *em)
+
+static void draw_em_mesh_geometry(BMGeom *egm, int selected)
 {
 	float r[3];
-
+	unsigned char col[4], tcol[4]; /* color of the text to draw */
 	glLineWidth(4.0f);
 	glPointSize(6.0f);
-	glColor4f(1.0f,0.0f,0.0f,1.0f);
-
-	BMGeom *egm;
-	BMIter iter;
-	BM_ITER_MESH(egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
+		get_geometry_theme_values(selected, col, tcol);
+		glColor3ubv(col);
 		switch (egm->geometry_type) {
 			case BM_GEOMETRY_TYPE_ARC:
 			{
@@ -3880,6 +3886,7 @@ static void draw_em_mesh_geometry(BMEditMesh *em)
 				mechanical_draw_circle(egm->center, r, egm->axis, 360.0f);
 				break;
 			case BM_GEOMETRY_TYPE_LINE:
+				glColor3ubv(col);
 				glBegin(GL_LINES);
 				{
 					glVertex3fv(egm->v[0]->co);
@@ -3897,7 +3904,7 @@ static void draw_em_mesh_geometry(BMEditMesh *em)
 				assert(0);
 		}
 	}
-}
+
 #endif
 
 static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMesh *em, UnitSettings *unit)
@@ -4564,8 +4571,24 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
+
+			BMIter iter;
+			BMGeom *egm = NULL;
+			BMGeom *egm_sel = NULL;
 			if (em->bm->totgeom &&  (me->drawflag & (ME_DRAW_GEOMETRY))) {
-				draw_em_mesh_geometry(em);
+
+				BM_ITER_MESH(egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
+					if(!BM_elem_flag_test(egm, BM_ELEM_SELECT)){
+						draw_em_mesh_geometry(egm, false);
+					}else{
+						egm_sel=egm;
+					}
+
+				}
+				if(egm_sel){
+					draw_em_mesh_geometry(egm_sel, true);
+				}
+
 			}
 #endif
 		}

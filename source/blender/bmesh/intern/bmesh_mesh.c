@@ -1593,6 +1593,13 @@ BMDim *BM_dim_at_index_find(BMesh *bm, const int index)
 }
 #endif
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+BMGeom *BM_geom_at_index_find(BMesh *bm, const int index)
+{
+	return BLI_mempool_findelem(bm->dpool, index);
+}
+#endif
+
 /**
  * Use lookup table when available, else use slower find functions.
  *

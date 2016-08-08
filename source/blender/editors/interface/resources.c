@@ -708,6 +708,15 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 					cp = ts->dim_text_sel;
 					break;
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+				case TH_GEOM:
+					cp = ts->geom_lines;
+					break;
+				case TH_GEOM_SEL:
+					cp = ts->geom_lines_sel;
+					break;
+#endif
+
 			}
 		}
 	}

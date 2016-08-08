@@ -178,6 +178,9 @@ EnumPropertyItem rna_enum_snap_element_items[] = {
 #ifdef WITH_MECHANICAL_SNAP_TO_CURSOR
 	{SCE_SNAP_MODE_PLANE, "PLANE", ICON_SNAP_FACE, "Plane", "Snap to plane"},
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+	{SCE_SNAP_MODE_GEOM,   "GEOMETRY", ICON_SNAP_FACE, "Geometry", "Snap to Geometry"},
+#endif
     {0, NULL, 0, NULL, NULL}
 };
 

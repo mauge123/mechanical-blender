@@ -57,6 +57,13 @@ struct SnapObjectHitDepth {
 	unsigned int ob_uuid;
 };
 
+//WITH_MECHANICAL_GEOMETRY
+typedef struct snap_geom_point
+{
+	float v[3];
+	float mval[2];
+}snap_geom_point;
+
 /** parameters that define which objects will be used to snap. */
 struct SnapObjectParams {
 	/* special context sensitive handling for the active or selected object */
