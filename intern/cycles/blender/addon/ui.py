@@ -401,6 +401,7 @@ class CyclesRender_PT_performance(CyclesButtonsPanel, Panel):
 
         col.label(text="Acceleration structure:")
         col.prop(cscene, "debug_use_spatial_splits")
+        col.prop(cscene, "debug_use_hair_bvh")
 
 
 class CyclesRender_PT_layer_options(CyclesButtonsPanel, Panel):
@@ -458,7 +459,9 @@ class CyclesRender_PT_layer_passes(CyclesButtonsPanel, Panel):
         col.prop(rl, "use_pass_z")
         col.prop(rl, "use_pass_mist")
         col.prop(rl, "use_pass_normal")
-        col.prop(rl, "use_pass_vector")
+        row = col.row()
+        row.prop(rl, "use_pass_vector")
+        row.active = not rd.use_motion_blur
         col.prop(rl, "use_pass_uv")
         col.prop(rl, "use_pass_object_index")
         col.prop(rl, "use_pass_material_index")
@@ -671,48 +674,6 @@ class Cycles_PT_context_material(CyclesButtonsPanel, Panel):
             split.separator()
 
 
-class Cycles_PT_mesh_displacement(CyclesButtonsPanel, Panel):
-    bl_label = "Displacement"
-    bl_context = "data"
-
-    @classmethod
-    def poll(cls, context):
-        if CyclesButtonsPanel.poll(context):
-            if context.mesh or context.curve or context.meta_ball:
-                if context.scene.cycles.feature_set == 'EXPERIMENTAL':
-                    return True
-
-        return False
-
-    def draw(self, context):
-        layout = self.layout
-
-        mesh = context.mesh
-        curve = context.curve
-        mball = context.meta_ball
-
-        if mesh:
-            cdata = mesh.cycles
-        elif curve:
-            cdata = curve.cycles
-        elif mball:
-            cdata = mball.cycles
-
-        split = layout.split()
-
-        col = split.column()
-        sub = col.column(align=True)
-        sub.label(text="Displacement:")
-        sub.prop(cdata, "displacement_method", text="")
-
-        col = split.column()
-        sub = col.column(align=True)
-        sub.label(text="Subdivision:")
-        sub.prop(cdata, "subdivision_type", text="")
-
-        if cdata.subdivision_type != 'NONE':
-            sub.prop(cdata, "dicing_rate")
-
 class CyclesObject_PT_motion_blur(CyclesButtonsPanel, Panel):
     bl_label = "Motion Blur"
     bl_context = "object"
@@ -892,7 +853,7 @@ class CyclesLamp_PT_lamp(CyclesButtonsPanel, Panel):
 
         lamp = context.lamp
         clamp = lamp.cycles
-        cscene = context.scene.cycles
+        # cscene = context.scene.cycles
 
         layout.prop(lamp, "type", expand=True)
 
@@ -1112,7 +1073,7 @@ class CyclesWorld_PT_settings(CyclesButtonsPanel, Panel):
 
         world = context.world
         cworld = world.cycles
-        cscene = context.scene.cycles
+        # cscene = context.scene.cycles
 
         split = layout.split()
 
@@ -1223,6 +1184,11 @@ class CyclesMaterial_PT_settings(CyclesButtonsPanel, Panel):
         col.label(text="Surface:")
         col.prop(cmat, "sample_as_light", text="Multiple Importance")
         col.prop(cmat, "use_transparent_shadow")
+
+        if context.scene.cycles.feature_set == 'EXPERIMENTAL':
+            col.separator()
+            col.label(text="Displacement:")
+            col.prop(cmat, "displacement_method", text="")
 
         col = split.column()
         col.label(text="Volume:")

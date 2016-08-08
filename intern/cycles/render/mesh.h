@@ -40,6 +40,7 @@ class Scene;
 class SceneParams;
 class AttributeRequest;
 class DiagSplit;
+struct PackedPatchTable;
 
 /* Mesh */
 
@@ -97,14 +98,31 @@ public:
 		return curve_first_key.size();
 	}
 
-	/* Displacement */
-	enum DisplacementMethod {
-		DISPLACE_BUMP = 0,
-		DISPLACE_TRUE = 1,
-		DISPLACE_BOTH = 2,
+	/* Mesh SubdFace */
+	struct SubdFace {
+		int start_corner;
+		int num_corners;
+		int shader;
+		bool smooth;
+		int ptex_offset;
 
-		DISPLACE_NUM_METHODS,
+		bool is_quad() { return num_corners == 4; }
+		float3 normal(const Mesh *mesh) const;
+		int num_ptex_faces() const { return num_corners == 4 ? 1 : num_corners; }
 	};
+
+	struct SubdEdgeCrease {
+		int v[2];
+		float crease;
+	};
+
+	enum SubdivisionType {
+		SUBDIVISION_NONE,
+		SUBDIVISION_LINEAR,
+		SUBDIVISION_CATMULL_CLARK,
+	};
+
+	SubdivisionType subdivision_type;
 
 	/* Mesh Data */
 	enum GeometryFlags {
@@ -119,7 +137,10 @@ public:
 	array<float3> verts;
 	array<int> shader;
 	array<bool> smooth;
-	array<bool> forms_quad; /* used to tell if triangle is part of a quad patch */
+
+	/* used for storing patch info for subd triangles, only allocated if there are patches */
+	array<int> triangle_patch; /* must be < 0 for non subd triangles */
+	array<float2> vert_patch_uv;
 
 	bool has_volume;  /* Set in the device_update_flags(). */
 	bool has_surface_bssrdf;  /* Set in the device_update_flags(). */
@@ -129,15 +150,23 @@ public:
 	array<int> curve_first_key;
 	array<int> curve_shader;
 
+	array<SubdFace> subd_faces;
+	array<int> subd_face_corners;
+	int num_ngons;
+
+	array<SubdEdgeCrease> subd_creases;
+
 	vector<Shader*> used_shaders;
 	AttributeSet attributes;
 	AttributeSet curve_attributes;
+	AttributeSet subd_attributes;
 
 	BoundBox bounds;
 	bool transform_applied;
 	bool transform_negative_scaled;
 	Transform transform_normal;
-	DisplacementMethod displacement_method;
+
+	PackedPatchTable *patch_table;
 
 	uint motion_steps;
 	bool use_motion_blur;
@@ -154,6 +183,13 @@ public:
 	size_t curve_offset;
 	size_t curvekey_offset;
 
+	size_t patch_offset;
+	size_t patch_table_offset;
+	size_t face_offset;
+	size_t corner_offset;
+
+	size_t num_subd_verts;
+
 	/* Functions */
 	Mesh();
 	~Mesh();
@@ -162,12 +198,15 @@ public:
 	void reserve_mesh(int numverts, int numfaces);
 	void resize_curves(int numcurves, int numkeys);
 	void reserve_curves(int numcurves, int numkeys);
+	void resize_subd_faces(int numfaces, int num_ngons, int numcorners);
+	void reserve_subd_faces(int numfaces, int num_ngons, int numcorners);
 	void clear();
 	void add_vertex(float3 P);
 	void add_vertex_slow(float3 P);
-	void add_triangle(int v0, int v1, int v2, int shader, bool smooth, bool forms_quad = false);
+	void add_triangle(int v0, int v1, int v2, int shader, bool smooth);
 	void add_curve_key(float3 loc, float radius);
 	void add_curve(int first_key, int shader);
+	void add_subd_face(int* corners, int num_corners, int shader_, bool smooth_);
 	int split_vertex(int vertex);
 
 	void compute_bounds();
@@ -177,9 +216,13 @@ public:
 	void pack_normals(Scene *scene, uint *shader, float4 *vnormal);
 	void pack_verts(const vector<uint>& tri_prim_index,
 	                uint4 *tri_vindex,
+	                uint *tri_patch,
+	                float2 *tri_patch_uv,
 	                size_t vert_offset,
 	                size_t tri_offset);
 	void pack_curves(Scene *scene, float4 *curve_key_co, float4 *curve_data, size_t curvekey_offset);
+	void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
+
 	void compute_bvh(DeviceScene *dscene,
 	                 SceneParams *params,
 	                 Progress *progress,
@@ -192,6 +235,7 @@ public:
 	void tag_update(Scene *scene, bool rebuild);
 
 	bool has_motion_blur() const;
+	bool has_true_displacement() const;
 
 	/* Check whether the mesh should have own BVH built separately. Briefly,
 	 * own BVH is needed for mesh, if:

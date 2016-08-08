@@ -237,6 +237,9 @@ endif()
 		list(APPEND BLENDER_SORTED_LIBS bf_mechanical)
 	endif()
 
+	if(WITH_ALEMBIC)
+		list(APPEND BLENDER_SORTED_LIBS bf_alembic)
+	endif()
 
 	foreach(SORTLIB ${BLENDER_SORTED_LIBS})
 		set(REMLIB ${SORTLIB})

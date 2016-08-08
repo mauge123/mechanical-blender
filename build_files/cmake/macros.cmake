@@ -333,6 +333,11 @@ function(SETUP_LIBDIRS)
 		link_directories(${LLVM_LIBPATH})
 	endif()
 
+	if(WITH_ALEMBIC)
+		link_directories(${ALEMBIC_LIBPATH})
+		link_directories(${HDF5_LIBPATH})
+	endif()
+
 	if(WIN32 AND NOT UNIX)
 		link_directories(${PTHREADS_LIBPATH})
 	endif()
@@ -434,6 +439,9 @@ function(setup_liblinks
 		endif()
 	endif()
 	target_link_libraries(${target} ${JPEG_LIBRARIES})
+	if(WITH_ALEMBIC)
+		target_link_libraries(${target} ${ALEMBIC_LIBRARIES} ${HDF5_LIBRARIES})
+	endif()
 	if(WITH_IMAGE_OPENEXR)
 		target_link_libraries(${target} ${OPENEXR_LIBRARIES})
 	endif()
@@ -607,6 +615,7 @@ function(SETUP_BLENDER_SORTED_LIBS)
 		bf_imbuf_openimageio
 		bf_imbuf_dds
 		bf_collada
+		bf_alembic
 		bf_intern_elbeem
 		bf_intern_memutil
 		bf_intern_guardedalloc
@@ -1551,3 +1560,21 @@ function(print_all_vars)
 		message("${_var}=${${_var}}")
 	endforeach()
 endfunction()
+
+macro(openmp_delayload
+	projectname
+	)
+		if(MSVC)
+			if(WITH_OPENMP)
+				if(MSVC_VERSION EQUAL 1800)
+					set(OPENMP_DLL_NAME "vcomp120")
+				else()
+					set(OPENMP_DLL_NAME "vcomp140")
+				endif()
+				SET_TARGET_PROPERTIES(${projectname} PROPERTIES LINK_FLAGS_RELEASE "/DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+				SET_TARGET_PROPERTIES(${projectname} PROPERTIES LINK_FLAGS_DEBUG "/DELAYLOAD:${OPENMP_DLL_NAME}d.dll delayimp.lib")
+				SET_TARGET_PROPERTIES(${projectname} PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+				SET_TARGET_PROPERTIES(${projectname} PROPERTIES LINK_FLAGS_MINSIZEREL "/DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+			endif(WITH_OPENMP)
+		endif(MSVC)
+endmacro()

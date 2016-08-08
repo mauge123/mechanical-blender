@@ -931,7 +931,7 @@ void render_update_anim_renderdata(Render *re, RenderData *rd)
 	BLI_duplicatelist(&re->r.views, &rd->views);
 }
 
-void RE_SetWindow(Render *re, rctf *viewplane, float clipsta, float clipend)
+void RE_SetWindow(Render *re, const rctf *viewplane, float clipsta, float clipend)
 {
 	/* re->ok flag? */
 	
@@ -946,7 +946,7 @@ void RE_SetWindow(Render *re, rctf *viewplane, float clipsta, float clipend)
 	
 }
 
-void RE_SetOrtho(Render *re, rctf *viewplane, float clipsta, float clipend)
+void RE_SetOrtho(Render *re, const rctf *viewplane, float clipsta, float clipend)
 {
 	/* re->ok flag? */
 	
@@ -967,15 +967,17 @@ void RE_SetView(Render *re, float mat[4][4])
 	invert_m4_m4(re->viewinv, re->viewmat);
 }
 
-void RE_GetViewPlane(Render *re, rctf *viewplane, rcti *disprect)
+void RE_GetViewPlane(Render *re, rctf *r_viewplane, rcti *r_disprect)
 {
-	*viewplane = re->viewplane;
+	*r_viewplane = re->viewplane;
 	
 	/* make disprect zero when no border render, is needed to detect changes in 3d view render */
-	if (re->r.mode & R_BORDER)
-		*disprect = re->disprect;
-	else
-		BLI_rcti_init(disprect, 0, 0, 0, 0);
+	if (re->r.mode & R_BORDER) {
+		*r_disprect = re->disprect;
+	}
+	else {
+		BLI_rcti_init(r_disprect, 0, 0, 0, 0);
+	}
 }
 
 void RE_GetView(Render *re, float mat[4][4])
@@ -4015,4 +4017,32 @@ RenderPass *RE_pass_find_by_type(volatile RenderLayer *rl, int passtype, const c
 		}
 	}
 	return rp;
+}
+
+/* create a renderlayer and renderpass for grease pencil layer */
+RenderPass *RE_create_gp_pass(RenderResult *rr, const char *layername, const char *viewname)
+{
+	RenderLayer *rl = BLI_findstring(&rr->layers, layername, offsetof(RenderLayer, name));
+	/* only create render layer if not exist */
+	if (!rl) {
+		rl = MEM_callocN(sizeof(RenderLayer), layername);
+		BLI_addtail(&rr->layers, rl);
+		BLI_strncpy(rl->name, layername, sizeof(rl->name));
+		rl->lay = 0;
+		rl->layflag = SCE_LAY_SOLID;
+		rl->passflag = SCE_PASS_COMBINED;
+		rl->rectx = rr->rectx;
+		rl->recty = rr->recty;
+	}
+	
+	/* clear previous pass if exist or the new image will be over previous one*/
+	RenderPass *rp = RE_pass_find_by_type(rl, SCE_PASS_COMBINED, viewname);
+	if (rp) {
+		if (rp->rect) {
+			MEM_freeN(rp->rect);
+		}
+		BLI_freelinkN(&rl->passes, rp);
+	}
+	/* create a totally new pass */
+	return gp_add_pass(rr, rl, 4, SCE_PASS_COMBINED, viewname);
 }

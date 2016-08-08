@@ -52,6 +52,7 @@ EnumPropertyItem rna_enum_id_type_items[] = {
 	{ID_AR, "ARMATURE", ICON_ARMATURE_DATA, "Armature", ""},
 	{ID_BR, "BRUSH", ICON_BRUSH_DATA, "Brush", ""},
 	{ID_CA, "CAMERA", ICON_CAMERA_DATA, "Camera", ""},
+	{ID_CF, "CACHEFILE", ICON_FILE, "Cache File", ""},
 	{ID_CU, "CURVE", ICON_CURVE_DATA, "Curve", ""},
 	{ID_VF, "FONT", ICON_FONT_DATA, "Font", ""},
 	{ID_GD, "GREASEPENCIL", ICON_GREASEPENCIL, "Grease Pencil", ""},
@@ -64,10 +65,10 @@ EnumPropertyItem rna_enum_id_type_items[] = {
 	{ID_LT, "LATTICE", ICON_LATTICE_DATA, "Lattice", ""},
 	{ID_MSK, "MASK", ICON_MOD_MASK, "Mask", ""},
 	{ID_MA, "MATERIAL", ICON_MATERIAL_DATA, "Material", ""},
-	{ID_MB, "META", ICON_META_DATA, "MetaBall", ""},
+	{ID_MB, "META", ICON_META_DATA, "Metaball", ""},
 	{ID_ME, "MESH", ICON_MESH_DATA, "Mesh", ""},
-	{ID_MC, "MOVIECLIP", ICON_CLIP, "MovieClip", ""},
-	{ID_NT, "NODETREE", ICON_NODETREE, "NodeTree", ""},
+	{ID_MC, "MOVIECLIP", ICON_CLIP, "Movie Clip", ""},
+	{ID_NT, "NODETREE", ICON_NODETREE, "Node Tree", ""},
 	{ID_OB, "OBJECT", ICON_OBJECT_DATA, "Object", ""},
 	{ID_PC, "PAINTCURVE", ICON_CURVE_BEZCURVE, "Paint Curve", ""},
 	{ID_PAL, "PALETTE", ICON_COLOR, "Palette", ""},
@@ -139,6 +140,7 @@ short RNA_type_to_ID_code(StructRNA *type)
 	if (RNA_struct_is_a(type, &RNA_Action)) return ID_AC;
 	if (RNA_struct_is_a(type, &RNA_Armature)) return ID_AR;
 	if (RNA_struct_is_a(type, &RNA_Brush)) return ID_BR;
+	if (RNA_struct_is_a(type, &RNA_CacheFile)) return ID_CF;
 	if (RNA_struct_is_a(type, &RNA_Camera)) return ID_CA;
 	if (RNA_struct_is_a(type, &RNA_Curve)) return ID_CU;
 	if (RNA_struct_is_a(type, &RNA_GreasePencil)) return ID_GD;
@@ -179,6 +181,7 @@ StructRNA *ID_code_to_RNA_type(short idcode)
 		case ID_AR: return &RNA_Armature;
 		case ID_BR: return &RNA_Brush;
 		case ID_CA: return &RNA_Camera;
+		case ID_CF: return &RNA_CacheFile;
 		case ID_CU: return &RNA_Curve;
 		case ID_GD: return &RNA_GreasePencil;
 		case ID_GR: return &RNA_Group;
@@ -1024,6 +1027,7 @@ static void rna_def_ID(BlenderRNA *brna)
 static void rna_def_library(BlenderRNA *brna)
 {
 	StructRNA *srna;
+	FunctionRNA *func;
 	PropertyRNA *prop;
 
 	srna = RNA_def_struct(brna, "Library", "ID");
@@ -1042,6 +1046,10 @@ static void rna_def_library(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "packed_file", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "packedfile");
 	RNA_def_property_ui_text(prop, "Packed File", "");
+
+	func = RNA_def_function(srna, "reload", "WM_lib_reload");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS | FUNC_USE_CONTEXT);
+	RNA_def_function_ui_description(func, "Reload this library and all its linked datablocks");
 }
 void RNA_def_ID(BlenderRNA *brna)
 {

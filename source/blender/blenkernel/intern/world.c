@@ -138,14 +138,11 @@ World *BKE_world_copy(Main *bmain, World *wrld)
 		wrldn->nodetree = ntreeCopyTree(bmain, wrld->nodetree);
 	}
 	
-	wrldn->preview = BKE_previewimg_copy(wrld->preview);
+	BKE_previewimg_id_copy(&wrldn->id, &wrld->id);
 
 	BLI_listbase_clear(&wrldn->gpumaterial);
 
-	if (ID_IS_LINKED_DATABLOCK(wrld)) {
-		BKE_id_expand_local(&wrldn->id);
-		BKE_id_lib_local_paths(bmain, wrld->id.lib, &wrldn->id);
-	}
+	BKE_id_copy_ensure_local(bmain, &wrld->id, &wrldn->id);
 
 	return wrldn;
 }
@@ -176,32 +173,7 @@ World *localize_world(World *wrld)
 	return wrldn;
 }
 
-void BKE_world_make_local(Main *bmain, World *wrld, const bool force_local)
+void BKE_world_make_local(Main *bmain, World *wrld, const bool lib_local)
 {
-	bool is_local = false, is_lib = false;
-
-	/* - only lib users: do nothing (unless force_local is set)
-	 * - only local users: set flag
-	 * - mixed: make copy
-	 */
-
-	if (!ID_IS_LINKED_DATABLOCK(wrld)) {
-		return;
-	}
-
-	BKE_library_ID_test_usages(bmain, wrld, &is_local, &is_lib);
-
-	if (force_local || is_local) {
-		if (!is_lib) {
-			id_clear_lib_data(bmain, &wrld->id);
-			BKE_id_expand_local(&wrld->id);
-		}
-		else {
-			World *wrld_new = BKE_world_copy(bmain, wrld);
-
-			wrld_new->id.us = 0;
-
-			BKE_libblock_remap(bmain, wrld, wrld_new, ID_REMAP_SKIP_INDIRECT_USAGE);
-		}
-	}
+	BKE_id_make_local_generic(bmain, &wrld->id, true, lib_local);
 }
