@@ -44,6 +44,7 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_mesh_types.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_object.h"
@@ -59,6 +60,7 @@
 
 #include "transform.h"
 #include "mesh_dimensions.h"
+#include "mechanical_geometry.h"
 
 typedef struct SnapObjectData {
 	enum {
@@ -311,25 +313,71 @@ static bool snapEdge(
 
 	return retval;
 }
-int get_max_geom_points(BMEditMesh *em)
-{
-	BMGeom *egm;
-	BMIter iter;
-	int num=0;
-	BM_ITER_MESH (egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
-		switch (egm->geometry_type) {
-			case BM_GEOMETRY_TYPE_LINE:
-			case BM_GEOMETRY_TYPE_ARC:
-				num=num+3;
 
-			break;
-			case BM_GEOMETRY_TYPE_CIRCLE:
-				num=num+1;
-			break;
-		}
+static int snap_geom_start_end(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)) {
+
+	int n_geom_points = 0;
+	copy_v3_v3((*p)->v, egm->start);
+	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+		(*p)++;
+		n_geom_points++;
 	}
-	return num;
+
+	copy_v3_v3((*p)->v, egm->end);
+	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+		(*p)++;
+		n_geom_points++;
+	}
+
+
+	return n_geom_points;
 }
+
+static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)){
+
+	int n_geom_points = 0;
+
+	mid_of_2_points((*p)->v, egm->start, egm->end);
+	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+		n_geom_points++;
+		(*p)++;
+	}
+
+	return n_geom_points;
+}
+
+static int snap_geom_center(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)){
+
+	int n_geom_points = 0;
+	copy_v3_v3((*p)->v, egm->center);
+	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+		n_geom_points++;
+		(*p)++;
+	}
+
+	return n_geom_points;
+
+}
+
+static int snap_geom_mid_arc(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)){
+
+	int n_geom_points = 0;
+	float mid[3];
+
+	mid_of_2_points(mid, egm->start, egm->end);
+	sub_v3_v3v3(mid, mid, egm->center );
+	normalize_v3(mid);
+	mul_v3_fl(mid, len_v3v3(egm->center,egm->start));
+	add_v3_v3v3((*p)->v, egm->center, mid);
+
+	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+		n_geom_points++;
+		(*p)++;
+	}
+
+	return n_geom_points;
+}
+
 
 
 
@@ -337,53 +385,50 @@ int get_max_geom_points(BMEditMesh *em)
 int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **points) {
 	int max_geom_points= get_max_geom_points(em);
 	int n_geom_points = 0;
+	Mesh *me = em->ob->data;
 	BMGeom *egm;
 	BMIter iter;
 
+
+	bool snap_end_line = me->snapflag & ME_GEOM_LINE_END_POINT;
+	bool snap_mid_line = me->snapflag & ME_GEOM_LINE_MID_POINT;
+	bool snap_end_arc = me->snapflag & ME_GEOM_ARC_END_POINT;
+	bool snap_mid_arc = me->snapflag & ME_GEOM_ARC_MID_POINT;
+	bool snap_center_arc_circle = me->snapflag & ME_GEOM_CENTER_POINT;
 
 	*points = MEM_callocN(sizeof(snap_geom_point)*max_geom_points, "Snap points array");
 	snap_geom_point *p = *points;
 	BM_ITER_MESH (egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
 		switch (egm->geometry_type) {
 			case BM_GEOMETRY_TYPE_LINE:
-				copy_v3_v3(p->v, egm->start);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
+				if(snap_end_line) {
+					n_geom_points += snap_geom_start_end(ar, egm, &p);
+
 				}
-				copy_v3_v3(p->v, egm->end);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
-				}
-				mid_of_2_points(p->v, egm->start, egm->end);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
+				if(snap_mid_line) {
+					n_geom_points += snap_geom_mid(ar, egm, &p);
+
 				}
 			break;
 			case BM_GEOMETRY_TYPE_CIRCLE:
-				copy_v3_v3(p->v, egm->center);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
+				if(snap_center_arc_circle) {
+					n_geom_points += snap_geom_center(ar, egm, &p);
+
 				}
 			break;
 			case BM_GEOMETRY_TYPE_ARC:
-				copy_v3_v3(p->v, egm->center);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
+				if(snap_center_arc_circle) {
+					n_geom_points += snap_geom_center(ar, egm, &p);
+
 				}
-				copy_v3_v3(p->v, egm->start);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
+
+				if(snap_end_arc) {
+					n_geom_points += snap_geom_start_end(ar, egm, &p);
+
 				}
-				copy_v3_v3(p->v, egm->end);
-				if (ED_view3d_project_float_global(ar, p->v, p->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-					n_geom_points++;
-					p++;
+				if(snap_mid_arc) {
+					n_geom_points += snap_geom_mid_arc(ar, egm, &p);
+
 				}
 
 			break;
@@ -395,7 +440,7 @@ int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **po
 
 }
 
-static bool snapGeom(const ARegion *ar, BMEditMesh *em,  const float mval_fl[2], float *dist_px, float r_loc[3], float r_no[3] )
+static bool snapGeom(const ARegion *ar, BMEditMesh *em,  const float mval_fl[2], float *dist_px, float r_loc[3], float UNUSED(r_no[3]) )
 {
 	snap_geom_point *points, *found = NULL;
 	bool retval = false;
