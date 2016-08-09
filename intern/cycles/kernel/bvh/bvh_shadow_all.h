@@ -37,11 +37,16 @@
  *
  */
 
-ccl_device bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
-                                            const Ray *ray,
-                                            Intersection *isect_array,
-                                            const uint max_hits,
-                                            uint *num_hits)
+#ifndef __KERNEL_GPU__
+ccl_device
+#else
+ccl_device_inline
+#endif
+bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
+                                 const Ray *ray,
+                                 Intersection *isect_array,
+                                 const uint max_hits,
+                                 uint *num_hits)
 {
 	/* todo:
 	 * - likely and unlikely for if() statements
@@ -254,9 +259,6 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 
 						/* shadow ray early termination */
 						if(hit) {
-							/* Update number of hits now, so we do proper check on max bounces. */
-							(*num_hits)++;
-
 							/* detect if this surface has a shader with transparent shadows */
 
 							/* todo: optimize so primitive visibility flag indicates if
@@ -283,15 +285,18 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 								return true;
 							}
 							/* if maximum number of hits reached, block all light */
-							else if(*num_hits >= max_hits) {
+							else if(*num_hits == max_hits) {
 								return true;
 							}
 
+							/* move on to next entry in intersections array */
+							isect_array++;
+							(*num_hits)++;
 #if BVH_FEATURE(BVH_INSTANCING)
 							num_hits_in_instance++;
 #endif
-							/* Move on to next entry in intersections array */
-							isect_array++;
+
+							isect_array->t = isect_t;
 						}
 
 						prim_addr++;

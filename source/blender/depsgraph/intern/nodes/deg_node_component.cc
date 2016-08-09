@@ -120,7 +120,7 @@ string ComponentDepsNode::identifier() const
 	sprintf(typebuf, "(%d)", type);
 
 	char layers[16];
-	sprintf(layers, "%d", this->layers);
+	sprintf(layers, "%u", this->layers);
 
 	return string(typebuf) + name + " : " + idname + " (Layers: " + layers + ")";
 }
@@ -366,6 +366,11 @@ static DepsNodeFactoryImpl<ParticlesComponentDepsNode> DNTI_EVAL_PARTICLES;
 DEG_DEPSNODE_DEFINE(ShadingComponentDepsNode, DEPSNODE_TYPE_SHADING, "Shading Component");
 static DepsNodeFactoryImpl<ShadingComponentDepsNode> DNTI_SHADING;
 
+/* Cache Component Defines ============================ */
+
+DEG_DEPSNODE_DEFINE(CacheComponentDepsNode, DEPSNODE_TYPE_CACHE, "Cache Component");
+static DepsNodeFactoryImpl<CacheComponentDepsNode> DNTI_CACHE;
+
 
 /* Node Types Register =================================== */
 
@@ -383,6 +388,8 @@ void deg_register_component_depsnodes()
 
 	deg_register_node_typeinfo(&DNTI_EVAL_PARTICLES);
 	deg_register_node_typeinfo(&DNTI_SHADING);
+
+	deg_register_node_typeinfo(&DNTI_CACHE);
 }
 
 }  // namespace DEG

@@ -270,6 +270,9 @@ static int GPU_material_construct_end(GPUMaterial *material, const char *passnam
 			material->partangvel = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_ANG_VELOCITY));
 		return 1;
 	}
+	else {
+		GPU_pass_free_nodes(&material->nodes);
+	}
 
 	return 0;
 }
@@ -2886,8 +2889,7 @@ void GPU_material_update_fvar_offset(GPUMaterial *gpu_material,
 			             "fvar%d_offset",
 			             input->attribid);
 			location = GPU_shader_get_uniform(shader, name);
-			/* Multiply by 2 because we're offseting U and V variables. */
-			GPU_shader_uniform_int(shader, location, layer_index * 2);
+			GPU_shader_uniform_int(shader, location, layer_index);
 		}
 	}
 

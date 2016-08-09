@@ -49,6 +49,7 @@
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_windowmanager_types.h"
+#include "DNA_gpencil_types.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
@@ -64,6 +65,7 @@
 #include "BKE_animsys.h"
 #include "BKE_action.h"
 #include "BKE_armature.h"
+#include "BKE_cachefile.h"
 #include "BKE_colortools.h"
 #include "BKE_depsgraph.h"
 #include "BKE_editmesh.h"
@@ -286,6 +288,13 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		ts->imapaint.paintcursor = NULL;
 		id_us_plus((ID *)ts->imapaint.stencil);
 		ts->particle.paintcursor = NULL;
+		/* duplicate Grease Pencil Drawing Brushes */
+		BLI_listbase_clear(&ts->gp_brushes);
+		for (bGPDbrush *brush = sce->toolsettings->gp_brushes.first; brush; brush = brush->next) {
+			bGPDbrush *newbrush = BKE_gpencil_brush_duplicate(brush);
+			BLI_addtail(&ts->gp_brushes, newbrush);
+		}
+
 	}
 	
 	/* make a private copy of the avicodecdata */
@@ -334,7 +343,7 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 	/* grease pencil */
 	if (scen->gpd) {
 		if (type == SCE_COPY_FULL) {
-			scen->gpd = gpencil_data_duplicate(bmain, scen->gpd, false);
+			scen->gpd = BKE_gpencil_data_duplicate(bmain, scen->gpd, false);
 		}
 		else if (type == SCE_COPY_EMPTY) {
 			scen->gpd = NULL;
@@ -344,7 +353,7 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		}
 	}
 
-	scen->preview = BKE_previewimg_copy(sce->preview);
+	BKE_previewimg_id_copy(&scen->id, &sce->id);
 
 	return scen;
 }
@@ -353,6 +362,13 @@ void BKE_scene_groups_relink(Scene *sce)
 {
 	if (sce->rigidbody_world)
 		BKE_rigidbody_world_groups_relink(sce->rigidbody_world);
+}
+
+void BKE_scene_make_local(Main *bmain, Scene *sce, const bool lib_local)
+{
+	/* For now should work, may need more work though to support all possible corner cases
+	 * (also scene_copy probably needs some love). */
+	BKE_id_make_local_generic(bmain, &sce->id, true, lib_local);
 }
 
 /** Free (or release) any data used by this scene (does not free the scene itself). */
@@ -425,6 +441,10 @@ void BKE_scene_free(Scene *sce)
 			BKE_paint_free(&sce->toolsettings->uvsculpt->paint);
 			MEM_freeN(sce->toolsettings->uvsculpt);
 		}
+		/* free Grease Pencil Drawing Brushes */
+		BKE_gpencil_free_brushes(&sce->toolsettings->gp_brushes);
+		BLI_freelistN(&sce->toolsettings->gp_brushes);
+
 		BKE_paint_free(&sce->toolsettings->imapaint.paint);
 
 		MEM_freeN(sce->toolsettings);
@@ -757,6 +777,11 @@ void BKE_scene_init(Scene *sce)
 		gp_brush->strength = 0.5f;
 		gp_brush->flag = GP_EDITBRUSH_FLAG_USE_FALLOFF;
 		
+		gp_brush = &gset->brush[GP_EDITBRUSH_TYPE_STRENGTH];
+		gp_brush->size = 25;
+		gp_brush->strength = 0.5f;
+		gp_brush->flag = GP_EDITBRUSH_FLAG_USE_FALLOFF;
+
 		gp_brush = &gset->brush[GP_EDITBRUSH_TYPE_GRAB];
 		gp_brush->size = 50;
 		gp_brush->strength = 0.3f;
@@ -1901,6 +1926,9 @@ void BKE_scene_update_for_newframe_ex(EvaluationContext *eval_ctx, Main *bmain, 
 #endif
 
 	BKE_mask_evaluate_all_masks(bmain, ctime, true);
+
+	/* Update animated cache files for modifiers. */
+	BKE_cachefile_update_frame(bmain, sce, ctime, (((double)sce->r.frs_sec) / (double)sce->r.frs_sec_base));
 
 #ifdef POSE_ANIMATION_WORKAROUND
 	scene_armature_depsgraph_workaround(bmain);

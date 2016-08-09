@@ -119,42 +119,14 @@ MetaBall *BKE_mball_copy(Main *bmain, MetaBall *mb)
 	mbn->editelems = NULL;
 	mbn->lastelem = NULL;
 	
-	if (ID_IS_LINKED_DATABLOCK(mb)) {
-		BKE_id_expand_local(&mbn->id);
-		BKE_id_lib_local_paths(bmain, mb->id.lib, &mbn->id);
-	}
+	BKE_id_copy_ensure_local(bmain, &mb->id, &mbn->id);
 
 	return mbn;
 }
 
-void BKE_mball_make_local(Main *bmain, MetaBall *mb, const bool force_local)
+void BKE_mball_make_local(Main *bmain, MetaBall *mb, const bool lib_local)
 {
-	bool is_local = false, is_lib = false;
-
-	/* - only lib users: do nothing (unless force_local is set)
-	 * - only local users: set flag
-	 * - mixed: make copy
-	 */
-
-	if (!ID_IS_LINKED_DATABLOCK(mb)) {
-		return;
-	}
-
-	BKE_library_ID_test_usages(bmain, mb, &is_local, &is_lib);
-
-	if (force_local || is_local) {
-		if (!is_lib) {
-			id_clear_lib_data(bmain, &mb->id);
-			BKE_id_expand_local(&mb->id);
-		}
-		else {
-			MetaBall *mb_new = BKE_mball_copy(bmain, mb);
-
-			mb_new->id.us = 0;
-
-			BKE_libblock_remap(bmain, mb, mb_new, ID_REMAP_SKIP_INDIRECT_USAGE);
-		}
-	}
+	BKE_id_make_local_generic(bmain, &mb->id, true, lib_local);
 }
 
 /* most simple meta-element adding function

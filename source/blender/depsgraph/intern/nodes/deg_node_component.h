@@ -159,7 +159,7 @@ struct ComponentDepsNode : public DepsNode {
 	// XXX: a poll() callback to check if component's first node can be started?
 
 	/* Temporary bitmask, used during graph construction. */
-	int layers;
+	unsigned int layers;
 };
 
 /* ---------------------------------------- */
@@ -206,6 +206,10 @@ struct ParticlesComponentDepsNode : public ComponentDepsNode {
 };
 
 struct ShadingComponentDepsNode : public ComponentDepsNode {
+	DEG_DEPSNODE_DECLARE;
+};
+
+struct CacheComponentDepsNode : public ComponentDepsNode {
 	DEG_DEPSNODE_DECLARE;
 };
 

@@ -90,6 +90,7 @@ static const int deg_debug_node_type_color_map[][2] = {
     {DEPSNODE_TYPE_GEOMETRY,     8},
     {DEPSNODE_TYPE_SEQUENCER,    9},
     {DEPSNODE_TYPE_SHADING,      10},
+    {DEPSNODE_TYPE_CACHE,        11},
     {-1,                         0}
 };
 #endif
@@ -288,7 +289,7 @@ static void deg_debug_graphviz_node_single(const DebugContext &ctx,
 	if (node->type == DEPSNODE_TYPE_ID_REF) {
 		IDDepsNode *id_node = (IDDepsNode *)node;
 		char buf[256];
-		BLI_snprintf(buf, sizeof(buf), " (Layers: %d)", id_node->layers);
+		BLI_snprintf(buf, sizeof(buf), " (Layers: %u)", id_node->layers);
 		name += buf;
 	}
 	if (ctx.show_eval_priority && node->tclass == DEPSNODE_CLASS_OPERATION) {
@@ -324,7 +325,7 @@ static void deg_debug_graphviz_node_cluster_begin(const DebugContext &ctx,
 	if (node->type == DEPSNODE_TYPE_ID_REF) {
 		IDDepsNode *id_node = (IDDepsNode *)node;
 		char buf[256];
-		BLI_snprintf(buf, sizeof(buf), " (Layers: %d)", id_node->layers);
+		BLI_snprintf(buf, sizeof(buf), " (Layers: %u)", id_node->layers);
 		name += buf;
 	}
 	deg_debug_fprintf(ctx, "// %s\n", name.c_str());
@@ -401,6 +402,7 @@ static void deg_debug_graphviz_node(const DebugContext &ctx,
 		case DEPSNODE_TYPE_EVAL_POSE:
 		case DEPSNODE_TYPE_BONE:
 		case DEPSNODE_TYPE_SHADING:
+		case DEPSNODE_TYPE_CACHE:
 		case DEPSNODE_TYPE_EVAL_PARTICLES:
 		{
 			ComponentDepsNode *comp_node = (ComponentDepsNode *)node;
