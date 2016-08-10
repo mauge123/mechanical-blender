@@ -181,8 +181,8 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 {
 	int type = 0;
 	float dir[3];
-	sub_v3_v3v3(dir,v2->co,v1->co);
-	normalize_v3(dir);
+	sub_v3_v3v3_prec(dir,v2->co,v1->co);
+	normalize_v3_prec(dir);
 	float a1, a2;
 	test_circle_data cdata;
 	*r_vcount = 0;

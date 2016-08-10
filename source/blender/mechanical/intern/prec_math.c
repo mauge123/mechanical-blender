@@ -19,14 +19,30 @@ static void v_pre(int *r, const float *v) {
 	r[2]= (int) roundf((v[2]*MECHANICAL_DEC_PRECISION));
 }
 
+static void v_to_pre(float *r, const int *v) {
+	r[0]= ((float) v[0]/(float) MECHANICAL_DEC_PRECISION);
+	r[1]= ((float) v[1]/(float) MECHANICAL_DEC_PRECISION);
+	r[2]= ((float) v[2]/(float) MECHANICAL_DEC_PRECISION);
+}
+
+static void reduce_v3_precision (int *v) {
+	v[0] = v[0]/10;
+	v[1] = v[1]/10;
+	v[2] = v[2]/10;
+}
+
+static int reduce_f_precision (int v) {
+	return v/10;
+}
+
+
 static int f_pre (float f) {
 	return (int) (f*MECHANICAL_DEC_PRECISION);
 }
 
-static void v_to_pre(float *r, const int *v) {
-	r[0]= ((float) v[0]/ (float) MECHANICAL_DEC_PRECISION);
-	r[1]= ((float) v[1]/ (float) MECHANICAL_DEC_PRECISION);
-	r[2]= ((float) v[2]/ (float) MECHANICAL_DEC_PRECISION);
+
+static float f_to_pre (int f) {
+	return ((float) f/(float) MECHANICAL_DEC_PRECISION);
 }
 
 
@@ -66,12 +82,25 @@ float normalize_v3_prec(float fa[3])
 	return d;
 }
 
+float ensure_f_prec (float f) {
+	return f_to_pre(f_pre(f));
+}
+
+void ensure_v3_prec (float f[3]) {
+	f[0] = ensure_f_prec(f[0]);
+	f[1] = ensure_f_prec(f[1]);
+	f[2] = ensure_f_prec(f[2]);
+}
+
 int eq_v3v3_prec(const float fa[3], const float fb[3])
 {
 	int a[3],b[3];
 
 	v_pre(a,fa);
 	v_pre(b,fb);
+
+	reduce_v3_precision(a);
+	reduce_v3_precision(b);
 
 	return (a[0] ==  b[0]) && (a[1] == b[1]) && (a[2] == b[2]);
 }
@@ -82,6 +111,8 @@ int eq_ff_prec(const float fa, const float fb)
 
 	a = f_pre(fa);
 	b = f_pre(fb);
+	a = reduce_f_precision(a);
+	b = reduce_f_precision(b);
 
 	return (a == b);
 }

@@ -19,4 +19,7 @@ int eq_ff_prec(const float fa, const float fb);
 int eq_v3v3_prec(const float fa[3], const float fb[3]);
 
 
+float ensure_f_prec (float f);
+void ensure_v3_prec (float f[3]);
+
 #endif //PREC_MATH_H

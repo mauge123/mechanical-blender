@@ -184,7 +184,7 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
 		// One intersection: Ok
 		copy_v3_v3(center,r1);
 		return 1;
-	} else if (res == 2 && len_v3v3(r1,r2) < DIM_CONSTRAINT_PRECISION) {
+	} else if (res == 2 && eq_v3v3_prec(r1,r2)) {
 		copy_v3_v3(center,r1);
 		return 1;
 	} else {
