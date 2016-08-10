@@ -2905,19 +2905,13 @@ int transformEnd(bContext *C, TransInfo *t)
 		 * This may should be perfomed on event processing, but disabled there on G.moving to
 		 * avoid compute on not finished operation
 		 */
-		DerivedMesh *dm = NULL;
 		BMEditMesh *em = NULL;
-		Object *ob = CTX_data_active_object(C);
 		if (t->obedit) {
-			if (ob->type == OB_MESH) {
-				dm = CDDM_from_mesh(ob->data);
-				em = (dm->type == DM_TYPE_EDITBMESH) ? BKE_editmesh_from_object(ob) : NULL;
+			if (t->obedit->type == OB_MESH) {
+				em = BKE_editmesh_from_object(t->obedit);
 			}
 			if (em) {
 				mechanical_update_mesh_geometry(BKE_editmesh_from_object(t->obedit));
-			}
-			if (dm) {
-				dm->release(dm);
 			}
 		}
 #endif

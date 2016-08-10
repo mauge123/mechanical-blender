@@ -61,12 +61,8 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 		getViewDepthPoint(t, p);
 #endif
 // WITH_MECHANICAL_CREATE_ON_REFERENCE_PLANE
-		Scene *scene= t->scene;
-		Object *ob = OBACT;
-		DerivedMesh *dm = NULL;
 		BMEditMesh *em = NULL;
-		if (t->obedit && ob->type == OB_MESH) {
-			dm = CDDM_from_mesh(ob->data);
+		if (t->obedit && t->obedit->type == OB_MESH) {
 			em = BKE_editmesh_from_object(t->obedit);
 		}
 		if (t->obedit && em) {
@@ -78,9 +74,6 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 			}
 		} else {
 			ED_view3d_win_to_3d(t->ar, p, fmval, vec);
-		}
-		if (dm) {
-			dm->release(dm);
 		}
 		sub_v3_v3v3(output, vec, t->iloc);
 	} else {
