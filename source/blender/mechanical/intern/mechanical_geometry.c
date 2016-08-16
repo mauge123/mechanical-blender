@@ -12,6 +12,7 @@
 #include "mechanical_utils.h"
 #include "mechanical_geometry.h"
 #include "prec_math.h"
+#include "mesh_dimensions.h"
 
 
 static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *v2, BMVert *current, void *data);
@@ -331,6 +332,8 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 						normal_tri_v3(egm->axis, egm->v[0]->co, egm->v[1]->co, egm->v[2]->co);
 						copy_v3_v3(egm->start, egm->v[0]->co);
 						copy_v3_v3(egm->end, egm->v[egm->totverts-1]->co);
+						arc_mid_point(egm);
+
 						break;
 					}
 					case BM_GEOMETRY_TYPE_LINE:
@@ -338,7 +341,8 @@ static void mechanical_calc_edit_mesh_geometry(BMEditMesh *em)
 						sub_v3_v3v3(egm->axis,egm->v[0]->co,egm->v[1]->co);
 						normalize_v3(egm->axis);
 						copy_v3_v3(egm->start, egm->v[0]->co);
-						copy_v3_v3(egm->end, egm->v[egm->totverts-1]->co);
+						copy_v3_v3(egm->end, egm->v[(egm->totverts)-1]->co);
+						mid_of_2_points(egm->mid, egm->start, egm->end);
 						break;
 					}
 					default:
@@ -507,6 +511,7 @@ void mechanical_update_mesh_geometry(BMEditMesh *em)
 		BM_elem_flag_disable(v, BM_ELEM_TAG);
 	}
 }
+
 
 
 

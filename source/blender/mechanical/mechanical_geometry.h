@@ -26,6 +26,7 @@ void set_geometry_center (BMEditMesh *em, float center[3]);
 
 
  int get_max_geom_points(BMEditMesh *em);
+ void arc_mid_point(BMGeom *egm);
 
 
 #endif //MECHANICAL_GEOMETRY_H

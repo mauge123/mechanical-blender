@@ -4,8 +4,12 @@
 
 #include "BKE_editmesh.h"
 #include "MEM_guardedalloc.h"
+#include "BLI_math.h"
 
 #include "mechanical_geometry.h"
+#include "mesh_dimensions.h"
+
+
 
 
 int get_max_geom_points(BMEditMesh *em)
@@ -30,4 +34,28 @@ int get_max_geom_points(BMEditMesh *em)
 		}
 	}
 	return num;
+}
+
+/***
+ * ASSUMES EQUAL ANGLES FOR AL VERTS
+ *
+ */
+void arc_mid_point(BMGeom *egm){
+		float v1[3], v2[3], mid[3];
+		float r;
+		int num= (egm->totverts)/2;
+
+		BLI_assert(egm->geometry_type == BM_GEOMETRY_TYPE_ARC);
+
+		if((egm->totverts)%2 ==0){
+			r=len_v3v3(egm->start, egm->center);
+			mid_of_2_points(mid,egm->v[num]->co, egm->v[num-1]->co);
+			sub_v3_v3v3(mid, mid, egm->center);
+			normalize_v3(mid);
+			mul_v3_fl(mid, r);
+			add_v3_v3v3(egm->mid, egm->center, mid);
+
+		}else{
+			copy_v3_v3(egm->mid, egm->v[num]->co);
+		}
 }

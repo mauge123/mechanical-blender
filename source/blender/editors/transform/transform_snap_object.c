@@ -61,6 +61,7 @@
 #include "transform.h"
 #include "mesh_dimensions.h"
 #include "mechanical_geometry.h"
+#include "mechanical_utils.h"
 
 typedef struct SnapObjectData {
 	enum {
@@ -337,7 +338,7 @@ static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p))
 
 	int n_geom_points = 0;
 
-	mid_of_2_points((*p)->v, egm->start, egm->end);
+	copy_v3_v3((*p)->v, egm->mid);
 	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 		n_geom_points++;
 		(*p)++;
@@ -359,30 +360,9 @@ static int snap_geom_center(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*
 
 }
 
-static int snap_geom_mid_arc(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)){
-
-	int n_geom_points = 0;
-	float mid[3];
-
-	mid_of_2_points(mid, egm->start, egm->end);
-	sub_v3_v3v3(mid, mid, egm->center );
-	normalize_v3(mid);
-	mul_v3_fl(mid, len_v3v3(egm->center,egm->start));
-	add_v3_v3v3((*p)->v, egm->center, mid);
-
-	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-		n_geom_points++;
-		(*p)++;
-	}
-
-	return n_geom_points;
-}
 
 
-
-
-
-int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **points) {
+static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **points) {
 	int max_geom_points= get_max_geom_points(em);
 	int n_geom_points = 0;
 	Mesh *me = em->ob->data;
@@ -427,7 +407,7 @@ int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **po
 
 				}
 				if(snap_mid_arc) {
-					n_geom_points += snap_geom_mid_arc(ar, egm, &p);
+					n_geom_points += snap_geom_mid(ar, egm, &p);
 
 				}
 

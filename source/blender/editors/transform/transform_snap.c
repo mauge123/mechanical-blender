@@ -686,12 +686,12 @@ void initSnapping(TransInfo *t, wmOperator *op)
 					RNA_float_get_array(op->ptr, "snap_point", t->tsnap.snapPoint);
 					t->tsnap.status |= SNAP_FORCED | POINT_INIT;
 				}
-		}
+			}
 #else
-		if (RNA_struct_property_is_set(op->ptr, "snap_point")) {
-			RNA_float_get_array(op->ptr, "snap_point", t->tsnap.snapPoint);
-			t->tsnap.status |= SNAP_FORCED | POINT_INIT;
-		}
+			if (RNA_struct_property_is_set(op->ptr, "snap_point")) {
+				RNA_float_get_array(op->ptr, "snap_point", t->tsnap.snapPoint);
+				t->tsnap.status |= SNAP_FORCED | POINT_INIT;
+			}
 #endif
 
 			
@@ -712,7 +712,7 @@ void initSnapping(TransInfo *t, wmOperator *op)
 		}
 	}
 	/* use scene defaults only when transform is modal */
-	else if (t->flag & T_MODAL) {
+	 if (t->flag & T_MODAL) {
 		if (ELEM(t->spacetype, SPACE_VIEW3D, SPACE_IMAGE, SPACE_NODE)) {
 			if (ts->snap_flag & SCE_SNAP) {
 				t->modifiers |= MOD_SNAP;

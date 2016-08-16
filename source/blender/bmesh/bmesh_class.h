@@ -259,6 +259,8 @@ typedef struct BMGeom {
 	float start[3];
 	float end[3];
 
+	float mid[3];
+
 } BMGeom;
 
 typedef struct BMGeom_OFlag {

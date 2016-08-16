@@ -2417,12 +2417,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_int_set(op->ptr, "transform_mode", t->mode);
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
-	RNA_boolean_set(op->ptr, "snap",(t->modifiers & MOD_SNAP) != 0);
+	RNA_boolean_set(op->ptr, "use_snap_self", t->tsnap.snap_self);
+	RNA_boolean_set(op->ptr, "snap", ts->snap_flag & SCE_SNAP);
 #endif
 
-#ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
-#endif
 
 	if ((prop = RNA_struct_find_property(op->ptr, "correct_uv"))) {
 		RNA_property_boolean_set(op->ptr, prop, (t->settings->uvcalc_flag & UVCALC_TRANSFORM_CORRECT) != 0);
@@ -2456,6 +2454,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			options |= CTX_GPENCIL_STROKES;
 		}
 	}
+	//PropertyRNA *miProp = prop;
 
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	if ((prop = RNA_struct_find_property(op->ptr, "transform_mode")) && RNA_property_is_set(op->ptr, prop)) {
@@ -2468,7 +2467,10 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		/* Remove value as is set execs the transform according to it*/
 		if ((prop = RNA_struct_find_property(op->ptr, "value")) && RNA_property_is_set(op->ptr, prop)) {
 			RNA_property_unset(op->ptr,prop);
+			//RNA_boolean_set(op->ptr, "snap", ts->snap_flag & SCE_SNAP);
+
 		}
+
 	}
 #endif
 
@@ -2548,7 +2550,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			wmKeyMapItem *kmi;
 
 			for (kmi = t->keymap->items.first; kmi; kmi = kmi->next) {
-				if (kmi->propvalue == TFM_MODAL_SNAP_INV_ON && kmi->val == KM_PRESS) {
+			if (kmi->propvalue == TFM_MODAL_SNAP_INV_ON && kmi->val == KM_PRESS) {
 					if ((ELEM(kmi->type, LEFTCTRLKEY, RIGHTCTRLKEY) &&   event->ctrl)  ||
 						(ELEM(kmi->type, LEFTSHIFTKEY, RIGHTSHIFTKEY) && event->shift) ||
 						(ELEM(kmi->type, LEFTALTKEY, RIGHTALTKEY) &&     event->alt)   ||
