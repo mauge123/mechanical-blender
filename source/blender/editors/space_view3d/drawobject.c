@@ -2671,7 +2671,7 @@ static void mechanical_draw_circle(float center[], float point[], float axis[], 
 }
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
-static void get_geometry_theme_values (int selected, unsigned char *r_lines, unsigned char *r_text)
+static void get_geometry_theme_values (int selected, unsigned char *r_lines, unsigned char *UNUSED(r_text))
 {
 	UI_GetThemeColor4ubv(selected ? TH_GEOM_SEL : TH_GEOM, r_lines);
 
@@ -2845,13 +2845,13 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected)
 {
 
-	float start[3], end[3], vr1[3], vr2[3], txt_pos[3], pos[3];
+	float start[3], end[3], vr1[3], vr2[3], txt_pos[3];
 	float axis[3];
 	float lpos;
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
-	float dim_angle, step;
+	float dim_angle;
 
 	get_dimension_theme_values(selected, col, tcol);
 
@@ -3010,7 +3010,7 @@ static void draw_dimension_axis(BMDim *edm)
 	}
 }
 
-bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
+static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
 	float vect[3], vect2[3], viewUni[3];
 	normalize_v3_v3(viewUni, rv3d->persinv[2]);

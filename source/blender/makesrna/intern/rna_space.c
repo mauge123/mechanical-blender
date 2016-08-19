@@ -489,9 +489,8 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 		if (obedit) {
 			if (ob->type == OB_MESH) {
 				em = BKE_editmesh_from_object(ob);
-				}
+			}
 			if(em){
-				BMEditMesh *em = BKE_editmesh_from_object(ob);
 				BMReference *erf = NULL;
 				BMIter iter;
 				if (em->bm->totref > 0) {

@@ -86,6 +86,9 @@ BMDim  *BM_dim_at_index_find(BMesh *bm, const int index);
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 BMReference *BM_reference_at_index_find(BMesh *bm, const int index);
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+BMGeom *BM_geom_at_index_find(BMesh *bm, const int index);
+#endif
 
 BMVert *BM_vert_at_index_find_or_table(BMesh *bm, const int index);
 BMEdge *BM_edge_at_index_find_or_table(BMesh *bm, const int index);
