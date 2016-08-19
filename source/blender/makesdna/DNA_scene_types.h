@@ -1624,6 +1624,9 @@ typedef struct Scene {
 	struct RigidBodyWorld *rigidbody_world;
 
 	struct PreviewImage *preview;
+
+	int geomsnapflag;
+	char pad4[4];
 } Scene;
 
 /* **************** RENDERDATA ********************* */
@@ -2238,5 +2241,32 @@ typedef enum eGPencil_Placement_Flags {
 #ifdef __cplusplus
 }
 #endif
+
+//WITH MECHANICAL_GEOMETRY
+enum {
+
+	//line
+	ME_GEOM_LINE_END_POINT				= 1 << 0,
+	ME_GEOM_LINE_MID_POINT				= 1 << 1,
+	//arc
+	ME_GEOM_ARC_END_POINT				= 1 << 2,
+	ME_GEOM_ARC_MID_POINT				= 1 << 3,
+	//arc and circle
+	ME_GEOM_CENTER_POINT				= 1 << 4,
+	//ortho
+	ME_GEOM_ORTHO_POINT					= 1 << 5,
+	//tangents
+	ME_GEOM_TANGENT_POINT				= 1 <<6,
+
+	// WITH_MECHANICAL_GEOMETRY
+	ME_DRAW_GEOMETRY					= 1 << 7,
+
+	// WITH_MECHANICAL_GEOMETRY
+	ME_PERP_VISIBILITY					= 1 << 8,
+
+
+};
+
+
 
 #endif  /* __DNA_SCENE_TYPES_H__ */

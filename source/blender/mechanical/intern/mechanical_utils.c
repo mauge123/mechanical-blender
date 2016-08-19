@@ -192,3 +192,47 @@ int center_of_3_points(float *center, float *p1, float *p2, float *p3) {
 	}
 }
 
+
+void isect_ortho_line_circl(float radius, float center[3], float p[3], float *r_isect){
+	float v1[3];
+	sub_v3_v3v3(v1, p, center);
+	normalize_v3(v1);
+	mul_v3_v3fl(r_isect, v1, radius);
+	add_v3_v3v3(r_isect, center, r_isect);
+}
+
+int isect_circle_circle(float r1, float c1[3], float r2, float c2[3], float n1[3], float *r_isect1, float *r_isect2){
+	float v_cent[3], v_cent_n[3], v_cent_perp[3];
+	float c_len = len_v3v3(c1, c2);
+	sub_v3_v3v3(v_cent, c2, c1);
+	if(c_len>(r1+r2)){
+		//No intereection
+		r_isect1= NULL;
+		r_isect2= NULL;
+		return 0;
+	}else if( c_len == r1+r2 ){
+		//Intersection exists in one point
+		mul_v3_fl(v_cent, (r2/(r2-r1)));
+		copy_v3_v3(r_isect1, v_cent);
+		r_isect2= NULL;
+		return 1;
+	}else{
+		//Two intersection points
+		normalize_v3_v3(v_cent_n, v_cent);
+		normalize_v3(n1);
+		cross_v3_v3v3(v_cent_perp, v_cent_n, n1);
+		float q=c_len*c_len+ r1*r1 -r2*r2;
+		float dx = 0.5 * (q / c_len);
+		float dy = 0.5 * sqrt((double) 4 * c_len * c_len  * r1 * r1 - q * q)/ c_len;
+		float aux[3];
+		mul_v3_v3fl(aux, v_cent_n, dx);
+		add_v3_v3v3(r_isect1, c1, aux);
+		copy_v3_v3(r_isect2, r_isect1);
+
+		mul_v3_v3fl(aux, v_cent_perp, dy);
+		add_v3_v3(r_isect1, aux);
+		sub_v3_v3(r_isect2, aux);
+		return 2;
+	}
+}
+

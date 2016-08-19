@@ -27,5 +27,7 @@ float point_dist_to_axis (float *c, float *a, float *p);
 
 int center_of_3_points(float *center, float *p1, float *p2, float *p3);
 
+void isect_ortho_line_circl(float radius, float center[3], float p[3], float *r_issect);
+int isect_circle_circle(float r1, float c1[3], float r2, float c2[3], float n1[3], float *r_isect1, float *r_isect2);
 
 #endif // MECHANICAL_UTILS_H

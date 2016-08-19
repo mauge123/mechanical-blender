@@ -3010,7 +3010,7 @@ static void draw_dimension_axis(BMDim *edm)
 	}
 }
 
-bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
+bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
 	float vect[3], vect2[3], viewUni[3];
 	normalize_v3_v3(viewUni, rv3d->persinv[2]);
@@ -3019,7 +3019,7 @@ bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 	switch (edm->dim_type) {
 		case DIM_TYPE_LINEAR:
 			sub_v3_v3v3(vect, edm->v[0]->co, edm->v[1]->co);
-			if (parallel_v3_v3(vect, viewUni) && rv3d->is_persp != 1 && !(me->drawflag & ME_PERP_VISIBILITY) ){
+			if (parallel_v3_v3(vect, viewUni) && rv3d->is_persp != 1 && !(scene->geomsnapflag & ME_PERP_VISIBILITY) ){
 					return false;
 			}
 			break;
@@ -3029,7 +3029,7 @@ bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 		case DIM_TYPE_ANGLE_3P_CON:
 		case DIM_TYPE_ANGLE_4P:
 			get_dimension_plane(vect, vect2, edm);
-			if ((perpendicular_v3_v3(vect, viewUni) || perpendicular_v3_v3(vect2, viewUni)) && !(me->drawflag & ME_PERP_VISIBILITY)){
+			if ((perpendicular_v3_v3(vect, viewUni) || perpendicular_v3_v3(vect2, viewUni)) && !(scene->geomsnapflag & ME_PERP_VISIBILITY)){
 				return false;
 			}
 			break;
@@ -3057,7 +3057,7 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 	}
 
 
-	if(check_dim_visibility(edm, rv3d, obedit)){
+	if(check_dim_visibility(edm, rv3d, obedit, scene)){
 
 		switch (edm->dim_type) {
 			case DIM_TYPE_LINEAR:
@@ -4575,7 +4575,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 			BMIter iter;
 			BMGeom *egm = NULL;
 			BMGeom *egm_sel = NULL;
-			if (em->bm->totgeom &&  (me->drawflag & (ME_DRAW_GEOMETRY))) {
+			if (em->bm->totgeom &&  (scene->geomsnapflag & (ME_DRAW_GEOMETRY))) {
 
 				BM_ITER_MESH(egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
 					if(!BM_elem_flag_test(egm, BM_ELEM_SELECT)){

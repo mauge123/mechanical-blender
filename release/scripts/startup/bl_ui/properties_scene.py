@@ -77,6 +77,33 @@ class SCENE_PT_scene(SceneButtonsPanel, Panel):
         layout.prop(scene, "background_set", text="Background")
         if context.scene.render.engine != 'BLENDER_GAME':
             layout.prop(scene, "active_clip", text="Active Clip")
+            
+class SCENE_PT_geom(SceneButtonsPanel, Panel):
+    bl_label = "Geometry"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+        with_freestyle = bpy.app.build_options.freestyle
+
+        mesh = context.active_object.data
+        scene = context.scene
+
+        split = layout.split()
+        
+        col = split.column() 
+        col.label(text="Mesh Display:")
+        col.prop(scene, "show_mesh_geometry", text="Show Geometry")
+        col.label(text="Snap Mode:")
+
+        col.prop(scene, "geom_line_end_point", text="Snap to Line End Points")
+        col.prop(scene, "geom_line_mid_point", text="Snap to Line Mid Point ")
+        col.prop(scene, "geom_arc_end_point", text="Snap to Arc End Points")
+        col.prop(scene, "geom_arc_mid_point", text="Snap to Arc Mid Point ")
+        col.prop(scene, "geom_center_point", text="Snap to Center Point")
+        col.prop(scene, "geom_ortho_point", text="Snap to Perpendicular Point")
+        col.prop(scene, "geom_tangent_point", text="Snap to Tangent Point")
+                
 
 
 class SCENE_PT_unit(SceneButtonsPanel, Panel):

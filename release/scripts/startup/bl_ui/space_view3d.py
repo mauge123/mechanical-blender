@@ -3453,36 +3453,6 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
         col = split.column()
         col.prop(mesh, "dim_perpendicular_visibility", text="Show Dimensions on Perpendicular View")
 
-class VIEW3D_PT_view3d_geometry(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_label = "Geometry"
-
-    @classmethod
-    def poll(cls, context):
-        # The active object check is needed because of local-mode
-        return (context.active_object and (context.mode == 'EDIT_MESH'))
-
-    def draw(self, context):
-        layout = self.layout
-        with_freestyle = bpy.app.build_options.freestyle
-
-        mesh = context.active_object.data
-        scene = context.scene
-
-        split = layout.split()
-        
-        col = split.column() 
-        col.label(text="Mesh Display:")
-        col.prop(mesh, "show_mesh_geometry", text="Show Geometry")
-        col.label(text="Snap Mode:")
-
-        col.prop(mesh, "geom_line_end_point", text="Snap to Line End Points")
-        col.prop(mesh, "geom_line_mid_point", text="Snap to Line Mid Point ")
-        col.prop(mesh, "geom_arc_end_point", text="Snap to Arc End Points")
-        col.prop(mesh, "geom_arc_mid_point", text="Snap to Arc Mid Point ")
-        col.prop(mesh, "geom_center_point", text="Snap to Center Point arc")
-
 
 
 class VIEW3D_PT_view3d_meshstatvis(Panel):

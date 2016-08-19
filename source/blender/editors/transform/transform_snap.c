@@ -1386,6 +1386,7 @@ bool snapObjectsTransform(
 {
 
 	struct SnapObjectParams params;
+	float *snap_target_temp = NULL;
 
 	if (t->state == TRANS_BASE_POINT || t->state == TRANS_SELECT_CENTER) {
 		params.snap_select = SNAP_SELF;
@@ -1394,13 +1395,31 @@ bool snapObjectsTransform(
 	}
 	params.use_object_edit_cage = (t->flag & T_EDIT) != 0;
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+
+	if (t->tsnap.targetSnap) {
+		t->tsnap.targetSnap(t);
+		snap_target_temp= t->tsnap.snapTarget;
+	}
+	bContext *C= t->context;
+	Scene *scene = CTX_data_scene(C);
 
 	return ED_transform_snap_object_project_view3d_ex(
 	        t->tsnap.object_context,
 	        t->scene->toolsettings->snap_mode,
-	        &params,
+			&params,
 	        mval, dist_px, NULL,
-	        r_loc, r_no, NULL);
+			r_loc, r_no, NULL, snap_target_temp, scene);
+
+#else
+	return ED_transform_snap_object_project_view3d_ex(
+			t->tsnap.object_context,
+			t->scene->toolsettings->snap_mode,
+			&params,
+			mval, dist_px, NULL,
+			r_loc, r_no, NULL);
+
+#endif
 }
 #else
 bool snapObjectsTransform(

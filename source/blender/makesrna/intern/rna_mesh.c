@@ -3772,56 +3772,6 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Is Editmode", "True when used in editmode");
 
-#ifdef WITH_MECHANICAL_GEOMETRY
-	prop = RNA_def_property(srna, "show_mesh_geometry", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "drawflag", ME_DRAW_GEOMETRY);
-	RNA_def_property_ui_text(prop, "Mesh Geometry",
-	                         "Display Mesh Geometry in editmode");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-	prop = RNA_def_property(srna, "dim_perpendicular_visibility", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "drawflag", ME_PERP_VISIBILITY);
-	RNA_def_property_ui_text(prop, "Dimension Visibility",
-							 "Show Dimensions on Perpendicular View");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-	//Line end
-	prop = RNA_def_property(srna, "geom_line_end_point", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "snapflag", ME_GEOM_LINE_END_POINT);
-	RNA_def_property_ui_text(prop, "Snap to ends geometry points",
-							 "Snap to ends points on Snap Geometry Mode");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-	//Line mid
-	prop = RNA_def_property(srna, "geom_line_mid_point", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "snapflag", ME_GEOM_LINE_MID_POINT);
-	RNA_def_property_ui_text(prop, "Snap to mid geometry point",
-							 "Snap to Mid Point on Snap Geometry Mode");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-	//Arc end
-	prop = RNA_def_property(srna, "geom_arc_end_point", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "snapflag", ME_GEOM_ARC_END_POINT);
-	RNA_def_property_ui_text(prop, "Snap to ends geometry points",
-							 "Snap to ends points on Snap Geometry Mode");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-	//Mid Arc
-	prop = RNA_def_property(srna, "geom_arc_mid_point", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "snapflag", ME_GEOM_ARC_MID_POINT);
-	RNA_def_property_ui_text(prop, "Snap to mid geometry point",
-							 "Snap to Mid Point on Snap Geometry Mode");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-	//Center Circle and Arc
-	prop = RNA_def_property(srna, "geom_center_point", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "snapflag", ME_GEOM_CENTER_POINT);
-	RNA_def_property_ui_text(prop, "Snap to Center Geometry Point",
-							 "Snap to Center Point on Snap Geometry Mode");
-	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-
-#endif
 
 	/* pointers */
 	rna_def_animdata_common(srna);

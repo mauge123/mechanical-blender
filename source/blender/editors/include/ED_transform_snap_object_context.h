@@ -114,7 +114,16 @@ bool ED_transform_snap_object_project_ray_all(
         const float ray_start[3], const float ray_normal[3],
         float ray_depth, bool sort,
         struct ListBase *r_hit_list);
+#ifdef WITH_MECHANICAL_GEOMETRY
+		bool ED_transform_snap_object_project_view3d_ex(
+				struct SnapObjectContext *sctx,
+				const unsigned short snap_to,
+				const struct SnapObjectParams *params,
+				const float mval[2], float *dist_px,
+				float *ray_depth,
+				float r_loc[3], float r_no[3], int *r_index, float *snap_target, Scene *scene);
 
+#else
 bool ED_transform_snap_object_project_view3d_ex(
         struct SnapObjectContext *sctx,
         const unsigned short snap_to,
@@ -122,6 +131,7 @@ bool ED_transform_snap_object_project_view3d_ex(
         const float mval[2], float *dist_px,
         float *ray_depth,
         float r_loc[3], float r_no[3], int *r_index);
+#endif
 bool ED_transform_snap_object_project_view3d(
         struct SnapObjectContext *sctx,
         const unsigned short snap_to,

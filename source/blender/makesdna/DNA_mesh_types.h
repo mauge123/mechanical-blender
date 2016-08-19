@@ -139,9 +139,7 @@ typedef struct Mesh {
 	struct CustomData ddata;
 	struct MReference *mref;
 /**/
-// WITH_MECHANICAL_GEOMETRY
-	int snapflag;
-	char pad3[4];
+
 
 
 
@@ -238,26 +236,13 @@ enum {
 /* draw loop normals */
 	ME_DRAW_LNORMALS       = 1 << 18,
 
-// WITH_MECHANICAL_GEOMETRY
-	ME_DRAW_GEOMETRY       = 1 << 19,
 
-// WITH_MECHANICAL_GEOMETRY
-	ME_PERP_VISIBILITY     = 1 << 20,
+
+
 };
 // WITH_MECHANICAL_GEOMETRY
 /* me->snapflag, short */
-enum {
 
-	//line
-	ME_GEOM_LINE_END_POINT				= 1 <<0,
-	ME_GEOM_LINE_MID_POINT				= 1 <<1,
-	//arc
-	ME_GEOM_ARC_END_POINT				= 1 <<2,
-	ME_GEOM_ARC_MID_POINT				= 1 <<3,
-	//arc and circle
-	ME_GEOM_CENTER_POINT				= 1 <<4,
-
-};
 
 
 

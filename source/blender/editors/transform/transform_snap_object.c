@@ -315,16 +315,19 @@ static bool snapEdge(
 	return retval;
 }
 
-static int snap_geom_start_end(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)) {
+
+static int snap_geom_start_end(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)) {
 
 	int n_geom_points = 0;
 	copy_v3_v3((*p)->v, egm->start);
+	mul_m4_v3(obmat, (*p)->v);
 	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 		(*p)++;
 		n_geom_points++;
 	}
 
 	copy_v3_v3((*p)->v, egm->end);
+	mul_m4_v3(obmat, (*p)->v);
 	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 		(*p)++;
 		n_geom_points++;
@@ -334,11 +337,12 @@ static int snap_geom_start_end(const ARegion *ar,  BMGeom *egm, snap_geom_point 
 	return n_geom_points;
 }
 
-static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)){
+static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)){
 
 	int n_geom_points = 0;
 
 	copy_v3_v3((*p)->v, egm->mid);
+	mul_m4_v3(obmat, (*p)->v);
 	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 		n_geom_points++;
 		(*p)++;
@@ -346,73 +350,160 @@ static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p))
 
 	return n_geom_points;
 }
+static int snap_geom_point_values(const ARegion *ar, float point[3], snap_geom_point *(*p), float obmat[4][4]){
+	int n_geom_points = 0;
+	copy_v3_v3((*p)->v, point);
+	mul_m4_v3(obmat, (*p)->v);
+	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+		n_geom_points++;
+		(*p)++;
+	}
+	return n_geom_points;
+}
 
-static int snap_geom_center(const ARegion *ar,  BMGeom *egm, snap_geom_point *(*p)){
+static int snap_geom_center(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)){
+
+
+
+	return snap_geom_point_values(ar, egm->center, &p, obmat);
+
+}
+/* * @brief point_dist_to_plane
+ * @param c reference point (on plane)
+ * @param a axis
+ * @param p point
+   */
+
+static int snap_geom_ortho(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
+
 
 	int n_geom_points = 0;
-	copy_v3_v3((*p)->v, egm->center);
-	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-		n_geom_points++;
-		(*p)++;
-	}
+	if(snap_target){
+		float v1[3], v2[3], axis[3], pt[3];
 
+		copy_v3_fl3(pt, snap_target[0], snap_target[1], snap_target[2]);
+		sub_v3_v3v3(axis, egm->end, egm->start);
+		sub_v3_v3v3(v2, pt, egm->end);
+
+		project_v3_v3v3(v1, v2, axis);
+		add_v3_v3v3(v1, egm->end, v1);
+		copy_v3_v3((*p)->v, v1);
+
+		n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+	}
+	return n_geom_points;
+
+}
+static int snap_geom_ortho_circle(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
+
+
+	int n_geom_points = 0;
+	if(snap_target){
+		float v1[3], pt[3];
+		copy_v3_fl3(pt, snap_target[0], snap_target[1], snap_target[2]);
+		float radius= len_v3v3(egm->center, egm->v[0]->co);
+
+		isect_ortho_line_circl(radius, egm->center, pt, v1);
+
+		n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+	}
+	return n_geom_points;
+
+}
+
+static int snap_geom_tangent(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
+
+
+	int n_geom_points = 0;
+	if(snap_target){
+		float r1, r2;
+		float isect1[3], isect2[3];
+		float c2[3];
+		int a = 0;
+		copy_v3_v3(c2, snap_target);
+		r1=len_v3v3(egm->center, egm->v[0]->co);
+		float dist= len_v3v3(c2, egm->center);
+		r2= sqrt(dist*dist-r1*r1);
+		a = isect_circle_circle(r1, egm->center, r2, c2, egm->axis, isect1, isect2);
+		if(a == 1 || a == 2){
+			n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+		}
+		if(a == 2){
+			n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+		}
+
+
+	}
 	return n_geom_points;
 
 }
 
 
-
-static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_point **points) {
+static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4][4], snap_geom_point **points, float *snap_target, Scene *scene) {
 	int max_geom_points= get_max_geom_points(em);
 	int n_geom_points = 0;
 	Mesh *me = em->ob->data;
 	BMGeom *egm;
 	BMIter iter;
 
+	bool snap_end_line = scene->geomsnapflag & ME_GEOM_LINE_END_POINT;
+	bool snap_mid_line = scene->geomsnapflag & ME_GEOM_LINE_MID_POINT;
+	bool snap_end_arc = scene->geomsnapflag & ME_GEOM_ARC_END_POINT;
+	bool snap_mid_arc = scene->geomsnapflag & ME_GEOM_ARC_MID_POINT;
+	bool snap_center_arc_circle = scene->geomsnapflag & ME_GEOM_CENTER_POINT;
+	bool snap_ortho = scene->geomsnapflag & ME_GEOM_ORTHO_POINT;
 
-	bool snap_end_line = me->snapflag & ME_GEOM_LINE_END_POINT;
-	bool snap_mid_line = me->snapflag & ME_GEOM_LINE_MID_POINT;
-	bool snap_end_arc = me->snapflag & ME_GEOM_ARC_END_POINT;
-	bool snap_mid_arc = me->snapflag & ME_GEOM_ARC_MID_POINT;
-	bool snap_center_arc_circle = me->snapflag & ME_GEOM_CENTER_POINT;
 
 	*points = MEM_callocN(sizeof(snap_geom_point)*max_geom_points, "Snap points array");
 	snap_geom_point *p = *points;
 	BM_ITER_MESH (egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
-		switch (egm->geometry_type) {
-			case BM_GEOMETRY_TYPE_LINE:
-				if(snap_end_line) {
-					n_geom_points += snap_geom_start_end(ar, egm, &p);
+			switch (egm->geometry_type) {
+				case BM_GEOMETRY_TYPE_LINE:
+					if(snap_end_line) {
+						n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
 
-				}
-				if(snap_mid_line) {
-					n_geom_points += snap_geom_mid(ar, egm, &p);
+					}
+					if(snap_mid_line) {
+						n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
 
-				}
-			break;
-			case BM_GEOMETRY_TYPE_CIRCLE:
-				if(snap_center_arc_circle) {
-					n_geom_points += snap_geom_center(ar, egm, &p);
+					}
+					if(snap_ortho){
+						n_geom_points += snap_geom_ortho(ar, egm, obmat, &p, snap_target);
+					}
 
-				}
-			break;
-			case BM_GEOMETRY_TYPE_ARC:
-				if(snap_center_arc_circle) {
-					n_geom_points += snap_geom_center(ar, egm, &p);
 
-				}
 
-				if(snap_end_arc) {
-					n_geom_points += snap_geom_start_end(ar, egm, &p);
+				break;
+				case BM_GEOMETRY_TYPE_CIRCLE:
+					if(point_on_plane(egm->center, egm->axis, snap_target)){
+						if(snap_center_arc_circle) {
+							n_geom_points += snap_geom_center(ar, egm, obmat, &p);
+						}
+						if(snap_ortho){
+							n_geom_points += snap_geom_ortho_circle(ar, egm, obmat, &p, snap_target);
+						}
+					}
+					n_geom_points += snap_geom_tangent(ar, egm, obmat, &p, snap_target);
+				break;
+				case BM_GEOMETRY_TYPE_ARC:
+					if(point_on_plane(egm->center, egm->axis, snap_target)){
+						if(snap_center_arc_circle) {
+							n_geom_points += snap_geom_center(ar, egm, obmat, &p);
 
-				}
-				if(snap_mid_arc) {
-					n_geom_points += snap_geom_mid(ar, egm, &p);
+						}
 
-				}
+						if(snap_end_arc) {
+							n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
 
-			break;
-		}
+						}
+						if(snap_mid_arc) {
+							n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
+
+						}
+					}
+				break;
+			}
+
 
 	}
 
@@ -420,7 +511,7 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, snap_geom_poi
 
 }
 
-static bool snapGeom(const ARegion *ar, BMEditMesh *em,  const float mval_fl[2], float *dist_px, float r_loc[3], float UNUSED(r_no[3]) )
+static bool snapGeom(const ARegion *ar, BMEditMesh *em, float obmat[4][4],  const float mval_fl[2], float *dist_px, float r_loc[3], float UNUSED(r_no[3]), float *snap_target, Scene *scene )
 {
 	snap_geom_point *points, *found = NULL;
 	bool retval = false;
@@ -431,7 +522,7 @@ static bool snapGeom(const ARegion *ar, BMEditMesh *em,  const float mval_fl[2],
 
 
 	//**********************
-	num_geom_points = init_geom_snap_data(ar, em, &points);
+	num_geom_points = init_geom_snap_data(ar, em, obmat, &points, snap_target, scene);
 
 
 
@@ -452,6 +543,7 @@ static bool snapGeom(const ARegion *ar, BMEditMesh *em,  const float mval_fl[2],
 	if (found) {
 		retval =  true;
 		copy_v3_v3(r_loc, found->v);
+
 	}
 
 	// Free data
@@ -1119,7 +1211,7 @@ static bool snapEditMesh(
         const float ray_start[3], const float ray_normal[3], const float ray_origin[3],
         float *ray_depth, const unsigned int ob_index,
         float r_loc[3], float r_no[3], int *r_index,
-        ListBase *r_hit_list, SnapSelect snap_select)
+		ListBase *r_hit_list, SnapSelect snap_select, float *snap_target, Scene *scene)
 #else
 static bool snapEditMesh(
         SnapObjectContext *sctx,
@@ -1421,7 +1513,7 @@ static bool snapEditMesh(
 			case SCE_SNAP_MODE_GEOM:
 			{
 
-				retval |= snapGeom(ar, em, mval, dist_px, r_loc, r_no);
+				retval |= snapGeom(ar, em, obmat,  mval, dist_px, r_loc, r_no, snap_target, scene);
 				break;
 			}
 		}
@@ -1446,7 +1538,7 @@ static bool snapObject(
         /* return args */
         float r_loc[3], float r_no[3], int *r_index,
         Object **r_ob, float r_obmat[4][4],
-        ListBase *r_hit_list, SnapSelect snap_select)
+		ListBase *r_hit_list, SnapSelect snap_select, float *snap_target, Scene *scene)
 #else
 static bool snapObject(
         SnapObjectContext *sctx,
@@ -1474,7 +1566,7 @@ static bool snapObject(
 			        ray_start, ray_normal, ray_origin,
 			        ray_depth, ob_index,
 			        r_loc, r_no, r_index,
-			        r_hit_list, snap_select);
+					r_hit_list, snap_select, snap_target, scene);
 #else
 			retval = snapEditMesh(
 			        sctx, ob, em, obmat, mval, dist_px, snap_to,
@@ -1539,7 +1631,7 @@ static bool snapObject(
 
 	return retval;
 }
-
+#ifdef WITH_MECHANICAL_GEOMETRY
 static bool snapObjectsRay(
         SnapObjectContext *sctx,
         const unsigned short snap_to, const SnapSelect snap_select,
@@ -1549,7 +1641,19 @@ static bool snapObjectsRay(
         /* return args */
         float r_loc[3], float r_no[3], int *r_index,
         Object **r_ob, float r_obmat[4][4],
-        ListBase *r_hit_list)
+		ListBase *r_hit_list, float *snap_target, Scene *scene)
+#else
+static bool snapObjectsRay(
+		SnapObjectContext *sctx,
+		const unsigned short snap_to, const SnapSelect snap_select,
+		const bool use_object_edit_cage,
+		const float mval[2], float *dist_px,
+		const float ray_start[3], const float ray_normal[3], const float ray_origin[3], float *ray_depth,
+		/* return args */
+		float r_loc[3], float r_no[3], int *r_index,
+		Object **r_ob, float r_obmat[4][4],
+		ListBase *r_hit_list)
+#endif
 {
 	bool retval = false;
 	unsigned int ob_index = 0;
@@ -1569,7 +1673,7 @@ static bool snapObjectsRay(
 		        sctx, ob, ob->obmat, false, snap_to,
 		        mval, dist_px, ob_index++,
 		        ray_start, ray_normal, ray_origin, ray_depth,
-		        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select);
+				r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select, snap_target, scene);
 #else
 		retval |= snapObject(
 		        sctx, ob, ob->obmat, false, snap_to,
@@ -1615,7 +1719,7 @@ static bool snapObjectsRay(
 					        sctx, dupli_snap, dupli_ob->mat, use_obedit_dupli, snap_to,
 					        mval, dist_px, ob_index++,
 					        ray_start, ray_normal, ray_origin, ray_depth,
-					        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select);
+							r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select, snap_target, scene);
 #else
 					retval |= snapObject(
 					        sctx, dupli_snap, dupli_ob->mat, use_obedit_dupli, snap_to,
@@ -1637,7 +1741,7 @@ static bool snapObjectsRay(
 			        sctx, ob_snap, ob->obmat, use_obedit, snap_to,
 			        mval, dist_px, ob_index++,
 			        ray_start, ray_normal, ray_origin, ray_depth,
-			        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select);
+					r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select, snap_target, scene);
 #else
 			retval |= snapObject(
 			        sctx, ob_snap, ob->obmat, use_obedit, snap_to,
@@ -1749,12 +1853,22 @@ bool ED_transform_snap_object_project_ray_ex(
         float r_loc[3], float r_no[3], int *r_index,
         Object **r_ob, float r_obmat[4][4])
 {
+#ifdef WITH_MECHANICAL_GEOMETRY
+	return snapObjectsRay(
+			sctx,
+			snap_to, params->snap_select, params->use_object_edit_cage,
+			NULL, NULL,
+			ray_start, ray_normal, ray_start, ray_depth,
+			r_loc, r_no, r_index, r_ob, r_obmat, NULL, NULL, NULL);
+
+#else
 	return snapObjectsRay(
 	        sctx,
 	        snap_to, params->snap_select, params->use_object_edit_cage,
 	        NULL, NULL,
 	        ray_start, ray_normal, ray_start, ray_depth,
-	        r_loc, r_no, r_index, r_ob, r_obmat, NULL);
+			r_loc, r_no, r_index, r_ob, r_obmat, NULL);
+#endif
 }
 
 /**
@@ -1779,7 +1893,16 @@ bool ED_transform_snap_object_project_ray_all(
 #ifdef DEBUG
 	float ray_depth_prev = ray_depth;
 #endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+	bool retval = snapObjectsRay(
+			sctx,
+			snap_to, params->snap_select, params->use_object_edit_cage,
+			NULL, NULL,
+			ray_start, ray_normal, ray_start, &ray_depth,
+			NULL, NULL, NULL, NULL, NULL,
+			r_hit_list, NULL, NULL);
 
+#else
 	bool retval = snapObjectsRay(
 	        sctx,
 	        snap_to, params->snap_select, params->use_object_edit_cage,
@@ -1787,6 +1910,7 @@ bool ED_transform_snap_object_project_ray_all(
 	        ray_start, ray_normal, ray_start, &ray_depth,
 	        NULL, NULL, NULL, NULL, NULL,
 	        r_hit_list);
+#endif
 
 	/* meant to be readonly for 'all' hits, ensure it is */
 #ifdef DEBUG
@@ -1919,14 +2043,24 @@ bool ED_transform_snap_object_project_view3d_mixed(
 	        mval_fl, dist_px, use_depth,
 	        r_co, r_no);
 }
-
+#ifdef WITH_MECHANICAL_GEOMETRY
 bool ED_transform_snap_object_project_view3d_ex(
         SnapObjectContext *sctx,
         const unsigned short snap_to,
         const struct SnapObjectParams *params,
         const float mval[2], float *dist_px,
         float *ray_depth,
-        float r_loc[3], float r_no[3], int *r_index)
+		float r_loc[3], float r_no[3], int *r_index, float *snap_target, Scene *scene)
+#else
+bool ED_transform_snap_object_project_view3d_ex(
+		SnapObjectContext *sctx,
+		const unsigned short snap_to,
+		const struct SnapObjectParams *params,
+		const float mval[2], float *dist_px,
+		float *ray_depth,
+		float r_loc[3], float r_no[3], int *r_index)
+
+#endif
 {
 	float ray_start[3], ray_normal[3], ray_origin[3];
 
@@ -1942,13 +2076,21 @@ bool ED_transform_snap_object_project_view3d_ex(
 	{
 		return false;
 	}
-
+#ifdef WITH_MECHANICAL_GEOMETRY
 	return snapObjectsRay(
 	        sctx,
 	        snap_to, params->snap_select, params->use_object_edit_cage,
 	        mval, dist_px,
 	        ray_start, ray_normal, ray_origin, ray_depth,
-	        r_loc, r_no, r_index, NULL, NULL, NULL);
+			r_loc, r_no, r_index, NULL, NULL, NULL, snap_target, scene);
+#else
+	return snapObjectsRay(
+			sctx,
+			snap_to, params->snap_select, params->use_object_edit_cage,
+			mval, dist_px,
+			ray_start, ray_normal, ray_origin, ray_depth,
+			r_loc, r_no, r_index, NULL, NULL, NULL);
+#endif
 }
 
 bool ED_transform_snap_object_project_view3d(
@@ -1959,13 +2101,24 @@ bool ED_transform_snap_object_project_view3d(
         float *ray_depth,
         float r_loc[3], float r_no[3])
 {
+#ifdef WITH_MECHANICAL_GEOMETRY
 	return ED_transform_snap_object_project_view3d_ex(
-	        sctx,
-	        snap_to,
-	        params,
-	        mval, dist_px,
-	        ray_depth,
-	        r_loc, r_no, NULL);
+			sctx,
+			snap_to,
+			params,
+			mval, dist_px,
+			ray_depth,
+			r_loc, r_no, NULL, NULL, NULL);
+#else
+	return ED_transform_snap_object_project_view3d_ex(
+			sctx,
+			snap_to,
+			params,
+			mval, dist_px,
+			ray_depth,
+			r_loc, r_no, NULL);
+#endif
+
 }
 
 /**
