@@ -351,21 +351,20 @@ static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, float obmat[4][4], sna
 	return n_geom_points;
 }
 static int snap_geom_point_values(const ARegion *ar, float point[3], snap_geom_point *(*p), float obmat[4][4]){
-	int n_geom_points = 0;
 	copy_v3_v3((*p)->v, point);
 	mul_m4_v3(obmat, (*p)->v);
 	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-		n_geom_points++;
 		(*p)++;
+		return 1;
 	}
-	return n_geom_points;
+	return 0;
 }
 
 static int snap_geom_center(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)){
 
 
 
-	return snap_geom_point_values(ar, egm->center, &p, obmat);
+	return snap_geom_point_values(ar, egm->center, p, obmat);
 
 }
 /* * @brief point_dist_to_plane
@@ -376,8 +375,6 @@ static int snap_geom_center(const ARegion *ar,  BMGeom *egm, float obmat[4][4], 
 
 static int snap_geom_ortho(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
 
-
-	int n_geom_points = 0;
 	if(snap_target){
 		float v1[3], v2[3], axis[3], pt[3];
 
@@ -389,15 +386,13 @@ static int snap_geom_ortho(const ARegion *ar,  BMGeom *egm, float obmat[4][4], s
 		add_v3_v3v3(v1, egm->end, v1);
 		copy_v3_v3((*p)->v, v1);
 
-		n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+		return snap_geom_point_values(ar, egm->center, p, obmat);
 	}
-	return n_geom_points;
+	return 0;
 
 }
 static int snap_geom_ortho_circle(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
 
-
-	int n_geom_points = 0;
 	if(snap_target){
 		float v1[3], pt[3];
 		copy_v3_fl3(pt, snap_target[0], snap_target[1], snap_target[2]);
@@ -405,17 +400,16 @@ static int snap_geom_ortho_circle(const ARegion *ar,  BMGeom *egm, float obmat[4
 
 		isect_ortho_line_circl(radius, egm->center, pt, v1);
 
-		n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+		return snap_geom_point_values(ar, pt, p, obmat);
 	}
-	return n_geom_points;
+	return 0;
 
 }
 
-static int snap_geom_tangent(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
-
-
+static int snap_geom_tangent(const ARegion *ar, BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target)
+{
 	int n_geom_points = 0;
-	if(snap_target){
+	if(snap_target) {
 		float r1, r2;
 		float isect1[3], isect2[3];
 		float c2[3];
@@ -426,13 +420,11 @@ static int snap_geom_tangent(const ARegion *ar,  BMGeom *egm, float obmat[4][4],
 		r2= sqrt(dist*dist-r1*r1);
 		a = isect_circle_circle(r1, egm->center, r2, c2, egm->axis, isect1, isect2);
 		if(a == 1 || a == 2){
-			n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+			n_geom_points += snap_geom_point_values(ar, isect1, p, obmat);
 		}
 		if(a == 2){
-			n_geom_points=snap_geom_point_values(ar, egm->center, &p, obmat);
+			n_geom_points += snap_geom_point_values(ar, isect2, p, obmat);
 		}
-
-
 	}
 	return n_geom_points;
 
@@ -442,7 +434,6 @@ static int snap_geom_tangent(const ARegion *ar,  BMGeom *egm, float obmat[4][4],
 static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4][4], snap_geom_point **points, float *snap_target, Scene *scene) {
 	int max_geom_points= get_max_geom_points(em);
 	int n_geom_points = 0;
-	Mesh *me = em->ob->data;
 	BMGeom *egm;
 	BMIter iter;
 
@@ -452,7 +443,7 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 	bool snap_mid_arc = scene->geomsnapflag & ME_GEOM_ARC_MID_POINT;
 	bool snap_center_arc_circle = scene->geomsnapflag & ME_GEOM_CENTER_POINT;
 	bool snap_ortho = scene->geomsnapflag & ME_GEOM_ORTHO_POINT;
-
+	bool snap_tangents = scene->geomsnapflag & ME_GEOM_TANGENT_POINT;
 
 	*points = MEM_callocN(sizeof(snap_geom_point)*max_geom_points, "Snap points array");
 	snap_geom_point *p = *points;
@@ -461,45 +452,40 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 				case BM_GEOMETRY_TYPE_LINE:
 					if(snap_end_line) {
 						n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
-
 					}
 					if(snap_mid_line) {
 						n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
-
 					}
 					if(snap_ortho){
 						n_geom_points += snap_geom_ortho(ar, egm, obmat, &p, snap_target);
 					}
-
-
-
 				break;
 				case BM_GEOMETRY_TYPE_CIRCLE:
-					if(point_on_plane(egm->center, egm->axis, snap_target)){
-						if(snap_center_arc_circle) {
-							n_geom_points += snap_geom_center(ar, egm, obmat, &p);
-						}
-						if(snap_ortho){
-							n_geom_points += snap_geom_ortho_circle(ar, egm, obmat, &p, snap_target);
-						}
+					if(snap_center_arc_circle) {
+						n_geom_points += snap_geom_center(ar, egm, obmat, &p);
 					}
-					n_geom_points += snap_geom_tangent(ar, egm, obmat, &p, snap_target);
+					if(snap_ortho && point_on_plane(egm->center, egm->axis, snap_target)){
+						n_geom_points += snap_geom_ortho_circle(ar, egm, obmat, &p, snap_target);
+					}
+					if (snap_tangents && point_on_plane(egm->center, egm->axis, snap_target)) {
+						n_geom_points += snap_geom_tangent(ar, egm, obmat, &p, snap_target);
+					}
 				break;
 				case BM_GEOMETRY_TYPE_ARC:
-					if(point_on_plane(egm->center, egm->axis, snap_target)){
-						if(snap_center_arc_circle) {
-							n_geom_points += snap_geom_center(ar, egm, obmat, &p);
-
-						}
-
-						if(snap_end_arc) {
-							n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
-
-						}
-						if(snap_mid_arc) {
-							n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
-
-						}
+					if(snap_center_arc_circle) {
+						n_geom_points += snap_geom_center(ar, egm, obmat, &p);
+					}
+					if(snap_end_arc) {
+						n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
+					}
+					if(snap_mid_arc) {
+						n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
+					}
+					if (snap_tangents && point_on_plane(egm->center, egm->axis, snap_target)) {
+						n_geom_points += snap_geom_tangent(ar, egm, obmat, &p, snap_target);
+					}
+					if(snap_ortho && point_on_plane(egm->center, egm->axis, snap_target)){
+						n_geom_points += snap_geom_ortho_circle(ar, egm, obmat, &p, snap_target);
 					}
 				break;
 			}

@@ -1401,15 +1401,13 @@ bool snapObjectsTransform(
 		t->tsnap.targetSnap(t);
 		snap_target_temp= t->tsnap.snapTarget;
 	}
-	bContext *C= t->context;
-	Scene *scene = CTX_data_scene(C);
 
 	return ED_transform_snap_object_project_view3d_ex(
 	        t->tsnap.object_context,
 	        t->scene->toolsettings->snap_mode,
 			&params,
 	        mval, dist_px, NULL,
-			r_loc, r_no, NULL, snap_target_temp, scene);
+			r_loc, r_no, NULL, snap_target_temp, t->scene);
 
 #else
 	return ED_transform_snap_object_project_view3d_ex(
