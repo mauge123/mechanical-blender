@@ -19,6 +19,7 @@
 
 #include "kernel_math.h"
 #include "svm/svm_types.h"
+#include "util_static_assert.h"
 
 #ifndef __KERNEL_GPU__
 #  define __KERNEL_CPU__
@@ -147,6 +148,7 @@ CCL_NAMESPACE_BEGIN
 #define __CAMERA_CLIPPING__
 #define __INTERSECTION_REFINE__
 #define __CLAMP_SAMPLE__
+#define __PATCH_EVAL__
 
 #ifdef __KERNEL_SHADING__
 #  define __SVM__
@@ -195,6 +197,9 @@ CCL_NAMESPACE_BEGIN
 #endif
 #ifdef __NO_BRANCHED_PATH__
 #  undef __BRANCHED_PATH__
+#endif
+#ifdef __NO_PATCH_EVAL__
+#  undef __PATCH_EVAL__
 #endif
 
 /* Random Numbers */
@@ -656,23 +661,18 @@ typedef struct AttributeDescriptor {
  * ShaderClosure has a fixed size, and any extra space must be allocated
  * with closure_alloc_extra().
  *
- * float3 is 12 bytes on CUDA and 16 bytes on CPU/OpenCL, we set the data
- * size to ensure ShaderClosure is 80 bytes total everywhere. */
+ * We pad the struct to 80 bytes and ensure it is aligned to 16 bytes, which
+ * we assume to be the maximum required alignment for any struct. */
 
 #define SHADER_CLOSURE_BASE \
 	float3 weight; \
 	ClosureType type; \
 	float sample_weight \
 
-typedef ccl_addr_space struct ShaderClosure {
+typedef ccl_addr_space struct ccl_align(16) ShaderClosure {
 	SHADER_CLOSURE_BASE;
 
-	/* pad to 80 bytes, data types are aligned to own size */
-#ifdef __KERNEL_CUDA__
-	float data[15];
-#else
-	float data[14];
-#endif
+	float data[14]; /* pad to 80 bytes */
 } ShaderClosure;
 
 /* Shader Context
@@ -747,7 +747,7 @@ enum ShaderDataFlag {
 #  define SD_THREAD (get_global_id(1) * get_global_size(0) + get_global_id(0))
 #  if defined(__SPLIT_KERNEL_AOS__)
      /* ShaderData is stored as an Array-of-Structures */
-#    define ccl_soa_member(type, name) type soa_##name;
+#    define ccl_soa_member(type, name) type soa_##name
 #    define ccl_fetch(s, t) (s[SD_THREAD].soa_##t)
 #    define ccl_fetch_array(s, t, index) (&s[SD_THREAD].soa_##t[index])
 #  else
@@ -755,7 +755,7 @@ enum ShaderDataFlag {
 #    define SD_GLOBAL_SIZE (get_global_size(0) * get_global_size(1))
 #    define SD_FIELD_SIZE(t) sizeof(((struct ShaderData*)0)->t)
 #    define SD_OFFSETOF(t) ((char*)(&((struct ShaderData*)0)->t) - (char*)0)
-#    define ccl_soa_member(type, name) type soa_##name;
+#    define ccl_soa_member(type, name) type soa_##name
 #    define ccl_fetch(s, t) (((ShaderData*)((ccl_addr_space char*)s + SD_GLOBAL_SIZE * SD_OFFSETOF(soa_##t) +  SD_FIELD_SIZE(soa_##t) * SD_THREAD - SD_OFFSETOF(soa_##t)))->soa_##t)
 #    define ccl_fetch_array(s, t, index) (&ccl_fetch(s, t)[index])
 #  endif
@@ -991,6 +991,7 @@ typedef struct KernelCamera {
 
 	int pad;
 } KernelCamera;
+static_assert_align(KernelCamera, 16);
 
 typedef struct KernelFilm {
 	float exposure;
@@ -1045,6 +1046,7 @@ typedef struct KernelFilm {
 	int pass_pad3;
 #endif
 } KernelFilm;
+static_assert_align(KernelFilm, 16);
 
 typedef struct KernelBackground {
 	/* only shader index */
@@ -1058,6 +1060,7 @@ typedef struct KernelBackground {
 	float ao_distance;
 	float ao_pad1, ao_pad2;
 } KernelBackground;
+static_assert_align(KernelBackground, 16);
 
 typedef struct KernelIntegrator {
 	/* emission */
@@ -1125,8 +1128,10 @@ typedef struct KernelIntegrator {
 	float volume_step_size;
 	int volume_samples;
 
-	int pad;
+	int pad1;
+	int pad2;
 } KernelIntegrator;
+static_assert_align(KernelIntegrator, 16);
 
 typedef struct KernelBVH {
 	/* root node */
@@ -1138,6 +1143,7 @@ typedef struct KernelBVH {
 	int use_qbvh;
 	int pad1, pad2;
 } KernelBVH;
+static_assert_align(KernelBVH, 16);
 
 typedef enum CurveFlag {
 	/* runtime flags */
@@ -1157,11 +1163,13 @@ typedef struct KernelCurves {
 	float minimum_width;
 	float maximum_width;
 } KernelCurves;
+static_assert_align(KernelCurves, 16);
 
 typedef struct KernelTables {
 	int beckmann_offset;
 	int pad1, pad2, pad3;
 } KernelTables;
+static_assert_align(KernelTables, 16);
 
 typedef struct KernelData {
 	KernelCamera cam;
@@ -1172,8 +1180,12 @@ typedef struct KernelData {
 	KernelCurves curve;
 	KernelTables tables;
 } KernelData;
+static_assert_align(KernelData, 16);
 
 #ifdef __KERNEL_DEBUG__
+/* NOTE: This is a runtime-only struct, alignment is not
+ * really important here.
+ */
 typedef ccl_addr_space struct DebugData {
 	// Total number of BVH node traversal steps and primitives intersections
 	// for the camera rays.
@@ -1258,7 +1270,7 @@ enum RayState {
 /* Patch map node flags */
 
 #define PATCH_MAP_NODE_IS_SET (1 << 30)
-#define PATCH_MAP_NODE_IS_LEAF (1 << 31)
+#define PATCH_MAP_NODE_IS_LEAF (1u << 31)
 #define PATCH_MAP_NODE_INDEX_MASK (~(PATCH_MAP_NODE_IS_SET | PATCH_MAP_NODE_IS_LEAF))
 
 CCL_NAMESPACE_END

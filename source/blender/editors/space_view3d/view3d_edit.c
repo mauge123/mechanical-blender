@@ -1341,6 +1341,8 @@ void VIEW3D_OT_rotate(wmOperatorType *ot)
 	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR;
 }
 
+#ifdef WITH_INPUT_NDOF
+
 /** \name NDOF Utility Functions
  * \{ */
 
@@ -1905,6 +1907,8 @@ void VIEW3D_OT_ndof_all(struct wmOperatorType *ot)
 	/* flags */
 	ot->flag = 0;
 }
+
+#endif /* WITH_INPUT_NDOF */
 
 /* ************************ viewmove ******************************** */
 
