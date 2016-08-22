@@ -316,40 +316,6 @@ static bool snapEdge(
 }
 
 
-static int snap_geom_start_end(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)) {
-
-	int n_geom_points = 0;
-	copy_v3_v3((*p)->v, egm->start);
-	mul_m4_v3(obmat, (*p)->v);
-	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-		(*p)++;
-		n_geom_points++;
-	}
-
-	copy_v3_v3((*p)->v, egm->end);
-	mul_m4_v3(obmat, (*p)->v);
-	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-		(*p)++;
-		n_geom_points++;
-	}
-
-
-	return n_geom_points;
-}
-
-static int snap_geom_mid(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)){
-
-	int n_geom_points = 0;
-
-	copy_v3_v3((*p)->v, egm->mid);
-	mul_m4_v3(obmat, (*p)->v);
-	if (ED_view3d_project_float_global(ar, (*p)->v, (*p)->mval, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
-		n_geom_points++;
-		(*p)++;
-	}
-
-	return n_geom_points;
-}
 static int snap_geom_point_values(const ARegion *ar, float point[3], snap_geom_point *(*p), float obmat[4][4]){
 	copy_v3_v3((*p)->v, point);
 	mul_m4_v3(obmat, (*p)->v);
@@ -360,33 +326,16 @@ static int snap_geom_point_values(const ARegion *ar, float point[3], snap_geom_p
 	return 0;
 }
 
-static int snap_geom_center(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p)){
-
-
-
-	return snap_geom_point_values(ar, egm->center, p, obmat);
-
-}
-/* * @brief point_dist_to_plane
- * @param c reference point (on plane)
- * @param a axis
- * @param p point
-   */
-
 static int snap_geom_ortho(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
 
 	if(snap_target){
-		float v1[3], v2[3], axis[3], pt[3];
+		float v1[3], v2[3];
 
-		copy_v3_fl3(pt, snap_target[0], snap_target[1], snap_target[2]);
-		sub_v3_v3v3(axis, egm->end, egm->start);
-		sub_v3_v3v3(v2, pt, egm->end);
+		sub_v3_v3v3(v2, snap_target, egm->start);
+		project_v3_v3v3(v1, v2, egm->axis);
+		add_v3_v3(v1, egm->start);
 
-		project_v3_v3v3(v1, v2, axis);
-		add_v3_v3v3(v1, egm->end, v1);
-		copy_v3_v3((*p)->v, v1);
-
-		return snap_geom_point_values(ar, egm->center, p, obmat);
+		return snap_geom_point_values(ar, v1, p, obmat);
 	}
 	return 0;
 
@@ -394,13 +343,10 @@ static int snap_geom_ortho(const ARegion *ar,  BMGeom *egm, float obmat[4][4], s
 static int snap_geom_ortho_circle(const ARegion *ar,  BMGeom *egm, float obmat[4][4], snap_geom_point *(*p), float *snap_target){
 
 	if(snap_target){
-		float v1[3], pt[3];
-		copy_v3_fl3(pt, snap_target[0], snap_target[1], snap_target[2]);
+		float v1[3];
 		float radius= len_v3v3(egm->center, egm->v[0]->co);
-
-		isect_ortho_line_circl(radius, egm->center, pt, v1);
-
-		return snap_geom_point_values(ar, pt, p, obmat);
+		isect_ortho_line_circl(radius, egm->center, snap_target, v1);
+		return snap_geom_point_values(ar, v1, p, obmat);
 	}
 	return 0;
 
@@ -451,10 +397,11 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 			switch (egm->geometry_type) {
 				case BM_GEOMETRY_TYPE_LINE:
 					if(snap_end_line) {
-						n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
+						n_geom_points +=  snap_geom_point_values(ar, egm->start, &p, obmat);
+						n_geom_points +=  snap_geom_point_values(ar, egm->end, &p, obmat);
 					}
 					if(snap_mid_line) {
-						n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
+						n_geom_points += snap_geom_point_values(ar, egm->mid, &p, obmat);
 					}
 					if(snap_ortho){
 						n_geom_points += snap_geom_ortho(ar, egm, obmat, &p, snap_target);
@@ -462,7 +409,7 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 				break;
 				case BM_GEOMETRY_TYPE_CIRCLE:
 					if(snap_center_arc_circle) {
-						n_geom_points += snap_geom_center(ar, egm, obmat, &p);
+						n_geom_points +=  snap_geom_point_values(ar, egm->center, &p, obmat);
 					}
 					if(snap_ortho && point_on_plane(egm->center, egm->axis, snap_target)){
 						n_geom_points += snap_geom_ortho_circle(ar, egm, obmat, &p, snap_target);
@@ -473,13 +420,14 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 				break;
 				case BM_GEOMETRY_TYPE_ARC:
 					if(snap_center_arc_circle) {
-						n_geom_points += snap_geom_center(ar, egm, obmat, &p);
+						n_geom_points +=  snap_geom_point_values(ar, egm->center, &p, obmat);
 					}
 					if(snap_end_arc) {
-						n_geom_points += snap_geom_start_end(ar, egm, obmat, &p);
+						n_geom_points +=  snap_geom_point_values(ar, egm->start, &p, obmat);
+						n_geom_points +=  snap_geom_point_values(ar, egm->end, &p, obmat);
 					}
 					if(snap_mid_arc) {
-						n_geom_points += snap_geom_mid(ar, egm, obmat, &p);
+						n_geom_points += snap_geom_point_values(ar, egm->mid, &p, obmat);
 					}
 					if (snap_tangents && point_on_plane(egm->center, egm->axis, snap_target)) {
 						n_geom_points += snap_geom_tangent(ar, egm, obmat, &p, snap_target);
