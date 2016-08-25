@@ -4481,3 +4481,81 @@ void MESH_OT_loop_to_region(wmOperatorType *ot)
 
 
 /************************ Select Path Operator *************************/
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+/* user facing function, does notification */
+bool EDBM_selec_snap_options_toggle(bContext *C, wmOperator *op, const int action)
+{
+	ToolSettings *ts = CTX_data_tool_settings(C);
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = NULL;
+	//TransInfo *t = op->customdata;
+	bool ret = false;
+
+
+	if (obedit && obedit->type == OB_MESH) {
+		em = BKE_editmesh_from_object(obedit);
+		em->snap_options=action;
+
+	}
+	if (em == NULL) {
+		return ret;
+	}
+	return true;
+}
+
+
+static int edbm_snap_options_exec(bContext *C, wmOperator *op)
+{
+	const int action      = RNA_enum_get(op->ptr,    "action");
+
+	if (EDBM_selec_snap_options_toggle(C, op, action)) {
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
+
+}
+
+static int edbm_snap_options_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	return edbm_snap_options_exec(C, op);
+}
+
+
+
+void MESH_OT_snap_options(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	static EnumPropertyItem actions_items[] = {
+		{0, "DEFAULT", 0, "Default", "Scene default snap options"},
+		{1, "LINE_END_POINT", 0, "LineEndPoint", "Snap to Line end Point"},
+		{2, "LINE_MID_POINT", 0, "lineMidPoint", "Snap to line mid P"},
+		{3, "ARC_END_POINT", 0, "ArcEndPoint", "Snap to Arc end Point"},
+		{4, "ARC_MID_POINT", 0, "ArcMidPoint", "Snap to Arc mid Point"},
+		{5, "CENTER_POINT", 0, "CenterPoint", "Snap to Center Point"},
+		{6, "ORTHO_POINT", 0, "OrthoPoint", "Snap to Perpendiculat Point"},
+		{7, "TANGENT_POINT", 0, "TangentPoint", "Snap to Tangent Point"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+
+	/* identifiers */
+	ot->name = "Snap Options";
+	ot->idname = "MESH_OT_snap_options";
+	ot->description = "Change snap options";
+
+	/* api callbacks */
+	ot->invoke = edbm_snap_options_invoke;
+	ot->exec = edbm_snap_options_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_enum(ot->srna, "action", actions_items, 0, "Action", "Selection action to execute");
+}
+#endif
+

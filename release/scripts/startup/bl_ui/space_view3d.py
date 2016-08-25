@@ -2388,6 +2388,28 @@ class VIEW3D_MT_edit_mesh_select_mode(Menu):
         layout.operator("mesh.select_mode", text="Dimension", icon='FACESEL').type = 'DIMENSION'
 # WITH_MECHANICAL_GEOMETRY
         layout.operator("mesh.select_mode", text="Geometry", icon='FACESEL').type = 'GEOMETRY'
+        layout.operator("scene.geomsnapflag", text="Line Mid Point", icon='EDGESEL')
+       
+        
+        
+class VIEW3D_MT_snap_options(Menu):
+        bl_label = "Select Snap Options"
+        
+        def draw(self, context):
+                layout = self.layout
+
+                layout.operator_context = 'INVOKE_REGION_WIN'
+
+                layout.operator("mesh.snap_options", text="Default").action = "DEFAULT"
+                layout.operator("mesh.snap_options", text="Snap to Line End Points").action = "LINE_END_POINT"
+                layout.operator("mesh.snap_options", text="Snap to Line Mid Point").action = "LINE_MID_POINT"
+                layout.operator("mesh.snap_options", text="Snap to Arc End Points").action = "ARC_END_POINT"
+                layout.operator("mesh.snap_options", text="Snap to Arc Mid Point").action = "ARC_MID_POINT"
+                layout.operator("mesh.snap_options", text="Snap to Center Point (Arc/Circle)").action = "CENTER_POINT"
+                layout.operator("mesh.snap_options", text="Snap to Perpendicular Point").action = "ORTHO_POINT"
+                layout.operator("mesh.snap_options", text="Snap to Tangent Point").action = "TANGENT_POINT"
+                
+
 
 class VIEW3D_MT_edit_mesh_extrude(Menu):
     bl_label = "Extrude"
@@ -3451,6 +3473,7 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
         col.separator()
         split = layout.split()
         col = split.column()
+        col.prop(mesh, "show_mesh_geometry", text="Show Geometry")
         col.prop(mesh, "dim_perpendicular_visibility", text="Show Dimensions on Perpendicular View")
 
 

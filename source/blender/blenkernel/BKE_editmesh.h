@@ -79,6 +79,10 @@ typedef struct BMEditMesh {
 
 	/*temp variables for x-mirror editing*/
 	int mirror_cdlayer; /* -1 is invalid */
+
+	/*snap options*/
+	short snap_options;
+
 } BMEditMesh;
 
 /* editmesh.c */

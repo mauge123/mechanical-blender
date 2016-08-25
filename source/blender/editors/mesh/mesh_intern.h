@@ -154,6 +154,9 @@ void MESH_OT_rip_edge(struct wmOperatorType *ot);
 void MESH_OT_select_similar(struct wmOperatorType *ot);
 void MESH_OT_select_similar_region(struct wmOperatorType *ot);
 void MESH_OT_select_mode(struct wmOperatorType *ot);
+#ifdef WITH_MECHANICAL_GEOMETRY
+void MESH_OT_snap_options(struct wmOperatorType *ot);
+#endif
 void MESH_OT_loop_multi_select(struct wmOperatorType *ot);
 void MESH_OT_loop_select(struct wmOperatorType *ot);
 void MESH_OT_edgering_select(struct wmOperatorType *ot);
