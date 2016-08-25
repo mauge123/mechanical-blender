@@ -1948,6 +1948,19 @@ extern const char *RE_engine_id_CYCLES;
 #define PROP_INVSQUARE         7
 #define PROP_MODE_MAX          8
 
+#ifdef WITH_MECHANICAL_GEOMETRY
+	/* toolsettings->snap_options */
+	#define EM_DEFAULT			0
+	#define EM_GEOM_LINE_END_POINT		1
+	#define EM_GEOM_LINE_MID_POINT		2
+	#define EM_GEOM_ARC_END_POINT		3
+	#define EM_GEOM_ARC_MID_POINT		4
+	#define EM_GEOM_CENTER_POINT		5
+	#define EM_GEOM_ORTHO_POINT		6
+	#define EM_GEOM_TANGENT_POINT		7
+#endif
+
+
 /* toolsettings->proportional */
 #define PROP_EDIT_OFF			0
 #define PROP_EDIT_ON			1
@@ -2246,23 +2259,18 @@ typedef enum eGPencil_Placement_Flags {
 enum {
 
 	//line
-	ME_GEOM_LINE_END_POINT				= 1 << 0,
-	ME_GEOM_LINE_MID_POINT				= 1 << 1,
+	GEOM_LINE_END_POINT				= 1 << 0,
+	GEOM_LINE_MID_POINT				= 1 << 1,
 	//arc
-	ME_GEOM_ARC_END_POINT				= 1 << 2,
-	ME_GEOM_ARC_MID_POINT				= 1 << 3,
+	GEOM_ARC_END_POINT				= 1 << 2,
+	GEOM_ARC_MID_POINT				= 1 << 3,
 	//arc and circle
-	ME_GEOM_CENTER_POINT				= 1 << 4,
+	GEOM_CENTER_POINT				= 1 << 4,
 	//ortho
-	ME_GEOM_ORTHO_POINT					= 1 << 5,
+	GEOM_ORTHO_POINT					= 1 << 5,
 	//tangents
-	ME_GEOM_TANGENT_POINT				= 1 <<6,
+	GEOM_TANGENT_POINT				= 1 <<6,
 
-	// WITH_MECHANICAL_GEOMETRY
-	ME_DRAW_GEOMETRY					= 1 << 7,
-
-	// WITH_MECHANICAL_GEOMETRY
-	ME_PERP_VISIBILITY					= 1 << 8,
 
 
 };

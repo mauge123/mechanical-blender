@@ -92,8 +92,6 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
         split = layout.split()
         
         col = split.column() 
-        col.label(text="Mesh Display:")
-        col.prop(scene, "show_mesh_geometry", text="Show Geometry")
         col.label(text="Snap Mode:")
 
         col.prop(scene, "geom_line_end_point", text="Snap to Line End Points")

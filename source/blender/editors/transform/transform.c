@@ -1679,6 +1679,12 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 				}
 				break;
 			case SKEY:
+#ifdef WITH_MECHANICAL
+				/* Conflicts with ALT+S for snap menu */
+				if (t->flag & T_ALT_TRANSFORM) {
+					break;
+				}
+#endif
 				/* only switch when... */
 				if (ELEM(t->mode, TFM_ROTATION, TFM_TRANSLATION, TFM_TRACKBALL)) {
 					restoreTransObjects(t);

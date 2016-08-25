@@ -236,6 +236,12 @@ enum {
 /* draw loop normals */
 	ME_DRAW_LNORMALS       = 1 << 18,
 
+// WITH_MECHANICAL_GEOMETRY
+	ME_DRAW_GEOMETRY		= 1 << 19,
+
+// WITH_MECHANICAL_GEOMETRY
+	ME_PERP_VISIBILITY		= 1 << 20,
+
 
 
 

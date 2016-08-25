@@ -146,6 +146,9 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_select_similar);
 	WM_operatortype_append(MESH_OT_select_similar_region);
 	WM_operatortype_append(MESH_OT_select_mode);
+#ifdef WITH_MECHANICAL_GEOMETRY
+	WM_operatortype_append(MESH_OT_snap_options);
+#endif
 	WM_operatortype_append(MESH_OT_loop_multi_select);
 	WM_operatortype_append(MESH_OT_mark_seam);
 	WM_operatortype_append(MESH_OT_mark_sharp);
@@ -384,6 +387,11 @@ void ED_keymap_mesh(wmKeyConfig *keyconf)
 	/* selection mode */
 	WM_keymap_add_menu(keymap, "VIEW3D_MT_edit_mesh_select_mode", TABKEY, KM_PRESS, KM_CTRL, 0);
 	
+
+	/* snap options */
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_snap_options", SKEY, KM_PRESS, KM_ALT, 0);
+
+
 	/* hide */
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_hide", HKEY, KM_PRESS, 0, 0);
 	RNA_boolean_set(kmi->ptr, "unselected", false);
