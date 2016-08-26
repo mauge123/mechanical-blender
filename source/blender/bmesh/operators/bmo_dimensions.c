@@ -135,7 +135,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 					v_arr = MEM_mallocN(sizeof (BMVert*)*2, "BMVert temp array");
 					v_arr[0] = egm->v[0];
 					v_arr[1] = egm->v[egm->totverts-1];
-					d = BM_dim_create(bm, v_arr, 2, type, NULL, BM_CREATE_NOP);
+					d = BM_dim_create(bm, v_arr, 2, type, NULL, BM_CREATE_NOP, NULL);
 					BMO_dim_flag_enable(bm, d, EXT_KEEP);
 					MEM_freeN (v_arr);
 				}
@@ -144,14 +144,14 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		else if (ELEM(type, DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS)) {
 			for (egm = BMO_iter_new(&siter, op->slots_in, "geom", BM_GEOMETRY); egm; egm = BMO_iter_step(&siter)) {
 				if (ELEM(egm->geometry_type, BM_GEOMETRY_TYPE_ARC, BM_GEOMETRY_TYPE_CIRCLE)) {
-					d = BM_dim_create(bm, egm->v, egm->totverts, type, NULL, BM_CREATE_NOP);
+					d = BM_dim_create(bm, egm->v, egm->totverts, type, NULL, BM_CREATE_NOP, NULL);
 					BMO_dim_flag_enable(bm, d, EXT_KEEP);
 				}
 			}
 		}else if (type == DIM_TYPE_ANGLE_3P) {
 			v_arr = create_dimension_from_geometry_3p_angle (bm, op);
 			if (v_arr) {
-				d = BM_dim_create(bm, v_arr, 3, type, NULL, BM_CREATE_NOP);
+				d = BM_dim_create(bm, v_arr, 3, type, NULL, BM_CREATE_NOP, NULL);
 				BMO_dim_flag_enable(bm, d, EXT_KEEP);
 				MEM_freeN (v_arr);
 			}
@@ -159,7 +159,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		else if (type == DIM_TYPE_ANGLE_4P) {
 			v_arr = create_dimension_from_geometry_4p_angle (bm, op);
 			if (v_arr) {
-				d = BM_dim_create(bm, v_arr, 4, type, NULL, BM_CREATE_NOP);
+				d = BM_dim_create(bm, v_arr, 4, type, NULL, BM_CREATE_NOP, NULL);
 				BMO_dim_flag_enable(bm, d, EXT_KEEP);
 				MEM_freeN (v_arr);
 			}
@@ -170,7 +170,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), n++) {
 			v_arr[n] = v;
 		}
-		d = BM_dim_create(bm, v_arr,op_verts_slot->len, type, NULL, BM_CREATE_USE_SELECT_ORDER);
+		d = BM_dim_create(bm, v_arr,op_verts_slot->len, type, NULL, BM_CREATE_USE_SELECT_ORDER, NULL);
 		BMO_dim_flag_enable(bm, (BMDim *)d, EXT_KEEP);
 		MEM_freeN (v_arr);
 	}

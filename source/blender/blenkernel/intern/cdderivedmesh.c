@@ -38,6 +38,7 @@
 #include "BLI_edgehash.h"
 #include "BLI_utildefines.h"
 #include "BLI_stackdefines.h"
+#include "BLI_string.h"
 
 #include "BKE_pbvh.h"
 #include "BKE_cdderivedmesh.h"
@@ -2398,6 +2399,7 @@ static DerivedMesh *cddm_from_bmesh_ex(
 		mdm->dpos_fact = edm->dpos_fact;
 		mdm->totverts = edm->totverts;
 		copy_v3_v3(mdm->fpos, edm->fpos);
+		(mdm->name, edm->name, 64);/* MAX_NAME */
 
 		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array cddm");
 		for (int n=0;n<edm->totverts;n++) {

@@ -254,6 +254,11 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			/* Individual dimension settings */
 			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("Dimension settings"), 0, yi -= buth + but_margin, 200, 20, NULL, 0, 0, 0, 0, "");
 
+			/* Dimension Name */
+			uiDefButC(block, UI_BTYPE_TEXT, 0, "Name: ",0, yi -= buth + but_margin, 200, buth,
+				&edm_sel->name, 0, 50, 0, 0, TIP_("Dimension name"));
+
+
 			// At least one dimension
 			tfp->dimension_value = get_dimension_value(edm_sel);
 			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,

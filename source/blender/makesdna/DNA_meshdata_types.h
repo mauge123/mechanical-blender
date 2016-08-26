@@ -78,6 +78,7 @@ typedef struct MDim {
 	short dim_type;
 	char flag;
 	char constraints;
+	char name[64];/* MAX_NAME */
 } MDim;
 /* */
 
