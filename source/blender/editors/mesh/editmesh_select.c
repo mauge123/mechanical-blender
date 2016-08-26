@@ -32,6 +32,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_mesh_types.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_bitmap.h"
 #include "BLI_listbase.h"
@@ -4530,14 +4531,14 @@ void MESH_OT_snap_options(wmOperatorType *ot)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem actions_items[] = {
-		{0, "DEFAULT", 0, "Default", "Scene default snap options"},
-		{1, "LINE_END_POINT", 0, "LineEndPoint", "Snap to Line end Point"},
-		{2, "LINE_MID_POINT", 0, "lineMidPoint", "Snap to line mid P"},
-		{3, "ARC_END_POINT", 0, "ArcEndPoint", "Snap to Arc end Point"},
-		{4, "ARC_MID_POINT", 0, "ArcMidPoint", "Snap to Arc mid Point"},
-		{5, "CENTER_POINT", 0, "CenterPoint", "Snap to Center Point"},
-		{6, "ORTHO_POINT", 0, "OrthoPoint", "Snap to Perpendiculat Point"},
-		{7, "TANGENT_POINT", 0, "TangentPoint", "Snap to Tangent Point"},
+		{GEOM_DEFAULT, "DEFAULT", 0, "Default", "Scene default snap options"},
+		{GEOM_LINE_END_POINT, "LINE_END_POINT", 0, "LineEndPoint", "Snap to Line end Point"},
+		{GEOM_LINE_MID_POINT, "LINE_MID_POINT", 0, "lineMidPoint", "Snap to line mid P"},
+		{GEOM_ARC_END_POINT, "ARC_END_POINT", 0, "ArcEndPoint", "Snap to Arc end Point"},
+		{GEOM_ARC_MID_POINT, "ARC_MID_POINT", 0, "ArcMidPoint", "Snap to Arc mid Point"},
+		{GEOM_CENTER_POINT, "CENTER_POINT", 0, "CenterPoint", "Snap to Center Point"},
+		{GEOM_ORTHO_POINT, "ORTHO_POINT", 0, "OrthoPoint", "Snap to Perpendiculat Point"},
+		{GEOM_TANGENT_POINT, "TANGENT_POINT", 0, "TangentPoint", "Snap to Tangent Point"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
