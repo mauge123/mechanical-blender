@@ -118,7 +118,6 @@ static EnumPropertyItem event_textinput_type_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-#ifdef WITH_INPUT_NDOF
 static EnumPropertyItem event_ndof_type_items[] = {
 	{NDOF_MOTION, "NDOF_MOTION", 0, "Motion", ""},
 	/* buttons on all 3dconnexion devices */
@@ -168,7 +167,6 @@ static EnumPropertyItem event_ndof_type_items[] = {
 	{NDOF_BUTTON_C, "NDOF_BUTTON_C", 0, "Button C", ""},
 	{0, NULL, 0, NULL, NULL}
 };
-#endif /* WITH_INPUT_NDOF */
 #endif /* RNA_RUNTIME */
 
 /* not returned: CAPSLOCKKEY, UNKNOWNKEY */
@@ -334,7 +332,6 @@ EnumPropertyItem rna_enum_event_type_items[] = {
 	{TIMERREPORT, "TIMER_REPORT", 0, "Timer Report", "TmrReport"},
 	{TIMERREGION, "TIMERREGION", 0, "Timer Region", "TmrReg"},
 	{0, "", 0, NULL, NULL},
-#ifdef WITH_INPUT_NDOF
 	{NDOF_MOTION, "NDOF_MOTION", 0, "NDOF Motion", "NdofMov"},
 	/* buttons on all 3dconnexion devices */
 	{NDOF_BUTTON_MENU, "NDOF_BUTTON_MENU", 0, "NDOF Menu", "NdofMenu"},
@@ -381,7 +378,6 @@ EnumPropertyItem rna_enum_event_type_items[] = {
 	{NDOF_BUTTON_A, "NDOF_BUTTON_A", 0, "NDOF Button A", "NdofBA"},
 	{NDOF_BUTTON_B, "NDOF_BUTTON_B", 0, "NDOF Button B", "NdofBB"},
 	{NDOF_BUTTON_C, "NDOF_BUTTON_C", 0, "NDOF Button C", "NdofBC"},
-#endif /* WITH_INPUT_NDOF */
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -705,12 +701,10 @@ static void rna_wmKeyMapItem_map_type_set(PointerRNA *ptr, int value)
 				kmi->type = TIMER;
 				kmi->val = KM_NOTHING;
 				break;
-#ifdef WITH_INPUT_NDOF
 			case KMI_TYPE_NDOF:
 				kmi->type = NDOF_MOTION;
 				kmi->val = KM_NOTHING;
 				break;
-#endif
 		}
 	}
 }
@@ -744,9 +738,7 @@ static EnumPropertyItem *rna_KeyMapItem_type_itemf(bContext *UNUSED(C), PointerR
 	if (map_type == KMI_TYPE_MOUSE) return event_mouse_type_items;
 	if (map_type == KMI_TYPE_TWEAK) return event_tweak_type_items;
 	if (map_type == KMI_TYPE_TIMER) return event_timer_type_items;
-#ifdef WITH_INPUT_NDOF
 	if (map_type == KMI_TYPE_NDOF) return event_ndof_type_items;
-#endif
 	if (map_type == KMI_TYPE_TEXTINPUT) return event_textinput_type_items;
 	else return rna_enum_event_type_items;
 }
@@ -1943,15 +1935,15 @@ static void rna_def_wm_keyconfigs(BlenderRNA *brna, PropertyRNA *cprop)
 	prop = RNA_def_property(srna, "addon", PROP_POINTER, PROP_NEVER_NULL);
 	RNA_def_property_pointer_sdna(prop, NULL, "addonconf");
 	RNA_def_property_struct_type(prop, "KeyConfig");
-	RNA_def_property_ui_text(prop, "Addon Key Configuration",
-	                         "Key configuration that can be extended by addons, and is added to the active "
+	RNA_def_property_ui_text(prop, "Add-on Key Configuration",
+	                         "Key configuration that can be extended by add-ons, and is added to the active "
 	                         "configuration when handling events");
 
 	prop = RNA_def_property(srna, "user", PROP_POINTER, PROP_NEVER_NULL);
 	RNA_def_property_pointer_sdna(prop, NULL, "userconf");
 	RNA_def_property_struct_type(prop, "KeyConfig");
 	RNA_def_property_ui_text(prop, "User Key Configuration",
-	                         "Final key configuration that combines keymaps from the active and addon configurations, "
+	                         "Final key configuration that combines keymaps from the active and add-on configurations, "
 	                         "and can be edited by the user");
 	
 	RNA_api_keyconfigs(srna);
@@ -2022,9 +2014,7 @@ static void rna_def_keyconfig(BlenderRNA *brna)
 		{KMI_TYPE_KEYBOARD, "KEYBOARD", 0, "Keyboard", ""},
 		{KMI_TYPE_TWEAK, "TWEAK", 0, "Tweak", ""},
 		{KMI_TYPE_MOUSE, "MOUSE", 0, "Mouse", ""},
-#ifdef WITH_INPUT_NDOF
 		{KMI_TYPE_NDOF, "NDOF", 0, "NDOF", ""},
-#endif
 		{KMI_TYPE_TEXTINPUT, "TEXTINPUT", 0, "Text Input", ""},
 		{KMI_TYPE_TIMER, "TIMER", 0, "Timer", ""},
 		{0, NULL, 0, NULL, NULL}

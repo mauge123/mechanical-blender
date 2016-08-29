@@ -113,16 +113,7 @@ CCL_NAMESPACE_BEGIN
 #  ifdef __KERNEL_OPENCL_AMD__
 #    define __CL_USE_NATIVE__
 #    define __KERNEL_SHADING__
-#    define __MULTI_CLOSURE__
-#    define __PASSES__
-#    define __BACKGROUND_MIS__
-#    define __LAMP_MIS__
-#    define __AO__
-#    define __CAMERA_MOTION__
-#    define __OBJECT_MOTION__
-#    define __HAIR__
-#    define __BAKING__
-#    define __TRANSPARENT_SHADOWS__
+#    define __KERNEL_ADV_SHADING__
 #  endif  /* __KERNEL_OPENCL_AMD__ */
 
 #  ifdef __KERNEL_OPENCL_INTEL_CPU__
@@ -745,7 +736,7 @@ enum ShaderDataFlag {
 
 #ifdef __SPLIT_KERNEL__
 #  define SD_THREAD (get_global_id(1) * get_global_size(0) + get_global_id(0))
-#  if defined(__SPLIT_KERNEL_AOS__)
+#  if !defined(__SPLIT_KERNEL_SOA__)
      /* ShaderData is stored as an Array-of-Structures */
 #    define ccl_soa_member(type, name) type soa_##name
 #    define ccl_fetch(s, t) (s[SD_THREAD].soa_##t)
