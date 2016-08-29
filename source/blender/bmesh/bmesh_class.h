@@ -198,6 +198,9 @@ typedef struct BMDim {
 	float fpos[3]; //fixed
 	float tpos[3]; //while moving: used when tagged
 
+	//Dimension Name
+	char name[MAX_NAME];
+
 
 } BMDim;
 

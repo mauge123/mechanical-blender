@@ -390,24 +390,16 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 	bool snap_ortho = false;
 	bool snap_tangents=false;
 
+	short snap_options = (em->snap_options == GEOM_DEFAULT) ? scene->geomsnapflag : em->snap_options;
 
-	if(em->snap_options == EM_GEOM_LINE_END_POINT)snap_end_line = true;
-	else if(em->snap_options == EM_GEOM_LINE_MID_POINT)snap_mid_line=true;
-	else if(em->snap_options == EM_GEOM_ARC_END_POINT)snap_end_arc=true;
-	else if(em->snap_options == EM_GEOM_ARC_MID_POINT)snap_mid_arc=true;
-	else if(em->snap_options == EM_GEOM_CENTER_POINT)snap_center_arc_circle=true;
-	else if(em->snap_options == EM_GEOM_ORTHO_POINT)snap_ortho=true;
-	else if(em->snap_options == EM_GEOM_TANGENT_POINT)snap_mid_line=true;
-	else if(em->snap_options == EM_DEFAULT){
-		if(scene->geomsnapflag & GEOM_LINE_END_POINT) snap_end_line = true;
-		if(scene->geomsnapflag & GEOM_LINE_MID_POINT) snap_mid_line = true;
-		if(scene->geomsnapflag & GEOM_LINE_END_POINT) snap_end_arc = true;
-		if(scene->geomsnapflag & GEOM_ARC_MID_POINT) snap_mid_arc = true;
-		if(scene->geomsnapflag & GEOM_CENTER_POINT) snap_center_arc_circle = true;
-		if(scene->geomsnapflag & GEOM_ORTHO_POINT) snap_ortho = true;
-		if(scene->geomsnapflag & GEOM_TANGENT_POINT) snap_tangents = true;
-	}
-
+	if(snap_options & GEOM_LINE_END_POINT) snap_end_line = true;
+	if(snap_options & GEOM_LINE_MID_POINT) snap_mid_line = true;
+	if(snap_options & GEOM_LINE_END_POINT) snap_end_arc = true;
+	if(snap_options & GEOM_ARC_MID_POINT) snap_mid_arc = true;
+	if(snap_options & GEOM_CENTER_POINT) snap_center_arc_circle = true;
+	if(snap_options & GEOM_ORTHO_POINT) snap_ortho = true;
+	if(snap_options & GEOM_TANGENT_POINT) snap_tangents = true;
+	else BLI_assert(false);
 
 	*points = MEM_callocN(sizeof(snap_geom_point)*max_geom_points, "Snap points array");
 	snap_geom_point *p = *points;
