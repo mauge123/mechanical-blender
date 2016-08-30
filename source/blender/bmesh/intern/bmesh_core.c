@@ -3077,7 +3077,7 @@ void bm_kill_only_reference(BMesh *bm, BMReference *erf)
 	BM_select_history_remove(bm, erf);
 
 	if (bm->ptoolflagpool) {
-		BLI_mempool_free(bm->dtoolflagpool, ((BMVert_OFlag *)erf)->oflags);
+		BLI_mempool_free(bm->ptoolflagpool, ((BMReference_OFlag *)erf)->oflags);
 	}
 
 	BLI_mempool_free(bm->ppool, erf);
