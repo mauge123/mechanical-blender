@@ -4566,7 +4566,9 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	mesh->mdim = newdataadr(fd, mesh->mdim);
 	if (mesh->mdim) {
-		mesh->mdim->v = newdataadr(fd,mesh->mdim->v);
+		for (int i =0;i<mesh->totdim;i++) {
+			mesh->mdim[i].v = newdataadr(fd,mesh->mdim[i].v);
+		}
 	}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
