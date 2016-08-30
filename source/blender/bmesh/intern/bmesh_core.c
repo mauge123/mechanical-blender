@@ -3059,7 +3059,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 		CustomData_bmesh_free_block(&bm->vdata, &edm->head.data);
 
 	if (bm->dtoolflagpool) {
-		BLI_mempool_free(bm->dtoolflagpool, ((BMVert_OFlag *)edm)->oflags);
+		BLI_mempool_free(bm->dtoolflagpool, ((BMDim_OFlag *)edm)->oflags);
 	}
 
 
