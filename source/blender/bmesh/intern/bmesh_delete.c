@@ -146,10 +146,6 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 {
 	BMEdge *e;
 	BMFace *f;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BMDim *d;
-	BMIter diter;
-#endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	BMDim *erf;
 	BMIter riter;
@@ -254,11 +250,6 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case DEL_DIM:
 		{
-			BM_ITER_MESH (d, &diter, bm, BM_DIMS_OF_MESH) {
-				if (!BMO_elem_flag_test(bm, d, oflag)) {
-					BMO_elem_flag_enable(bm, d, oflag);
-				}
-			}
 			bmo_remove_tagged_dims(bm, oflag);
 			break;
 		}

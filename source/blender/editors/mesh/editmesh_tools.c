@@ -386,7 +386,7 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 			break;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case MESH_DELETE_DIM:
-			if (!EDBM_op_callf(em, op, "delete geom=%hv context=%i", BM_ELEM_SELECT, DEL_DIM))  /* Erase DIM */
+			if (!EDBM_op_callf(em, op, "delete dims=%hd context=%i", BM_ELEM_SELECT, DEL_DIM))  /* Erase DIM */
 				return OPERATOR_CANCELLED;
 			break;
 #endif
