@@ -9102,6 +9102,9 @@ void getViewDepthPoint(TransInfo *t, float *r_loc)
 {
 
 	calculateCenterMedian(t, r_loc);
+	if (t->obedit) {
+		mul_m4_v3(t->obedit->obmat, r_loc);
+	}
 }
 #endif
 
