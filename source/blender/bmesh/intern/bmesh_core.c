@@ -784,12 +784,33 @@ int bmesh_elem_check(void *element, const char htype)
 
 #endif /* NDEBUG */
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static bool vert_on_dimension(BMesh *bm , BMVert* v) {
+	BMDim *edm = NULL;
+	BMIter iter;
+	// Search if delete affects a dimension
+	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+		for (int i=0;i<edm->totverts;i++) {
+			if (v == edm->v[i]) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+#endif
+
+
 /**
  * low level function, only frees the vert,
  * doesn't change or adjust surrounding geometry
  */
 static void bm_kill_only_vert(BMesh *bm, BMVert *v)
 {
+	if (vert_on_dimension(bm,v)) {
+		return;
+	}
+
 	bm->totvert--;
 	bm->elem_index_dirty |= BM_VERT;
 	bm->elem_table_dirty |= BM_VERT;
@@ -1049,11 +1070,6 @@ void BM_edge_kill(BMesh *bm, BMEdge *e)
  */
 void BM_vert_kill(BMesh *bm, BMVert *v)
 {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BMDim *edm = NULL;
-	BMIter iter;
-#endif
-
 	if (v->e) {
 		BMEdge *e, *e_next;
 
@@ -1064,15 +1080,6 @@ void BM_vert_kill(BMesh *bm, BMVert *v)
 			e = e_next;
 		}
 	}
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	// Search if delete affects a dimension
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		if (v == edm->v[0] || v == edm->v[1]) {
-			bm_kill_only_dim (bm,edm);
-		}
-	}
-#endif
 
 	bm_kill_only_vert(bm, v);
 }
@@ -3045,13 +3052,19 @@ void bmesh_face_swap_data(BMFace *f_a, BMFace *f_b)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 {
+	BMVert** v;
+	BMIter iter;
+	int vcount;
+
 	BLI_assert (edm);
 
 	bm->totdim--;
 	bm->elem_index_dirty |= BM_DIM;
 	bm->elem_table_dirty |= BM_DIM;
 
-	MEM_freeN(edm->v);
+	v = edm->v; // Will be free after dimension removal
+	vcount = edm->totverts;
+	// This is because vert is not deleted if is assigned to a dimension
 
 	BM_select_history_remove(bm, edm);
 
@@ -3062,8 +3075,26 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 		BLI_mempool_free(bm->dtoolflagpool, ((BMDim_OFlag *)edm)->oflags);
 	}
 
-
 	BLI_mempool_free(bm->dpool, edm);
+
+	// Remove unused verts
+	for (int i=0;i<vcount;i++) {
+		if (BM_vert_edge_count(v[i]) == 0) {
+			// Check if not used by other dimensions
+			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+				int j=0;
+				for (j =0;j<edm->totverts && (edm->v[j] == v[i]);j++);
+				if (j<edm->totverts) {
+					break;
+				}
+			}
+			if (!edm) {
+				bm_kill_only_vert(bm,v[i]);
+			}
+		}
+	}
+
+	MEM_freeN(v);  //Free edm->v
 }
 #endif
 
