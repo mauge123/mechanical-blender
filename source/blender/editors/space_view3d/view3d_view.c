@@ -33,12 +33,14 @@
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_view3d_types.h"
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
 #include "BLI_rect.h"
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 
 #include "BKE_anim.h"
 #include "BKE_action.h"
@@ -1042,6 +1044,23 @@ void view3d_viewmatrix_set(Scene *scene, const View3D *v3d, RegionView3D *rv3d)
 		}
 		/* end lock offset */
 	}
+
+#ifdef WITH_MECHANICAL_UCS
+	{
+		ListBase *transform_spaces = &scene->transform_spaces;
+		if (v3d->ucs > 0) {
+			TransformOrientation *ts = BLI_findlink(transform_spaces, v3d->ucs-1);
+
+			float m[4][4] = {{0}};
+			float r[4][4] = {{0}};
+			normalize_m4(m);
+			copy_m4_m3(m,ts->mat);
+			invert_m4(m);
+			mul_m4_series(r,rv3d->viewmat,m);
+			copy_m4_m4(rv3d->viewmat,r);
+		}
+	}
+#endif
 }
 
 static void view3d_select_loop(ViewContext *vc, Scene *scene, View3D *v3d, ARegion *ar, bool use_obedit_skip)

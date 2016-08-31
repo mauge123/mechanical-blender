@@ -224,6 +224,9 @@ EnumPropertyItem *rna_TransformOrientation_itemf(struct bContext *C, struct Poin
 EnumPropertyItem *rna_Sensor_type_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 EnumPropertyItem *rna_Actuator_type_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 
+// WITH_MECHANICAL_UCS
+EnumPropertyItem *rna_ucs_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
+
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 EnumPropertyItem *rna_ReferencePlane_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 

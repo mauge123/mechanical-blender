@@ -323,6 +323,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_SNAP_TO_PLANE)
 	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
+	add_definitions(-DWITH_MECHANICAL_UCS)
 endif()
 
 

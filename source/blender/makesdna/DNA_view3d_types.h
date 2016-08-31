@@ -247,7 +247,8 @@ typedef struct View3D {
 
 	// WITH_MECHANICAL_MESH_REFERENCE_PLANES
 	int refplane;
-	char pad5[4];
+	// WITH_MECHANICAL_UCS
+	int ucs;
 
 } View3D;
 

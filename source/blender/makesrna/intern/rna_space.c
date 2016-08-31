@@ -164,6 +164,11 @@ static EnumPropertyItem transform_orientation_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
+// WITH_MECHANICAL_UCS
+static EnumPropertyItem ucs_items[] = {
+	{0, "global", 0, "Global", "Use global as system coordinates"},
+	{0, NULL, 0, NULL, NULL}
+};
 
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static EnumPropertyItem reference_planes_items[] = {
@@ -439,6 +444,46 @@ EnumPropertyItem *rna_TransformOrientation_itemf(bContext *C, PointerRNA *ptr, P
 	int i = V3D_MANIP_CUSTOM, totitem = 0;
 
 	RNA_enum_items_add(&item, &totitem, transform_orientation_items);
+
+	if (ptr->type == &RNA_SpaceView3D)
+		scene = ((bScreen *)ptr->id.data)->scene;
+	else
+		scene = CTX_data_scene(C);  /* can't use scene from ptr->id.data because that enum is also used by operators */
+
+	if (scene) {
+		transform_spaces = &scene->transform_spaces;
+		ts = transform_spaces->first;
+	}
+
+	if (ts) {
+		RNA_enum_item_add_separator(&item, &totitem);
+
+		for (; ts; ts = ts->next) {
+			tmp.identifier = ts->name;
+			tmp.name = ts->name;
+			tmp.value = i++;
+			RNA_enum_item_add(&item, &totitem, &tmp);
+		}
+	}
+
+	RNA_enum_item_end(&item, &totitem);
+	*r_free = true;
+
+	return item;
+}
+
+
+// WITH_MECHANICAL_UCS
+EnumPropertyItem *rna_ucs_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	Scene *scene = NULL;
+	ListBase *transform_spaces;
+	TransformOrientation *ts = NULL;
+	EnumPropertyItem tmp = {0, "", 0, "", ""};
+	EnumPropertyItem *item = NULL;
+	int i = 1, totitem = 0;
+
+	RNA_enum_items_add(&item, &totitem, ucs_items);
 
 	if (ptr->type == &RNA_SpaceView3D)
 		scene = ((bScreen *)ptr->id.data)->scene;
@@ -2697,6 +2742,15 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "TransformOrientation");
 	RNA_def_property_pointer_funcs(prop, "rna_CurrentOrientation_get", NULL, NULL, NULL);
 	RNA_def_property_ui_text(prop, "Current Transform Orientation", "Current transformation orientation");
+
+#ifdef WITH_MECHANICAL_UCS
+	prop = RNA_def_property(srna, "ucs", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "ucs");
+	RNA_def_property_enum_items(prop, ucs_items);
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_ucs_itemf");
+	RNA_def_property_ui_text(prop, "ucs", "User Coordinate System");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+#endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	prop = RNA_def_property(srna, "reference_plane", PROP_ENUM, PROP_NONE);
