@@ -476,13 +476,20 @@ float ED_view3d_grid_scale(Scene *scene, View3D *v3d, const char **grid_unit)
 	return v3d->grid * ED_scene_grid_scale(scene, grid_unit);
 }
 
+#ifdef WITH_MECHANICAL_UCS
+static void drawfloor(Scene *scene, View3D *v3d, RegionView3D *rv3d, const char **grid_unit, bool write_depth)
+#else
 static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool write_depth)
+#endif
 {
 	float grid, grid_scale;
 	unsigned char col_grid[3];
 	const int gridlines = v3d->gridlines / 2;
 
 	if (v3d->gridlines < 3) return;
+#ifdef WITH_MECHANICAL_UCS
+	glLoadMatrixf(rv3d->ucsmat);
+#endif
 	
 	/* use 'grid_scale' instead of 'v3d->grid' from now on */
 	grid_scale = ED_view3d_grid_scale(scene, v3d, grid_unit);
@@ -561,6 +568,9 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 	}
 	
 	glDepthMask(GL_TRUE);
+#ifdef WITH_MECHANICAL_UCS
+	glLoadMatrixf(rv3d->viewmat);
+#endif
 }
 
 
@@ -2676,6 +2686,23 @@ void ED_view3d_update_viewmat(Scene *scene, View3D *v3d, ARegion *ar, float view
 	mul_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
 	invert_m4_m4(rv3d->persinv, rv3d->persmat);
 	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
+#ifdef WITH_MECHANICAL_UCS
+	{
+		ListBase *transform_spaces = &scene->transform_spaces;
+		if (v3d->ucs > 0) {
+			TransformOrientation *ts = BLI_findlink(transform_spaces, v3d->ucs-1);
+
+			float m[4][4] = {{0}};
+			unit_m4(m);
+			copy_m4_m3(m,ts->mat);
+			//invert_m4(m);
+			mul_m4_m4m4(rv3d->ucsmat, rv3d->viewmat,m);
+		} else {
+			copy_m4_m4(rv3d->ucsmat, rv3d->viewmat);
+		}
+	}
+#endif
+
 	
 	/* calculate GLSL view dependent values */
 
@@ -2783,7 +2810,11 @@ static void view3d_draw_objects(
 			glLoadMatrixf(rv3d->viewmat);
 		}
 		else if (!draw_grids_after) {
+#ifdef WITH_MECHANICAL_UCS
+			drawfloor(scene, v3d, rv3d, grid_unit, true);
+#else
 			drawfloor(scene, v3d, grid_unit, true);
+#endif
 		}
 	}
 
@@ -2861,7 +2892,11 @@ static void view3d_draw_objects(
 
 	/* perspective floor goes last to use scene depth and avoid writing to depth buffer */
 	if (draw_grids_after) {
+#ifdef WITH_MECHANICAL_UCS
+		drawfloor(scene, v3d, rv3d, grid_unit, false);
+#else
 		drawfloor(scene, v3d, grid_unit, false);
+#endif
 	}
 
 	/* must be before xray draw which clears the depth buffer */

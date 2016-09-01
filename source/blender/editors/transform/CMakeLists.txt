@@ -81,6 +81,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_SNAP_TO_PLANE)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 	add_definitions(-DWITH_MECHANICAL_GRAB_FIX)
+	add_definitions(-DWITH_MECHANICAL_UCS)
 endif()
 
 add_definitions(${GL_DEFINITIONS})
