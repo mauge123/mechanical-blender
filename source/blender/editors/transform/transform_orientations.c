@@ -689,6 +689,7 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 
 	zero_v3(normal);
 	zero_v3(plane);
+	zero_v3(origin);
 
 	if (obedit) {
 		float imat[3][3], mat[3][3];
@@ -920,7 +921,7 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 
 				BM_ITER_MESH (v, &iter, em->bm, BM_VERTS_OF_MESH) {
 					if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
-						add_v3_v3(origin, v->no);
+						add_v3_v3(origin, v->co);
 						i++;
 					}
 				}
