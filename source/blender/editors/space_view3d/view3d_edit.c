@@ -3911,13 +3911,17 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 		float quat[4];
 
 #ifdef WITH_MECHANICAL_UCS
-		ListBase *transform_spaces = &scene->transform_spaces;
 		if (v3d->ucs > 0) {
 			float m[3][3];
 			float eul[3];
-			TransformOrientation *ts = BLI_findlink(transform_spaces, v3d->ucs-1);
+			TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, v3d->ucs-1);
+
 			copy_m3_m3(m,ts->mat);
 			mat3_to_eul(eul,m);
+
+			copy_v3_v3(rv3d->ofs, ts->origin);
+			mul_v3_fl(rv3d->ofs,-1.0f);
+
 			switch (viewnum) {
 				case RV3D_VIEW_TOP:
 					// XY

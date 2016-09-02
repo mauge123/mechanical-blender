@@ -1178,7 +1178,8 @@ typedef struct TransformOrientation {
 	struct TransformOrientation *next, *prev;
 	char name[64];	/* MAX_NAME */
 	float mat[3][3];
-	int pad;
+// WITH_MECHANICAL_UCS
+	float origin[3];
 } TransformOrientation;
 
 /* *************************************************************** */

@@ -98,6 +98,9 @@ static TransformOrientation *createViewSpace(bContext *C, ReportList *UNUSED(rep
 {
 	RegionView3D *rv3d = CTX_wm_region_view3d(C);
 	float mat[3][3];
+#ifdef WITH_MECHANICAL_UCS
+	float origin[3] = {0};
+#endif
 
 	if (!rv3d)
 		return NULL;
@@ -116,7 +119,11 @@ static TransformOrientation *createViewSpace(bContext *C, ReportList *UNUSED(rep
 		}
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	return addMatrixSpace(C, mat, origin, name, overwrite);
+#else
 	return addMatrixSpace(C, mat, name, overwrite);
+#endif
 }
 
 static TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(reports),
@@ -125,6 +132,9 @@ static TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(r
 	Base *base = CTX_data_active_base(C);
 	Object *ob;
 	float mat[3][3];
+#ifdef WITH_MECHANICAL_UCS
+	float origin[4] = {0};
+#endif
 
 	if (base == NULL)
 		return NULL;
@@ -132,6 +142,9 @@ static TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(r
 	ob = base->object;
 
 	copy_m3_m4(mat, ob->obmat);
+#ifdef WITH_MECHANICAL_UCS
+	copy_v3_v3 (origin, ob->loc);
+#endif
 	normalize_m3(mat);
 
 	/* use object name if no name is given */
@@ -139,7 +152,11 @@ static TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(r
 		name = ob->id.name + 2;
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	return addMatrixSpace(C, mat, origin, name, overwrite);
+#else
 	return addMatrixSpace(C, mat, name, overwrite);
+#endif
 }
 
 static TransformOrientation *createBoneSpace(bContext *C, ReportList *reports,
@@ -147,8 +164,13 @@ static TransformOrientation *createBoneSpace(bContext *C, ReportList *reports,
 {
 	float mat[3][3];
 	float normal[3], plane[3];
+#ifdef WITH_MECHANICAL_UCS
+	float origin[3];
 
+	getTransformOrientation(C, normal, plane, origin);
+#else
 	getTransformOrientation(C, normal, plane);
+#endif
 
 	if (createSpaceNormalTangent(mat, normal, plane) == 0) {
 		BKE_reports_prepend(reports, "Cannot use zero-length bone");
@@ -159,16 +181,28 @@ static TransformOrientation *createBoneSpace(bContext *C, ReportList *reports,
 		name = "Bone";
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	return addMatrixSpace(C, mat, origin, name, overwrite);
+#else
 	return addMatrixSpace(C, mat, name, overwrite);
+#endif
 }
 
 static TransformOrientation *createCurveSpace(bContext *C, ReportList *reports,
                                               const char *name, const bool overwrite)
 {
 	float mat[3][3];
+#ifdef WITH_MECHANICAL_UCS
+	float normal[3], plane[3], origin[3];
+#else
 	float normal[3], plane[3];
+#endif
 
+#ifdef WITH_MECHANICAL_UCS
+	getTransformOrientation(C, normal, plane, origin);
+#else
 	getTransformOrientation(C, normal, plane);
+#endif
 
 	if (createSpaceNormalTangent(mat, normal, plane) == 0) {
 		BKE_reports_prepend(reports, "Cannot use zero-length curve");
@@ -179,7 +213,11 @@ static TransformOrientation *createCurveSpace(bContext *C, ReportList *reports,
 		name = "Curve";
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	return addMatrixSpace(C, mat, origin, name, overwrite);
+#else
 	return addMatrixSpace(C, mat, name, overwrite);
+#endif
 }
 
 
@@ -187,10 +225,18 @@ static TransformOrientation *createMeshSpace(bContext *C, ReportList *reports,
                                              const char *name, const bool overwrite)
 {
 	float mat[3][3];
+#ifdef WITH_MECHANICAL_UCS
+	float normal[3], plane[3], origin[3];
+#else
 	float normal[3], plane[3];
+#endif
 	int type;
 
+#ifdef WITH_MECHANICAL_UCS
+	type = getTransformOrientation(C, normal, plane, origin);
+#else
 	type = getTransformOrientation(C, normal, plane);
+#endif
 	
 	switch (type) {
 		case ORIENTATION_VERT:
@@ -258,7 +304,11 @@ static TransformOrientation *createMeshSpace(bContext *C, ReportList *reports,
 			return NULL;
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	return addMatrixSpace(C, mat, origin, name, overwrite);
+#else
 	return addMatrixSpace(C, mat, name, overwrite);
+#endif
 }
 
 bool createSpaceNormal(float mat[3][3], const float normal[3])
@@ -349,8 +399,13 @@ void BIF_createTransformOrientation(bContext *C, ReportList *reports,
 	}
 }
 
+#ifdef WITH_MECHANICAL_UCS
+TransformOrientation *addMatrixSpace(bContext *C, float mat[3][3], float origin[3],
+                                     const char *name, const bool overwrite)
+#else
 TransformOrientation *addMatrixSpace(bContext *C, float mat[3][3],
                                      const char *name, const bool overwrite)
+#endif
 {
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts = NULL;
@@ -374,6 +429,7 @@ TransformOrientation *addMatrixSpace(bContext *C, float mat[3][3],
 
 	/* copy matrix into transform space */
 	copy_m3_m3(ts->mat, mat);
+	copy_v3_v3(ts->origin, origin);
 
 	return ts;
 }
@@ -618,7 +674,11 @@ static unsigned int bm_mesh_faces_select_get_n(BMesh *bm, BMVert **elems, const 
 }
 #endif
 
+#ifdef WITH_MECHANICAL_UCS
+int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3], float origin[3], const short around)
+#else
 int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3], const short around)
+#endif
 {
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
@@ -849,6 +909,25 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 				}
 #endif
 			}
+
+#ifdef WITH_MECHANICAL_UCS
+			if (em->bm->totvertsel > 1) {
+				BMIter iter;
+				BMVert *v;
+				int i =0;
+
+				zero_v3(origin);
+
+				BM_ITER_MESH (v, &iter, em->bm, BM_VERTS_OF_MESH) {
+					if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
+						add_v3_v3(origin, v->no);
+						i++;
+					}
+				}
+				mul_v3_fl(origin, 1.0f/i);
+				mul_m4_v3(ob->obmat,origin);
+			}
+#endif
 
 			/* not needed but this matches 2.68 and older behavior */
 			negate_v3(plane);
@@ -1082,22 +1161,35 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 	return result;
 }
 
+#ifdef WITH_MECHANICAL_UCS
+int getTransformOrientation(const bContext *C, float normal[3], float plane[3], float origin[3])
+#else
 int getTransformOrientation(const bContext *C, float normal[3], float plane[3])
+#endif
 {
 	/* dummy value, not V3D_AROUND_ACTIVE and not V3D_AROUND_LOCAL_ORIGINS */
 	short around = V3D_AROUND_CENTER_BOUNDS;
 
+#ifdef WITH_MECHANICAL_UCS
+	return getTransformOrientation_ex(C, normal, plane, origin, around);
+#else
 	return getTransformOrientation_ex(C, normal, plane, around);
+#endif
 }
 
 void ED_getTransformOrientationMatrix(const bContext *C, float orientation_mat[3][3], const short around)
 {
 	float normal[3] = {0.0, 0.0, 0.0};
 	float plane[3] = {0.0, 0.0, 0.0};
+	float origin[3];
 
 	int type;
 
+#ifdef WITH_MECHANICAL_UCS
+	type = getTransformOrientation_ex(C, normal, plane, origin, around);
+#else
 	type = getTransformOrientation_ex(C, normal, plane, around);
+#endif
 
 	switch (type) {
 		case ORIENTATION_NORMAL:

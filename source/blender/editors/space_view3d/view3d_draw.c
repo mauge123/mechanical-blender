@@ -2688,15 +2688,22 @@ void ED_view3d_update_viewmat(Scene *scene, View3D *v3d, ARegion *ar, float view
 	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
 #ifdef WITH_MECHANICAL_UCS
 	{
-		ListBase *transform_spaces = &scene->transform_spaces;
 		if (v3d->ucs > 0) {
-			TransformOrientation *ts = BLI_findlink(transform_spaces, v3d->ucs-1);
+			TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, v3d->ucs-1);
+			if (ts) {
+				float m[4][4] = {{0}}, mt[4][4];
+				unit_m4(m);
+				unit_m4(mt); // Translation matrix
 
-			float m[4][4] = {{0}};
-			unit_m4(m);
-			copy_m4_m3(m,ts->mat);
-			//invert_m4(m);
-			mul_m4_m4m4(rv3d->ucsmat, rv3d->viewmat,m);
+				copy_m4_m3(m,ts->mat);
+				translate_m4(mt,ts->origin[0], ts->origin[1], ts->origin[2]);
+
+				mul_m4_series(rv3d->ucsmat, rv3d->viewmat, mt, m);
+			} else {
+				// Invalid
+				v3d->ucs = 0;
+				copy_m4_m4(rv3d->ucsmat, rv3d->viewmat);
+			}
 		} else {
 			copy_m4_m4(rv3d->ucsmat, rv3d->viewmat);
 		}
