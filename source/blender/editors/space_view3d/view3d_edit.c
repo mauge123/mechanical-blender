@@ -5348,6 +5348,19 @@ static int dim_value_num_input_invoke(bContext *C, wmOperator *op,const wmEvent 
 }
 
 
+static int dim_value_num_input_modal_poll(bContext *C)
+{
+	BMEditMesh *em;
+	// Check a dimension is selected
+	Object *obedit = CTX_data_edit_object(C);
+	if (obedit && obedit->type == OB_MESH) {
+		em = BKE_editmesh_from_object(obedit);
+		return em && em->bm->totdimsel;
+	}
+	return ED_operator_editmesh(C);
+}
+
+
 static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -5418,6 +5431,7 @@ void VIEW3D_OT_dim_value_num_input(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = dim_value_num_input_invoke;
 	ot->modal =dim_value_num_input_modal;
+	ot->poll = dim_value_num_input_modal_poll;
 
 	/* flags */
 	ot->flag = 0;
