@@ -2748,7 +2748,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "ucs");
 	RNA_def_property_enum_items(prop, ucs_items);
 	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_ucs_itemf");
-	RNA_def_property_ui_text(prop, "ucs", "User Coordinate System");
+	RNA_def_property_ui_text(prop, "UCS", "User Coordinate System");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 #endif
 
