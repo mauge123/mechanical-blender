@@ -3919,8 +3919,10 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 			copy_m3_m3(m,ts->mat);
 			mat3_to_eul(eul,m);
 
-			copy_v3_v3(rv3d->ofs, ts->origin);
-			mul_v3_fl(rv3d->ofs,-1.0f);
+			if (rv3d->persp != RV3D_ORTHO) {
+				copy_v3_v3(rv3d->ofs, ts->origin);
+				mul_v3_fl(rv3d->ofs,-1.0f);
+			}
 
 			switch (viewnum) {
 				case RV3D_VIEW_TOP:
