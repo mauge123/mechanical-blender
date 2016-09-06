@@ -438,7 +438,7 @@ void BM_mesh_bm_from_me(
 			}
 
 			//d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
-			d = dtable[i] = BM_dim_create(bm,v_arr,mdim->totverts,mdim->dim_type,NULL,BM_CREATE_SKIP_CD, mdim->name);
+			d = dtable[i] = BM_dim_create(mdim->link, bm,v_arr,mdim->totverts,mdim->dim_type,NULL,BM_CREATE_SKIP_CD, mdim->name);
 
 			MEM_freeN (v_arr);
 
@@ -854,7 +854,23 @@ void BM_mesh_bm_to_me(
 		mdm->totverts = edm->totverts;
 		mdm->dim_type = edm->dim_type;
 		mdm->dpos_fact = edm->dpos_fact;
-		mdm->value = get_dimension_value(edm);
+
+		if (edm->link) {
+			mdm->link = edm->link;
+			if (mdm->link->mdim) {
+				mdm->link->mdim = mdim;
+			} else {
+				BLI_assert(mdm->link == mdim);
+			}
+			mdm->value = &edm->link->value;
+		} else {
+			BLI_assert("not initialized");
+		}
+
+		if (mdm->value) {
+			*(mdm->value) = get_dimension_value(edm);
+		}
+
 		mdm->constraints = edm->constraints;
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		copy_v3_v3(mdm->center, edm->center);

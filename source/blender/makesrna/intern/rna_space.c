@@ -35,6 +35,7 @@
 #include "BKE_key.h"
 #include "BKE_movieclip.h"
 #include "BKE_node.h"
+#include "BKE_mesh.h"
 
 #include "DNA_action_types.h"
 #include "DNA_key_types.h"
@@ -45,6 +46,7 @@
 #include "DNA_sequence_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_mesh_types.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -466,6 +468,38 @@ EnumPropertyItem *rna_TransformOrientation_itemf(bContext *C, PointerRNA *ptr, P
 
 	return item;
 }
+//WITH_MECHANICAL_DIMENSION
+
+EnumPropertyItem *rna_ReferenceDim_itemf(bContext *UNUSED(C), PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	EnumPropertyItem tmp = {0, "", 0, "", ""};
+	EnumPropertyItem *item = NULL;
+	int totitem = 0;
+
+
+	if (ptr->type == &RNA_DriverTarget) {
+		DriverTarget *dtar =  (DriverTarget*) ptr->data;
+		Object *ob = (Object *)dtar->id;
+
+		if (ob) {
+			Mesh *me = BKE_mesh_from_object(ob);
+			if (me && me->totdim) {
+				MDim *mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
+				for (int n=0;n<me->totdim;mdim++, n++) {
+					tmp.identifier = me->mdim[n].name;
+					tmp.name = me->mdim[n].name;
+					tmp.value = n;
+					RNA_enum_item_add(&item, &totitem, &tmp);
+				}
+			}
+		}
+	}
+
+	RNA_enum_item_end(&item, &totitem);
+	*r_free = true;
+
+	return item;
+	}
 
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)

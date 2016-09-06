@@ -717,6 +717,33 @@ static void graph_panel_driverVar__transChan(uiLayout *layout, ID *id, DriverVar
 	uiItemR(sub, &dtar_ptr, "transform_space", 0, IFACE_("Space"), ICON_NONE);
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void graph_panel_driverVar__dim(uiLayout *layout, ID *id, DriverVar *dvar)
+{
+	DriverTarget *dtar = &dvar->targets[0];
+	PointerRNA dtar_ptr;
+	uiLayout *col;
+	Object *ob = (Object *)dtar->id;
+
+	/* initialize RNA pointer to the target */
+	RNA_pointer_create(id, &RNA_DriverTarget, dtar, &dtar_ptr);
+
+
+	/* properties */
+	col = uiLayoutColumn(layout, true);
+	//uiLayoutSetRedAlert(col, (dtar->flag & DTAR_FLAG_INVALID)); /* XXX: per field... */
+	uiItemR(col, &dtar_ptr, "id", 0,  IFACE_("Object"), ICON_NONE);
+
+	/* properties */
+
+	if (dtar->id) {
+		uiItemR(col, &dtar_ptr, "reference_dimension", 0, IFACE_("Dimension"), ICON_NONE);
+	}
+
+
+}
+#endif
+
 /* driver settings for active F-Curve (only for 'Drivers' mode) */
 static void graph_panel_drivers(const bContext *C, Panel *pa)
 {
@@ -729,6 +756,7 @@ static void graph_panel_drivers(const bContext *C, Panel *pa)
 	uiLayout *col;
 	uiBlock *block;
 	uiBut *but;
+
 	
 	/* Get settings from context */
 	if (!graph_panel_context(C, &ale, &fcu))
@@ -915,6 +943,10 @@ static void graph_panel_drivers(const bContext *C, Panel *pa)
 			case DVAR_TYPE_TRANSFORM_CHAN:     /* transform channel */
 				graph_panel_driverVar__transChan(box, ale->id, dvar);
 				break;
+//WITH_MECHANICAL_DIMENSIONS
+			case DVAR_TYPE_DIMENSION:
+				graph_panel_driverVar__dim(box, ale->id, dvar);
+			break;
 		}
 		
 		/* 3) value of variable */

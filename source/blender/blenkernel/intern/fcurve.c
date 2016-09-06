@@ -42,6 +42,8 @@
 #include "DNA_anim_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_object_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
@@ -60,6 +62,8 @@
 #include "BKE_curve.h" 
 #include "BKE_global.h"
 #include "BKE_object.h"
+#include "BKE_mesh.h"
+#include "BKE_customdata.h"
 
 #include "RNA_access.h"
 
@@ -1248,6 +1252,31 @@ static float dvar_eval_singleProp(ChannelDriver *driver, DriverVar *dvar)
 	return dtar_get_prop_val(driver, &dvar->targets[0]);
 }
 
+
+/* evaluate 'single prop' driver variable */
+static float dvar_eval_dimension(ChannelDriver *UNUSED(driver), DriverVar *dvar)
+{
+	DriverTarget *dtar = &dvar->targets[0];
+	Object *ob = (Object *)dtar->id;
+	float value = 0.0f;
+
+	if (ob) {
+		Mesh *me = BKE_mesh_from_object(ob);
+		if (me && me->totdim) {
+			MDim *mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
+			for (int n=0;n<me->totdim;mdim++, n++) {
+				if (n == dtar->refdim) {
+					value = *(mdim->value);
+					break;
+				}
+			}
+		}
+	}
+
+	return value;
+
+}
+
 /* evaluate 'rotation difference' driver variable */
 static float dvar_eval_rotDiff(ChannelDriver *driver, DriverVar *dvar)
 {
@@ -1586,6 +1615,14 @@ static DriverVarTypeInfo dvar_types[MAX_DVAR_TYPES] = {
 		{"Object/Bone"},     /* UI names for targets */
 		{DTAR_FLAG_STRUCT_REF | DTAR_FLAG_ID_OB_ONLY}   /* flags */
 	END_DVAR_TYPEDEF,
+
+	BEGIN_DVAR_TYPEDEF(DVAR_TYPE_DIMENSION)
+		dvar_eval_dimension,     /* eval callback */
+		1,     /* number of targets used */
+		{"Object"},     /* UI names for targets */
+		{0}     /* flags */
+	END_DVAR_TYPEDEF,
+
 };
 
 /* Get driver variable typeinfo */

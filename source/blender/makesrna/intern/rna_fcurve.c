@@ -40,6 +40,7 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
+#include "RNA_enum_types.h"
 
 #include "rna_internal.h"
 
@@ -1425,6 +1426,12 @@ static void rna_def_drivertarget(BlenderRNA *brna)
 		                                                "parenting/restpose"},
 		{0, NULL, 0, NULL, NULL}
 	};
+
+	// WITH_MECHANICAL_DIMENSION
+	static EnumPropertyItem reference_dimension_items[] = {
+		{0, "REFERENCE_DIMENSION", 0, "None", ""},
+		{0, NULL, 0, NULL, NULL}
+	 };
 	
 	srna = RNA_def_struct(brna, "DriverTarget", NULL);
 	RNA_def_struct_ui_text(srna, "Driver Target", "Source of input values for driver variables");
@@ -1473,6 +1480,15 @@ static void rna_def_drivertarget(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, prop_local_space_items);
 	RNA_def_property_ui_text(prop, "Transform Space", "Space in which transforms are used");
 	RNA_def_property_update(prop, 0, "rna_DriverTarget_update_data");
+
+	/* MECHANICAL */
+	prop = RNA_def_property(srna, "reference_dimension", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "refdim");
+	RNA_def_property_enum_items(prop, reference_dimension_items);
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_ReferenceDim_itemf");
+	RNA_def_property_ui_text(prop, "Reference Dimension", "Reference Dimensions");
+
+
 }
 
 static void rna_def_drivervar(BlenderRNA *brna)
@@ -1486,6 +1502,8 @@ static void rna_def_drivervar(BlenderRNA *brna)
 		                           "Final transformation value of object or bone"},
 		{DVAR_TYPE_ROT_DIFF, "ROTATION_DIFF", ICON_PARTICLE_TIP, "Rotational Difference", "Use the angle between two bones"},  /* XXX: Icon... */
 		{DVAR_TYPE_LOC_DIFF, "LOC_DIFF", ICON_FULLSCREEN_ENTER, "Distance", "Distance between two bones or objects"},          /* XXX: Icon... */
+// WITH_MECHANICAL_DIMENSIONS
+		{DVAR_TYPE_DIMENSION, "DIMENSION", ICON_NONE, "Dimension", "Dimension values"},
 		{0, NULL, 0, NULL, NULL}
 	};
 		
