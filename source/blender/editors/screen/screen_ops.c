@@ -3015,10 +3015,13 @@ static void view3d_localview_update_rv3d(struct RegionView3D *rv3d)
 	}
 }
 
-static void region_quadview_init_rv3d(ScrArea *sa, ARegion *ar,
+static void region_quadview_init_rv3d(ScrArea *sa, ARegion *ar, Scene *scene,
                                       const char viewlock, const char view, const char persp)
 {
 	RegionView3D *rv3d = ar->regiondata;
+#ifdef WITH_MECHANICAL_UCS
+	View3D *v3d = sa->spacedata.first;
+#endif
 
 	if (persp == RV3D_CAMOB) {
 		ED_view3d_lastview_store(rv3d);
@@ -3028,7 +3031,22 @@ static void region_quadview_init_rv3d(ScrArea *sa, ARegion *ar,
 	rv3d->view = view;
 	rv3d->persp = persp;
 
+#ifdef WITH_MECHANICAL_UCS
+	if (v3d->ucs) {
+		TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, v3d->ucs-1);
+		if (ts) {
+			ED_view3d_lock_ucs(ts, rv3d);
+		} else {
+			// Invalid ucs
+			ED_view3d_lock(rv3d);
+		}
+	} else {
+		// Global
+		ED_view3d_lock(rv3d);
+	}
+#else
 	ED_view3d_lock(rv3d);
+#endif
 	view3d_localview_update_rv3d(rv3d);
 	if ((viewlock & RV3D_BOXCLIP) && (persp == RV3D_ORTHO)) {
 		ED_view3d_quadview_update(sa, ar, true);
@@ -3100,6 +3118,9 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 	else {
 		/* Enter quad-view */
 		ScrArea *sa = CTX_wm_area(C);
+#ifdef WITH_MECHANICAL_UCS
+		Scene *scene = CTX_data_scene(C);
+#endif
 		ARegion *newar;
 		int count;
 		
@@ -3125,9 +3146,15 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 			const char viewlock = (rv3d->viewlock_quad & RV3D_VIEWLOCK_INIT) ?
 			                      (rv3d->viewlock_quad & ~RV3D_VIEWLOCK_INIT) : RV3D_LOCKED;
 
+#ifdef WITH_MECHANICAL_UCS
+			region_quadview_init_rv3d(sa, ar,              scene, viewlock, ED_view3d_lock_view_from_index(index_qsplit++), RV3D_ORTHO);
+			region_quadview_init_rv3d(sa, (ar = ar->next), scene, viewlock, ED_view3d_lock_view_from_index(index_qsplit++), RV3D_ORTHO);
+			region_quadview_init_rv3d(sa, (ar = ar->next), scene, viewlock, ED_view3d_lock_view_from_index(index_qsplit++), RV3D_ORTHO);
+#else
 			region_quadview_init_rv3d(sa, ar,              viewlock, ED_view3d_lock_view_from_index(index_qsplit++), RV3D_ORTHO);
 			region_quadview_init_rv3d(sa, (ar = ar->next), viewlock, ED_view3d_lock_view_from_index(index_qsplit++), RV3D_ORTHO);
 			region_quadview_init_rv3d(sa, (ar = ar->next), viewlock, ED_view3d_lock_view_from_index(index_qsplit++), RV3D_ORTHO);
+#endif
 			/* forcing camera is distracting */
 #if 0
 			if (v3d->camera) region_quadview_init_rv3d(sa, (ar = ar->next), 0, RV3D_VIEW_CAMERA, RV3D_CAMOB);
