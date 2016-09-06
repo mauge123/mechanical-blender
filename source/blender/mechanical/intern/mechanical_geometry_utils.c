@@ -41,8 +41,7 @@ int get_max_geom_points(BMEditMesh *em)
  *
  */
 void arc_mid_point(BMGeom *egm){
-		float v1[3], v2[3], mid[3];
-		float r;
+		float mid[3], r;
 		int num= (egm->totverts)/2;
 
 		BLI_assert(egm->geometry_type == BM_GEOMETRY_TYPE_ARC);

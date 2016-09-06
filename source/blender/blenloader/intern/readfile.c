@@ -2707,6 +2707,7 @@ static void lib_link_cachefiles(FileData *fd, Main *bmain)
 
 		BLI_listbase_clear(&cache_file->object_paths);
 		cache_file->handle = NULL;
+		cache_file->handle_mutex = NULL;
 
 		if (cache_file->adt) {
 			lib_link_animdata(fd, &cache_file->id, cache_file->adt);
@@ -2717,6 +2718,7 @@ static void lib_link_cachefiles(FileData *fd, Main *bmain)
 static void direct_link_cachefile(FileData *fd, CacheFile *cache_file)
 {
 	cache_file->handle = NULL;
+	cache_file->handle_mutex = NULL;
 
 	/* relink animdata */
 	cache_file->adt = newdataadr(fd, cache_file->adt);
@@ -4564,7 +4566,9 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	mesh->mdim = newdataadr(fd, mesh->mdim);
 	if (mesh->mdim) {
-		mesh->mdim->v = newdataadr(fd,mesh->mdim->v);
+		for (int i =0;i<mesh->totdim;i++) {
+			mesh->mdim[i].v = newdataadr(fd,mesh->mdim[i].v);
+		}
 	}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
@@ -5313,6 +5317,9 @@ static void direct_link_object(FileData *fd, Object *ob)
 	 * time when file was saved.
 	 */
 	ob->recalc = 0;
+
+	/* XXX This should not be needed - but seems like it can happen in some cases, so for now play safe... */
+	ob->proxy_from = NULL;
 
 	/* loading saved files with editmode enabled works, but for undo we like
 	 * to stay in object mode during undo presses so keep editmode disabled.
@@ -6710,10 +6717,13 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					 * since it gets initialized later */
 					sima->iuser.scene = NULL;
 					
-					sima->scopes.waveform_1 = NULL;
-					sima->scopes.waveform_2 = NULL;
-					sima->scopes.waveform_3 = NULL;
-					sima->scopes.vecscope = NULL;
+#if 0
+					/* Those are allocated and freed by space code, no need to handle them here. */
+					MEM_SAFE_FREE(sima->scopes.waveform_1);
+					MEM_SAFE_FREE(sima->scopes.waveform_2);
+					MEM_SAFE_FREE(sima->scopes.waveform_3);
+					MEM_SAFE_FREE(sima->scopes.vecscope);
+#endif
 					sima->scopes.ok = 0;
 					
 					/* NOTE: pre-2.5, this was local data not lib data, but now we need this as lib data

@@ -92,6 +92,8 @@ typedef struct RegionView3D {
 	float persinv[4][4];		/* inverse of persmat */
 	float viewcamtexcofac[4];	/* offset/scale for camera glsl texcoords */
 
+	float ucsmat[4][4];
+
 	/* viewmat/persmat multiplied with object matrix, while drawing and selection */
 	float viewmatob[4][4];
 	float persmatob[4][4];
@@ -247,7 +249,8 @@ typedef struct View3D {
 
 	// WITH_MECHANICAL_MESH_REFERENCE_PLANES
 	int refplane;
-	char pad5[4];
+	// WITH_MECHANICAL_UCS
+	int ucs;
 
 } View3D;
 

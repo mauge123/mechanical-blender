@@ -386,7 +386,7 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 			break;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case MESH_DELETE_DIM:
-			if (!EDBM_op_callf(em, op, "delete geom=%hv context=%i", BM_ELEM_SELECT, DEL_DIM))  /* Erase DIM */
+			if (!EDBM_op_callf(em, op, "delete dims=%hd context=%i", BM_ELEM_SELECT, DEL_DIM))  /* Erase DIM */
 				return OPERATOR_CANCELLED;
 			break;
 #endif
@@ -3145,8 +3145,10 @@ static void mesh_separate_material_assign_mat_nr(Main *bmain, Object *ob, const 
 		BKE_material_resize_id(bmain, obdata, 1, true);
 
 		ob->mat[0] = ma_ob;
+		id_us_plus((ID *)ma_ob);
 		ob->matbits[0] = matbit;
 		(*matarar)[0] = ma_obdata;
+		id_us_plus((ID *)ma_obdata);
 	}
 	else {
 		BKE_material_clear_id(bmain, obdata, true);

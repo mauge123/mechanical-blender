@@ -3910,7 +3910,48 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 	if (RV3D_VIEW_IS_AXIS(viewnum)) {
 		float quat[4];
 
+#ifdef WITH_MECHANICAL_UCS
+		if (v3d->ucs > 0) {
+			float m[3][3];
+			float eul[3];
+			TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, v3d->ucs-1);
+
+			copy_m3_m3(m,ts->mat);
+			mat3_to_eul(eul,m);
+
+			copy_v3_v3(rv3d->ofs, ts->origin);
+			mul_v3_fl(rv3d->ofs,-1.0f);
+
+			switch (viewnum) {
+				case RV3D_VIEW_TOP:
+					// XY
+					invert_m3(m);
+					mat3_to_quat(quat,m);
+					break;
+				case RV3D_VIEW_FRONT:
+					// ZX
+					rotate_eul(eul,'X',M_PI /2.0f);
+					eul_to_mat3(m,eul);
+					invert_m3(m);
+					mat3_to_quat(quat,m);
+					break;
+				case RV3D_VIEW_RIGHT:
+					// ZY
+					rotate_eul(eul,'Z',M_PI /2.0f);
+					rotate_eul(eul,'X',M_PI /2.0f);
+					eul_to_mat3(m,eul);
+					invert_m3(m);
+					mat3_to_quat(quat,m);
+					break;
+				default:
+					ED_view3d_quat_from_axis_view(viewnum, quat);
+			}
+		} else {
+			ED_view3d_quat_from_axis_view(viewnum, quat);
+		}
+#else
 		ED_view3d_quat_from_axis_view(viewnum, quat);
+#endif
 		axis_set_view(C, v3d, ar, quat, viewnum, nextperspo, align_active, smooth_viewtx);
 	}
 	else if (viewnum == RV3D_VIEW_CAMERA) {

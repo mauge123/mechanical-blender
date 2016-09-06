@@ -699,7 +699,7 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		}
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-		prop = RNA_def_boolean(ot->srna, "snap_target_fixed", false, NULL, NULL);
+		prop = RNA_def_boolean(ot->srna, "snap_target_fixed", false, "Snap Target Fixed", NULL);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 		prop = RNA_def_float_vector(ot->srna, "snap_point_value", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "", -FLT_MAX, FLT_MAX);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
@@ -709,7 +709,7 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
-		prop = RNA_def_int(ot->srna, "transform_mode", TFM_TRANSLATION, 0, 0,NULL,NULL,0,0);
+		prop = RNA_def_int(ot->srna, "transform_mode", TFM_TRANSLATION, 0, 0, "Transform Mode", NULL, 0, 0);
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
 	}
@@ -736,7 +736,7 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 
 #ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
 	/* T_USES_MANIPULATOR FLAG */
-	prop = RNA_def_boolean(ot->srna,"uses_manipulator",false,NULL,NULL);
+	prop = RNA_def_boolean(ot->srna, "uses_manipulator", false, "Uses Manipulator", NULL);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 #endif
 

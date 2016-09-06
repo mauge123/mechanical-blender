@@ -4485,9 +4485,8 @@ void MESH_OT_loop_to_region(wmOperatorType *ot)
 
 #ifdef WITH_MECHANICAL_GEOMETRY
 /* user facing function, does notification */
-bool EDBM_selec_snap_options_toggle(bContext *C, wmOperator *op, const int action)
+static bool EDBM_selec_snap_options_toggle(bContext *C, wmOperator *UNUSED(op), const int action)
 {
-	ToolSettings *ts = CTX_data_tool_settings(C);
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = NULL;
 	//TransInfo *t = op->customdata;
@@ -4519,7 +4518,7 @@ static int edbm_snap_options_exec(bContext *C, wmOperator *op)
 
 }
 
-static int edbm_snap_options_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int edbm_snap_options_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
 	return edbm_snap_options_exec(C, op);
 }
@@ -4528,8 +4527,6 @@ static int edbm_snap_options_invoke(bContext *C, wmOperator *op, const wmEvent *
 
 void MESH_OT_snap_options(wmOperatorType *ot)
 {
-	PropertyRNA *prop;
-
 	static EnumPropertyItem actions_items[] = {
 		{GEOM_DEFAULT, "DEFAULT", 0, "Default", "Scene default snap options"},
 		{GEOM_LINE_END_POINT, "LINE_END_POINT", 0, "LineEndPoint", "Snap to Line end Point"},

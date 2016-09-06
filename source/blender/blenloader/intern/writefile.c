@@ -49,7 +49,7 @@
  *     <bh.len>            int,  len data after BHead
  *     <bh.old>            void,  old pointer
  *     <bh.SDNAnr>         int
- *     <bh.nr>             int, in case of array: amount of structs
+ *     <bh.nr>             int, in case of array: number of structs
  *     data
  *     ...
  *     ...
@@ -2253,7 +2253,7 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 				write_customdata(wd, &mesh->id, mesh->totdim, &mesh->ddata, dlayers, -1, 0);
 				MDim *mdm = CustomData_get_layer(&mesh->ddata, CD_MDIM);
-				for (int i =0;i< mesh->totdim;i++){
+				for (int i =0;i< mesh->totdim;i++, mdm++){
 					writedata(wd, DATA, sizeof(int)*mdm->totverts, mdm->v);
 				}
 #endif

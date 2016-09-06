@@ -74,6 +74,11 @@ static bool mechanical_check_edge_line (BMEditMesh *UNUSED(em), BMEdge *e) {
 	BMIter iter;
 	BMFace *efa;
 	float *prev_fno = NULL;
+
+	if (eq_v3v3_prec(e->v1->co, e->v2->co)) {
+		return false;
+	}
+
 	BM_ITER_ELEM(efa, &iter, e, BM_FACES_OF_EDGE) {
 		if (prev_fno && parallel_v3u_v3u(efa->no,prev_fno)) {
 			break;
@@ -97,14 +102,23 @@ static bool mechanical_follow_edge_loop_test_circle(BMEditMesh *UNUSED(em), BMEd
 	float *center = cdata->center;
 	float n_center[3];
 
+	if (eq_v3v3_prec(v1->co, v2->co) || eq_v3v3_prec(v1->co, current->co) || eq_v3v3_prec(v2->co, current->co)) {
+		return false;
+	}
+
 	return ( !eq_v3v3_prec(current->co,center) &&
 		center_of_3_points(n_center, v1->co, v2->co, current->co) &&
 		eq_v3v3_prec(n_center, center) &&
 		angle_v3v3v3 (e->v1->co, center, e->v2->co) < MAX_ANGLE_EDGE_FROM_CENTER_ON_ARC);
 }
 
-static bool mechanical_follow_edge_loop_test_line(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *UNUSED(v2), BMVert *current, void *data) {
+static bool mechanical_follow_edge_loop_test_line(BMEditMesh *em, BMEdge *e, BMVert *v1, BMVert *v2, BMVert *current, void *data) {
 	float *dir = data;
+
+	if (eq_v3v3_prec(v1->co, v2->co)) {
+		return false;
+	}
+
 	return point_on_axis(v1->co,dir,current->co) && mechanical_check_edge_line(em,e);
 }
 
@@ -182,6 +196,11 @@ static int mechanical_follow_circle(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVe
 {
 	int type = 0;
 	float dir[3];
+
+	if (eq_v3v3_prec(v1->co, v2->co) || eq_v3v3_prec(v1->co, v3->co) || eq_v3v3_prec(v2->co, v3->co)) {
+		return 0;
+	}
+
 	sub_v3_v3v3_prec(dir,v2->co,v1->co);
 	normalize_v3_prec(dir);
 	float a1, a2;
@@ -223,6 +242,10 @@ static int mechanical_follow_line(BMEditMesh *em, BMEdge *e1, BMEdge *e2, BMVert
                                      BMVert* *r_voutput, int* r_vcount, BMEdge* *r_eoutput, int* r_ecount)
 {
 	float dir[3];
+
+	if (eq_v3v3_prec(v1->co, v2->co)) {
+		return 0;
+	}
 
 	sub_v3_v3v3_prec(dir, v2->co, v1->co);
 	normalize_v3(dir);

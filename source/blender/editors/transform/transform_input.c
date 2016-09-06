@@ -90,8 +90,9 @@ static void InputSpring(TransInfo *t, MouseInput *mi, const double mval[2], floa
 	float ratio;
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 	if (t->spacetype == SPACE_VIEW3D){
-		float center[2];
-		projectFloatView(t, t->center,center);
+		float p[3],center[2];
+		getViewDepthPoint(t,p);
+		projectFloatView(t, p,center);
 		dx = ((double)center[0] - mval[0]);
 		dy = ((double)center[1] - mval[1]);
 	} else {

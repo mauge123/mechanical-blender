@@ -9100,8 +9100,7 @@ bool checkUseAxisMatrix(TransInfo *t)
 #ifdef WITH_MECHANICAL_GRAB_FIX
 void getViewDepthPoint(TransInfo *t, float *r_loc)
 {
-
-	calculateCenterMedian(t, r_loc);
+	copy_v3_v3(r_loc, t->center_global);
 }
 #endif
 

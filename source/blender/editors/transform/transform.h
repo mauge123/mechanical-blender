@@ -853,8 +853,13 @@ void initTransformOrientation(struct bContext *C, TransInfo *t);
 bool createSpaceNormal(float mat[3][3], const float normal[3]);
 bool createSpaceNormalTangent(float mat[3][3], const float normal[3], const float tangent[3]);
 
+#ifdef WITH_MECHANICAL_UCS
+struct TransformOrientation *addMatrixSpace(struct bContext *C, float mat[3][3],float origin[3],
+                                            const char *name, const bool overwrite);
+#else
 struct TransformOrientation *addMatrixSpace(struct bContext *C, float mat[3][3],
                                             const char *name, const bool overwrite);
+#endif
 bool applyTransformOrientation(const struct bContext *C, float mat[3][3], char r_name[64], int index);
 
 #define ORIENTATION_NONE	0
@@ -865,8 +870,13 @@ bool applyTransformOrientation(const struct bContext *C, float mat[3][3], char r
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 #define ORIENTATION_REFERENCE_PLANE 5
 
+#ifdef WITH_MECHANICAL_UCS
+int getTransformOrientation_ex(const struct bContext *C, float normal[3], float plane[3], float origin[3], const short around);
+int getTransformOrientation(const struct bContext *C, float normal[3], float plane[3], float origin[3]);
+#else
 int getTransformOrientation_ex(const struct bContext *C, float normal[3], float plane[3], const short around);
 int getTransformOrientation(const struct bContext *C, float normal[3], float plane[3]);
+#endif
 
 void freeEdgeSlideTempFaces(EdgeSlideData *sld);
 void freeEdgeSlideVerts(TransInfo *t, TransCustomData *custom_data);
