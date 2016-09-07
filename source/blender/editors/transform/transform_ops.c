@@ -32,6 +32,7 @@
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 
 #include "BLT_translation.h"
 
@@ -271,6 +272,11 @@ static int create_orientation_exec(bContext *C, wmOperator *op)
 	const bool use = RNA_boolean_get(op->ptr, "use");
 	const bool overwrite = RNA_boolean_get(op->ptr, "overwrite");
 	const bool use_view = RNA_boolean_get(op->ptr, "use_view");
+#ifdef WITH_MECHANICAL_UCS
+	const bool set_ucs = RNA_boolean_get(op->ptr, "set_ucs");
+	TransformOrientation *ts;
+	Scene *scene = CTX_data_scene(C);
+#endif
 	View3D *v3d = CTX_wm_view3d(C);
 
 	RNA_string_get(op->ptr, "name", name);
@@ -280,7 +286,26 @@ static int create_orientation_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	ts = BIF_createTransformOrientation(C, op->reports, name, use_view, use, overwrite);
+	if (ts == NULL) {
+		BKE_report(op->reports, RPT_ERROR, "Cannot create transform!");
+		return OPERATOR_CANCELLED;
+	}
+#else
 	BIF_createTransformOrientation(C, op->reports, name, use_view, use, overwrite);
+#endif
+
+#ifdef WITH_MECHANICAL_UCS
+	if (set_ucs) {
+		if (scene) {
+			// 0 = Global
+			v3d->ucs = BLI_findindex(&scene->transform_spaces, ts)+1;
+		} else {
+			BKE_report(op->reports, RPT_ERROR, "Cannot set ucs!");
+		}
+	}
+#endif
 
 	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
 	WM_event_add_notifier(C, NC_SCENE | NA_EDITED, CTX_data_scene(C));
@@ -304,6 +329,9 @@ static void TRANSFORM_OT_create_orientation(struct wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "use_view", false, "Use View",
 	                "Use the current view instead of the active object to create the new orientation");
 	RNA_def_boolean(ot->srna, "use", false, "Use after creation", "Select orientation after its creation");
+#ifdef WITH_MECHANICAL_UCS
+	RNA_def_boolean(ot->srna, "set_ucs", false, "Set as UCS", "Select as ucs after its creation");
+#endif
 	RNA_def_boolean(ot->srna, "overwrite", false, "Overwrite previous",
 	                "Overwrite previously created orientation with same name");
 }

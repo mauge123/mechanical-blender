@@ -127,9 +127,15 @@ struct ReportList;
 void BIF_clearTransformOrientation(struct bContext *C);
 void BIF_removeTransformOrientation(struct bContext *C, struct TransformOrientation *ts);
 void BIF_removeTransformOrientationIndex(struct bContext *C, int index);
+#ifdef WITH_MECHANICAL_UCS
+struct TransformOrientation* BIF_createTransformOrientation(struct bContext *C, struct ReportList *reports,
+                                    const char *name, const bool use_view,
+                                    const bool activate, const bool overwrite);
+#else
 void BIF_createTransformOrientation(struct bContext *C, struct ReportList *reports,
                                     const char *name, const bool use_view,
                                     const bool activate, const bool overwrite);
+#endif
 void BIF_selectTransformOrientation(struct bContext *C, struct TransformOrientation *ts);
 void BIF_selectTransformOrientationValue(struct bContext *C, int orientation);
 
