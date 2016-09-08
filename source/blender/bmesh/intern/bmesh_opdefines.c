@@ -2059,6 +2059,7 @@ static BMOpDefine bmo_create_dimension_def = {
 	/* slots_in */
 	{{"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices */
 	{"geom", BMO_OP_SLOT_ELEMENT_BUF, {BM_GEOMETRY}},
+	{"object", BMO_OP_SLOT_PTR, {(int)BMO_OP_SLOT_SUBTYPE_PTR_OBJECT}},
 	{"dim_type",BMO_OP_SLOT_INT},
 	 {{'\0'}},
 	},

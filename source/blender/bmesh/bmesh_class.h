@@ -201,6 +201,8 @@ typedef struct BMDim {
 	//Dimension Name
 	char name[MAX_NAME];
 
+	struct MDimLink *link; //pointer to value on mdim
+
 
 } BMDim;
 

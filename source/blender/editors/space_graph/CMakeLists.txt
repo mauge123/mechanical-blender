@@ -59,6 +59,11 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
+endif()
+
 add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_editor_space_graph "${SRC}" "${INC}" "${INC_SYS}")

@@ -99,6 +99,19 @@ bool ui_block_is_menu(const uiBlock *block)
 	        ((block->flag & UI_BLOCK_KEEP_OPEN) == 0));
 }
 
+//WITH_MECHANICAL_DIMENSION
+bool ui_block_is_dimension_value(const uiBut *but)
+{
+	char *name = "Dimension Value";
+	float len_name =strlen(name);
+	if(strncmp(but->tip, name, len_name)==0){
+		return true;
+	}else{
+		return false;
+	}
+
+}
+
 bool ui_block_is_pie_menu(const uiBlock *block)
 {
 	return ((block->flag & UI_BLOCK_RADIAL) != 0);

@@ -792,7 +792,7 @@ static EnumPropertyItem *driver_mapping_type_itemsf(bContext *C, PointerRNA *UNU
 	}
 	else {
 		/* We need at least this one! */
-		RNA_enum_items_add_value(&item, &totitem, input, CREATEDRIVER_MAPPING_NONE);
+		RNA_enum_item_add(&item, &totitem, input);
 	}
 	
 	RNA_enum_item_end(&item, &totitem);

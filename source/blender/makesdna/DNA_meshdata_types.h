@@ -74,12 +74,22 @@ typedef struct MDim {
 	float dpos_fact;
 	float fpos[3];
 	float center[3];
-	float value; // Stored Dimension Value
+	float *value; // Stored Dimension Value
+	char pad1[4];
 	short dim_type;
 	char flag;
 	char constraints;
 	char name[64];/* MAX_NAME */
+	struct MDimLink *link;
 } MDim;
+
+typedef struct MDimLink {
+	Link *next, *prev;
+	float value;
+	char pad[4];
+	MDim  *mdim;
+
+} MDimLink;
 /* */
 
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS

@@ -451,6 +451,9 @@ void ui_fontscale(short *points, float aspect);
 
 extern bool ui_block_is_menu(const uiBlock *block) ATTR_WARN_UNUSED_RESULT;
 extern bool ui_block_is_pie_menu(const uiBlock *block) ATTR_WARN_UNUSED_RESULT;
+// WITH_MECHANICAL_DIMENSIONS
+bool ui_block_is_dimension_value(const uiBut *but);
+
 extern void ui_block_to_window_fl(const struct ARegion *ar, uiBlock *block, float *x, float *y);
 extern void ui_block_to_window(const struct ARegion *ar, uiBlock *block, int *x, int *y);
 extern void ui_block_to_window_rctf(const struct ARegion *ar, uiBlock *block, rctf *rct_dst, const rctf *rct_src);

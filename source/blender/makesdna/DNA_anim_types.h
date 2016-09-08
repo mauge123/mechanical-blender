@@ -276,6 +276,11 @@ typedef struct DriverTarget {
 	
 	short flag;				/* flags for the validity of the target (NOTE: these get reset every time the types change) */
 	int idtype;				/* type of ID-block that this target can use */
+
+	int refdim;				/* Dimension*/
+	int pad;
+
+
 } DriverTarget;
 
 /* Driver Target flags */
@@ -354,6 +359,10 @@ typedef enum eDriverVar_Types {
 	 * NOTE: this must always be th last item in this list,
 	 * 		so add new types above this line
 	 */
+//WITH_MECHANICAL_DIMENSIONS
+	DVAR_TYPE_DIMENSION,
+
+
 	MAX_DVAR_TYPES
 } eDriverVar_Types;
 

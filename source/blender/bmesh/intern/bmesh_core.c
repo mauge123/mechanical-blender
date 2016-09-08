@@ -3148,7 +3148,7 @@ static bool unique_name_dim_check(void *arg, const char *name)
  * \note base on BM_edge_create function
  */
 BMDim *BM_dim_create(
-		BMesh *bm, BMVert *(*v), int v_count, int dim_type,
+		MDimLink *mdim_link, BMesh *bm, BMVert *(*v), int v_count, int dim_type,
 		const BMDim *d_example, const eBMCreateFlag create_flag, char *name)
 {
 	BMDim *edm = BLI_mempool_alloc(bm->dpool);
@@ -3264,6 +3264,7 @@ BMDim *BM_dim_create(
 
 	}
 
+	edm->link = mdim_link;
 
 	/* --- done --- */
 
