@@ -922,6 +922,42 @@ static float view3d_quat_axis[6][4] = {
 };
 
 
+#ifdef WITH_MECHANICAL_UCS
+bool ED_view3d_quat_from_axis_view_ucs(TransformOrientation *ts , const char viewnum, float quat[4]) {
+	float m[3][3];
+	float eul[3];
+
+	copy_m3_m3(m,ts->mat);
+	mat3_to_eul(eul,m);
+
+	switch (viewnum) {
+		case RV3D_VIEW_TOP:
+			// XY
+			invert_m3(m);
+			mat3_to_quat(quat,m);
+			break;
+		case RV3D_VIEW_FRONT:
+			// ZX
+			rotate_eul(eul,'X',M_PI /2.0f);
+			eul_to_mat3(m,eul);
+			invert_m3(m);
+			mat3_to_quat(quat,m);
+			break;
+		case RV3D_VIEW_RIGHT:
+			// ZY
+			rotate_eul(eul,'Z',M_PI /2.0f);
+			rotate_eul(eul,'X',M_PI /2.0f);
+			eul_to_mat3(m,eul);
+			invert_m3(m);
+			mat3_to_quat(quat,m);
+			break;
+		default:
+			ED_view3d_quat_from_axis_view(viewnum, quat);
+	}
+	return true;
+}
+#endif
+
 bool ED_view3d_quat_from_axis_view(const char view, float quat[4])
 {
 	if (RV3D_VIEW_IS_AXIS(view)) {
@@ -979,6 +1015,15 @@ bool ED_view3d_lock(RegionView3D *rv3d)
 	return ED_view3d_quat_from_axis_view(rv3d->view, rv3d->viewquat);
 }
 
+#ifdef WITH_MECHANICAL_UCS
+bool ED_view3d_lock_ucs(TransformOrientation *ts, RegionView3D *rv3d)
+{
+	ED_view3d_quat_from_axis_view_ucs(ts, rv3d->view, rv3d->viewquat);
+	return true;
+}
+
+#endif
+
 /* don't set windows active in here, is used by renderwin too */
 void view3d_viewmatrix_set(Scene *scene, const View3D *v3d, RegionView3D *rv3d)
 {
@@ -998,8 +1043,23 @@ void view3d_viewmatrix_set(Scene *scene, const View3D *v3d, RegionView3D *rv3d)
 
 		/* should be moved to better initialize later on XXX */
 		if (rv3d->viewlock & RV3D_LOCKED)
+#ifdef WITH_MECHANICAL_UCS
+		{
+			if (v3d->ucs > 0) {
+				TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, v3d->ucs-1);
+				if (ts) {
+					ED_view3d_lock_ucs(ts,rv3d);
+				} else {
+					ED_view3d_lock(rv3d);
+				}
+			} else {
+				ED_view3d_lock(rv3d);
+			}
+		}
+#else
 			ED_view3d_lock(rv3d);
-		
+#endif
+
 		quat_to_mat4(rv3d->viewmat, rv3d->viewquat);
 		if (rv3d->persp == RV3D_PERSP) rv3d->viewmat[3][2] -= rv3d->dist;
 		if (v3d->ob_centre) {

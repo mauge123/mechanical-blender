@@ -283,9 +283,19 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 	double vec4[4];
 	unsigned char col[3], col2[3];
 
+#ifdef WITH_MECHANICAL_UCS
+	float persmat[4][4];
+	mul_m4_m4m4(persmat, rv3d->winmat, rv3d->ucsmat);
+
+
+	fx = persmat[3][0];
+	fy = persmat[3][1];
+	fw = persmat[3][3];
+#else
 	fx = rv3d->persmat[3][0];
 	fy = rv3d->persmat[3][1];
 	fw = rv3d->persmat[3][3];
+#endif
 
 	wx = (ar->winx / 2.0); /* because of rounding errors, grid at wrong location */
 	wy = (ar->winy / 2.0);
@@ -293,11 +303,15 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 	x = (wx) * fx / fw;
 	y = (wy) * fy / fw;
 
-	vec4[0] = vec4[1] = v3d->grid;
+	vec4[0] = vec4[1] = v3d->grid;  //Grid Scale
 
 	vec4[2] = 0.0;
 	vec4[3] = 1.0;
+#ifdef WITH_MECHANICAL_UCS
+	mul_m4_v4d(persmat, vec4);
+#else
 	mul_m4_v4d(rv3d->persmat, vec4);
+#endif
 	fx = vec4[0];
 	fy = vec4[1];
 	fw = vec4[3];
@@ -2682,10 +2696,6 @@ void ED_view3d_update_viewmat(Scene *scene, View3D *v3d, ARegion *ar, float view
 	else
 		view3d_viewmatrix_set(scene, v3d, rv3d);  /* note: calls BKE_object_where_is_calc for camera... */
 
-	/* update utilitity matrices */
-	mul_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
-	invert_m4_m4(rv3d->persinv, rv3d->persmat);
-	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
 #ifdef WITH_MECHANICAL_UCS
 	{
 		if (v3d->ucs > 0) {
@@ -2699,6 +2709,7 @@ void ED_view3d_update_viewmat(Scene *scene, View3D *v3d, ARegion *ar, float view
 				translate_m4(mt,ts->origin[0], ts->origin[1], ts->origin[2]);
 
 				mul_m4_series(rv3d->ucsmat, rv3d->viewmat, mt, m);
+
 			} else {
 				// Invalid
 				v3d->ucs = 0;
@@ -2709,6 +2720,12 @@ void ED_view3d_update_viewmat(Scene *scene, View3D *v3d, ARegion *ar, float view
 		}
 	}
 #endif
+
+	/* update utilitity matrices */
+	mul_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
+	invert_m4_m4(rv3d->persinv, rv3d->persmat);
+	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
+
 
 	
 	/* calculate GLSL view dependent values */

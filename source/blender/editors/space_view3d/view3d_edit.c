@@ -3912,40 +3912,8 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 
 #ifdef WITH_MECHANICAL_UCS
 		if (v3d->ucs > 0) {
-			float m[3][3];
-			float eul[3];
 			TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, v3d->ucs-1);
-
-			copy_m3_m3(m,ts->mat);
-			mat3_to_eul(eul,m);
-
-			copy_v3_v3(rv3d->ofs, ts->origin);
-			mul_v3_fl(rv3d->ofs,-1.0f);
-
-			switch (viewnum) {
-				case RV3D_VIEW_TOP:
-					// XY
-					invert_m3(m);
-					mat3_to_quat(quat,m);
-					break;
-				case RV3D_VIEW_FRONT:
-					// ZX
-					rotate_eul(eul,'X',M_PI /2.0f);
-					eul_to_mat3(m,eul);
-					invert_m3(m);
-					mat3_to_quat(quat,m);
-					break;
-				case RV3D_VIEW_RIGHT:
-					// ZY
-					rotate_eul(eul,'Z',M_PI /2.0f);
-					rotate_eul(eul,'X',M_PI /2.0f);
-					eul_to_mat3(m,eul);
-					invert_m3(m);
-					mat3_to_quat(quat,m);
-					break;
-				default:
-					ED_view3d_quat_from_axis_view(viewnum, quat);
-			}
+			ED_view3d_quat_from_axis_view_ucs(ts, viewnum, quat);
 		} else {
 			ED_view3d_quat_from_axis_view(viewnum, quat);
 		}
@@ -5348,6 +5316,19 @@ static int dim_value_num_input_invoke(bContext *C, wmOperator *op,const wmEvent 
 }
 
 
+static int dim_value_num_input_modal_poll(bContext *C)
+{
+	BMEditMesh *em;
+	// Check a dimension is selected
+	Object *obedit = CTX_data_edit_object(C);
+	if (obedit && obedit->type == OB_MESH) {
+		em = BKE_editmesh_from_object(obedit);
+		return em && em->bm->totdimsel;
+	}
+	return ED_operator_editmesh(C);
+}
+
+
 static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -5418,6 +5399,7 @@ void VIEW3D_OT_dim_value_num_input(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = dim_value_num_input_invoke;
 	ot->modal =dim_value_num_input_modal;
+	ot->poll = dim_value_num_input_modal_poll;
 
 	/* flags */
 	ot->flag = 0;

@@ -365,6 +365,11 @@ char ED_view3d_lock_view_from_index(int index);
 char ED_view3d_axis_view_opposite(char view);
 bool ED_view3d_lock(struct RegionView3D *rv3d);
 
+#ifdef WITH_MECHANICAL_UCS
+bool ED_view3d_quat_from_axis_view_ucs(TransformOrientation *ts, const char viewnum, float quat[4]);
+bool ED_view3d_lock_ucs(TransformOrientation *ts, struct RegionView3D *rv3d);
+#endif
+
 uint64_t ED_view3d_datamask(const struct Scene *scene, const struct View3D *v3d);
 uint64_t ED_view3d_screen_datamask(const struct bScreen *screen);
 

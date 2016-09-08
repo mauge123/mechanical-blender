@@ -3682,6 +3682,9 @@ class VIEW3D_PT_transform_orientations(Panel):
         orientation = view.current_orientation
 
         row = layout.row(align=True)
+        row.prop(view, "ucs", text="UCS")
+
+        row = layout.row(align=True)
         row.prop(view, "transform_orientation", text="")
         row.operator("transform.create_orientation", text="", icon='ZOOMIN')
 

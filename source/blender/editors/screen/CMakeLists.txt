@@ -53,6 +53,11 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_UCS)
+endif()
+
+
 add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_editor_screen "${SRC}" "${INC}" "${INC_SYS}")
