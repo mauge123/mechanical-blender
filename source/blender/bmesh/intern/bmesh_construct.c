@@ -815,7 +815,7 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 			v_arr[j] = vtable[BM_elem_index_get(d->v[j])];
 		}
 
-		d_new = BM_dim_create(NULL, bm_new,v_arr,d->totverts,d->dim_type,d,BM_CREATE_SKIP_CD, NULL);
+		d_new = BM_dim_create(bm_new,v_arr,d->totverts,d->dim_type,d,BM_CREATE_SKIP_CD, NULL);
 
 		MEM_freeN (v_arr);
 

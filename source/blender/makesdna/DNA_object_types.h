@@ -299,10 +299,6 @@ typedef struct Object {
 	LodLevel *currentlod;
 
 	struct PreviewImage *preview;
-// WITH_MECHANICAL_DIMENSION
-	ListBase dim_values;  //MDimLink
-
-
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */

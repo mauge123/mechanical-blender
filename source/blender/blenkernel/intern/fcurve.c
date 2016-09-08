@@ -1266,7 +1266,7 @@ static float dvar_eval_dimension(ChannelDriver *UNUSED(driver), DriverVar *dvar)
 			MDim *mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
 			for (int n=0;n<me->totdim;mdim++, n++) {
 				if (n == dtar->refdim) {
-					value = *(mdim->value);
+					value = mdim->value;
 					break;
 				}
 			}

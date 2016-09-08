@@ -2927,10 +2927,10 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 								   false);
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension(mdm->center,mdm->fpos, *mdm->value,mdm->dpos_fact,false);
+			draw_diameter_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
 		case DIM_TYPE_RADIUS:
-			draw_radius_dimension(mdm->center,mdm->fpos, *mdm->value,mdm->dpos_fact,false);
+			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
