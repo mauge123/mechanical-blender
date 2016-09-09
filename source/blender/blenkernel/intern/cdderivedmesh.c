@@ -2401,12 +2401,11 @@ static DerivedMesh *cddm_from_bmesh_ex(
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	index = dm->getDimDataArray(dm, CD_ORIGINDEX);
-	BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
+	BM_ITER_MESH_PTR_INDEX (edm, &iter, bm, BM_PTR_DIMS_OF_MESH, i) {
 		MDim *mdm = &mdim[i];
 		mdm->dpos_fact = edm->dpos_fact;
 		mdm->totverts = edm->totverts;
 		copy_v3_v3(mdm->fpos, edm->fpos);
-		(mdm->name, edm->name, 64);/* MAX_NAME */
 
 		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array cddm");
 		for (int n=0;n<edm->totverts;n++) {

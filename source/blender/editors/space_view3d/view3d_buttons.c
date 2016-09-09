@@ -232,7 +232,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 		BMIter iter;
 
 		if (bm->totdimsel) {
-			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					totdim++;
 					edm_sel = edm;
@@ -256,7 +256,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 			/* Dimension Name */
 			uiDefButC(block, UI_BTYPE_TEXT, 0, "Name: ",0, yi -= buth + but_margin, 200, buth,
-				&edm_sel->name, 0, 50, 0, 0, TIP_("Dimension name"));
+				MDIM_FROM_BMDIM(edm_sel)->id.name, 0, 50, 0, 0, TIP_("Dimension name"));
 
 
 			// At least one dimension
@@ -292,10 +292,11 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			Mesh *me = ob->data;
 			BMEditMesh *em = me->edit_btmesh;
 			BMesh *bm = em->bm;
+			BMDim **ptr_edm;
 			BMDim *edm;
 			BMIter iter;
 
-			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					apply_dimension_value (bm, edm, tfp->dimension_value, ts);
 					//apply_txt_dimension_value(edm, tfp->dim_txt_pos);

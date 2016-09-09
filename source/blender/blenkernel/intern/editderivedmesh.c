@@ -740,7 +740,7 @@ static void emDM_foreachMappedDim(
 	int i;
 
 
-	BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
+	BM_ITER_MESH_PTR_INDEX (edm, &iter, bm, BM_PTR_DIMS_OF_MESH, i) {
 		func(userData, i, edm->dpos);
 	}
 }

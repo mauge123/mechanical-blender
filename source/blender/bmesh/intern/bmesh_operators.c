@@ -588,7 +588,7 @@ static int bmo_mesh_flag_count(
 		if (htype & BM_DIM) {
 			BMIter iter;
 			BMDim *ele;
-			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(ele, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				if (BMO_dim_flag_test_bool(bm, ele, oflag) == test_for_enabled) {
 					count_dim++;
 				}
@@ -658,7 +658,7 @@ void BMO_mesh_flag_disable_all(BMesh *bm, BMOperator *UNUSED(op), const char hty
 			if (htype & BM_DIM) {
 			BMIter iter;
 			BMDim *ele;
-			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(ele, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				BMO_dim_flag_disable(bm, ele, oflag);
 			}
 		}
@@ -949,7 +949,7 @@ static void bmo_slot_buffer_from_hflag(
 		}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (htype & BM_DIM) {
-			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(ele, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				if ((!respecthide || !BM_elem_flag_test(ele, BM_ELEM_HIDDEN)) &&
 				    BM_elem_flag_test_bool(ele, hflag) == test_for_enabled)
 				{
@@ -1154,7 +1154,7 @@ static void bmo_slot_buffer_from_flag(
 #endif
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (htype & BM_DIM) {
-			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(ele, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				if (BMO_dim_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
@@ -1412,7 +1412,7 @@ static void bmo_flag_layer_alloc(BMesh *bm)
 
 			BLI_mempool *newpool = bm->dtoolflagpool;
 
-			BM_ITER_MESH_INDEX (ele, &iter, bm, BM_DIMS_OF_MESH, i) {
+			BM_ITER_MESH_PTR_INDEX (ele, &iter, bm, BM_PTR_DIMS_OF_MESH, i) {
 				void *oldflags = ele->oflags;
 				ele->oflags = BLI_mempool_calloc(newpool);
 				memcpy(ele->oflags, oldflags, old_totflags_size);

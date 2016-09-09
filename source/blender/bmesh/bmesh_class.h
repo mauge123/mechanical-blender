@@ -169,11 +169,16 @@ typedef struct BMLoop {
 #define DIM_TYPE_ANGLE_3P_CON	6
 
 
+#define MDIM_FROM_BMDIM(ele) \
+	((MDim*) ((void*) ele - sizeof(ID)))
+
 typedef struct BMDim {
 	BMHeader head;
-	//struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 
 	struct BMVert *(*v);
+
+	/** FOLLOWING DATA IS STORED IN MDim (shared) */
+
 	// Number Of verts
 	int totverts;
 
@@ -197,10 +202,6 @@ typedef struct BMDim {
 	//Dimension position, from midpoint
 	float fpos[3]; //fixed
 	float tpos[3]; //while moving: used when tagged
-
-	//Dimension Name
-	char name[MAX_NAME];
-
 
 } BMDim;
 

@@ -211,7 +211,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 				BMDim *edm;
 				BMIter iter;
 				int i =0;
-				BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
+				BM_ITER_MESH_PTR_INDEX (edm, &iter, bm, BM_PTR_DIMS_OF_MESH, i) {
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
 						if (!G.moving) {

@@ -248,6 +248,7 @@ typedef enum ID_Type {
 	ID_PAL  = MAKE_ID2('P', 'L'), /* Palette */
 	ID_PC   = MAKE_ID2('P', 'C'), /* PaintCurve  */
 	ID_CF   = MAKE_ID2('C', 'F'), /* CacheFile */
+	ID_DM   = MAKE_ID2('D', 'M'), /* Dimension */
 } ID_Type;
 
 /* Only used as 'placeholder' in .blend files for directly linked datablocks. */
@@ -418,6 +419,7 @@ enum {
 	INDEX_ID_SCE,
 	INDEX_ID_WM,
 	INDEX_ID_MSK,
+	INDEX_ID_DM,
 	INDEX_ID_NULL,
 };
 

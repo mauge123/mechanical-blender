@@ -121,8 +121,9 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 	BMDim *d;
 	BMOpSlot *op_verts_slot = BMO_slot_get(op->slots_in, "verts");
 	BMOpSlot *op_geom_slot = BMO_slot_get(op->slots_in, "geom");
+	MDim *mdm = BMO_slot_ptr_get(op->slots_in, "dimension");
 	int n=0;
-	int type = BMO_slot_int_get(op->slots_in,"dim_type");
+	int type = mdm->dim_type = BMO_slot_int_get(op->slots_in,"dim_type");
 
 // WITH_MECHANICAL_GEOMETRY
 	if (op_geom_slot->len > 0) {
@@ -170,16 +171,15 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		for (v = BMO_iter_new(&siter, op->slots_in, "verts", BM_VERT); v; v = BMO_iter_step(&siter), n++) {
 			v_arr[n] = v;
 		}
-		d = BM_dim_create(bm, v_arr,op_verts_slot->len, type, NULL, BM_CREATE_USE_SELECT_ORDER, NULL);
+		d = BM_dim_create(bm, v_arr,op_verts_slot->len, type, NULL, BM_CREATE_USE_SELECT_ORDER, mdm);
 		BMO_dim_flag_enable(bm, (BMDim *)d, EXT_KEEP);
 		MEM_freeN (v_arr);
 	}
 
-	BM_ITER_MESH(d, &iter, bm, BM_DIMS_OF_MESH) {
+	BM_ITER_MESH_PTR(d, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 		if (BMO_dim_flag_test(bm,d, EXT_KEEP)) {
 			BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
 			BMO_dim_flag_disable(bm, d, EXT_KEEP);
 		}
 	}
-
 }

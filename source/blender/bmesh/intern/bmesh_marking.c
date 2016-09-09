@@ -51,7 +51,7 @@ static void recount_totsels(BMesh *bm)
 	const char iter_types[6] = {BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,
 	                            BM_FACES_OF_MESH,
-								BM_DIMS_OF_MESH,
+								BM_PTR_DIMS_OF_MESH,
 								BM_REFERENCES_OF_MESH,
 	                            BM_GEOMETRY_OF_MESH};
 	int *tots[6];
@@ -96,6 +96,7 @@ static void recount_totsels(BMesh *bm)
 		int count = 0;
 
 		BM_ITER_MESH (ele, &iter, bm, iter_types[i]) {
+			ele = BM_ELEM_ENSURE_VALUE_GET(ele, iter_types[i]);
 			if (BM_elem_flag_test(ele, BM_ELEM_SELECT)) count += 1;
 		}
 		*tots[i] = count;
@@ -833,7 +834,7 @@ static int bm_mesh_flag_count(
 	}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (htype & BM_DIM) {
-		BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+		BM_ITER_MESH_PTR(ele, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 			if (respecthide && BM_elem_flag_test(ele, BM_ELEM_HIDDEN)) continue;
 			if (BM_elem_flag_test_bool(ele, hflag) == test_for_enabled) tot++;
 		}
@@ -1250,7 +1251,7 @@ void BM_mesh_elem_hflag_disable_test(
 // WITH_MECHANICAL_GEOMETRY
 	const char iter_types[6] = {
 									BM_REFERENCES_OF_MESH,
-									BM_DIMS_OF_MESH,
+									BM_PTR_DIMS_OF_MESH,
 									BM_VERTS_OF_MESH,
 									BM_EDGES_OF_MESH,
 									BM_FACES_OF_MESH,
@@ -1304,6 +1305,7 @@ void BM_mesh_elem_hflag_disable_test(
 			BMElem *ele;
 
 			ele = BM_iter_new(&iter, bm, iter_types[i], NULL);
+			ele = BM_ELEM_ENSURE_VALUE_GET(ele, iter_types[i]);
 			for ( ; ele; ele = BM_iter_step(&iter)) {
 				BM_elem_flag_disable(ele, BM_ELEM_SELECT);
 			}
@@ -1325,6 +1327,7 @@ void BM_mesh_elem_hflag_disable_test(
 			if (htype & flag_types[i]) {
 				ele = BM_iter_new(&iter, bm, iter_types[i], NULL);
 				for ( ; ele; ele = BM_iter_step(&iter)) {
+					ele = BM_ELEM_ENSURE_VALUE_GET(ele, iter_types[i]);
 
 					if (UNLIKELY(respecthide && BM_elem_flag_test(ele, BM_ELEM_HIDDEN))) {
 						/* pass */
@@ -1356,7 +1359,7 @@ void BM_mesh_elem_hflag_enable_test(
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 // WITH_MECHANICAL_GEOMETRY
 	const char iter_types[6] = {
-								BM_DIMS_OF_MESH,
+								BM_PTR_DIMS_OF_MESH,
 								BM_REFERENCES_OF_MESH,
 								BM_VERTS_OF_MESH,
 	                            BM_EDGES_OF_MESH,

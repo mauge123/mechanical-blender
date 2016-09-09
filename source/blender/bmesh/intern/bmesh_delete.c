@@ -102,7 +102,7 @@ static void bmo_remove_tagged_dims(BMesh *bm, const short oflag)
 	BMDim *d, *d_next;
 	BMIter iter;
 
-	BM_ITER_MESH_MUTABLE (d, d_next, &iter, bm, BM_DIMS_OF_MESH) {
+	BM_ITER_MESH_PTR_MUTABLE (d, d_next, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 		if (BMO_elem_flag_test(bm, d, oflag)) {
 			BM_dim_kill(bm, d);
 		}

@@ -491,8 +491,8 @@ EnumPropertyItem *rna_ReferenceDim_itemf(bContext *UNUSED(C), PointerRNA *ptr, P
 			if (me && me->totdim) {
 				MDim *mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
 				for (int n=0;n<me->totdim;mdim++, n++) {
-					tmp.identifier = me->mdim[n].name;
-					tmp.name = me->mdim[n].name;
+					tmp.identifier = me->mdim[n].id.name;
+					tmp.name = me->mdim[n].id.name;
 					tmp.value = n;
 					RNA_enum_item_add(&item, &totitem, &tmp);
 				}

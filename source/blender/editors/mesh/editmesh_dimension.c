@@ -29,6 +29,7 @@
 #include "DNA_object_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "BLI_math.h"
 
@@ -37,6 +38,7 @@
 #include "BKE_context.h"
 #include "BKE_library.h"
 #include "BKE_editmesh.h"
+#include "BKE_main.h"
 
 #include "RNA_define.h"
 #include "RNA_access.h"
@@ -56,15 +58,15 @@
 #include "mesh_dimensions.h"
 
 
-static int mechanical_add_dimension_from_vertexs (int dim_type, BMEditMesh *em, wmOperator *op)
+static int mechanical_add_dimension_from_vertexs (int dim_type, MDim *mdm, BMEditMesh *em, wmOperator *op)
 {
 
 	BMOperator bmop;
 	char op_str [255] = {0};
 
-	sprintf(op_str,"create_dimension %s %s %s", "verts=%hv", "geom=%hg", "dim_type=%i");
+	sprintf(op_str,"create_dimension %s %s %s %s", "verts=%hv", "geom=%hg", "dim_type=%i", "dimension=%p");
 
-	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, BM_ELEM_SELECT, dim_type);
+	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, BM_ELEM_SELECT, dim_type, mdm);
 
 	/* deselect original verts */
 	BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_in, "verts", BM_VERT, BM_ELEM_SELECT, true);
@@ -89,8 +91,15 @@ static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 
 	int dim_type = RNA_enum_get(op->ptr, "dim_type");
 
+	// Create Dimension Object
+	Main *bmain = CTX_data_main(C);
+
+
 	if (em->bm->totvertsel >= get_necessary_dimension_verts(dim_type)) {
-		if (!mechanical_add_dimension_from_vertexs(dim_type, em, op)) {
+
+		MDim *mdm = BKE_libblock_alloc(bmain, ID_DM, "Dimension");
+
+		if (!mechanical_add_dimension_from_vertexs(dim_type, mdm, em, op)) {
 			ret = OPERATOR_CANCELLED;
 		}
 	}

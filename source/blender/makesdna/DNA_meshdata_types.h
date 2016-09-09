@@ -34,6 +34,9 @@
 
 #include "DNA_customdata_types.h"
 #include "DNA_listBase.h"
+#include "DNA_ID.h"
+
+#include "DNA_object_types.h"
 
 struct Image;
 
@@ -69,16 +72,38 @@ typedef struct MVert {
 
 // WITH_MECHANICAL_MESH_DIMENSION
 typedef struct MDim {
-	unsigned int *v; /* Array of vertexs */
-	unsigned int totverts;
+	ID id;
+
+	char data[40]; //BMDim
+
+	/* SHARED BDIM data */
+
+	int totverts;
+	int dim_type;
+	int constraints; //Overrided automatic constraints
+
+	// Dimension position, used for select
+	float dpos[3];
 	float dpos_fact;
-	float fpos[3];
+
+	// Linear Dimension
+	int dir;  // Direction, to which side the value should be modified
+	float end[3], start[3];  //Points of base line
+
+	// Diameter Dimension
 	float center[3];
-	float value; // Stored Dimension Value
-	short dim_type;
+
+	//Dimension position, from midpoint
+	float fpos[3]; //fixed
+	float tpos[3]; //while moving: used when tagged
+
+	/* END SHARED BMDIM data */
+	float value; //stored value
+	unsigned int *v; /* Array of vertexs */
+
 	char flag;
-	char constraints;
-	char name[64];/* MAX_NAME */
+	char pad[7];
+
 } MDim;
 /* */
 

@@ -83,7 +83,8 @@ static void bm_mempool_init_ex(
 		loop_size = sizeof(BMLoop);
 		face_size = sizeof(BMFace);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		dim_size = sizeof(BMDim);
+		// Dimensions data is all stored on MDim
+		dim_size = sizeof(BMDim*);
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 		ref_size = sizeof(BMReference);
@@ -204,7 +205,7 @@ void BM_mesh_elem_toolflags_ensure(BMesh *bm)
 			BLI_mempool *toolflagpool = bm->dtoolflagpool;
 			BMIter iter;
 			BMDim_OFlag *ele;
-			BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(ele, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				ele->oflags = BLI_mempool_calloc(toolflagpool);
 			}
 		}
@@ -1493,7 +1494,7 @@ void BM_mesh_elem_table_ensure(BMesh *bm, const char htype)
 #pragma omp section
 		{
 			if (htype_needed & BM_DIM) {
-				BM_iter_as_array(bm, BM_DIMS_OF_MESH, NULL, (void **)bm->dtable, bm->totdim);
+				BM_iter_as_array(bm, BM_PTR_DIMS_OF_MESH, NULL, (void **)bm->dtable, bm->totdim);
 			}
 		}
 #endif
@@ -1544,7 +1545,8 @@ BMDim *BM_dim_at_index(BMesh *bm, const int index)
 {
 	BLI_assert((index >= 0) && (index < bm->totdim));
 	BLI_assert((bm->elem_table_dirty & BM_DIM) == 0);
-	return bm->dtable[index];
+	// pool Dimensions is a pointer pool
+	return *((void **) bm->dtable[index]);
 }
 #endif
 

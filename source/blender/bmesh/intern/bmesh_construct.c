@@ -807,7 +807,7 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	BLI_assert(i == bm_old->totedge);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BM_ITER_MESH_INDEX (d, &iter, bm_old, BM_DIMS_OF_MESH, i) {
+	BM_ITER_MESH_PTR_INDEX (d, &iter, bm_old, BM_PTR_DIMS_OF_MESH, i) {
 		BMVert *(*v_arr);
 
 		v_arr = MEM_mallocN(sizeof (BMVert*)*d->totverts,"BMVert temp array");
@@ -815,7 +815,7 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 			v_arr[j] = vtable[BM_elem_index_get(d->v[j])];
 		}
 
-		d_new = BM_dim_create(bm_new,v_arr,d->totverts,d->dim_type,d,BM_CREATE_SKIP_CD, NULL);
+		d_new = BM_dim_create(bm_new,v_arr,d->totverts,d->dim_type,d,BM_CREATE_SKIP_CD, MDIM_FROM_BMDIM(d));
 
 		MEM_freeN (v_arr);
 

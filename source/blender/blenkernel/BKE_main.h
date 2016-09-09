@@ -105,6 +105,7 @@ typedef struct Main {
 	ListBase mask;
 	ListBase linestyle;
 	ListBase cachefiles;
+	ListBase dimensions;
 
 	char id_tag_update[MAX_LIBARRAY];
 

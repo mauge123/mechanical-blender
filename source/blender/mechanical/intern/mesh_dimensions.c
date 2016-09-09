@@ -462,7 +462,7 @@ BMDim* get_selected_dimension(BMesh *bm){
 	BMDim *edm = NULL;
 	BMIter iter;
 	if (bm->totdimsel == 1) {
-		BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+		BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 			if ( BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 				break;
 			}

@@ -438,7 +438,7 @@ void BM_mesh_bm_from_me(
 			}
 
 			//d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
-			d = dtable[i] = BM_dim_create(bm,v_arr,mdim->totverts,mdim->dim_type,NULL,BM_CREATE_SKIP_CD, mdim->name);
+			d = dtable[i] = BM_dim_create(bm,v_arr,mdim->totverts,mdim->dim_type,NULL,BM_CREATE_SKIP_CD, mdim);
 
 			MEM_freeN (v_arr);
 
@@ -845,7 +845,7 @@ void BM_mesh_bm_to_me(
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	mdm = mdim;
 	i = 0;
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+	BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 
 		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array");
 		for (int n=0;n<edm->totverts;n++) {
@@ -859,7 +859,6 @@ void BM_mesh_bm_to_me(
 		copy_v3_v3(mdm->fpos, edm->fpos);
 		copy_v3_v3(mdm->center, edm->center);
 		mdm->flag = BM_dimension_flag_to_mflag(edm);
-		BLI_strncpy(mdm->name, edm->name, 64);
 		BM_elem_index_set(edm, i); /* set_inline */
 		/* copy over customdat */
 		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, edm->head.data, i);

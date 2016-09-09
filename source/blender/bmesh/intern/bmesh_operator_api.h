@@ -243,6 +243,7 @@ typedef enum eBMOpSlotSubType_Ptr {
 	BMO_OP_SLOT_SUBTYPE_PTR_SCENE  = 101,
 	BMO_OP_SLOT_SUBTYPE_PTR_OBJECT = 102,
 	BMO_OP_SLOT_SUBTYPE_PTR_MESH   = 103,
+	BMP_OP_SLOT_SUBTYPE_PTR_DIM	   = 104,
 } eBMOpSlotSubType_Ptr;
 
 typedef union eBMOpSlotSubType_Union {

@@ -789,7 +789,7 @@ static bool vert_on_dimension(BMesh *bm , BMVert* v) {
 	BMDim *edm = NULL;
 	BMIter iter;
 	// Search if delete affects a dimension
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+	BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 		for (int i=0;i<edm->totverts;i++) {
 			if (v == edm->v[i]) {
 				return true;
@@ -3081,7 +3081,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 	for (int i=0;i<vcount;i++) {
 		if (BM_vert_edge_count(v[i]) == 0) {
 			// Check if not used by other dimensions
-			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
 				int j=0;
 				for (j =0;j<edm->totverts && (edm->v[j] == v[i]);j++);
 				if (j<edm->totverts) {
@@ -3126,22 +3126,6 @@ int order_select_compare (const void *ptr_a,const void *ptr_b) {
 }
 #endif
 
-
-static bool unique_name_dim_check(void *arg, const char *name)
-{
-	BMDim *edm;
-	BMIter iter;
-	BMesh *bm = arg;
-
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		if (strcmp(edm->name, name) == 0) {
-			return true;
-		}
-	}
-	return false;
-
-}
-
 /**
  * \brief Main function for creating a new dimension.
  *
@@ -3149,21 +3133,25 @@ static bool unique_name_dim_check(void *arg, const char *name)
  */
 BMDim *BM_dim_create(
 		BMesh *bm, BMVert *(*v), int v_count, int dim_type,
-		const BMDim *d_example, const eBMCreateFlag create_flag, char *name)
+		const BMDim *d_example, const eBMCreateFlag create_flag, MDim *mdm)
 {
-	BMDim *edm = BLI_mempool_alloc(bm->dpool);
+
+	BMDim **ptr_edm = BLI_mempool_alloc(bm->dpool);
+	BMDim *edm = *ptr_edm = mdm->data;
+	//*ptr_edm = MEM_callocN(sizeof(BMDim), "edm test");
+	//BMDim *edm = *ptr_edm;
+
 	BMReference *erf;
 	BMIter iter;
 
 	float vect[3], no1[3], no2[3];
-	char def_name[MAX_NAME];
 
 	BLI_assert((d_example == NULL) || (d_example->head.htype == BM_DIM));
 	BLI_assert(!(create_flag & 1));
 
 
 
-	/* --- assignBLI_mempool_alloc(bm->dpool);BLI_mempool_alloc(bm->dpool); all members --- */
+	/* --- assign all members --- */
 	edm->head.data = NULL;
 
 #ifdef USE_DEBUG_INDEX_MEMCHECK
@@ -3199,19 +3187,10 @@ BMDim *BM_dim_create(
 		qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
 	}
 
-	edm->name[0] = '\0';
-	if(name == NULL) {
-		BLI_strncpy(def_name, "Dimension", MAX_NAME);
-		BLI_uniquename_cb(unique_name_dim_check, bm, def_name, '.', edm->name, 50);
-	} else {
-		BLI_strncpy(edm->name, name, MAX_NAME);
-	}
-
-
 
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
-	switch (edm->dim_type) {
+	switch (dim_type) {
 		case DIM_TYPE_LINEAR:
 			BLI_assert (v_count >= 2);
 			BLI_assert (edm->v[0]  != edm->v[1]);
