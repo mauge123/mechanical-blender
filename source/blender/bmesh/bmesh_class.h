@@ -178,7 +178,7 @@ typedef struct BMDim {
 
 	struct BMVert *(*v);
 
-	/** FOLLOWING DATA IS STORED IN MDim (shared) */
+	int totverts;
 
 	struct MDim *mdim;
 

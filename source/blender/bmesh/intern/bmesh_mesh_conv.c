@@ -818,12 +818,14 @@ void BM_mesh_bm_to_me(
 	BM_ITER_MESH_INDEX(edm, &iter, bm, BM_DIMS_OF_MESH, i) {
 
 		me->mdim[i] = edm->mdim;
-		me->mdim[i]->v = MEM_callocN(sizeof(int)*edm->mdim->totverts, "Mesh Dimension index array");
-		for (int n=0;n<edm->mdim->totverts;n++) {
+		me->mdim[i]->totverts = edm->totverts;
+		me->mdim[i]->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array");
+		for (int n=0;n<edm->totverts;n++) {
 			me->mdim[i]->v[n] = BM_elem_index_get(edm->v[n]);
 		}
 
 		me->mdim[i]->flag = BM_dimension_flag_to_mflag(edm);
+
 		BM_elem_index_set(edm, i); /* set_inline */
 
 		BM_CHECK_ELEMENT(edm);

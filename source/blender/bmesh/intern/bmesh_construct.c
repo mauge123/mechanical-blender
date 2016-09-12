@@ -804,12 +804,12 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	BM_ITER_MESH_INDEX (d, &iter, bm_old, BM_DIMS_OF_MESH, i) {
 		BMVert *(*v_arr);
 
-		v_arr = MEM_mallocN(sizeof (BMVert*)*d->mdim->totverts,"BMVert temp array");
-		for (int j=0;j<d->mdim->totverts;j++) {
+		v_arr = MEM_mallocN(sizeof (BMVert*)*d->totverts,"BMVert temp array");
+		for (int j=0;j<d->totverts;j++) {
 			v_arr[j] = vtable[BM_elem_index_get(d->v[j])];
 		}
 
-		d_new = BM_dim_create(bm_new,v_arr,d->mdim->totverts,d->mdim->dim_type,d,BM_CREATE_SKIP_CD, d->mdim);
+		d_new = BM_dim_create(bm_new,v_arr,d->totverts,d->mdim->dim_type,d,BM_CREATE_SKIP_CD, d->mdim);
 
 		MEM_freeN (v_arr);
 

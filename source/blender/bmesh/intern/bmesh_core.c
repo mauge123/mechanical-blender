@@ -790,7 +790,7 @@ static bool vert_on_dimension(BMesh *bm , BMVert* v) {
 	BMIter iter;
 	// Search if delete affects a dimension
 	BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
-		for (int i=0;i<edm->mdim->totverts;i++) {
+		for (int i=0;i<edm->totverts;i++) {
 			if (v == edm->v[i]) {
 				return true;
 			}
@@ -3063,7 +3063,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 	bm->elem_table_dirty |= BM_DIM;
 
 	v = edm->v; // Will be free after dimension removal
-	vcount = edm->mdim->totverts;
+	vcount = edm->totverts;
 	// This is because vert is not deleted if is assigned to a dimension
 
 	BM_select_history_remove(bm, edm);
@@ -3083,8 +3083,8 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 			// Check if not used by other dimensions
 			BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 				int j=0;
-				for (j =0;j<edm->mdim->totverts && (edm->v[j] == v[i]);j++);
-				if (j<edm->mdim->totverts) {
+				for (j =0;j<edm->totverts && (edm->v[j] == v[i]);j++);
+				if (j<edm->totverts) {
 					break;
 				}
 			}
@@ -3175,14 +3175,14 @@ BMDim *BM_dim_create(
 	edm->mdim->dim_type = dim_type;
 	edm->mdim->constraints = 0;
 
-	edm->mdim->totverts = v_count;
-	edm->v = MEM_mallocN(sizeof(MVert*)*edm->mdim->totverts, "Dimension vertex pointer array");
-	for (int n=0;n<edm->mdim->totverts;n++){
+	edm->totverts = v_count;
+	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
+	for (int n=0;n<edm->totverts;n++){
 		BLI_assert(v[n]->head.htype == BM_VERT);
 		edm->v[n] = v[n];
 	}
 	if (create_flag & BM_CREATE_USE_SELECT_ORDER) {
-		qsort(edm->v,edm->mdim->totverts, sizeof (MVert*), order_select_compare);
+		qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
 	}
 
 

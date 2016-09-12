@@ -2326,7 +2326,7 @@ static int createTransEditDim(TransInfo *t) {
 	int ret =0;
     if (bm->totdimsel == 1) {
 		ret = 1;
-		for (int i=0;i<edm->mdim->totverts;i++) {
+		for (int i=0;i<edm->totverts;i++) {
 			if (BM_elem_flag_test(edm->v[i],BM_ELEM_SELECT)) {
 				ret =0;
 			}
