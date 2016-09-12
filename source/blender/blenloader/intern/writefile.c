@@ -2249,9 +2249,6 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 				// Dimension are pointers
 				writedata(wd, DATA, sizeof(MDim **) * mesh->totdim, mesh->mdim);
-				for (int i=0;i<mesh->totdim;i++) {
-					writedata(wd, DATA, sizeof(MDim *), mesh->mdim[i]);
-				}
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
