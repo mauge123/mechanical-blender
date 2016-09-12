@@ -74,10 +74,6 @@ typedef struct MVert {
 typedef struct MDim {
 	ID id;
 
-	char data[40]; //BMDim
-
-	/* SHARED BDIM data */
-
 	int totverts;
 	int dim_type;
 	int constraints; //Overrided automatic constraints
@@ -97,12 +93,12 @@ typedef struct MDim {
 	float fpos[3]; //fixed
 	float tpos[3]; //while moving: used when tagged
 
-	/* END SHARED BMDIM data */
 	float value; //stored value
 	unsigned int *v; /* Array of vertexs */
 
 	char flag;
 	char pad[7];
+
 
 } MDim;
 /* */

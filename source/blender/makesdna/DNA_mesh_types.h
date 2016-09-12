@@ -81,10 +81,6 @@ typedef struct Mesh {
 	struct MVert *mvert;	/* array of verts */
 	struct MEdge *medge;	/* array of edges */
 	struct MDeformVert *dvert;	/* deformgroup vertices */
-// WITH_MECHANICAL_MESH_DIMENSIONS
-	struct MDim *mdim;	/* array of dimensions */
-/* */
-
 
 	/* array of colors for the tessellated faces, must be number of tessellated
 	 * faces * 4 in length */
@@ -136,8 +132,10 @@ typedef struct Mesh {
 // WITH_MECHANICAL_MESH_DIMENSIONS
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	int totdim, totref;
-	struct CustomData ddata;
 	struct MReference *mref;
+	struct MDim **mdim;	/* array of pointers to dimensions */
+	/* */
+
 /**/
 
 

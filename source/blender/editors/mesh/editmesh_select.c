@@ -2012,17 +2012,17 @@ void select_dimension_data (BMDim *edm, void *context) {
 
 	float len_start_click,len_end_click, len_dpos_end, len_dpos_start, len_start_end;
 
-	switch (edm->dim_type)
+	switch (edm->mdim->dim_type)
 	{
 		case DIM_TYPE_LINEAR:
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_4P:
 		case DIM_TYPE_ANGLE_3P_CON:
 
-			ED_view3d_project_float_object(vc->ar,edm->start, screen_co_start, flag);
-			ED_view3d_project_float_object(vc->ar,edm->end, screen_co_end, flag);
+			ED_view3d_project_float_object(vc->ar,edm->mdim->start, screen_co_start, flag);
+			ED_view3d_project_float_object(vc->ar,edm->mdim->end, screen_co_end, flag);
 
-			ED_view3d_project_float_object(vc->ar,edm->dpos, screen_co_dpos, flag);
+			ED_view3d_project_float_object(vc->ar,edm->mdim->dpos, screen_co_dpos, flag);
 
 			len_start_end=len_v2v2(screen_co_start, screen_co_end);
 			len_start_click=len_v2v2(screen_co_start,fmval);
@@ -2033,25 +2033,25 @@ void select_dimension_data (BMDim *edm, void *context) {
 
 			if(len_dpos_end>len_start_end){
 				if(len_dpos_start-len_start_click>5){
-					edm->dir=-1;
+					edm->mdim->dir=-1;
 				}else if(len_dpos_start-len_start_click<-5){
-					edm->dir=1;
+					edm->mdim->dir=1;
 				}else{
-					edm->dir=0;
+					edm->mdim->dir=0;
 				}
 			}else {
 				if(len_dpos_end-len_end_click>5){
-					edm->dir=1;
+					edm->mdim->dir=1;
 				}else if(len_dpos_end-len_end_click<-5){
-					edm->dir=-1;
+					edm->mdim->dir=-1;
 				}else {
-					edm->dir=0;
+					edm->mdim->dir=0;
 				}
 			}
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
-			edm->dir = 0;
+			edm->mdim->dir = 0;
 			break;
 		default:
 			BLI_assert(0);

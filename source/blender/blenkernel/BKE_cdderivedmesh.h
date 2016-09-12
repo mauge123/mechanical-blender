@@ -170,10 +170,6 @@ struct MFace *CDDM_get_tessface(struct DerivedMesh *dm, int index);
 struct MLoop *CDDM_get_loop(struct DerivedMesh *dm, int index);
 struct MPoly *CDDM_get_poly(struct DerivedMesh *dm, int index);
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-struct MDim *CDDM_get_dim(struct DerivedMesh *dm, int index);
-#endif
-
 /* vertex/edge/face array access functions - return the array holding the
  * desired data
  * should always succeed
@@ -184,9 +180,6 @@ struct MEdge *CDDM_get_edges(struct DerivedMesh *dm);
 struct MFace *CDDM_get_tessfaces(struct DerivedMesh *dm);
 struct MLoop *CDDM_get_loops(struct DerivedMesh *dm);
 struct MPoly *CDDM_get_polys(struct DerivedMesh *dm);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-struct MDim *CDDM_get_dims(struct DerivedMesh *dm);
-#endif
 
 /* Assigns news m*** layers to the cddm.  Note that you must handle
  * freeing the old ones yourself.  Also you must ensure dm->num****Data

@@ -77,7 +77,7 @@ typedef enum BMIterType {
 	BM_LOOPS_OF_LOOP = 12,
 	BM_LOOPS_OF_EDGE = 13,
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BM_PTR_DIMS_OF_MESH = 14,
+	BM_DIMS_OF_MESH = 14,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	BM_REFERENCES_OF_MESH = 15,
@@ -89,9 +89,6 @@ typedef enum BMIterType {
 
 #define BM_ITYPE_MAX 16
 
-#define BM_ELEM_ENSURE_VALUE_GET(ele, itype) \
-	(ele && itype == 14) ? *((void**)ele) : ele
-
 /* the iterator htype for each iterator */
 extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
 
@@ -100,25 +97,10 @@ extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
 	     ele; \
 	     BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BM_iter_step(iter))
 
-#define BM_ITER_MESH_PTR(ele, iter, bm, itype) \
-	void **z; \
-	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = (z = BM_iter_new(iter, bm, itype, NULL)) ? *z : NULL; \
-	     ele; \
-	     BM_CHECK_TYPE_ELEM_ASSIGN(ele) = (z = BM_iter_step(iter)) ? *z : NULL)
-
-
 #define BM_ITER_MESH_INDEX(ele, iter, bm, itype, indexvar) \
 	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BM_iter_new(iter, bm, itype, NULL), indexvar = 0; \
 	     ele; \
 	     BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BM_iter_step(iter), (indexvar)++)
-
-
-#define BM_ITER_MESH_PTR_INDEX(ele, iter, bm, itype, indexvar) \
-	void **z; \
-	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = (z = BM_iter_new(iter, bm, itype, NULL)) ? *z : NULL, indexvar = 0; \
-	     ele; \
-	     BM_CHECK_TYPE_ELEM_ASSIGN(ele) = (z = BM_iter_step(iter)) ? *z : NULL, (indexvar)++)
-
 
 /* a version of BM_ITER_MESH which keeps the next item in storage
  * so we can delete the current item, see bug [#36923] */
@@ -135,13 +117,6 @@ extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
 	     ele = ele_next)
 
 #endif
-
-#  define BM_ITER_MESH_PTR_MUTABLE(ele, ele_next, iter, bm, itype) \
-	void **z; \
-	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) =  (z = BM_iter_new(iter, bm, itype, NULL)) ? *z : NULL ; \
-	     ele ? ((BM_CHECK_TYPE_ELEM_ASSIGN(ele_next) = (z = BM_iter_step(iter)) ? *z : NULL), 1) : 0; \
-	     ele = ele_next)
-
 
 #define BM_ITER_ELEM(ele, iter, data, itype) \
 	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BM_iter_new(iter, NULL, itype, data); \

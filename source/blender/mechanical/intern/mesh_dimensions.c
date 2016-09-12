@@ -20,16 +20,16 @@ bool valid_constraint_setting(BMDim *edm, int constraint) {
 	bool ret = false;
 	switch (constraint) {
 		case DIM_PLANE_CONSTRAINT:
-			ret = ELEM(edm->dim_type,DIM_TYPE_LINEAR,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P);
+			ret = ELEM(edm->mdim->dim_type,DIM_TYPE_LINEAR,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P);
 			break;
 		case DIM_AXIS_CONSTRAINT:
-			ret = ELEM(edm->dim_type,DIM_TYPE_RADIUS, DIM_TYPE_DIAMETER);
+			ret = ELEM(edm->mdim->dim_type,DIM_TYPE_RADIUS, DIM_TYPE_DIAMETER);
 			break;
 		case DIM_ALLOW_SLIDE_CONSTRAINT:
-			ret = ELEM(edm->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P, DIM_TYPE_ANGLE_3P_CON);
+			ret = ELEM(edm->mdim->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P, DIM_TYPE_ANGLE_3P_CON);
 			break;
 		case DIM_CONCENTRIC_CONSTRAINT:
-			ret = (edm->dim_type == DIM_TYPE_ANGLE_3P_CON);
+			ret = (edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON);
 			break;
 	}
 	return ret;
@@ -38,22 +38,22 @@ bool valid_constraint_setting(BMDim *edm, int constraint) {
 //Return dimension between two vertex
 float get_dimension_value(BMDim *edm){
 	float v=0;
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			v = len_v3v3(edm->v[0]->co, edm->v[1]->co);
 			break;
 		case DIM_TYPE_DIAMETER:
-			v = len_v3v3(edm->v[0]->co, edm->center)*2;
+			v = len_v3v3(edm->v[0]->co, edm->mdim->center)*2;
 			break;
 		case DIM_TYPE_RADIUS:
-			v = len_v3v3(edm->v[0]->co, edm->center);
+			v = len_v3v3(edm->v[0]->co, edm->mdim->center);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
-			v = RAD2DEG(angle_v3v3v3(edm->v[0]->co,edm->center,edm->v[2]->co));
+			v = RAD2DEG(angle_v3v3v3(edm->v[0]->co,edm->mdim->center,edm->v[2]->co));
 			break;
 		case DIM_TYPE_ANGLE_4P:
-			v = RAD2DEG(angle_v3v3v3(edm->v[0]->co,edm->center, edm->v[3]->co));
+			v = RAD2DEG(angle_v3v3v3(edm->v[0]->co,edm->mdim->center, edm->v[3]->co));
 			break;
 		default:
 			BLI_assert(0);
@@ -76,7 +76,7 @@ int get_necessary_dimension_verts (int dim_type) {
 
 
 static void untag_dimension_necessary_verts(BMDim *edm) {
-	for (int i=0;i<get_necessary_dimension_verts(edm->dim_type);i++) {
+	for (int i=0;i<get_necessary_dimension_verts(edm->mdim->dim_type);i++) {
 		BM_elem_flag_disable(edm->v[i], BM_ELEM_TAG);
 	}
 }
@@ -100,7 +100,7 @@ static void apply_dimension_radius_from_center_exec(float* point, float *center,
 
 static void apply_dimension_radius_from_center(BMesh *bm, BMDim *edm, float value, int constraints) {
 
-	BLI_assert (ELEM(edm->dim_type,DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS));
+	BLI_assert (ELEM(edm->mdim->dim_type,DIM_TYPE_DIAMETER, DIM_TYPE_RADIUS));
 
 	float axis[3],v[3], ncenter[3], p[3];
 	float curv = get_dimension_value(edm); // Current Value
@@ -109,7 +109,7 @@ static void apply_dimension_radius_from_center(BMesh *bm, BMDim *edm, float valu
 	BMIter iter;
 	BMVert* eve;
 
-	if (edm->dim_type == DIM_TYPE_DIAMETER) {
+	if (edm->mdim->dim_type == DIM_TYPE_DIAMETER) {
 		curv/=2.0f;
 	}
 	inc = value-curv;
@@ -125,9 +125,9 @@ static void apply_dimension_radius_from_center(BMesh *bm, BMDim *edm, float valu
 			if (BM_elem_flag_test(eve,BM_ELEM_TAG)) {
 				continue;
 			}
-			sub_v3_v3v3(v,eve->co, edm->center);
+			sub_v3_v3v3(v,eve->co, edm->mdim->center);
 			project_v3_v3v3(ncenter,v, axis);
-			add_v3_v3(ncenter,edm->center);
+			add_v3_v3(ncenter,edm->mdim->center);
 
 			if (fabs((len_v3v3 (eve->co, ncenter) - curv)) <  DIM_CONSTRAINT_PRECISION){
 				BM_elem_flag_enable(eve, BM_ELEM_TAG);
@@ -138,7 +138,7 @@ static void apply_dimension_radius_from_center(BMesh *bm, BMDim *edm, float valu
 	// Update related Verts
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
-			apply_dimension_radius_from_center_exec(eve->co,edm->center,axis,inc);
+			apply_dimension_radius_from_center_exec(eve->co,edm->mdim->center,axis,inc);
 			// Reset tag
 			BM_elem_flag_disable(eve, BM_ELEM_TAG);
 		}
@@ -171,17 +171,17 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 	BMIter iter;
 	BMVert* eve;
 
-	BLI_assert (edm->dim_type == DIM_TYPE_LINEAR);
+	BLI_assert (edm->mdim->dim_type == DIM_TYPE_LINEAR);
 
-	if (edm->dir == 0){
+	if (edm->mdim->dir == 0){
 		// Both directions
 		float len=get_dimension_value(edm);
 		float len2=(value-len)/2;
-		edm->dir = 1;
+		edm->mdim->dir = 1;
 		apply_dimension_linear_value(bm, edm,(len+len2), constraints);
-		edm->dir = -1;
+		edm->mdim->dir = -1;
 		apply_dimension_linear_value(bm, edm,value,constraints);
-		edm->dir = 0;
+		edm->mdim->dir = 0;
 		return;
 	}
 
@@ -189,9 +189,9 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 
 	if (constraints & DIM_PLANE_CONSTRAINT) {
 		float p[3], d_dir[3];
-		if (edm->dir == -1) {
+		if (edm->mdim->dir == -1) {
 			copy_v3_v3(p, edm->v[0]->co);
-		} else if (edm->dir == 1) {
+		} else if (edm->mdim->dir == 1) {
 			copy_v3_v3(p, edm->v[1]->co);
 		}
 		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[1]->co);
@@ -203,9 +203,9 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 
 
 	// Update Dimension Verts
-	if(edm->dir==1){
+	if(edm->mdim->dir==1){
 		apply_dimension_linear_value_exec(edm->v[1]->co,edm->v[0]->co, value, v);
-	}else if(edm->dir==-1){
+	}else if(edm->mdim->dir==-1){
 		apply_dimension_linear_value_exec(edm->v[0]->co,edm->v[1]->co, value, v);
 	}
 
@@ -286,28 +286,28 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	BMIter iter;
 	BMVert* eve;
 
-	BLI_assert (ELEM(edm->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P, DIM_TYPE_ANGLE_3P_CON));
+	BLI_assert (ELEM(edm->mdim->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P, DIM_TYPE_ANGLE_3P_CON));
 
 	get_dimension_plane(axis, pp, edm);
 	d = value - get_dimension_value(edm);
 
-	if (edm->dir == 0) {
+	if (edm->mdim->dir == 0) {
 		// Both sides
-		edm->dir = 1;
+		edm->mdim->dir = 1;
 		apply_dimension_angle(bm, edm,value - d/2.0f, constraints);
-		edm->dir = -1;
+		edm->mdim->dir = -1;
 		apply_dimension_angle(bm, edm,value,constraints);
-		edm->dir = 0;
+		edm->mdim->dir = 0;
 		return;
 	}
 
 	// Get Dimension dir
-	if (edm->dir == 1) {
+	if (edm->mdim->dir == 1) {
 		copy_v3_v3(p, edm->v[2]->co);
-		sub_v3_v3v3(r, edm->v[2]->co, edm->center);
-	} else if (edm->dir == -1) {
+		sub_v3_v3v3(r, edm->v[2]->co, edm->mdim->center);
+	} else if (edm->mdim->dir == -1) {
 		copy_v3_v3(p, edm->v[0]->co);
-		sub_v3_v3v3(r, edm->v[0]->co, edm->center);
+		sub_v3_v3v3(r, edm->v[0]->co, edm->mdim->center);
 	}
 	cross_v3_v3v3(d_dir,axis,r);
 	normalize_v3(d_dir);
@@ -318,10 +318,10 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
 	}
 
-	if (edm->dim_type == DIM_TYPE_ANGLE_3P_CON) {
+	if (edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
 
-		int i_ofs =  (edm->dim_type ==  DIM_TYPE_ANGLE_3P_CON) ? 3 : 4;
-		float *t = (edm->dir == 1) ? edm->v[2]->co : edm->v[0]->co;
+		int i_ofs =  (edm->mdim->dim_type ==  DIM_TYPE_ANGLE_3P_CON) ? 3 : 4;
+		float *t = (edm->mdim->dir == 1) ? edm->v[2]->co : edm->v[0]->co;
 
 		if (center_of_3_points (ccenter, edm->v[i_ofs]->co, edm->v[i_ofs+1]->co, edm->v[i_ofs+2]->co))
 		{
@@ -337,10 +337,10 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 			r_constraint = len_v3(rcenter1);
 			normalize_v3(rcenter1);
 
-			v_perpendicular_to_axis (ccenter2, ccenter1, edm->center, constraint_axis);
-			sub_v3_v3v3(ccenter2, edm->center, ccenter2);
+			v_perpendicular_to_axis (ccenter2, ccenter1, edm->mdim->center, constraint_axis);
+			sub_v3_v3v3(ccenter2, edm->mdim->center, ccenter2);
 
-			sub_v3_v3v3(rcenter2,ccenter2,edm->center);
+			sub_v3_v3v3(rcenter2,ccenter2,edm->mdim->center);
 			r_constraint_c = len_v3(rcenter2);
 			normalize_v3(rcenter2);
 
@@ -373,24 +373,24 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		// Untag vertex not in plane
 		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 			if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
-				if (!point_on_plane (edm->center,d_dir,eve->co)) {
+				if (!point_on_plane (edm->mdim->center,d_dir,eve->co)) {
 					BM_elem_flag_disable(eve, BM_ELEM_TAG);
 				}
 			}
 		}
 	}
 
-	if (edm->dir == 1) {
-		apply_dimension_angle_exec(bm,edm->v[2],edm->center, axis,d,constraints, p_constraint_axis);
-		if (edm->dim_type == DIM_TYPE_ANGLE_4P){
-			apply_dimension_angle_exec(bm, edm->v[3],edm->center, axis,d,constraints, p_constraint_axis);
+	if (edm->mdim->dir == 1) {
+		apply_dimension_angle_exec(bm,edm->v[2],edm->mdim->center, axis,d,constraints, p_constraint_axis);
+		if (edm->mdim->dim_type == DIM_TYPE_ANGLE_4P){
+			apply_dimension_angle_exec(bm, edm->v[3],edm->mdim->center, axis,d,constraints, p_constraint_axis);
 		}
 	}
-	if (edm->dir == -1) {
+	if (edm->mdim->dir == -1) {
 		d = d*(-1);
-		apply_dimension_angle_exec(bm, edm->v[0],edm->center, axis, d,constraints, p_constraint_axis);
-		if (edm->dim_type == DIM_TYPE_ANGLE_4P){
-			apply_dimension_angle_exec(bm, edm->v[1],edm->center, axis,d, constraints, p_constraint_axis);
+		apply_dimension_angle_exec(bm, edm->v[0],edm->mdim->center, axis, d,constraints, p_constraint_axis);
+		if (edm->mdim->dim_type == DIM_TYPE_ANGLE_4P){
+			apply_dimension_angle_exec(bm, edm->v[1],edm->mdim->center, axis,d, constraints, p_constraint_axis);
 		}
 	}
 
@@ -408,7 +408,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 				// r_constraint_c has sign
 				mul_v3_fl(ncenter,r_constraint_c);
 				add_v3_v3(ncenter,ccenter2);
-				if (edm->dir == -1) {
+				if (edm->mdim->dir == -1) {
 					normal_tri_v3(naxis,ccenter1,ccenter2,ncenter);
 				} else {
 					normal_tri_v3(naxis,ccenter2,ccenter1,ncenter);
@@ -418,10 +418,10 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 			} else {
 
-				sub_v3_v3v3(v,eve->co, edm->center);
+				sub_v3_v3v3(v,eve->co, edm->mdim->center);
 	
 				project_v3_v3v3(ncenter,v, axis);
-				add_v3_v3(ncenter,edm->center);
+				add_v3_v3(ncenter,edm->mdim->center);
 	
 				apply_dimension_angle_exec(bm, eve,ncenter, axis,d,constraints, p_constraint_axis);
 			}
@@ -434,9 +434,9 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts) {
 
-	int constraints = (edm->constraints & DIM_CONSTRAINT_OVERRIDE) ? edm->constraints : ts->dimension_constraints;
+	int constraints = (edm->mdim->constraints & DIM_CONSTRAINT_OVERRIDE) ? edm->mdim->constraints : ts->dimension_constraints;
 
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			apply_dimension_linear_value(bm,edm,value,constraints);
 			break;
@@ -462,7 +462,7 @@ BMDim* get_selected_dimension(BMesh *bm){
 	BMDim *edm = NULL;
 	BMIter iter;
 	if (bm->totdimsel == 1) {
-		BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
+		BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 			if ( BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 				break;
 			}
@@ -473,7 +473,7 @@ BMDim* get_selected_dimension(BMesh *bm){
 
 
 void get_dimension_mid(float mid[3],BMDim *edm){
-	switch (edm->dim_type)
+	switch (edm->mdim->dim_type)
 	{
 		case DIM_TYPE_LINEAR:
 			mid_of_2_points(mid, edm->v[0]->co, edm->v[1]->co);
@@ -485,30 +485,30 @@ void get_dimension_mid(float mid[3],BMDim *edm){
 
 void get_dimension_plane (float v[3], float p[3], BMDim *edm){
 	float m[3]={0}, r[3]={0};
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			BLI_assert(0); // Not possible
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
-			sub_v3_v3v3(m,edm->v[0]->co,edm->center);
+			sub_v3_v3v3(m,edm->v[0]->co,edm->mdim->center);
 			normalize_v3(m);
-			sub_v3_v3v3(r,edm->v[1]->co,edm->center);
+			sub_v3_v3v3(r,edm->v[1]->co,edm->mdim->center);
 			normalize_v3(r);
 			if (parallel_v3u_v3u(m,r)) {
 				// Parallel vector, use next
-				sub_v3_v3v3(r,edm->v[2]->co,edm->center);
+				sub_v3_v3v3(r,edm->v[2]->co,edm->mdim->center);
 				normalize_v3(r);
 			}
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
-			sub_v3_v3v3(m,edm->v[0]->co,edm->center);
-			sub_v3_v3v3(r,edm->v[2]->co,edm->center);
+			sub_v3_v3v3(m,edm->v[0]->co,edm->mdim->center);
+			sub_v3_v3v3(r,edm->v[2]->co,edm->mdim->center);
 			break;
 		case DIM_TYPE_ANGLE_4P:
-			sub_v3_v3v3(m,edm->v[0]->co,edm->center);
-			sub_v3_v3v3(r,edm->v[3]->co,edm->center);
+			sub_v3_v3v3(m,edm->v[0]->co,edm->mdim->center);
+			sub_v3_v3v3(r,edm->v[3]->co,edm->mdim->center);
 			break;
 		default:
 			BLI_assert(0);
@@ -527,31 +527,31 @@ void mid_of_2_points (float *mid, float *p1, float *p2) {
 
 static void set_dimension_angle_start_end(BMDim *edm, float *a, float *b) {
 	float len;
-	len = len_v3(edm->fpos);
-	sub_v3_v3v3(edm->start,a,edm->center);
-	normalize_v3(edm->start);
-	mul_v3_fl(edm->start,len);
-	add_v3_v3(edm->start,edm->center);
-	sub_v3_v3v3(edm->end,b,edm->center);
-	normalize_v3(edm->end);
-	mul_v3_fl(edm->end,len);
-	add_v3_v3(edm->end,edm->center);
+	len = len_v3(edm->mdim->fpos);
+	sub_v3_v3v3(edm->mdim->start,a,edm->mdim->center);
+	normalize_v3(edm->mdim->start);
+	mul_v3_fl(edm->mdim->start,len);
+	add_v3_v3(edm->mdim->start,edm->mdim->center);
+	sub_v3_v3v3(edm->mdim->end,b,edm->mdim->center);
+	normalize_v3(edm->mdim->end);
+	mul_v3_fl(edm->mdim->end,len);
+	add_v3_v3(edm->mdim->end,edm->mdim->center);
 }
 
 static void set_dimension_circ_start_end(BMDim* edm, float value) {
 	float v[3];
-	sub_v3_v3v3(v,edm->fpos, edm->center);
+	sub_v3_v3v3(v,edm->mdim->fpos, edm->mdim->center);
 	normalize_v3(v);
 	mul_v3_fl(v,value);
-	add_v3_v3v3(edm->start,edm->center,v);
-	sub_v3_v3v3(edm->end, edm->center,v);
+	add_v3_v3v3(edm->mdim->start,edm->mdim->center,v);
+	sub_v3_v3v3(edm->mdim->end, edm->mdim->center,v);
 }
 
 static void set_dimension_start_end(BMDim *edm) {
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
-			add_v3_v3v3(edm->start,edm->fpos, edm->v[0]->co);
-			add_v3_v3v3(edm->end, edm->fpos, edm->v[1]->co);
+			add_v3_v3v3(edm->mdim->start,edm->mdim->fpos, edm->v[0]->co);
+			add_v3_v3v3(edm->mdim->end, edm->mdim->fpos, edm->v[1]->co);
 			break;
 		case DIM_TYPE_DIAMETER:
 			set_dimension_circ_start_end(edm,get_dimension_value(edm)/2.0f);
@@ -574,16 +574,16 @@ static void set_dimension_start_end(BMDim *edm) {
 
 void set_dimension_center (BMDim *edm) {
 	float a[3];
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
-			zero_v3(edm->center);
+			zero_v3(edm->mdim->center);
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
 			// Recalc dimension center
-			if (center_of_3_points (edm->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
+			if (center_of_3_points (edm->mdim->center, edm->v[0]->co, edm->v[1]->co, edm->v[2]->co)) {
 				// Ok
-			} else if (center_of_3_points (edm->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
+			} else if (center_of_3_points (edm->mdim->center, edm->v[1]->co, edm->v[0]->co, edm->v[2]->co)) {
 				// Ok
 			} else {
 				// Somthing is going grong!
@@ -592,7 +592,7 @@ void set_dimension_center (BMDim *edm) {
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
-			copy_v3_v3(edm->center, edm->v[1]->co);
+			copy_v3_v3(edm->mdim->center, edm->v[1]->co);
 			break;
 		case DIM_TYPE_ANGLE_4P:
 			isect_line_line_v3(
@@ -600,7 +600,7 @@ void set_dimension_center (BMDim *edm) {
 						edm->v[1]->co,
 						edm->v[2]->co,
 						edm->v[3]->co,
-						edm->center,
+						edm->mdim->center,
 						a // Should match center if cooplanar
 			        );
 			break;
@@ -612,33 +612,33 @@ static void ensure_fpos_on_plane (BMDim *edm){
 	// Set f pos always on dimension plane!
 	// fpos is related to dimension center
 	get_dimension_plane(n,p, edm);
-	add_v3_v3(edm->fpos,edm->center);
-	project_v3_plane(edm->fpos, n, p);
-	sub_v3_v3(edm->fpos,edm->center);
+	add_v3_v3(edm->mdim->fpos,edm->mdim->center);
+	project_v3_plane(edm->mdim->fpos, n, p);
+	sub_v3_v3(edm->mdim->fpos,edm->mdim->center);
 }
 
 void dimension_data_update (BMDim *edm) {
 	float axis[3], v1[3],v2[3], l;
 
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			// Set dimension always perpendicular to edge
-			l = len_v3(edm->fpos);
+			l = len_v3(edm->mdim->fpos);
 			sub_v3_v3v3(axis, edm->v[0]->co, edm->v[1]->co);
 			normalize_v3(axis);
-			project_v3_v3v3(v1,edm->fpos,axis);
-			sub_v3_v3(edm->fpos,v1);
-			normalize_v3(edm->fpos);
-			mul_v3_fl (edm->fpos, l);
+			project_v3_v3v3(v1,edm->mdim->fpos,axis);
+			sub_v3_v3(edm->mdim->fpos,v1);
+			normalize_v3(edm->mdim->fpos);
+			mul_v3_fl (edm->mdim->fpos, l);
 
 
 			// Baseline
 			set_dimension_start_end(edm);
 
 			// Set txt pos acording pos factor
-			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
-			mul_v3_fl(edm->dpos, edm->dpos_fact);
-			add_v3_v3(edm->dpos, edm->start);
+			sub_v3_v3v3(edm->mdim->dpos, edm->mdim->end, edm->mdim->start);
+			mul_v3_fl(edm->mdim->dpos, edm->mdim->dpos_fact);
+			add_v3_v3(edm->mdim->dpos, edm->mdim->start);
 
 			break;
 		case DIM_TYPE_DIAMETER:
@@ -648,9 +648,9 @@ void dimension_data_update (BMDim *edm) {
 
 
 			// Set txt pos acording pos factor
-			sub_v3_v3v3(edm->dpos, edm->end, edm->start);
-			mul_v3_fl(edm->dpos, edm->dpos_fact);
-			add_v3_v3(edm->dpos, edm->start);
+			sub_v3_v3v3(edm->mdim->dpos, edm->mdim->end, edm->mdim->start);
+			mul_v3_fl(edm->mdim->dpos, edm->mdim->dpos_fact);
+			add_v3_v3(edm->mdim->dpos, edm->mdim->start);
 			break;
 		case DIM_TYPE_RADIUS:
 			set_dimension_center(edm);
@@ -659,9 +659,9 @@ void dimension_data_update (BMDim *edm) {
 			set_dimension_start_end(edm); // First
 
 			// Set txt pos acording pos factor
-			sub_v3_v3v3(edm->dpos, edm->end, edm->center);
-			mul_v3_fl(edm->dpos, edm->dpos_fact);
-			add_v3_v3(edm->dpos, edm->start);
+			sub_v3_v3v3(edm->mdim->dpos, edm->mdim->end, edm->mdim->center);
+			mul_v3_fl(edm->mdim->dpos, edm->mdim->dpos_fact);
+			add_v3_v3(edm->mdim->dpos, edm->mdim->start);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
@@ -672,16 +672,16 @@ void dimension_data_update (BMDim *edm) {
 			set_dimension_start_end(edm);
 
 			// Set txt pos acording pos factor
-			sub_v3_v3v3(v1,edm->start,edm->center);
+			sub_v3_v3v3(v1,edm->mdim->start,edm->mdim->center);
 			normalize_v3(v1);
-			sub_v3_v3v3(v2,edm->end,edm->center);
+			sub_v3_v3v3(v2,edm->mdim->end,edm->mdim->center);
 			cross_v3_v3v3(axis,v1,v2);
 			normalize_v3(v2);
 
 			// Set txt pos acording pos factor
-			mul_v3_fl(v1,len_v3(edm->fpos));
-			rotate_v3_v3v3fl(edm->dpos,v1,axis, acos(dot_v3v3(v1,v2))*edm->dpos_fact);
-			add_v3_v3(edm->dpos, edm->center);
+			mul_v3_fl(v1,len_v3(edm->mdim->fpos));
+			rotate_v3_v3v3fl(edm->mdim->dpos,v1,axis, acos(dot_v3v3(v1,v2))*edm->mdim->dpos_fact);
+			add_v3_v3(edm->mdim->dpos, edm->mdim->center);
 			break;
 		default:
 			BLI_assert(0);

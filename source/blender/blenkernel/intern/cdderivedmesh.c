@@ -76,9 +76,6 @@ typedef struct {
 	MFace *mface;
 	MLoop *mloop;
 	MPoly *mpoly;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	MDim  *mdim;
-#endif
 
 	/* Cached */
 	struct PBVH *pbvh;
@@ -94,14 +91,6 @@ static int cdDM_getNumVerts(DerivedMesh *dm)
 {
 	return dm->numVertData;
 }
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static int cdDM_getNumDims(DerivedMesh *dm)
-{
-	return dm->numDimData;
-}
-#endif
-
 
 static int cdDM_getNumEdges(DerivedMesh *dm)
 {
@@ -177,13 +166,6 @@ static void cdDM_copyPolyArray(DerivedMesh *dm, MPoly *r_poly)
 	CDDerivedMesh *cddm = (CDDerivedMesh *)dm;
 	memcpy(r_poly, cddm->mpoly, sizeof(*r_poly) * dm->numPolyData);
 }
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void cdDM_copyDimArray(DerivedMesh *dm, MDim *r_dim)
-{
-	CDDerivedMesh *cddm = (CDDerivedMesh *)dm;
-	memcpy(r_dim, cddm->mdim, sizeof(*r_dim) * dm->numDimData);
-}
-#endif
 
 static void cdDM_getMinMax(DerivedMesh *dm, float r_min[3], float r_max[3])
 {
@@ -1818,33 +1800,6 @@ static void cdDM_foreachMappedVert(
 	}
 }
 
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void cdDM_foreachMappedDim(
-        DerivedMesh *dm,
-        void (*func)(void *userData, int index, const float pos[3]),
-        void *userData,
-        DMForeachFlag UNUSED(flag))
-{
-	MDim *mdm = CDDM_get_dims(dm);
-	const int *index = DM_get_dim_data_layer(dm, CD_ORIGINDEX);
-	int i;
-
-	if (index) {
-		for (i = 0; i < dm->numDimData; i++, mdm++) {
-			const int orig = *index++;
-			if (orig == ORIGINDEX_NONE) continue;
-			func(userData, orig, mdm->fpos);
-		}
-	}
-	else {
-		for (i = 0; i < dm->numDimData; i++, mdm++) {
-			func(userData, i, mdm->fpos);
-		}
-	}
-}
-#endif
-
 static void cdDM_foreachMappedEdge(
         DerivedMesh *dm,
         void (*func)(void *userData, int index, const float v0co[3], const float v1co[3]),
@@ -2018,9 +1973,6 @@ static CDDerivedMesh *cdDM_create(const char *desc)
 	dm->getNumTessFaces = cdDM_getNumTessFaces;
 	dm->getNumLoops = cdDM_getNumLoops;
 	dm->getNumPolys = cdDM_getNumPolys;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	dm->getNumDims = cdDM_getNumDims;
-#endif
 
 	dm->getVert = cdDM_getVert;
 	dm->getEdge = cdDM_getEdge;
@@ -2031,9 +1983,6 @@ static CDDerivedMesh *cdDM_create(const char *desc)
 	dm->copyTessFaceArray = cdDM_copyTessFaceArray;
 	dm->copyLoopArray = cdDM_copyLoopArray;
 	dm->copyPolyArray = cdDM_copyPolyArray;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	dm->copyDimArray = cdDM_copyDimArray;
-#endif
 
 	dm->getVertData = DM_get_vert_data;
 	dm->getEdgeData = DM_get_edge_data;
@@ -2080,59 +2029,35 @@ static CDDerivedMesh *cdDM_create(const char *desc)
 	dm->foreachMappedEdge = cdDM_foreachMappedEdge;
 	dm->foreachMappedLoop = cdDM_foreachMappedLoop;
 	dm->foreachMappedFaceCenter = cdDM_foreachMappedFaceCenter;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	dm->foreachMappedDim = cdDM_foreachMappedDim;
-#endif
 
 	dm->release = cdDM_release;
 
 	return cddm;
 }
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-DerivedMesh *CDDM_new(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys) {
-	return CDDM_new_mechanical(numVerts, numEdges, numTessFaces, numLoops, numPolys, 0);
-}
-DerivedMesh *CDDM_new_mechanical(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys, int numDims)
-#else
 DerivedMesh *CDDM_new(int numVerts, int numEdges, int numTessFaces, int numLoops, int numPolys)
-#endif
 {
 	CDDerivedMesh *cddm = cdDM_create("CDDM_new dm");
 	DerivedMesh *dm = &cddm->dm;
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DM_init(dm, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces, numLoops, numPolys, numDims);
-#else
 	DM_init(dm, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces, numLoops, numPolys);
-#endif
 
 	CustomData_add_layer(&dm->vertData, CD_ORIGINDEX, CD_CALLOC, NULL, numVerts);
 	CustomData_add_layer(&dm->edgeData, CD_ORIGINDEX, CD_CALLOC, NULL, numEdges);
 	CustomData_add_layer(&dm->faceData, CD_ORIGINDEX, CD_CALLOC, NULL, numTessFaces);
 	CustomData_add_layer(&dm->polyData, CD_ORIGINDEX, CD_CALLOC, NULL, numPolys);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_add_layer(&dm->dimData, CD_ORIGINDEX, CD_CALLOC, NULL, numDims);
-#endif
 
 	CustomData_add_layer(&dm->vertData, CD_MVERT, CD_CALLOC, NULL, numVerts);
 	CustomData_add_layer(&dm->edgeData, CD_MEDGE, CD_CALLOC, NULL, numEdges);
 	CustomData_add_layer(&dm->faceData, CD_MFACE, CD_CALLOC, NULL, numTessFaces);
 	CustomData_add_layer(&dm->loopData, CD_MLOOP, CD_CALLOC, NULL, numLoops);
 	CustomData_add_layer(&dm->polyData, CD_MPOLY, CD_CALLOC, NULL, numPolys);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_add_layer(&dm->dimData, CD_MDIM, CD_CALLOC, NULL, numDims);
-#endif
-
 
 	cddm->mvert = CustomData_get_layer(&dm->vertData, CD_MVERT);
 	cddm->medge = CustomData_get_layer(&dm->edgeData, CD_MEDGE);
 	cddm->mface = CustomData_get_layer(&dm->faceData, CD_MFACE);
 	cddm->mloop = CustomData_get_layer(&dm->loopData, CD_MLOOP);
 	cddm->mpoly = CustomData_get_layer(&dm->polyData, CD_MPOLY);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	cddm->mdim = CustomData_get_layer(&dm->dimData, CD_MDIM);
-#endif
 
 	return dm;
 }
@@ -2146,13 +2071,8 @@ DerivedMesh *CDDM_from_mesh(Mesh *mesh)
 
 	/* this does a referenced copy, with an exception for fluidsim */
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DM_init(dm, DM_TYPE_CDDM, mesh->totvert, mesh->totedge, 0 /* mesh->totface */,
-	        mesh->totloop, mesh->totpoly, mesh->totdim);
-#else
 	DM_init(dm, DM_TYPE_CDDM, mesh->totvert, mesh->totedge, 0 /* mesh->totface */,
 	        mesh->totloop, mesh->totpoly);
-#endif
 	dm->deformedOnly = 1;
 	dm->cd_flag = mesh->cd_flag;
 
@@ -2168,18 +2088,11 @@ DerivedMesh *CDDM_from_mesh(Mesh *mesh)
 	                 mesh->totloop);
 	CustomData_merge(&mesh->pdata, &dm->polyData, mask, alloctype,
 	                 mesh->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_merge(&mesh->ddata, &dm->dimData, mask, alloctype,
-	                 mesh->totdim);
-#endif
 
 	cddm->mvert = CustomData_get_layer(&dm->vertData, CD_MVERT);
 	cddm->medge = CustomData_get_layer(&dm->edgeData, CD_MEDGE);
 	cddm->mloop = CustomData_get_layer(&dm->loopData, CD_MLOOP);
 	cddm->mpoly = CustomData_get_layer(&dm->polyData, CD_MPOLY);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	cddm->mdim = CustomData_get_layer(&dm->dimData, CD_MDIM);
-#endif
 #if 0
 	cddm->mface = CustomData_get_layer(&dm->faceData, CD_MFACE);
 #else
@@ -2309,37 +2222,22 @@ static DerivedMesh *cddm_from_bmesh_ex(
         const bool use_tessface,
         const int em_tottri, const BMLoop *(*em_looptris)[3])
 {
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DerivedMesh *dm = CDDM_new_mechanical(bm->totvert,
-	                           bm->totedge,
-	                           use_tessface ? em_tottri : 0,
-	                           bm->totloop,
-	                           bm->totface,
-	                           bm->totdim);
-#else
 	DerivedMesh *dm = CDDM_new(bm->totvert,
 	                           bm->totedge,
 	                           use_tessface ? em_tottri : 0,
 	                           bm->totloop,
 	                           bm->totface);
-#endif
 
 	CDDerivedMesh *cddm = (CDDerivedMesh *)dm;
 	BMIter iter;
 	BMVert *eve;
 	BMEdge *eed;
 	BMFace *efa;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BMDim *edm;
-#endif
 	MVert *mvert = cddm->mvert;
 	MEdge *medge = cddm->medge;
 	MFace *mface = cddm->mface;
 	MLoop *mloop = cddm->mloop;
 	MPoly *mpoly = cddm->mpoly;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	MDim *mdim = cddm->mdim;
-#endif
 	int numCol = CustomData_number_of_layers(&bm->ldata, CD_MLOOPCOL);
 	int numTex = CustomData_number_of_layers(&bm->pdata, CD_MTEXPOLY);
 	int *index, add_orig;
@@ -2368,10 +2266,6 @@ static DerivedMesh *cddm_from_bmesh_ex(
 	                 CD_CALLOC, dm->numLoopData);
 	CustomData_merge(&bm->pdata, &dm->polyData, mask,
 	                 CD_CALLOC, dm->numPolyData);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_merge(&bm->ddata, &dm->dimData, mask,
-	                 CD_CALLOC, dm->numDimData);
-#endif
 
 	/* add tessellation mface layers */
 	if (use_tessface) {
@@ -2398,29 +2292,6 @@ static DerivedMesh *cddm_from_bmesh_ex(
 		CustomData_from_bmesh_block(&bm->vdata, &dm->vertData, eve->head.data, i);
 	}
 	bm->elem_index_dirty &= ~BM_VERT;
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	index = dm->getDimDataArray(dm, CD_ORIGINDEX);
-	BM_ITER_MESH_PTR_INDEX (edm, &iter, bm, BM_PTR_DIMS_OF_MESH, i) {
-		MDim *mdm = &mdim[i];
-		mdm->dpos_fact = edm->dpos_fact;
-		mdm->totverts = edm->totverts;
-		copy_v3_v3(mdm->fpos, edm->fpos);
-
-		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array cddm");
-		for (int n=0;n<edm->totverts;n++) {
-			mdm->v[n] = BM_elem_index_get (edm->v[n]);
-		}
-
-		BM_elem_index_set(edm, i); /* set_inline */
-
-
-		if (add_orig) *index++ = i;
-
-		CustomData_from_bmesh_block(&bm->ddata, &dm->dimData, edm->head.data, i);
-	}
-	bm->elem_index_dirty &= ~BM_DIM;
-#endif
 
 	index = dm->getEdgeDataArray(dm, CD_ORIGINDEX);
 	BM_ITER_MESH_INDEX (eed, &iter, bm, BM_EDGES_OF_MESH, i) {
@@ -2537,9 +2408,6 @@ static DerivedMesh *cddm_copy_ex(DerivedMesh *source, int faces_from_tessfaces)
 	int numTessFaces = source->numTessFaceData;
 	int numLoops = source->numLoopData;
 	int numPolys = source->numPolyData;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	int numDims = source->numDimData;
-#endif
 
 	/* ensure these are created if they are made on demand */
 	source->getVertDataArray(source, CD_ORIGINDEX);
@@ -2548,13 +2416,8 @@ static DerivedMesh *cddm_copy_ex(DerivedMesh *source, int faces_from_tessfaces)
 	source->getPolyDataArray(source, CD_ORIGINDEX);
 
 	/* this initializes dm, and copies all non mvert/medge/mface layers */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DM_from_template_mechanical(dm, source, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces,
-	                 numLoops, numPolys, numDims);
-#else
 	DM_from_template(dm, source, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces,
 	                 numLoops, numPolys);
-#endif
 	dm->deformedOnly = source->deformedOnly;
 	dm->cd_flag = source->cd_flag;
 	dm->dirty = source->dirty;
@@ -2595,29 +2458,12 @@ DerivedMesh *CDDM_copy_from_tessface(DerivedMesh *source)
 
 /* note, the CD_ORIGINDEX layers are all 0, so if there is a direct
  * relationship between mesh data this needs to be set by the caller. */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-DerivedMesh *CDDM_from_template_ex(
-        DerivedMesh *source,
-        int numVerts, int numEdges, int numTessFaces,
-        int numLoops, int numPolys,
-        CustomDataMask mask)
-{
-	return CDDM_from_template_ex_mechanical (
-	            source,numVerts, numEdges, numTessFaces, numLoops, numPolys,0, mask);
-}
 
-DerivedMesh *CDDM_from_template_ex_mechanical(
-        DerivedMesh *source,
-        int numVerts, int numEdges, int numTessFaces,
-        int numLoops, int numPolys, int numDims,
-        CustomDataMask mask)
-#else
 DerivedMesh *CDDM_from_template_ex(
         DerivedMesh *source,
         int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys,
         CustomDataMask mask)
-#endif
 {
 	CDDerivedMesh *cddm = cdDM_create("CDDM_from_template dest");
 	DerivedMesh *dm = &cddm->dm;
@@ -2629,19 +2475,11 @@ DerivedMesh *CDDM_from_template_ex(
 	source->getPolyDataArray(source, CD_ORIGINDEX);
 
 	/* this does a copy of all non mvert/medge/mface layers */
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	DM_from_template_ex_mechanical(
-	        dm, source, DM_TYPE_CDDM,
-	        numVerts, numEdges, numTessFaces,
-	        numLoops, numPolys, numDims,
-	        mask);
-#else
-		DM_from_template_ex(
-	        dm, source, DM_TYPE_CDDM,
-	        numVerts, numEdges, numTessFaces,
-	        numLoops, numPolys,
-	        mask);
-#endif
+	DM_from_template_ex(
+		dm, source, DM_TYPE_CDDM,
+		numVerts, numEdges, numTessFaces,
+		numLoops, numPolys,
+		mask);
 
 	/* now add mvert/medge/mface layers */
 	CustomData_add_layer(&dm->vertData, CD_MVERT, CD_CALLOC, NULL, numVerts);
@@ -2665,28 +2503,7 @@ DerivedMesh *CDDM_from_template_ex(
 
 	return dm;
 }
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-DerivedMesh *CDDM_from_template(
-        DerivedMesh *source,
-        int numVerts, int numEdges, int numTessFaces,
-        int numLoops, int numPolys)
-{
-	return CDDM_from_template_mechanical(
-	        source, numVerts, numEdges, numTessFaces,
-	        numLoops, numPolys, 0);
-}
 
-DerivedMesh *CDDM_from_template_mechanical(
-        DerivedMesh *source,
-        int numVerts, int numEdges, int numTessFaces,
-        int numLoops, int numPolys, int numDims)
-{
-	return CDDM_from_template_ex_mechanical(
-	        source, numVerts, numEdges, numTessFaces,
-	        numLoops, numPolys, numDims,
-	        CD_MASK_DERIVEDMESH);
-}
-#else
 DerivedMesh *CDDM_from_template(
         DerivedMesh *source,
         int numVerts, int numEdges, int numTessFaces,
@@ -2697,7 +2514,6 @@ DerivedMesh *CDDM_from_template(
 	        numLoops, numPolys,
 	        CD_MASK_DERIVEDMESH);
 }
-#endif
 
 void CDDM_apply_vert_coords(DerivedMesh *dm, float (*vertCoords)[3])
 {
@@ -3701,14 +3517,6 @@ MPoly *CDDM_get_poly(DerivedMesh *dm, int index)
 	return &((CDDerivedMesh *)dm)->mpoly[index];
 }
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-MDim *CDDM_get_dim(DerivedMesh *dm, int index)
-{
-	return &((CDDerivedMesh *)dm)->mdim[index];
-}
-#endif
-
-
 /* array access functions */
 
 MVert *CDDM_get_verts(DerivedMesh *dm)
@@ -3735,13 +3543,6 @@ MPoly *CDDM_get_polys(DerivedMesh *dm)
 {
 	return ((CDDerivedMesh *)dm)->mpoly;
 }
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-MDim *CDDM_get_dims(DerivedMesh *dm)
-{
-	return ((CDDerivedMesh *)dm)->mdim;
-}
-#endif
 
 void CDDM_tessfaces_to_faces(DerivedMesh *dm)
 {

@@ -789,8 +789,8 @@ static bool vert_on_dimension(BMesh *bm , BMVert* v) {
 	BMDim *edm = NULL;
 	BMIter iter;
 	// Search if delete affects a dimension
-	BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
-		for (int i=0;i<edm->totverts;i++) {
+	BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
+		for (int i=0;i<edm->mdim->totverts;i++) {
 			if (v == edm->v[i]) {
 				return true;
 			}
@@ -3063,7 +3063,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 	bm->elem_table_dirty |= BM_DIM;
 
 	v = edm->v; // Will be free after dimension removal
-	vcount = edm->totverts;
+	vcount = edm->mdim->totverts;
 	// This is because vert is not deleted if is assigned to a dimension
 
 	BM_select_history_remove(bm, edm);
@@ -3081,10 +3081,10 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 	for (int i=0;i<vcount;i++) {
 		if (BM_vert_edge_count(v[i]) == 0) {
 			// Check if not used by other dimensions
-			BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
+			BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 				int j=0;
-				for (j =0;j<edm->totverts && (edm->v[j] == v[i]);j++);
-				if (j<edm->totverts) {
+				for (j =0;j<edm->mdim->totverts && (edm->v[j] == v[i]);j++);
+				if (j<edm->mdim->totverts) {
 					break;
 				}
 			}
@@ -3136,10 +3136,8 @@ BMDim *BM_dim_create(
 		const BMDim *d_example, const eBMCreateFlag create_flag, MDim *mdm)
 {
 
-	BMDim **ptr_edm = BLI_mempool_alloc(bm->dpool);
-	BMDim *edm = *ptr_edm = mdm->data;
-	//*ptr_edm = MEM_callocN(sizeof(BMDim), "edm test");
-	//BMDim *edm = *ptr_edm;
+	BMDim *edm = BLI_mempool_alloc(bm->dpool);
+	edm->mdim = mdm;
 
 	BMReference *erf;
 	BMIter iter;
@@ -3174,17 +3172,17 @@ BMDim *BM_dim_create(
 		((BMDim_OFlag *)edm)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 	}
 
-	edm->dim_type = dim_type;
-	edm->constraints = 0;
+	edm->mdim->dim_type = dim_type;
+	edm->mdim->constraints = 0;
 
-	edm->totverts = v_count;
-	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
-	for (int n=0;n<edm->totverts;n++){
+	edm->mdim->totverts = v_count;
+	edm->v = MEM_mallocN(sizeof(MVert*)*edm->mdim->totverts, "Dimension vertex pointer array");
+	for (int n=0;n<edm->mdim->totverts;n++){
 		BLI_assert(v[n]->head.htype == BM_VERT);
 		edm->v[n] = v[n];
 	}
 	if (create_flag & BM_CREATE_USE_SELECT_ORDER) {
-		qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
+		qsort(edm->v,edm->mdim->totverts, sizeof (MVert*), order_select_compare);
 	}
 
 
@@ -3211,8 +3209,8 @@ BMDim *BM_dim_create(
 			cross_v3_v3v3(no2,no1,vect);
 			normalize_v3(no2);
 
-			edm->dpos_fact = 0.5f;
-			copy_v3_v3(edm->fpos, no2);
+			edm->mdim->dpos_fact = 0.5f;
+			copy_v3_v3(edm->mdim->fpos, no2);
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
@@ -3221,9 +3219,9 @@ BMDim *BM_dim_create(
 			set_dimension_center(edm);
 
 			//set direction
-			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
-			normalize_v3(edm->fpos);
-			edm->dpos_fact = 0.5f;
+			sub_v3_v3v3(edm->mdim->fpos,edm->v[0]->co, edm->mdim->center);
+			normalize_v3(edm->mdim->fpos);
+			edm->mdim->dpos_fact = 0.5f;
 			break;
 		case DIM_TYPE_ANGLE_3P_CON:
 			BLI_assert (v_count >= 6);
@@ -3231,11 +3229,11 @@ BMDim *BM_dim_create(
 			BLI_assert (v_count >= 4);
 		case DIM_TYPE_ANGLE_3P:
 			BLI_assert (v_count >= 3);
-			copy_v3_v3(edm->center, edm->v[1]->co);
+			copy_v3_v3(edm->mdim->center, edm->v[1]->co);
 			//set direction
-			sub_v3_v3v3(edm->fpos,edm->center, edm->v[2]->co);
-			normalize_v3(edm->fpos);
-			edm->dpos_fact = 0.5f;
+			sub_v3_v3v3(edm->mdim->fpos,edm->mdim->center, edm->v[2]->co);
+			normalize_v3(edm->mdim->fpos);
+			edm->mdim->dpos_fact = 0.5f;
 			break;
 		default:
 			BLI_assert(0);
@@ -3257,14 +3255,11 @@ BMDim *BM_dim_create(
 		if (d_example) {
 			BM_elem_attrs_copy(bm, bm, d_example, edm);
 		}
-		else {
-			CustomData_bmesh_set_default(&bm->edata, &edm->head.data);
-		}
 	}
 
 	if (d_example) {
-		copy_v3_v3(edm->fpos,d_example->fpos);
-		edm->constraints = d_example->constraints;
+		copy_v3_v3(edm->mdim->fpos,d_example->mdim->fpos);
+		edm->mdim->constraints = d_example->mdim->constraints;
 	}
 
 	dimension_data_update (edm);
@@ -3321,7 +3316,7 @@ BMReference *BM_reference_plane_create(
 	/* allocate flags */
 //	erf->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 	if (bm->use_toolflags) {
-		((BMReference_OFlag *)erf)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+		((BMReference_OFlag *)erf)->oflags = bm->ptoolflagpool ? BLI_mempool_calloc(bm->ptoolflagpool) : NULL;
 	}
 
 	/* --- done --- */

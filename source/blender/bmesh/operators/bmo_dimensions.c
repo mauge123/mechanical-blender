@@ -176,7 +176,7 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		MEM_freeN (v_arr);
 	}
 
-	BM_ITER_MESH_PTR(d, &iter, bm, BM_PTR_DIMS_OF_MESH) {
+	BM_ITER_MESH(d, &iter, bm, BM_DIMS_OF_MESH) {
 		if (BMO_dim_flag_test(bm,d, EXT_KEEP)) {
 			BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "dim.out", BM_DIM, EXT_KEEP);
 			BMO_dim_flag_disable(bm, d, EXT_KEEP);

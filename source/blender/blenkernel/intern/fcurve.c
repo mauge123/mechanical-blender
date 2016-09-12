@@ -1263,7 +1263,7 @@ static float dvar_eval_dimension(ChannelDriver *UNUSED(driver), DriverVar *dvar)
 	if (ob) {
 		Mesh *me = BKE_mesh_from_object(ob);
 		if (me && me->totdim) {
-			MDim *mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
+			MDim *mdim = me->mdim;
 			for (int n=0;n<me->totdim;mdim++, n++) {
 				if (n == dtar->refdim) {
 					value = mdim->value;

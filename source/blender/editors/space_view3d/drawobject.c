@@ -145,22 +145,6 @@ typedef struct drawDMVerts_userData {
 	float imat[4][4];
 } drawDMVerts_userData;
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-typedef struct drawDMDims_userData {
-	/* BMesh */
-	BMEditMesh *em;
-	BMDim *edm_act;
-	ARegion *ar;
-	char sel;
-	Object* obedit;
-	Scene* scene;
-
-	/* Mesh */
-	DerivedMesh *dm;
-
-} drawDMDims_userData;
-
-#endif
 
 typedef struct drawDMEdgesSel_userData {
 	BMesh *bm;
@@ -2912,11 +2896,8 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
  * /Brief Draw dimensions in ObjectMode
  *
 */
-static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
+static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 {
-	drawDMDims_userData* data = userData;
-	DerivedMesh* dm = data->dm;
-	MDim* mdm = CDDM_get_dim(dm,index);
 
 	switch (mdm->dim_type) {
 		case DIM_TYPE_LINEAR:
@@ -2966,11 +2947,11 @@ static void draw_dimension_direction_points(BMDim *edm)
 	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
 
 		glBegin(GL_POINTS);
-		if(edm->dir==1 || edm->dir == 0){
-			glVertex3fv(edm->end);
+		if(edm->mdim->dir==1 || edm->mdim->dir == 0){
+			glVertex3fv(edm->mdim->end);
 		}
-		if(edm->dir==-1 || edm->dir == 0){
-			glVertex3fv(edm->start);
+		if(edm->mdim->dir==-1 || edm->mdim->dir == 0){
+			glVertex3fv(edm->mdim->start);
 		}
 		glEnd();
 	}
@@ -2981,7 +2962,7 @@ static void draw_dimension_axis(BMDim *edm)
 	float axis[3];
 	float center[3], a[3], b[3], m[3];
 
-	BLI_assert (edm->dim_type == DIM_TYPE_ANGLE_3P_CON);
+	BLI_assert (edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON);
 
 	if (center_of_3_points (center, edm->v[3]->co, edm->v[4]->co, edm->v[5]->co))
 	{
@@ -3010,13 +2991,13 @@ static void draw_dimension_axis(BMDim *edm)
 	}
 }
 
-static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
+static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
 	float vect[3], vect2[3], viewUni[3];
 	normalize_v3_v3(viewUni, rv3d->persinv[2]);
 	Mesh *me = obedit->data;
 
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			sub_v3_v3v3(vect, edm->v[0]->co, edm->v[1]->co);
 			if (parallel_v3_v3(vect, viewUni) && rv3d->is_persp != 1 && !(me->drawflag & ME_PERP_VISIBILITY) ){
@@ -3041,52 +3022,39 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit,
  * /Brief Draw dimensions in EditMode
  *
 */
-static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
+static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
-	drawDMDims_userData *data = userData;
-	BMEditMesh *em = data->em;
-	BMDim *edm = BM_dim_at_index(em->bm, index);
-	Object *obedit = data->obedit;
-	Scene *scene = data->scene;
-	RegionView3D *rv3d = data->ar->regiondata;
 
+	if(check_dim_visibility(edm, rv3d, obedit)){
 
-	if (scene->obedit != obedit) {
-		// Draw only on active element
-		return;
-	}
-
-
-	if(check_dim_visibility(edm, rv3d, obedit, scene)){
-
-		switch (edm->dim_type) {
+		switch (edm->mdim->dim_type) {
 			case DIM_TYPE_LINEAR:
-				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
+				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->mdim->fpos, edm->mdim->dpos_fact,
 										   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 
 			break;
 			case DIM_TYPE_DIAMETER:
 
-				draw_diameter_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+				draw_diameter_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
 										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_RADIUS:
 
-				draw_radius_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+				draw_radius_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
 										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_ANGLE_3P:
 			case DIM_TYPE_ANGLE_3P_CON:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->fpos, edm->dpos_fact,
+				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->mdim->fpos, edm->mdim->dpos_fact,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
-				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->dim_type == DIM_TYPE_ANGLE_3P_CON) {
+				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
 					draw_dimension_axis(edm);
 				}
 				break;
 			case DIM_TYPE_ANGLE_4P:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->center, edm->fpos, edm->dpos_fact,
+				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->mdim->center, edm->mdim->fpos, edm->mdim->dpos_fact,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 				break;
@@ -3097,27 +3065,20 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 }
 
 
-static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
-						  RegionView3D*  UNUSED(rv3d), Object* obedit)
+static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
-	if (!dm->foreachMappedDim) {
-		// Set to NULL on ccgdm->dm
-		return;
+	BMIter iter;
+	BMDim *edm;
+	BM_ITER_MESH(edm, &iter, em->bm, BM_DIMS_OF_MESH) {
+		draw_em_dim (edm,rv3d,obedit,scene);
 	}
+}
 
-	drawDMDims_userData data;
-	data.sel = sel;
-	data.edm_act = edm_act;
-	data.em = em;
-	data.ar = ar;
-	data.obedit = obedit;
-	data.scene = scene;
-	data.dm = dm;
-
-	if (obedit) {
-		dm->foreachMappedDim(dm, draw_em_dims__mapFunc, &data, DM_FOREACH_NOP);
-	} else {
-		dm->foreachMappedDim(dm, draw_om_dims__mapFunc, &data, DM_FOREACH_NOP);
+static void draw_ob_dims(Object *ob, DerivedMesh *dm)
+{
+	Mesh *me = ob->data;
+	for (int i=0;i<me->totdim;i++) {
+		draw_om_dim(me->mdim[i], dm);
 	}
 }
 
@@ -3838,7 +3799,7 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 
 			glPointSize(size);
 			glColor4ubv(col);
-			draw_dm_dims(ar, scene, em, cageDM, sel, edm_act, rv3d, obedit);
+			draw_em_dims(em,rv3d,obedit,scene);
 
 
 			if (pass == 0) {
@@ -4848,10 +4809,10 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS){
 				if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED) {
 					if (base->flag & SELECT) {
-						draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+						draw_ob_dims(ob, dm);
 					}
 				} else {
-					draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+					draw_ob_dims(ob, dm);
 				}
 			}
 #endif

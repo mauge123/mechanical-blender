@@ -574,9 +574,8 @@ static void bm_dim_attrs_copy(
 		BLI_assert(!"BMDim: source and targer match");
 		return;
 	}
-	CustomData_bmesh_free_block_data(&target_mesh->ddata, target_dim->head.data);
-	CustomData_bmesh_copy_data(&source_mesh->ddata, &target_mesh->ddata,
-	                           source_dim->head.data, &target_dim->head.data);
+
+	// No customdata
 }
 #endif
 
@@ -732,17 +731,12 @@ void BM_mesh_copy_init_customdata(BMesh *bm_dst, BMesh *bm_src, const BMAllocTem
 	CustomData_copy(&bm_src->edata, &bm_dst->edata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&bm_src->ldata, &bm_dst->ldata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&bm_src->pdata, &bm_dst->pdata, CD_MASK_BMESH, CD_CALLOC, 0);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_copy(&bm_src->ddata, &bm_dst->ddata, CD_MASK_BMESH, CD_CALLOC, 0);
-#endif
 
 	CustomData_bmesh_init_pool(&bm_dst->vdata, allocsize->totvert, BM_VERT);
 	CustomData_bmesh_init_pool(&bm_dst->edata, allocsize->totedge, BM_EDGE);
 	CustomData_bmesh_init_pool(&bm_dst->ldata, allocsize->totloop, BM_LOOP);
 	CustomData_bmesh_init_pool(&bm_dst->pdata, allocsize->totface, BM_FACE);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_bmesh_init_pool(&bm_dst->ddata, allocsize->totdim, BM_DIM);
-#endif
+
 }
 
 
@@ -807,15 +801,15 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	BLI_assert(i == bm_old->totedge);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BM_ITER_MESH_PTR_INDEX (d, &iter, bm_old, BM_PTR_DIMS_OF_MESH, i) {
+	BM_ITER_MESH_INDEX (d, &iter, bm_old, BM_DIMS_OF_MESH, i) {
 		BMVert *(*v_arr);
 
-		v_arr = MEM_mallocN(sizeof (BMVert*)*d->totverts,"BMVert temp array");
-		for (int j=0;j<d->totverts;j++) {
+		v_arr = MEM_mallocN(sizeof (BMVert*)*d->mdim->totverts,"BMVert temp array");
+		for (int j=0;j<d->mdim->totverts;j++) {
 			v_arr[j] = vtable[BM_elem_index_get(d->v[j])];
 		}
 
-		d_new = BM_dim_create(bm_new,v_arr,d->totverts,d->dim_type,d,BM_CREATE_SKIP_CD, MDIM_FROM_BMDIM(d));
+		d_new = BM_dim_create(bm_new,v_arr,d->mdim->totverts,d->mdim->dim_type,d,BM_CREATE_SKIP_CD, d->mdim);
 
 		MEM_freeN (v_arr);
 

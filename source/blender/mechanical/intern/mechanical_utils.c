@@ -62,7 +62,7 @@ void tag_vertexs_affected_by_dimension (BMesh *bm, BMDim *edm)
 	}
 
 	// Tag vertexs of dimension
-	for (int i=0;i<edm->totverts;i++) {
+	for (int i=0;i<edm->mdim->totverts;i++) {
 		// Tag elements
 		BM_elem_flag_enable(edm->v[i], BM_ELEM_TAG);
 	}

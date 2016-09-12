@@ -211,7 +211,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 				BMDim *edm;
 				BMIter iter;
 				int i =0;
-				BM_ITER_MESH_PTR_INDEX (edm, &iter, bm, BM_PTR_DIMS_OF_MESH, i) {
+				BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
 						if (!G.moving) {
@@ -221,20 +221,20 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 					}
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
-						switch (edm->dim_type){
+						switch (edm->mdim->dim_type){
 							case DIM_TYPE_LINEAR:
-								get_dimension_mid(edm->fpos,edm);
-								sub_v3_v3(edm->fpos,edm->tpos);
-								mul_v3_fl(edm->fpos,-1.0f);
+								get_dimension_mid(edm->mdim->fpos,edm);
+								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
+								mul_v3_fl(edm->mdim->fpos,-1.0f);
 								break;
 							case DIM_TYPE_DIAMETER:
 							case DIM_TYPE_RADIUS:
 							case DIM_TYPE_ANGLE_3P:
 							case DIM_TYPE_ANGLE_4P:
 							case DIM_TYPE_ANGLE_3P_CON:
-								copy_v3_v3(edm->fpos,edm->center);
-								sub_v3_v3(edm->fpos,edm->tpos);
-								mul_v3_fl(edm->fpos,-1.0f);
+								copy_v3_v3(edm->mdim->fpos,edm->mdim->center);
+								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
+								mul_v3_fl(edm->mdim->fpos,-1.0f);
 								break;
 							default:
 								BLI_assert(0);

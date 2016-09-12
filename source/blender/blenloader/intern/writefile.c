@@ -2194,9 +2194,7 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 		CustomDataLayer *flayers = NULL, flayers_buff[CD_TEMP_CHUNK_SIZE];
 		CustomDataLayer *llayers = NULL, llayers_buff[CD_TEMP_CHUNK_SIZE];
 		CustomDataLayer *players = NULL, players_buff[CD_TEMP_CHUNK_SIZE];
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		CustomDataLayer *dlayers = NULL, dlayers_buff[CD_TEMP_CHUNK_SIZE];
-#endif
+
 		if (mesh->id.us > 0 || wd->current) {
 			/* write LibData */
 			if (!save_for_old_blender) {
@@ -2229,9 +2227,6 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 #endif
 				CustomData_file_write_prepare(&mesh->ldata, &llayers, llayers_buff, ARRAY_SIZE(llayers_buff));
 				CustomData_file_write_prepare(&mesh->pdata, &players, players_buff, ARRAY_SIZE(players_buff));
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-				CustomData_file_write_prepare(&mesh->ddata, &dlayers, dlayers_buff, ARRAY_SIZE(dlayers_buff));
-#endif
 
 				writestruct_at_address(wd, ID_ME, Mesh, 1, old_mesh, mesh);
 				write_iddata(wd, &mesh->id);
@@ -2250,11 +2245,12 @@ static void write_meshes(WriteData *wd, ListBase *idbase)
 				write_customdata(wd, &mesh->id, mesh->totface, &mesh->fdata, flayers, -1, 0);
 				write_customdata(wd, &mesh->id, mesh->totloop, &mesh->ldata, llayers, -1, 0);
 				write_customdata(wd, &mesh->id, mesh->totpoly, &mesh->pdata, players, -1, 0);
+
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-				write_customdata(wd, &mesh->id, mesh->totdim, &mesh->ddata, dlayers, -1, 0);
-				MDim *mdm = CustomData_get_layer(&mesh->ddata, CD_MDIM);
-				for (int i =0;i< mesh->totdim;i++, mdm++){
-					writedata(wd, DATA, sizeof(int)*mdm->totverts, mdm->v);
+				// Dimension are pointers
+				writedata(wd, DATA, sizeof(MDim **) * mesh->totdim, mesh->mdim);
+				for (int i=0;i<mesh->totdim;i++) {
+					writedata(wd, DATA, sizeof(MDim *), mesh->mdim[i]);
 				}
 #endif
 
@@ -3231,6 +3227,19 @@ static void write_armatures(WriteData *wd, ListBase *idbase)
 	mywrite_flush(wd);
 }
 
+static void write_dims(WriteData *wd, ListBase *idbase) {
+	MDim *mdim = idbase->first;
+	while (mdim) {
+		/* write LibData */
+		writestruct(wd, ID_DM, MDim, 1, mdim);
+		write_iddata(wd, &mdim->id);
+		writedata(wd,DATA,sizeof(MVert*)*mdim->totverts,mdim->v);
+		mdim = mdim->id.next;
+	}
+	mywrite_flush(wd);
+}
+
+
 static void write_texts(WriteData *wd, ListBase *idbase)
 {
 	Text *text;
@@ -4123,7 +4132,11 @@ static bool write_file_handle(
 	write_gpencils(wd, &mainvar->gpencil);
 	write_linestyles(wd, &mainvar->linestyle);
 	write_cachefiles(wd, &mainvar->cachefiles);
+
+	write_dims(wd,&mainvar->dimensions);
+
 	write_libraries(wd,  mainvar->next);
+
 
 	/* So changes above don't cause a 'DNA1' to be detected as changed on undo. */
 	mywrite_flush(wd);

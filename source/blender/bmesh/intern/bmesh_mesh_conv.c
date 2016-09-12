@@ -275,9 +275,6 @@ void BM_mesh_bm_from_me(
 	CustomData_free(&bm->edata, bm->totedge);
 	CustomData_free(&bm->ldata, bm->totloop);
 	CustomData_free(&bm->pdata, bm->totface);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_free(&bm->ddata, bm->totdim);
-#endif
 
 	if (!me || !me->totvert ) {
 		if (me) { /*no verts? still copy customdata layout*/
@@ -285,17 +282,11 @@ void BM_mesh_bm_from_me(
 			CustomData_copy(&me->edata, &bm->edata, CD_MASK_BMESH, CD_ASSIGN, 0);
 			CustomData_copy(&me->ldata, &bm->ldata, CD_MASK_BMESH, CD_ASSIGN, 0);
 			CustomData_copy(&me->pdata, &bm->pdata, CD_MASK_BMESH, CD_ASSIGN, 0);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-			CustomData_copy(&me->ddata, &bm->ddata, CD_MASK_BMESH, CD_ASSIGN, 0);
-#endif
 
 			CustomData_bmesh_init_pool(&bm->vdata, me->totvert, BM_VERT);
 			CustomData_bmesh_init_pool(&bm->edata, me->totedge, BM_EDGE);
 			CustomData_bmesh_init_pool(&bm->ldata, me->totloop, BM_LOOP);
 			CustomData_bmesh_init_pool(&bm->pdata, me->totpoly, BM_FACE);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-			CustomData_bmesh_init_pool(&bm->ddata, me->totdim, BM_DIM);
-#endif
 
 		}
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
@@ -312,9 +303,6 @@ void BM_mesh_bm_from_me(
 	CustomData_copy(&me->edata, &bm->edata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&me->ldata, &bm->ldata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&me->pdata, &bm->pdata, CD_MASK_BMESH, CD_CALLOC, 0);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_copy(&me->ddata, &bm->ddata, CD_MASK_BMESH, CD_CALLOC, 0);
-#endif
 
 	/* make sure uv layer names are consisten */
 	totuv = CustomData_number_of_layers(&bm->pdata, CD_MTEXPOLY);
@@ -373,9 +361,6 @@ void BM_mesh_bm_from_me(
 	CustomData_bmesh_init_pool(&bm->edata, me->totedge, BM_EDGE);
 	CustomData_bmesh_init_pool(&bm->ldata, me->totloop, BM_LOOP);
 	CustomData_bmesh_init_pool(&bm->pdata, me->totpoly, BM_FACE);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_bmesh_init_pool(&bm->ddata, me->totdim, BM_DIM);
-#endif
 
 	BM_mesh_cd_flag_apply(bm, me->cd_flag);
 
@@ -423,28 +408,22 @@ void BM_mesh_bm_from_me(
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (me->totdim) {
-		dtable = MEM_mallocN(sizeof(void **) * me->totdim, "mesh to bmesh dtable");
+		dtable = MEM_mallocN(sizeof(void *) * me->totdim, "mesh to bmesh dtable");
 
-		mdim = me->mdim;
-		for (i = 0; i < me->totdim; i++, mdim++) {
+		for (i = 0; i < me->totdim; i++) {
 			BMVert *(*v_arr);
+			mdim = me->mdim[i];
 
 			BM_mesh_elem_toolflags_ensure(bm);
-
 
 			v_arr = MEM_mallocN(sizeof (BMVert*)*mdim->totverts,"BMVert temp array");
 			for (int k=0;k<mdim->totverts;k++) {
 				v_arr[k] = vtable[mdim->v[k]];
 			}
 
-			//d = dtable[i] = BM_dim_create_linear(bm, vtable[mdim->v[0]], vtable[mdim->v[1]], NULL, BM_CREATE_SKIP_CD);
 			d = dtable[i] = BM_dim_create(bm,v_arr,mdim->totverts,mdim->dim_type,NULL,BM_CREATE_SKIP_CD, mdim);
 
 			MEM_freeN (v_arr);
-
-			copy_v3_v3(d->fpos,mdim->fpos);
-			d->dpos_fact = mdim->dpos_fact;
-			d->constraints = mdim->constraints;
 
 			BM_elem_index_set(d, i); /* set_ok */
 
@@ -688,7 +667,6 @@ void BM_mesh_bm_to_me(
 	BMFace *f;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMDim *edm;
-	MDim *mdm, *mdim, *mdim_pr;
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	BMReference *erf;
@@ -720,9 +698,18 @@ void BM_mesh_bm_to_me(
 	else mloop = MEM_callocN(bm->totloop * sizeof(MLoop), "loadeditbMesh loop");
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (me->totdim) {
+		for (int n=0;n<me->totdim;n++) {
+			MEM_freeN(me->mdim[n]->v);
+		}
+	}
 	/* new dimension block */
-	if (bm->totdim == 0) mdim = NULL;
-	else mdim = MEM_callocN(bm->totdim * sizeof(MDim), "loadeditbMesh dimension");
+	if (bm->totdim == 0) {
+		me->mdim =  NULL;
+	}
+	else {
+		me->mdim =  MEM_callocN(bm->totdim * sizeof(MDim*), "loadeditbMesh dimension");
+	}
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
@@ -746,15 +733,6 @@ void BM_mesh_bm_to_me(
 	CustomData_free(&me->fdata, me->totface);
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	if (me->totdim) {
-		mdim_pr = CustomData_get_layer(&me->ddata, CD_MDIM);
-		for (int n=0;n<me->totdim;mdim_pr++, n++) {
-			MEM_freeN(mdim_pr->v);
-		}
-	}
-	CustomData_free(&me->ddata, me->totdim);
-#endif
 
 	/* add new custom data */
 	me->totvert = bm->totvert;
@@ -779,18 +757,12 @@ void BM_mesh_bm_to_me(
 		CustomData_copy(&bm->edata, &me->edata, mask, CD_CALLOC, me->totedge);
 		CustomData_copy(&bm->ldata, &me->ldata, mask, CD_CALLOC, me->totloop);
 		CustomData_copy(&bm->pdata, &me->pdata, mask, CD_CALLOC, me->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		CustomData_copy(&bm->ddata, &me->ddata, mask, CD_CALLOC, me->totdim);
-#endif
 	}
 
 	CustomData_add_layer(&me->vdata, CD_MVERT, CD_ASSIGN, mvert, me->totvert);
 	CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, me->totedge);
 	CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
 	CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_add_layer(&me->ddata, CD_MDIM, CD_ASSIGN, mdim, me->totdim);
-#endif
 
 	me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 
@@ -843,28 +815,17 @@ void BM_mesh_bm_to_me(
 	bm->elem_index_dirty &= ~BM_EDGE;
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	mdm = mdim;
-	i = 0;
-	BM_ITER_MESH_PTR(edm, &iter, bm, BM_PTR_DIMS_OF_MESH) {
+	BM_ITER_MESH_INDEX(edm, &iter, bm, BM_DIMS_OF_MESH, i) {
 
-		mdm->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array");
-		for (int n=0;n<edm->totverts;n++) {
-			mdm->v[n] = BM_elem_index_get(edm->v[n]);
+		me->mdim[i] = edm->mdim;
+		me->mdim[i]->v = MEM_callocN(sizeof(int)*edm->mdim->totverts, "Mesh Dimension index array");
+		for (int n=0;n<edm->mdim->totverts;n++) {
+			me->mdim[i]->v[n] = BM_elem_index_get(edm->v[n]);
 		}
-		mdm->totverts = edm->totverts;
-		mdm->dim_type = edm->dim_type;
-		mdm->dpos_fact = edm->dpos_fact;
-		mdm->value = get_dimension_value(edm);
-		mdm->constraints = edm->constraints;
-		copy_v3_v3(mdm->fpos, edm->fpos);
-		copy_v3_v3(mdm->center, edm->center);
-		mdm->flag = BM_dimension_flag_to_mflag(edm);
-		BM_elem_index_set(edm, i); /* set_inline */
-		/* copy over customdat */
-		CustomData_from_bmesh_block(&bm->ddata, &me->ddata, edm->head.data, i);
 
-		i++;
-		mdm++;
+		me->mdim[i]->flag = BM_dimension_flag_to_mflag(edm);
+		BM_elem_index_set(edm, i); /* set_inline */
+
 		BM_CHECK_ELEMENT(edm);
 	}
 	bm->elem_index_dirty &= ~BM_DIM;
