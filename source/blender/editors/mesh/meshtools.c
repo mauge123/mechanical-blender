@@ -87,7 +87,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	MPoly *mpoly = NULL;
 	MLoop *mloop = NULL;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	MDim *mdim= NULL;
+	MDim **mdim= NULL;
 #endif
 	Key *key, *nkey = NULL;
 	KeyBlock *kb, *okb, *kbn;
@@ -308,6 +308,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	loopofs = 0;
 	polyofs = 0;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	mdim = MEM_callocN(sizeof(int**)*totdim, "resized array of dimensions");
 	dimofs = 0;
 #endif
 	
@@ -438,11 +439,10 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			if (me->totdim) {
-				MDim *pr_dim = me->mdim;
-				for (a = 0; a < me->totdim; a++, mdim++) {
-					mdim->v = MEM_callocN(sizeof(int)*mdim->totverts, "Mesh Dimension index array");
-					for (i=0;i<mdim->totverts;i++) {
-						mdim->v[i] = pr_dim->v[i] + vertofs;
+				for (a = 0; a < me->totdim; a++) {
+					mdim[a+dimofs] = me->mdim[a];
+					for (i=0;i<me->mdim[a]->totverts;i++) {
+						mdim[a+dimofs]->v[i] = me->mdim[a]->v[i] += vertofs;
 					}
 				}
 			}
@@ -527,6 +527,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	me->totpoly = totpoly;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	me->totdim = totdim;
+	me->mdim = mdim;
 #endif
 
 	me->vdata = vdata;
