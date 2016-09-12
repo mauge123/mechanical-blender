@@ -443,16 +443,6 @@ struct DerivedMesh {
 	                        void *userData,
 	                        DMDrawFlag flag);
 
-// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	void (*drawMappedReferencePlanes)(DerivedMesh *dm,
-	                        DMSetDrawOptions setDrawOptions,
-	                        DMSetMaterial setMaterial,
-	                        DMCompareDrawOptions compareDrawOptions,
-	                        void *userData,
-	                        DMDrawFlag flag);
-/* */
-
-
 	/** Draw mapped faces using MTFace
 	 * - Drawing options too complicated to enumerate, look at code.
 	 */
@@ -514,12 +504,6 @@ struct DerivedMesh {
 	                          DMForeachFlag flag);
 /* */
 
-// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	void (*foreachMappedReference)(DerivedMesh *dm,
-	                                     void (*func)(void *userData, int index, void *element),
-			                             void *userData,
-			                             DMForeachFlag flag);
-/* */
 };
 
 void DM_init_funcs(DerivedMesh *dm);

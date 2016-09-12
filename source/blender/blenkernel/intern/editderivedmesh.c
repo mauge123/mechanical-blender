@@ -746,23 +746,6 @@ static void emDM_foreachMappedDim(
 }
 #endif
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void emDM_foreachMappedReference (
-        DerivedMesh *dm,
-        void (*func)(void *userData, int index, void *ele),
-        void *userData,
-        DMForeachFlag UNUSED(flag)){
-	EditDerivedBMesh *bmdm = (EditDerivedBMesh *)dm;
-	BMesh *bm = bmdm->em->bm;
-	BMReference *erf;
-	BMIter iter;
-	int i;
-	BM_ITER_MESH_INDEX (erf, &iter, bm, BM_REFERENCES_OF_MESH, i) {
-		func(userData,i,erf);
-	}
-}
-#endif
-
 static void emDM_drawMappedEdges(
         DerivedMesh *dm,
         DMSetDrawOptions setDrawOptions,
@@ -951,36 +934,6 @@ static void emDM_foreachMappedFaceCenter(
 		}
 	}
 }
-
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes_select_mapFunc(void *userData, int index, void *ele)
-{
-	DMSetDrawOptions setDrawOptions = userData;
-	BMReference *erf = ele;
-	if (setDrawOptions(erf,index) == DM_DRAW_OPTION_NORMAL) {
-		glBegin(GL_QUADS);
-		glVertex3fv(erf->v1);
-		glVertex3fv(erf->v2);
-		glVertex3fv(erf->v3);
-		glVertex3fv(erf->v4);
-		glEnd();
-	}
-}
-
-
-static void emDM_drawMappedReferencePlanes(
-        DerivedMesh *dm,
-        DMSetDrawOptions setDrawOptions,
-        DMSetMaterial UNUSED(setMaterial),
-        /* currently unused -- each original face is handled separately */
-        DMCompareDrawOptions UNUSED(compareDrawOptions),
-        void *UNUSED(userData),
-        DMDrawFlag UNUSED(flag))
-{
-	dm->foreachMappedReference(dm, draw_em_reference_planes_select_mapFunc, setDrawOptions, DM_FOREACH_NOP);
-}
-#endif
-
 
 static void emDM_drawMappedFaces(
         DerivedMesh *dm,
@@ -2342,10 +2295,6 @@ DerivedMesh *getEditDerivedBMesh(
 	bmdm->dm.foreachMappedDim = emDM_foreachMappedDim;
 #endif
 
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	bmdm->dm.foreachMappedReference = emDM_foreachMappedReference;
-#endif
-
 	bmdm->dm.drawEdges = emDM_drawEdges;
 	bmdm->dm.drawMappedEdges = emDM_drawMappedEdges;
 	bmdm->dm.drawMappedEdgesInterp = emDM_drawMappedEdgesInterp;
@@ -2356,10 +2305,6 @@ DerivedMesh *getEditDerivedBMesh(
 	bmdm->dm.drawFacesTex = emDM_drawFacesTex;
 	bmdm->dm.drawFacesGLSL = emDM_drawFacesGLSL;
 	bmdm->dm.drawUVEdges = emDM_drawUVEdges;
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	bmdm->dm.drawMappedReferencePlanes = emDM_drawMappedReferencePlanes;
-#endif
-
 	bmdm->dm.release = emDM_release;
 
 	bmdm->vertexCos = (const float (*)[3])vertexCos;

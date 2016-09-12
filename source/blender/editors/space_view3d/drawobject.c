@@ -3022,7 +3022,7 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
  * /Brief Draw dimensions in EditMode
  *
 */
-static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
+static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
 
 	if(check_dim_visibility(edm, rv3d, obedit)){
@@ -3070,7 +3070,7 @@ static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Sce
 	BMIter iter;
 	BMDim *edm;
 	BM_ITER_MESH(edm, &iter, em->bm, BM_DIMS_OF_MESH) {
-		draw_em_dim (edm,rv3d,obedit,scene);
+		draw_em_dim (edm, rv3d, obedit);
 	}
 }
 
@@ -3085,10 +3085,8 @@ static void draw_ob_dims(Object *ob, DerivedMesh *dm)
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes__mapFunc(void *userData, int index, BMReference *erf)
+static void draw_em_reference_plane(View3D *v3d,BMReference *erf, int index)
 {
-	View3D *v3d = userData;
-
 	// May be set to other values
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glEnable (GL_BLEND);
@@ -3112,11 +3110,6 @@ static void draw_em_reference_planes__mapFunc(void *userData, int index, BMRefer
 	glVertex3fv(erf->v4);
 	glEnd();
 	glDisable(GL_BLEND);
-}
-
-static void draw_dm_reference_planes(DerivedMesh *dm, Scene *UNUSED(scene), View3D *v3d)
-{
-	dm->foreachMappedReference(dm, draw_em_reference_planes__mapFunc, v3d, DM_FOREACH_NOP);
 }
 #endif
 
@@ -3815,9 +3808,15 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
+static void draw_em_reference_planes(View3D *v3d, BMEditMesh *em)
 {
-	draw_dm_reference_planes(dm, scene, v3d);
+	BMReference *erf;
+	BMIter iter;
+	int i =0;
+	BM_ITER_MESH_INDEX(erf,&iter,em->bm, BM_REFERENCES_OF_MESH, i) {
+		draw_em_reference_plane(v3d, erf, i);
+	}
+
 }
 #endif
 
@@ -4528,7 +4527,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 			if (em->bm->totref) {
-				draw_em_reference_planes(scene, v3d, cageDM);
+				draw_em_reference_planes(v3d, em);
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
@@ -8927,10 +8926,8 @@ static DMDrawOption bbs_mesh_solid__setSolidDrawOptions(void *userData, int inde
 	}
 }
 
-static DMDrawOption bbs_mesh_solid_plane_setSolidDrawOptions(void *userData, int index)
+static DMDrawOption bbs_mesh_solid_plane_setSolidDrawOptions(BMReference *erf, int index)
 {
-	BMReference *erf = userData;
-
 	if (!BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
 		GPU_select_index_set(index + 1);
 		return DM_DRAW_OPTION_NORMAL;
@@ -8977,9 +8974,24 @@ static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *UNUSED(scene), View3D *UNUSED(v3d),
-							  Object *UNUSED(ob), DerivedMesh *dm)
+							  Object *UNUSED(ob))
 {
-	dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
+	BMReference *erf;
+	BMIter iter;
+	int i;
+	BM_ITER_MESH_INDEX(erf, &iter, em->bm, BM_REFERENCES_OF_MESH, i){
+		if (bbs_mesh_solid_plane_setSolidDrawOptions(erf, i) == DM_DRAW_OPTION_NORMAL) {
+			glBegin(GL_QUADS);
+			glVertex3fv(erf->v1);
+			glVertex3fv(erf->v2);
+			glVertex3fv(erf->v3);
+			glVertex3fv(erf->v4);
+			glEnd();
+		}
+	}
+
+	//dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
+
 }
 #endif
 
@@ -9063,13 +9075,8 @@ void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, Objec
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 			if (ob->mode & OB_MODE_EDIT && ts->selectmode & SCE_SELECT_REFERENCE) {
 				Mesh *me = ob->data;
-				BMEditMesh *em = me->edit_btmesh;
+				bbs_mesh_solid_reference_planes_EM(me->edit_btmesh, scene, v3d, ob);
 
-				DerivedMesh *dm = editbmesh_get_derived_cage(scene, ob, em, CD_MASK_BAREMESH);
-
-				bbs_mesh_solid_reference_planes_EM(em, scene, v3d, ob, dm);
-
-				dm->release(dm);
 			} else if (ob->mode & OB_MODE_EDIT) {
 #else
 			if (ob->mode & OB_MODE_EDIT) {
