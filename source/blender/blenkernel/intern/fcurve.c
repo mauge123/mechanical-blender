@@ -1263,10 +1263,9 @@ static float dvar_eval_dimension(ChannelDriver *UNUSED(driver), DriverVar *dvar)
 	if (ob) {
 		Mesh *me = BKE_mesh_from_object(ob);
 		if (me && me->totdim) {
-			MDim *mdim = me->mdim;
-			for (int n=0;n<me->totdim;mdim++, n++) {
-				if (n == dtar->refdim) {
-					value = mdim->value;
+			for (int i=0; i < me->totdim; i++) {
+				if (i == dtar->refdim) {
+					value = me->mdim[i]->value;
 					break;
 				}
 			}
