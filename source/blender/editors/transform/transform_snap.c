@@ -1709,6 +1709,16 @@ static void applyGridIncrement(TransInfo *t, float *val, int max_index, const fl
 	const float *asp = use_aspect ? t->aspect : asp_local;
 	int i;
 
+#ifdef WITH_MECHANICAL_UCS
+	View3D *v3d = t->view;
+	TransformOrientation *ts = NULL;
+	float ts_imat[3][3];
+	if (v3d->ucs > 0) {
+		ts = BLI_findlink(&t->scene->transform_spaces, v3d->ucs-1);
+		invert_m3_m3(ts_imat,ts->mat);
+	}
+#endif
+
 	BLI_assert(ELEM(t->tsnap.mode, SCE_SNAP_MODE_INCREMENT, SCE_SNAP_MODE_GRID));
 	BLI_assert(max_index <= 2);
 
@@ -1736,17 +1746,37 @@ static void applyGridIncrement(TransInfo *t, float *val, int max_index, const fl
 		}
 	}
 
+#ifdef WITH_MECHANICAL_UCS
+	// Convert to transform oritentation system coordinates
+	if (ts) {
+		float tmp[3];
+		mul_v3_m3v3(tmp,ts_imat, val);
+		copy_v3_v3(val,tmp);
+	}
+#endif
+
 	/* absolute snapping on grid based on global center */
 	if ((t->tsnap.snap_spatial_grid) && (t->mode == TFM_TRANSLATION)) {
-		const float *center_global = t->center_global;
+		float center_global[3];
 
 		/* use a fallback for cursor selection,
 		 * this isn't useful as a global center for absolute grid snapping
 		 * since its not based on the position of the selection. */
 		if (t->around == V3D_AROUND_CURSOR) {
 			const TransCenterData *cd = transformCenter_from_type(t, V3D_AROUND_CENTER_MEAN);
-			center_global = cd->global;
+			copy_v3_v3(center_global,cd->global);
+		} else {
+			copy_v3_v3(center_global,t->center_global);
 		}
+
+#ifdef WITH_MECHANICAL_UCS
+		// Set the center match the origin
+		if (ts) {
+			float tmp[3];
+			sub_v3_v3v3(tmp,center_global,ts->origin);
+			mul_v3_m3v3(center_global,ts_imat, tmp);
+		}
+#endif
 
 		for (i = 0; i <= max_index; i++) {
 			/* do not let unconstrained axis jump to absolute grid increments */
@@ -1763,4 +1793,14 @@ static void applyGridIncrement(TransInfo *t, float *val, int max_index, const fl
 			val[i] = iter_fac * roundf(val[i] / iter_fac);
 		}
 	}
+
+#ifdef WITH_MECHANICAL_UCS
+	// Convert Back to Global Coordinates
+	if (ts) {
+		float tmp[3];
+		mul_v3_m3v3(tmp,ts->mat, val);
+		copy_v3_v3(val,tmp);
+	}
+#endif
+
 }
