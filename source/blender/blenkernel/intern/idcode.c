@@ -303,6 +303,7 @@ int BKE_idcode_to_index(const short idcode)
 		CASE_IDINDEX(VF);
 		CASE_IDINDEX(WM);
 		CASE_IDINDEX(WO);
+		CASE_IDINDEX(DM);
 	}
 
 	BLI_assert(0);

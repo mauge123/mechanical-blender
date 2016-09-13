@@ -419,9 +419,6 @@ void BKE_mesh_update_customdata_pointers(Mesh *me, const bool do_ensure_tess_cd)
 	me->mloopcol = CustomData_get_layer(&me->ldata, CD_MLOOPCOL);
 	me->mloopuv = CustomData_get_layer(&me->ldata, CD_MLOOPUV);
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	me->mdim = CustomData_get_layer(&me->ddata, CD_MDIM);
-#endif
 }
 
 bool BKE_mesh_has_custom_loop_normals(Mesh *me)
@@ -444,9 +441,6 @@ void BKE_mesh_free(Mesh *me)
 	CustomData_free(&me->fdata, me->totface);
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_free(&me->ddata, me->totdim);
-#endif
 
 	MEM_SAFE_FREE(me->mat);
 	MEM_SAFE_FREE(me->bb);
@@ -488,9 +482,6 @@ void BKE_mesh_init(Mesh *me)
 	CustomData_reset(&me->fdata);
 	CustomData_reset(&me->pdata);
 	CustomData_reset(&me->ldata);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_reset(&me->ddata);
-#endif
 }
 
 Mesh *BKE_mesh_add(Main *bmain, const char *name)
@@ -528,9 +519,6 @@ Mesh *BKE_mesh_copy(Main *bmain, Mesh *me)
 	else {
 		mesh_tessface_clear_intern(men, false);
 	}
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_copy(&me->ddata, &men->ddata, CD_MASK_MESH, CD_DUPLICATE, men->totdim);
-#endif
 
 	BKE_mesh_update_customdata_pointers(men, do_tessface);
 
@@ -1385,9 +1373,6 @@ void BKE_mesh_from_nurbs_displist(Object *ob, ListBase *dispbase, const bool use
 		me->medge = CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, alledge, me->totedge);
 		me->mloop = CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, allloop, me->totloop);
 		me->mpoly = CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, allpoly, me->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		me->mdim = CustomData_add_layer(&me->ddata, CD_MDIM, CD_ASSIGN, NULL, me->totdim);
-#endif
 
 		if (alluv) {
 			const char *uvname = "Orco";
@@ -2352,7 +2337,7 @@ Mesh *BKE_mesh_new_from_object(
 				DerivedMesh *dm;
 				/* CustomDataMask mask = CD_MASK_BAREMESH|CD_MASK_MTFACE|CD_MASK_MCOL; */
 				CustomDataMask mask = CD_MASK_MESH; /* this seems more suitable, exporter,
-			                                         * for example, needs CD_MASK_MDEFORMVERT */
+				                                     * for example, needs CD_MASK_MDEFORMVERT */
 
 				if (calc_undeformed)
 					mask |= CD_MASK_ORCO;

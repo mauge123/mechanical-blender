@@ -115,8 +115,8 @@ extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
 	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BM_iter_new(iter, bm, itype, NULL); \
 	     ele ? ((BM_CHECK_TYPE_ELEM_ASSIGN(ele_next) = BM_iter_step(iter)), 1) : 0; \
 	     ele = ele_next)
-#endif
 
+#endif
 
 #define BM_ITER_ELEM(ele, iter, data, itype) \
 	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BM_iter_new(iter, NULL, itype, data); \

@@ -92,8 +92,6 @@ typedef enum CustomDataType {
 	CD_ORIGINDEX        = 7,
 	CD_NORMAL           = 8,
 
-	/* Using 42 dues to not be able to compute CD_MASK_MESH on compiler time */
-	CD_MDIM				= 9,
 /*	CD_POLYINDEX        = 9, */
 
 	CD_PROP_FLT         = 10,
@@ -145,8 +143,6 @@ typedef enum CustomDataType {
 #define CD_MASK_MFACE		(1 << CD_MFACE)
 #define CD_MASK_MTFACE		(1 << CD_MTFACE)
 #define CD_MASK_MCOL		(1 << CD_MCOL)
-
-#define CD_MASK_DIM			(1 << CD_MDIM)
 
 #define CD_MASK_ORIGINDEX	(1 << CD_ORIGINDEX)
 #define CD_MASK_NORMAL		(1 << CD_NORMAL)

@@ -24,7 +24,6 @@
 #define __ABC_EXPORTER_H__
 
 #include <Alembic/Abc/All.h>
-#include <fstream>
 #include <map>
 #include <set>
 #include <vector>
@@ -66,6 +65,10 @@ struct ExportSettings {
 	bool export_child_hairs;
 	bool export_ogawa;
 	bool pack_uv;
+	bool triangulate;
+
+	int quad_method;
+	int ngon_method;
 
 	bool do_convert_axis;
 	float convert_matrix[3][3];
@@ -76,7 +79,6 @@ class AbcExporter {
 
 	const char *m_filename;
 
-	std::ofstream m_out_file;
 	Alembic::Abc::OArchive m_archive;
 	unsigned int m_trans_sampling_index, m_shape_sampling_index;
 

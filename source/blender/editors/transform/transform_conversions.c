@@ -2342,9 +2342,9 @@ static int createTransEditDim(TransInfo *t) {
 			t->total = 1; // Only 1 dimension
 			td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Dimension)");
 			td->flag = 0;
-			td->loc = edm->tpos;
+			td->loc = edm->mdim->tpos;
 
-			switch (edm->dim_type){
+			switch (edm->mdim->dim_type){
 				case DIM_TYPE_LINEAR:
 					get_dimension_mid(mid,edm);
 					copy_v3_v3(td->iloc, mid);
@@ -2354,8 +2354,8 @@ static int createTransEditDim(TransInfo *t) {
 				case DIM_TYPE_RADIUS:
 				case DIM_TYPE_ANGLE_3P:
 				case DIM_TYPE_ANGLE_3P_CON:
-					copy_v3_v3(td->iloc,edm->center);
-					copy_v3_v3(td->center, edm->center);
+					copy_v3_v3(td->iloc,edm->mdim->center);
+					copy_v3_v3(td->center, edm->mdim->center);
 					break;
 				default:
 					BLI_assert(0);

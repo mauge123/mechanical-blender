@@ -36,6 +36,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_scene_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "BLI_math.h"
 #include "BLI_listbase.h"
@@ -833,7 +834,7 @@ static int bm_mesh_flag_count(
 	}
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (htype & BM_DIM) {
-		BM_ITER_MESH (ele, &iter, bm, BM_DIMS_OF_MESH) {
+		BM_ITER_MESH(ele, &iter, bm, BM_DIMS_OF_MESH) {
 			if (respecthide && BM_elem_flag_test(ele, BM_ELEM_HIDDEN)) continue;
 			if (BM_elem_flag_test_bool(ele, hflag) == test_for_enabled) tot++;
 		}

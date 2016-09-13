@@ -178,13 +178,8 @@ typedef enum DMDirtyFlag {
 typedef struct DerivedMesh DerivedMesh;
 struct DerivedMesh {
 	/** Private DerivedMesh data, only for internal DerivedMesh use */
-// WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData vertData, edgeData, faceData, loopData, polyData, dimData;
-	int numVertData, numEdgeData, numTessFaceData, numLoopData, numPolyData, numDimData;
-/*
 	CustomData vertData, edgeData, faceData, loopData, polyData;
 	int numVertData, numEdgeData, numTessFaceData, numLoopData, numPolyData;
-*/
 	int needsFree; /* checked on ->release, is set to 0 for cached results */
 	int deformedOnly; /* set by modifier stack if only deformed from original */
 	BVHCache *bvhCache;
@@ -240,9 +235,6 @@ struct DerivedMesh {
 	int (*getNumTessFaces)(DerivedMesh *dm);
 	int (*getNumLoops)(DerivedMesh *dm);
 	int (*getNumPolys)(DerivedMesh *dm);
-// WITH_MECHANICAL_MESH_DIMENSIONS
-	int (*getNumDims)(DerivedMesh *dm);
-/* */
 	/** Copy a single vert/edge/tessellated face from the derived mesh into
 	 * ``*r_{vert/edge/face}``. note that the current implementation
 	 * of this function can be quite slow, iterating over all
@@ -262,9 +254,6 @@ struct DerivedMesh {
 	struct MFace *(*getTessFaceArray)(DerivedMesh * dm);
 	struct MLoop *(*getLoopArray)(DerivedMesh * dm);
 	struct MPoly *(*getPolyArray)(DerivedMesh * dm);
-// WITH_MECHANICAL_MESH_DIMENSIONS
-	struct MDim *(*getDimArray)(DerivedMesh * dm);
-/* */
 
 	/** Copy all verts/edges/faces from the derived mesh into
 	 * *{vert/edge/face}_r (must point to a buffer large enough)
@@ -274,9 +263,6 @@ struct DerivedMesh {
 	void (*copyTessFaceArray)(DerivedMesh *dm, struct MFace *r_face);
 	void (*copyLoopArray)(DerivedMesh *dm, struct MLoop *r_loop);
 	void (*copyPolyArray)(DerivedMesh *dm, struct MPoly *r_poly);
-// WITH_MECHANICAL_MESH_DIMENSIONS
-	void (*copyDimArray)(DerivedMesh *dm, struct MDim *r_dim);
-/* */
 
 	/** Return a copy of all verts/edges/faces from the derived mesh
 	 * it is the caller's responsibility to free the returned pointer
@@ -305,9 +291,6 @@ struct DerivedMesh {
 	void *(*getTessFaceDataArray)(DerivedMesh *dm, int type);
 	void *(*getLoopDataArray)(DerivedMesh *dm, int type);
 	void *(*getPolyDataArray)(DerivedMesh *dm, int type);
-// WITH_MECHANICAL_MESH_DIMENSIONS
-	void *(*getDimDataArray)(DerivedMesh *dm, int type);
-/* */
 
 	/** Retrieves the base CustomData structures for
 	 * verts/edges/tessfaces/loops/facdes*/
@@ -460,16 +443,6 @@ struct DerivedMesh {
 	                        void *userData,
 	                        DMDrawFlag flag);
 
-// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	void (*drawMappedReferencePlanes)(DerivedMesh *dm,
-	                        DMSetDrawOptions setDrawOptions,
-	                        DMSetMaterial setMaterial,
-	                        DMCompareDrawOptions compareDrawOptions,
-	                        void *userData,
-	                        DMDrawFlag flag);
-/* */
-
-
 	/** Draw mapped faces using MTFace
 	 * - Drawing options too complicated to enumerate, look at code.
 	 */
@@ -531,47 +504,20 @@ struct DerivedMesh {
 	                          DMForeachFlag flag);
 /* */
 
-// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	void (*foreachMappedReference)(DerivedMesh *dm,
-	                                     void (*func)(void *userData, int index, void *element),
-			                             void *userData,
-			                             DMForeachFlag flag);
-/* */
 };
 
 void DM_init_funcs(DerivedMesh *dm);
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void DM_init(
-        DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
-        int numFaces, int numLoops, int numPolys, int numDims);
-#else
 void DM_init(
         DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
         int numFaces, int numLoops, int numPolys);
-#endif
 
-
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void DM_from_template_ex_mechanical(
-        DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
-        int numVerts, int numEdges, int numTessFaces,
-        int numLoops, int numPolys, int numDims,
-        CustomDataMask mask);
-#endif
 void DM_from_template_ex(
         DerivedMesh *dm, DerivedMesh *source, DerivedMeshType type,
         int numVerts, int numEdges, int numTessFaces,
         int numLoops, int numPolys,
         CustomDataMask mask);
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void DM_from_template_mechanical(
-        DerivedMesh *dm, DerivedMesh *source,
-        DerivedMeshType type,
-        int numVerts, int numEdges, int numFaces,
-        int numLoops, int numPolys, int numDims);
-#endif
 void DM_from_template(
         DerivedMesh *dm, DerivedMesh *source,
         DerivedMeshType type,
@@ -621,11 +567,6 @@ void DM_add_loop_layer(
 void DM_add_poly_layer(
         struct DerivedMesh *dm, int type, int alloctype,
         void *layer);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		void DM_add_dim_layer(
-		struct DerivedMesh *dm, int type, int alloctype,
-		void *layer);
-#endif
 
 /* custom data access functions
  * return pointer to data from first layer which matches type

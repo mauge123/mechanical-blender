@@ -70,6 +70,7 @@
 #include "DNA_vfont_types.h"
 #include "DNA_windowmanager_types.h"
 #include "DNA_world_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -652,6 +653,8 @@ ListBase *which_libbase(Main *mainlib, short type)
 			return &(mainlib->paintcurves);
 		case ID_CF:
 			return &(mainlib->cachefiles);
+		case ID_DM:
+			return &(mainlib->dimensions);
 	}
 	return NULL;
 }
@@ -799,6 +802,8 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[INDEX_ID_SCE] = &(main->scene);
 	lb[INDEX_ID_WM]  = &(main->wm);
 	lb[INDEX_ID_MSK] = &(main->mask);
+
+	lb[INDEX_ID_DM]  = &(main->object);
 	
 	lb[INDEX_ID_NULL] = NULL;
 
@@ -925,6 +930,9 @@ void *BKE_libblock_alloc_notest(short type)
 			break;
 		case ID_CF:
 			id = MEM_callocN(sizeof(CacheFile), "Cache File");
+			break;
+		case ID_DM:
+			id = MEM_callocN(sizeof(MDim), "Dimension");
 			break;
 	}
 	return id;

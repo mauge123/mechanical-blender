@@ -24,6 +24,10 @@
 #define __BMESH_CLASS_H__
 
 #include "DNA_defs.h"
+#include "DNA_meshdata_types.h"
+
+
+
 
 /** \file blender/bmesh/bmesh_class.h
  *  \ingroup bmesh
@@ -171,38 +175,12 @@ typedef struct BMLoop {
 
 typedef struct BMDim {
 	BMHeader head;
-	//struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 
 	struct BMVert *(*v);
-	// Number Of verts
+
 	int totverts;
 
-	int dim_type;
-
-	short constraints; //Overrided automatic constraints
-
-	// Dimension position, used for select
-	float dpos[3];
-
-	// Dimension position fact
-	float dpos_fact;
-
-	// Linear Dimension
-	int dir;  // Direction, to which side the value should be modified
-	float end[3], start[3];  //Points of base line
-
-	// Diameter Dimension
-	float center[3];
-
-	//Dimension position, from midpoint
-	float fpos[3]; //fixed
-	float tpos[3]; //while moving: used when tagged
-
-	//Dimension Name
-	char name[MAX_NAME];
-
-	struct MDimLink *link; //pointer to value on mdim
-
+	struct MDim *mdim;
 
 } BMDim;
 
@@ -395,9 +373,6 @@ typedef struct BMesh {
 
 	BMDim **dtable;
 	int dtable_tot;
-
-	CustomData ddata;
-//
 
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	// We are not using custom data for planes

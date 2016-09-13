@@ -51,6 +51,8 @@ void SVMShaderManager::device_update(Device *device, DeviceScene *dscene, Scene 
 
 	VLOG(1) << "Total " << scene->shaders.size() << " shaders.";
 
+	double start_time = time_dt();
+
 	/* test if we need to update */
 	device_free(device, dscene, scene);
 
@@ -95,6 +97,10 @@ void SVMShaderManager::device_update(Device *device, DeviceScene *dscene, Scene 
 	device_update_common(device, dscene, scene, progress);
 
 	need_update = false;
+
+	VLOG(1) << "Shader manager updated "
+	        << scene->shaders.size() << " shaders in "
+	        << time_dt() - start_time << " seconds.";
 }
 
 void SVMShaderManager::device_free(Device *device, DeviceScene *dscene, Scene *scene)
@@ -671,8 +677,9 @@ void SVMCompiler::compile_type(Shader *shader, ShaderGraph *graph, ShaderType ty
 	}
 
 	/* for the bump shader we need add a node to store the shader state */
+	bool need_bump_state = (type == SHADER_TYPE_BUMP) && (shader->displacement_method == DISPLACE_BOTH);
 	int bump_state_offset = SVM_STACK_INVALID;
-	if(type == SHADER_TYPE_BUMP) {
+	if(need_bump_state) {
 		bump_state_offset = stack_find_offset(SVM_BUMP_EVAL_STATE_SIZE);
 		add_node(NODE_ENTER_BUMP_EVAL, bump_state_offset);
 	}
@@ -714,7 +721,7 @@ void SVMCompiler::compile_type(Shader *shader, ShaderGraph *graph, ShaderType ty
 	}
 
 	/* add node to restore state after bump shader has finished */
-	if(type == SHADER_TYPE_BUMP) {
+	if(need_bump_state) {
 		add_node(NODE_LEAVE_BUMP_EVAL, bump_state_offset);
 	}
 
@@ -760,7 +767,8 @@ void SVMCompiler::compile(Scene *scene,
 		shader->graph_bump->finalize(scene,
 		                             true,
 		                             false,
-		                             shader->has_integrator_dependency);
+		                             shader->has_integrator_dependency,
+		                             shader->displacement_method == DISPLACE_BOTH);
 	}
 
 	current_shader = shader;

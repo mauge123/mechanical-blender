@@ -145,22 +145,6 @@ typedef struct drawDMVerts_userData {
 	float imat[4][4];
 } drawDMVerts_userData;
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-typedef struct drawDMDims_userData {
-	/* BMesh */
-	BMEditMesh *em;
-	BMDim *edm_act;
-	ARegion *ar;
-	char sel;
-	Object* obedit;
-	Scene* scene;
-
-	/* Mesh */
-	DerivedMesh *dm;
-
-} drawDMDims_userData;
-
-#endif
 
 typedef struct drawDMEdgesSel_userData {
 	BMesh *bm;
@@ -2912,11 +2896,8 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
  * /Brief Draw dimensions in ObjectMode
  *
 */
-static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
+static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 {
-	drawDMDims_userData* data = userData;
-	DerivedMesh* dm = data->dm;
-	MDim* mdm = CDDM_get_dim(dm,index);
 
 	switch (mdm->dim_type) {
 		case DIM_TYPE_LINEAR:
@@ -2927,10 +2908,10 @@ static void draw_om_dims__mapFunc(void *userData, int index, const float UNUSED(
 								   false);
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension(mdm->center,mdm->fpos, *mdm->value,mdm->dpos_fact,false);
+			draw_diameter_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
 		case DIM_TYPE_RADIUS:
-			draw_radius_dimension(mdm->center,mdm->fpos, *mdm->value,mdm->dpos_fact,false);
+			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
@@ -2966,11 +2947,11 @@ static void draw_dimension_direction_points(BMDim *edm)
 	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
 
 		glBegin(GL_POINTS);
-		if(edm->dir==1 || edm->dir == 0){
-			glVertex3fv(edm->end);
+		if(edm->mdim->dir==1 || edm->mdim->dir == 0){
+			glVertex3fv(edm->mdim->end);
 		}
-		if(edm->dir==-1 || edm->dir == 0){
-			glVertex3fv(edm->start);
+		if(edm->mdim->dir==-1 || edm->mdim->dir == 0){
+			glVertex3fv(edm->mdim->start);
 		}
 		glEnd();
 	}
@@ -2981,7 +2962,7 @@ static void draw_dimension_axis(BMDim *edm)
 	float axis[3];
 	float center[3], a[3], b[3], m[3];
 
-	BLI_assert (edm->dim_type == DIM_TYPE_ANGLE_3P_CON);
+	BLI_assert (edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON);
 
 	if (center_of_3_points (center, edm->v[3]->co, edm->v[4]->co, edm->v[5]->co))
 	{
@@ -3010,13 +2991,13 @@ static void draw_dimension_axis(BMDim *edm)
 	}
 }
 
-static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
+static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
 	float vect[3], vect2[3], viewUni[3];
 	normalize_v3_v3(viewUni, rv3d->persinv[2]);
 	Mesh *me = obedit->data;
 
-	switch (edm->dim_type) {
+	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			sub_v3_v3v3(vect, edm->v[0]->co, edm->v[1]->co);
 			if (parallel_v3_v3(vect, viewUni) && rv3d->is_persp != 1 && !(me->drawflag & ME_PERP_VISIBILITY) ){
@@ -3041,52 +3022,39 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit,
  * /Brief Draw dimensions in EditMode
  *
 */
-static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(pos[3]))
+static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
-	drawDMDims_userData *data = userData;
-	BMEditMesh *em = data->em;
-	BMDim *edm = BM_dim_at_index(em->bm, index);
-	Object *obedit = data->obedit;
-	Scene *scene = data->scene;
-	RegionView3D *rv3d = data->ar->regiondata;
 
+	if(check_dim_visibility(edm, rv3d, obedit)){
 
-	if (scene->obedit != obedit) {
-		// Draw only on active element
-		return;
-	}
-
-
-	if(check_dim_visibility(edm, rv3d, obedit, scene)){
-
-		switch (edm->dim_type) {
+		switch (edm->mdim->dim_type) {
 			case DIM_TYPE_LINEAR:
-				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->fpos, edm->dpos_fact,
+				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->mdim->fpos, edm->mdim->dpos_fact,
 										   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 
 			break;
 			case DIM_TYPE_DIAMETER:
 
-				draw_diameter_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+				draw_diameter_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
 										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_RADIUS:
 
-				draw_radius_dimension(edm->center, edm->fpos, get_dimension_value(edm), edm->dpos_fact,
+				draw_radius_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
 										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_ANGLE_3P:
 			case DIM_TYPE_ANGLE_3P_CON:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->fpos, edm->dpos_fact,
+				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->mdim->fpos, edm->mdim->dpos_fact,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
-				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->dim_type == DIM_TYPE_ANGLE_3P_CON) {
+				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
 					draw_dimension_axis(edm);
 				}
 				break;
 			case DIM_TYPE_ANGLE_4P:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->center, edm->fpos, edm->dpos_fact,
+				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->mdim->center, edm->mdim->fpos, edm->mdim->dpos_fact,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 				break;
@@ -3097,37 +3065,28 @@ static void draw_em_dims__mapFunc(void *userData, int index, const float UNUSED(
 }
 
 
-static void draw_dm_dims(ARegion *ar, Scene *scene, BMEditMesh *em, DerivedMesh *dm, const char sel, BMDim *edm_act,
-						  RegionView3D*  UNUSED(rv3d), Object* obedit)
+static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
-	if (!dm->foreachMappedDim) {
-		// Set to NULL on ccgdm->dm
-		return;
+	BMIter iter;
+	BMDim *edm;
+	BM_ITER_MESH(edm, &iter, em->bm, BM_DIMS_OF_MESH) {
+		draw_em_dim (edm, rv3d, obedit);
 	}
+}
 
-	drawDMDims_userData data;
-	data.sel = sel;
-	data.edm_act = edm_act;
-	data.em = em;
-	data.ar = ar;
-	data.obedit = obedit;
-	data.scene = scene;
-	data.dm = dm;
-
-	if (obedit) {
-		dm->foreachMappedDim(dm, draw_em_dims__mapFunc, &data, DM_FOREACH_NOP);
-	} else {
-		dm->foreachMappedDim(dm, draw_om_dims__mapFunc, &data, DM_FOREACH_NOP);
+static void draw_ob_dims(Object *ob, DerivedMesh *dm)
+{
+	Mesh *me = ob->data;
+	for (int i=0;i<me->totdim;i++) {
+		draw_om_dim(me->mdim[i], dm);
 	}
 }
 
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes__mapFunc(void *userData, int index, BMReference *erf)
+static void draw_em_reference_plane(View3D *v3d,BMReference *erf, int index)
 {
-	View3D *v3d = userData;
-
 	// May be set to other values
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glEnable (GL_BLEND);
@@ -3151,11 +3110,6 @@ static void draw_em_reference_planes__mapFunc(void *userData, int index, BMRefer
 	glVertex3fv(erf->v4);
 	glEnd();
 	glDisable(GL_BLEND);
-}
-
-static void draw_dm_reference_planes(DerivedMesh *dm, Scene *UNUSED(scene), View3D *v3d)
-{
-	dm->foreachMappedReference(dm, draw_em_reference_planes__mapFunc, v3d, DM_FOREACH_NOP);
 }
 #endif
 
@@ -3838,7 +3792,7 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 
 			glPointSize(size);
 			glColor4ubv(col);
-			draw_dm_dims(ar, scene, em, cageDM, sel, edm_act, rv3d, obedit);
+			draw_em_dims(em,rv3d,obedit,scene);
 
 
 			if (pass == 0) {
@@ -3854,9 +3808,15 @@ static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* o
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void draw_em_reference_planes(Scene *scene, View3D *v3d, DerivedMesh *dm)
+static void draw_em_reference_planes(View3D *v3d, BMEditMesh *em)
 {
-	draw_dm_reference_planes(dm, scene, v3d);
+	BMReference *erf;
+	BMIter iter;
+	int i =0;
+	BM_ITER_MESH_INDEX(erf,&iter,em->bm, BM_REFERENCES_OF_MESH, i) {
+		draw_em_reference_plane(v3d, erf, i);
+	}
+
 }
 #endif
 
@@ -4567,7 +4527,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 			if (em->bm->totref) {
-				draw_em_reference_planes(scene, v3d, cageDM);
+				draw_em_reference_planes(v3d, em);
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
@@ -4848,10 +4808,10 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS){
 				if (v3d->flag & V3D_SHOW_MESH_DIMENSIONS_ON_SELECTED) {
 					if (base->flag & SELECT) {
-						draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+						draw_ob_dims(ob, dm);
 					}
 				} else {
-					draw_dm_dims(ar,scene,NULL,dm,0,NULL,rv3d,NULL);
+					draw_ob_dims(ob, dm);
 				}
 			}
 #endif
@@ -8550,122 +8510,79 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 		}
 	}
 
-	/* draw code for smoke */
-	if (smd) {
-#if 0
-		/* draw collision objects */
-		if ((smd->type & MOD_SMOKE_TYPE_COLL) && smd->coll) {
-			SmokeCollSettings *scs = smd->coll;
-			if (scs->points) {
-				size_t i;
+	/* draw code for smoke, only draw domains */
+	if (smd && smd->domain) {
+		SmokeDomainSettings *sds = smd->domain;
+		float viewnormal[3];
 
-				glLoadMatrixf(rv3d->viewmat);
+		glLoadMatrixf(rv3d->viewmat);
+		glMultMatrixf(ob->obmat);
 
-				if (col || (ob->flag & SELECT)) cpack(0xFFFFFF);
-				glDepthMask(GL_FALSE);
-				glEnable(GL_BLEND);
-				
+		if (!render_override) {
+			BoundBox bb;
+			float p0[3], p1[3];
 
-				// glPointSize(3.0);
-				glBegin(GL_POINTS);
-
-				for (i = 0; i < scs->numpoints; i++)
-				{
-					glVertex3fv(&scs->points[3 * i]);
-				}
-
-				glEnd();
-
-				glMultMatrixf(ob->obmat);
-				glDisable(GL_BLEND);
-				glDepthMask(GL_TRUE);
-				if (col) cpack(col);
-			}
-		}
-#endif
-
-		/* only draw domains */
-		if (smd->domain) {
-			SmokeDomainSettings *sds = smd->domain;
-			float viewnormal[3];
-
-			glLoadMatrixf(rv3d->viewmat);
-			glMultMatrixf(ob->obmat);
-
-			if (!render_override) {
-				BoundBox bb;
-				float p0[3], p1[3];
-
-				/* draw adaptive domain bounds */
-				if ((sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN)) {
-					/* draw domain max bounds */
-					VECSUBFAC(p0, sds->p0, sds->cell_size, sds->adapt_res);
-					VECADDFAC(p1, sds->p1, sds->cell_size, sds->adapt_res);
-					BKE_boundbox_init_from_minmax(&bb, p0, p1);
-					draw_box(bb.vec, false);
-				}
-
-#if 0
-				/* draw base resolution bounds */
-				BKE_boundbox_init_from_minmax(&bb, sds->p0, sds->p1);
-				draw_box(bb.vec);
-#endif
-
-
-				/* draw a single voxel to hint the user about the resolution of the fluid */
-				copy_v3_v3(p0, sds->p0);
-
-				if (sds->flags & MOD_SMOKE_HIGHRES) {
-					madd_v3_v3v3fl(p1, p0, sds->cell_size, 1.0f / (sds->amplify + 1));
-				}
-				else {
-					add_v3_v3v3(p1, p0, sds->cell_size);
-				}
-
+			/* draw max domain bounds */
+			if ((sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN)) {
+				VECSUBFAC(p0, sds->p0, sds->cell_size, sds->adapt_res);
+				VECADDFAC(p1, sds->p1, sds->cell_size, sds->adapt_res);
 				BKE_boundbox_init_from_minmax(&bb, p0, p1);
 				draw_box(bb.vec, false);
 			}
 
-			/* don't show smoke before simulation starts, this could be made an option in the future */
-			if (sds->fluid && CFRA >= sds->point_cache[0]->startframe) {
-				float p0[3], p1[3];
+			/* draw a single voxel to hint the user about the resolution of the fluid */
+			copy_v3_v3(p0, sds->p0);
 
-				/* get view vector */
-				invert_m4_m4(ob->imat, ob->obmat);
-				mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
-				normalize_v3(viewnormal);
+			if (sds->flags & MOD_SMOKE_HIGHRES) {
+				madd_v3_v3v3fl(p1, p0, sds->cell_size, 1.0f / (sds->amplify + 1));
+			}
+			else {
+				add_v3_v3v3(p1, p0, sds->cell_size);
+			}
 
-				/* set dynamic boundaries to draw the volume
-				 * also scale cube to global space to equalize volume slicing on all axes
-				 *  (it's scaled back before drawing) */
-				p0[0] = (sds->p0[0] + sds->cell_size[0] * sds->res_min[0] + sds->obj_shift_f[0]) * fabsf(ob->size[0]);
-				p0[1] = (sds->p0[1] + sds->cell_size[1] * sds->res_min[1] + sds->obj_shift_f[1]) * fabsf(ob->size[1]);
-				p0[2] = (sds->p0[2] + sds->cell_size[2] * sds->res_min[2] + sds->obj_shift_f[2]) * fabsf(ob->size[2]);
-				p1[0] = (sds->p0[0] + sds->cell_size[0] * sds->res_max[0] + sds->obj_shift_f[0]) * fabsf(ob->size[0]);
-				p1[1] = (sds->p0[1] + sds->cell_size[1] * sds->res_max[1] + sds->obj_shift_f[1]) * fabsf(ob->size[1]);
-				p1[2] = (sds->p0[2] + sds->cell_size[2] * sds->res_max[2] + sds->obj_shift_f[2]) * fabsf(ob->size[2]);
+			BKE_boundbox_init_from_minmax(&bb, p0, p1);
+			draw_box(bb.vec, false);
+		}
 
-				if (!sds->wt || !(sds->viewsettings & MOD_SMOKE_VIEW_SHOWBIG)) {
-					sds->tex = NULL;
-					GPU_create_smoke(smd, 0);
-					draw_smoke_volume(sds, ob, p0, p1, viewnormal);
-					GPU_free_smoke(smd);
-				}
-				else if (sds->wt && (sds->viewsettings & MOD_SMOKE_VIEW_SHOWBIG)) {
-					sds->tex = NULL;
-					GPU_create_smoke(smd, 1);
-					draw_smoke_volume(sds, ob, p0, p1, viewnormal);
-					GPU_free_smoke(smd);
-				}
+		/* don't show smoke before simulation starts, this could be made an option in the future */
+		if (sds->fluid && CFRA >= sds->point_cache[0]->startframe) {
+			float p0[3], p1[3];
 
-				/* smoke debug render */
+			/* get view vector */
+			invert_m4_m4(ob->imat, ob->obmat);
+			mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
+			normalize_v3(viewnormal);
+
+			/* set dynamic boundaries to draw the volume
+			 * also scale cube to global space to equalize volume slicing on all axes
+			 *  (it's scaled back before drawing) */
+			p0[0] = (sds->p0[0] + sds->cell_size[0] * sds->res_min[0] + sds->obj_shift_f[0]) * fabsf(ob->size[0]);
+			p0[1] = (sds->p0[1] + sds->cell_size[1] * sds->res_min[1] + sds->obj_shift_f[1]) * fabsf(ob->size[1]);
+			p0[2] = (sds->p0[2] + sds->cell_size[2] * sds->res_min[2] + sds->obj_shift_f[2]) * fabsf(ob->size[2]);
+			p1[0] = (sds->p0[0] + sds->cell_size[0] * sds->res_max[0] + sds->obj_shift_f[0]) * fabsf(ob->size[0]);
+			p1[1] = (sds->p0[1] + sds->cell_size[1] * sds->res_max[1] + sds->obj_shift_f[1]) * fabsf(ob->size[1]);
+			p1[2] = (sds->p0[2] + sds->cell_size[2] * sds->res_max[2] + sds->obj_shift_f[2]) * fabsf(ob->size[2]);
+
+			if (!sds->wt || !(sds->viewsettings & MOD_SMOKE_VIEW_SHOWBIG)) {
+				sds->tex = NULL;
+				GPU_create_smoke(smd, 0);
+				draw_smoke_volume(sds, ob, p0, p1, viewnormal);
+				GPU_free_smoke(smd);
+			}
+			else if (sds->wt && (sds->viewsettings & MOD_SMOKE_VIEW_SHOWBIG)) {
+				sds->tex = NULL;
+				GPU_create_smoke(smd, 1);
+				draw_smoke_volume(sds, ob, p0, p1, viewnormal);
+				GPU_free_smoke(smd);
+			}
+
+			/* smoke debug render */
 #ifdef SMOKE_DEBUG_VELOCITY
-				draw_smoke_velocity(smd->domain, ob);
+			draw_smoke_velocity(smd->domain, ob);
 #endif
 #ifdef SMOKE_DEBUG_HEAT
-				draw_smoke_heat(smd->domain, ob);
+			draw_smoke_heat(smd->domain, ob);
 #endif
-			}
 		}
 	}
 
@@ -9009,10 +8926,8 @@ static DMDrawOption bbs_mesh_solid__setSolidDrawOptions(void *userData, int inde
 	}
 }
 
-static DMDrawOption bbs_mesh_solid_plane_setSolidDrawOptions(void *userData, int index)
+static DMDrawOption bbs_mesh_solid_plane_setSolidDrawOptions(BMReference *erf, int index)
 {
-	BMReference *erf = userData;
-
 	if (!BM_elem_flag_test(erf, BM_ELEM_HIDDEN)) {
 		GPU_select_index_set(index + 1);
 		return DM_DRAW_OPTION_NORMAL;
@@ -9059,9 +8974,24 @@ static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *UNUSED(scene), View3D *UNUSED(v3d),
-							  Object *UNUSED(ob), DerivedMesh *dm)
+							  Object *UNUSED(ob))
 {
-	dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
+	BMReference *erf;
+	BMIter iter;
+	int i;
+	BM_ITER_MESH_INDEX(erf, &iter, em->bm, BM_REFERENCES_OF_MESH, i){
+		if (bbs_mesh_solid_plane_setSolidDrawOptions(erf, i) == DM_DRAW_OPTION_NORMAL) {
+			glBegin(GL_QUADS);
+			glVertex3fv(erf->v1);
+			glVertex3fv(erf->v2);
+			glVertex3fv(erf->v3);
+			glVertex3fv(erf->v4);
+			glEnd();
+		}
+	}
+
+	//dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
+
 }
 #endif
 
@@ -9145,13 +9075,8 @@ void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, Objec
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 			if (ob->mode & OB_MODE_EDIT && ts->selectmode & SCE_SELECT_REFERENCE) {
 				Mesh *me = ob->data;
-				BMEditMesh *em = me->edit_btmesh;
+				bbs_mesh_solid_reference_planes_EM(me->edit_btmesh, scene, v3d, ob);
 
-				DerivedMesh *dm = editbmesh_get_derived_cage(scene, ob, em, CD_MASK_BAREMESH);
-
-				bbs_mesh_solid_reference_planes_EM(em, scene, v3d, ob, dm);
-
-				dm->release(dm);
 			} else if (ob->mode & OB_MODE_EDIT) {
 #else
 			if (ob->mode & OB_MODE_EDIT) {

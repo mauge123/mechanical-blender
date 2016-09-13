@@ -299,10 +299,6 @@ typedef struct Object {
 	LodLevel *currentlod;
 
 	struct PreviewImage *preview;
-// WITH_MECHANICAL_DIMENSION
-	ListBase dim_values;  //MDimLink
-
-
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -365,6 +361,8 @@ enum {
 
 /* 23 and 24 are for life and sector (old file compat.) */
 	OB_ARMATURE   = 25,
+
+	OB_DIM		  = 26,
 };
 
 /* check if the object type supports materials */

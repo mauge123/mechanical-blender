@@ -6952,13 +6952,6 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 		uiItemO(layout, NULL,
 		        ICON_NONE, "UI_OT_copy_python_command_button");
 	}
-// WITH_MECHANICAL_DIMENSION
-	if(ui_block_is_dimension_value(but)){
-		uiItemMenuEnumO(layout, C, "ANIM_OT_driver_button_add", "mapping_type",
-						CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Add Driver"),
-						ICON_DRIVER);
-	}
-
 
 	/* perhaps we should move this into (G.debug & G_DEBUG) - campbell */
 	if (ui_block_is_menu(but->block) == false) {

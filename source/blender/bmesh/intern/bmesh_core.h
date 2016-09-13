@@ -27,6 +27,8 @@
  *  \ingroup bmesh
  */
 
+struct MDim;
+
 BMFace *BM_face_copy(
         BMesh *bm_dst, BMesh *bm_src, BMFace *f,
         const bool copy_verts, const bool copy_edges);
@@ -125,8 +127,8 @@ void    bmesh_face_swap_data(BMFace *f_a, BMFace *f_b);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_create(
-		struct MDimLink *mdim_link, BMesh *bm, BMVert *(*v), int v_count, int dim_type,
-		const BMDim *d_example, const eBMCreateFlag create_flag, char *name);
+        BMesh *bm, BMVert *(*v), int v_count, int dim_type,
+		const BMDim *d_example, const eBMCreateFlag create_flag, struct MDim *mdm);
 
 void BM_dim_kill(BMesh *bm, BMDim *edm);
 void bm_kill_only_dim(BMesh *bm, BMDim *edm);

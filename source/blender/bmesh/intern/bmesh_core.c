@@ -789,7 +789,7 @@ static bool vert_on_dimension(BMesh *bm , BMVert* v) {
 	BMDim *edm = NULL;
 	BMIter iter;
 	// Search if delete affects a dimension
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+	BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 		for (int i=0;i<edm->totverts;i++) {
 			if (v == edm->v[i]) {
 				return true;
@@ -3081,7 +3081,7 @@ void bm_kill_only_dim(BMesh *bm, BMDim *edm)
 	for (int i=0;i<vcount;i++) {
 		if (BM_vert_edge_count(v[i]) == 0) {
 			// Check if not used by other dimensions
-			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 				int j=0;
 				for (j =0;j<edm->totverts && (edm->v[j] == v[i]);j++);
 				if (j<edm->totverts) {
@@ -3126,44 +3126,30 @@ int order_select_compare (const void *ptr_a,const void *ptr_b) {
 }
 #endif
 
-
-static bool unique_name_dim_check(void *arg, const char *name)
-{
-	BMDim *edm;
-	BMIter iter;
-	BMesh *bm = arg;
-
-	BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
-		if (strcmp(edm->name, name) == 0) {
-			return true;
-		}
-	}
-	return false;
-
-}
-
 /**
  * \brief Main function for creating a new dimension.
  *
  * \note base on BM_edge_create function
  */
 BMDim *BM_dim_create(
-		MDimLink *mdim_link, BMesh *bm, BMVert *(*v), int v_count, int dim_type,
-		const BMDim *d_example, const eBMCreateFlag create_flag, char *name)
+		BMesh *bm, BMVert *(*v), int v_count, int dim_type,
+		const BMDim *d_example, const eBMCreateFlag create_flag, MDim *mdm)
 {
+
 	BMDim *edm = BLI_mempool_alloc(bm->dpool);
+	edm->mdim = mdm;
+
 	BMReference *erf;
 	BMIter iter;
 
 	float vect[3], no1[3], no2[3];
-	char def_name[MAX_NAME];
 
 	BLI_assert((d_example == NULL) || (d_example->head.htype == BM_DIM));
 	BLI_assert(!(create_flag & 1));
 
 
 
-	/* --- assignBLI_mempool_alloc(bm->dpool);BLI_mempool_alloc(bm->dpool); all members --- */
+	/* --- assign all members --- */
 	edm->head.data = NULL;
 
 #ifdef USE_DEBUG_INDEX_MEMCHECK
@@ -3186,8 +3172,8 @@ BMDim *BM_dim_create(
 		((BMDim_OFlag *)edm)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 	}
 
-	edm->dim_type = dim_type;
-	edm->constraints = 0;
+	edm->mdim->dim_type = dim_type;
+	edm->mdim->constraints = 0;
 
 	edm->totverts = v_count;
 	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
@@ -3199,19 +3185,10 @@ BMDim *BM_dim_create(
 		qsort(edm->v,edm->totverts, sizeof (MVert*), order_select_compare);
 	}
 
-	edm->name[0] = '\0';
-	if(name == NULL) {
-		BLI_strncpy(def_name, "Dimension", MAX_NAME);
-		BLI_uniquename_cb(unique_name_dim_check, bm, def_name, '.', edm->name, 50);
-	} else {
-		BLI_strncpy(edm->name, name, MAX_NAME);
-	}
-
-
 
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
-	switch (edm->dim_type) {
+	switch (dim_type) {
 		case DIM_TYPE_LINEAR:
 			BLI_assert (v_count >= 2);
 			BLI_assert (edm->v[0]  != edm->v[1]);
@@ -3232,8 +3209,8 @@ BMDim *BM_dim_create(
 			cross_v3_v3v3(no2,no1,vect);
 			normalize_v3(no2);
 
-			edm->dpos_fact = 0.5f;
-			copy_v3_v3(edm->fpos, no2);
+			edm->mdim->dpos_fact = 0.5f;
+			copy_v3_v3(edm->mdim->fpos, no2);
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
@@ -3242,9 +3219,9 @@ BMDim *BM_dim_create(
 			set_dimension_center(edm);
 
 			//set direction
-			sub_v3_v3v3(edm->fpos,edm->v[0]->co, edm->center);
-			normalize_v3(edm->fpos);
-			edm->dpos_fact = 0.5f;
+			sub_v3_v3v3(edm->mdim->fpos,edm->v[0]->co, edm->mdim->center);
+			normalize_v3(edm->mdim->fpos);
+			edm->mdim->dpos_fact = 0.5f;
 			break;
 		case DIM_TYPE_ANGLE_3P_CON:
 			BLI_assert (v_count >= 6);
@@ -3252,11 +3229,11 @@ BMDim *BM_dim_create(
 			BLI_assert (v_count >= 4);
 		case DIM_TYPE_ANGLE_3P:
 			BLI_assert (v_count >= 3);
-			copy_v3_v3(edm->center, edm->v[1]->co);
+			copy_v3_v3(edm->mdim->center, edm->v[1]->co);
 			//set direction
-			sub_v3_v3v3(edm->fpos,edm->center, edm->v[2]->co);
-			normalize_v3(edm->fpos);
-			edm->dpos_fact = 0.5f;
+			sub_v3_v3v3(edm->mdim->fpos,edm->mdim->center, edm->v[2]->co);
+			normalize_v3(edm->mdim->fpos);
+			edm->mdim->dpos_fact = 0.5f;
 			break;
 		default:
 			BLI_assert(0);
@@ -3264,7 +3241,6 @@ BMDim *BM_dim_create(
 
 	}
 
-	edm->link = mdim_link;
 
 	/* --- done --- */
 
@@ -3279,14 +3255,11 @@ BMDim *BM_dim_create(
 		if (d_example) {
 			BM_elem_attrs_copy(bm, bm, d_example, edm);
 		}
-		else {
-			CustomData_bmesh_set_default(&bm->edata, &edm->head.data);
-		}
 	}
 
 	if (d_example) {
-		copy_v3_v3(edm->fpos,d_example->fpos);
-		edm->constraints = d_example->constraints;
+		copy_v3_v3(edm->mdim->fpos,d_example->mdim->fpos);
+		edm->mdim->constraints = d_example->mdim->constraints;
 	}
 
 	dimension_data_update (edm);
@@ -3343,7 +3316,7 @@ BMReference *BM_reference_plane_create(
 	/* allocate flags */
 //	erf->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 	if (bm->use_toolflags) {
-		((BMReference_OFlag *)erf)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
+		((BMReference_OFlag *)erf)->oflags = bm->ptoolflagpool ? BLI_mempool_calloc(bm->ptoolflagpool) : NULL;
 	}
 
 	/* --- done --- */

@@ -4105,8 +4105,14 @@ static void lib_link_particlesettings(FileData *fd, Main *main)
 				if (index_ok) {
 					/* if we have indexes, let's use them */
 					for (dw = part->dupliweights.first; dw; dw = dw->next) {
-						GroupObject *go = (GroupObject *)BLI_findlink(&part->dup_group->gobject, dw->index);
-						dw->ob = go ? go->ob : NULL;
+						/* Do not try to restore pointer here, we have to search for group objects in another
+						 * separated step.
+						 * Reason is, the used group may be linked from another library, which has not yet
+						 * been 'lib_linked'.
+						 * Since dw->ob is not considered as an object user (it does not make objet directly linked),
+						 * we may have no valid way to retrieve it yet.
+						 * See T49273. */
+						dw->ob = NULL;
 					}
 				}
 				else {
@@ -4400,6 +4406,10 @@ static void lib_link_mesh(FileData *fd, Main *main)
 				lib_link_customdata_mtface(fd, me, &me->mr->fdata,
 				                           ((MultiresLevel*)me->mr->levels.first)->totface);
 			}
+
+			for (i=0;i<me->totdim;i++) {
+				me->mdim[i] = newlibadr_us(fd, me->id.lib, me->mdim[i]);
+			}
 		}
 	}
 
@@ -4564,12 +4574,7 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	mesh->mtpoly = newdataadr(fd, mesh->mtpoly);
 	mesh->mselect = newdataadr(fd, mesh->mselect);
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	mesh->mdim = newdataadr(fd, mesh->mdim);
-	if (mesh->mdim) {
-		for (int i =0;i<mesh->totdim;i++) {
-			mesh->mdim[i].v = newdataadr(fd,mesh->mdim[i].v);
-		}
-	}
+	mesh->mdim = newdataadr(fd,mesh->mdim);
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	mesh->mref = newdataadr(fd, mesh->mref);
@@ -4588,10 +4593,6 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	direct_link_customdata(fd, &mesh->fdata, mesh->totface);
 	direct_link_customdata(fd, &mesh->ldata, mesh->totloop);
 	direct_link_customdata(fd, &mesh->pdata, mesh->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	direct_link_customdata(fd, &mesh->ddata, mesh->totdim);
-#endif
-
 
 	mesh->bb = NULL;
 	mesh->edit_btmesh = NULL;
@@ -5548,6 +5549,12 @@ static void direct_link_object(FileData *fd, Object *ob)
 
 	ob->preview = direct_link_preview_image(fd, ob->preview);
 }
+
+
+static void direct_link_dimension (FileData *fd, MDim *mdim) {
+	mdim->v = newdataadr(fd,mdim->v);
+}
+
 
 /* ************ READ SCENE ***************** */
 
@@ -7968,6 +7975,9 @@ static const char *dataname(short id_code)
 		case ID_MSK: return "Data from MSK";
 		case ID_LS: return "Data from LS";
 		case ID_CF: return "Data from CF";
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case ID_DM: return "Data form MD";
+#endif
 	}
 	return "Data from Lib Block";
 	
@@ -8116,7 +8126,6 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, const short 
 	/* read all data into fd->datamap */
 	bhead = read_data_into_oldnewmap(fd, bhead, allocname);
 	
-	/* init pointers direct data */
 	direct_link_id(fd, id);
 	
 	switch (GS(id->name)) {
@@ -8221,6 +8230,9 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, const short 
 			break;
 		case ID_CF:
 			direct_link_cachefile(fd, (CacheFile *)id);
+			break;
+		case ID_DM:
+			direct_link_dimension(fd, (MDim *)id);
 			break;
 	}
 	

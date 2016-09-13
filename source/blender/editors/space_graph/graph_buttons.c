@@ -736,7 +736,7 @@ static void graph_panel_driverVar__dim(uiLayout *layout, ID *id, DriverVar *dvar
 
 	/* properties */
 
-	if (dtar->id) {
+	if (ob) {
 		uiItemR(col, &dtar_ptr, "reference_dimension", 0, IFACE_("Dimension"), ICON_NONE);
 	}
 

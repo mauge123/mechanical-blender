@@ -232,7 +232,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 		BMIter iter;
 
 		if (bm->totdimsel) {
-			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					totdim++;
 					edm_sel = edm;
@@ -256,7 +256,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 			/* Dimension Name */
 			uiDefButC(block, UI_BTYPE_TEXT, 0, "Name: ",0, yi -= buth + but_margin, 200, buth,
-				&edm_sel->name, 0, 50, 0, 0, TIP_("Dimension name"));
+				edm_sel->mdim->id.name+2, 0, 50, 0, 0, TIP_("Dimension name"));
 
 
 			// At least one dimension
@@ -265,13 +265,13 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
 			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 
-			tfp->dim_txt_pos= edm_sel->dpos_fact;
+			tfp->dim_txt_pos= edm_sel->mdim->dpos_fact;
 			// Add dimension position
 			uiDefButF(block, UI_BTYPE_NUM_SLIDER, B_OBJECTPANELMEDIAN,IFACE_("Text Position:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_txt_pos,-2.0f,2.0f, 10, RNA_TRANSLATION_PREC_DEFAULT, TIP_("Position"));
 
 
-			tfp->dim_constraints = edm_sel->constraints;
+			tfp->dim_constraints = edm_sel->mdim->constraints;
 
 			uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONSTRAINT_OVERRIDE ,B_OBJECTPANELMEDIAN, IFACE_("Override constraints:"),0, yi -= buth + but_margin, 200, buth,
 				&tfp->dim_constraints,0.0f,0.0f, 0, 0, TIP_("Override Automatic Constraints"));
@@ -295,12 +295,12 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			BMDim *edm;
 			BMIter iter;
 
-			BM_ITER_MESH (edm, &iter, bm, BM_DIMS_OF_MESH) {
+			BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					apply_dimension_value (bm, edm, tfp->dimension_value, ts);
 					//apply_txt_dimension_value(edm, tfp->dim_txt_pos);
-					edm->dpos_fact = tfp->dim_txt_pos;
-					edm->constraints = tfp->dim_constraints;
+					edm->mdim->dpos_fact = tfp->dim_txt_pos;
+					edm->mdim->constraints = tfp->dim_constraints;
 				}
 			}
 		}

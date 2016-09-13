@@ -366,9 +366,15 @@ bool createSpaceNormalTangent(float mat[3][3], const float normal[3], const floa
 	return true;
 }
 
+#ifdef WITH_MECHANICAL_UCS
+TransformOrientation *BIF_createTransformOrientation(bContext *C, ReportList *reports,
+                                    const char *name, const bool use_view,
+                                    const bool activate, const bool overwrite)
+#else
 void BIF_createTransformOrientation(bContext *C, ReportList *reports,
                                     const char *name, const bool use_view,
                                     const bool activate, const bool overwrite)
+#endif
 {
 	TransformOrientation *ts = NULL;
 
@@ -397,6 +403,9 @@ void BIF_createTransformOrientation(bContext *C, ReportList *reports,
 	if (activate && ts != NULL) {
 		BIF_selectTransformOrientation(C, ts);
 	}
+#ifdef WITH_MECHANICAL_UCS
+	return ts;
+#endif
 }
 
 #ifdef WITH_MECHANICAL_UCS

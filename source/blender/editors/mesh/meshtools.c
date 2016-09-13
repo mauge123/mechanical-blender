@@ -87,7 +87,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	MPoly *mpoly = NULL;
 	MLoop *mloop = NULL;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	MDim *mdim= NULL;
+	MDim **mdim= NULL;
 #endif
 	Key *key, *nkey = NULL;
 	KeyBlock *kb, *okb, *kbn;
@@ -101,11 +101,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	bool ok = false;
 	bDeformGroup *dg, *odg;
 	MDeformVert *dvert;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData vdata, edata, fdata, ldata, pdata, ddata;
-#else
 	CustomData vdata, edata, fdata, ldata, pdata;
-#endif
 
 	if (scene->obedit) {
 		BKE_report(op->reports, RPT_WARNING, "Cannot join while in edit mode");
@@ -301,23 +297,18 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	CustomData_reset(&fdata);
 	CustomData_reset(&ldata);
 	CustomData_reset(&pdata);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_reset(&ddata);
-#endif
 
 	mvert = CustomData_add_layer(&vdata, CD_MVERT, CD_CALLOC, NULL, totvert);
 	medge = CustomData_add_layer(&edata, CD_MEDGE, CD_CALLOC, NULL, totedge);
 	mloop = CustomData_add_layer(&ldata, CD_MLOOP, CD_CALLOC, NULL, totloop);
 	mpoly = CustomData_add_layer(&pdata, CD_MPOLY, CD_CALLOC, NULL, totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	mdim = CustomData_add_layer(&ddata, CD_MDIM, CD_CALLOC, NULL, totdim);
-#endif
 
 	vertofs = 0;
 	edgeofs = 0;
 	loopofs = 0;
 	polyofs = 0;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	mdim = MEM_callocN(sizeof(int**)*totdim, "resized array of dimensions");
 	dimofs = 0;
 #endif
 	
@@ -448,14 +439,10 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			if (me->totdim) {
-				MDim *pr_dim = CustomData_get_layer(&me->ddata, CD_MDIM);
-				CustomData_merge(&me->ddata, &ddata, CD_MASK_MESH, CD_DEFAULT, totdim);
-				CustomData_copy_data_named(&me->ddata, &ddata, 0, dimofs, me->totdim);
-
-				for (a = 0; a < me->totdim; a++, mdim++) {
-					mdim->v = MEM_callocN(sizeof(int)*mdim->totverts, "Mesh Dimension index array");
-					for (i=0;i<mdim->totverts;i++) {
-						mdim->v[i] = pr_dim->v[i] + vertofs;
+				for (a = 0; a < me->totdim; a++) {
+					mdim[a+dimofs] = me->mdim[a];
+					for (i=0;i<me->mdim[a]->totverts;i++) {
+						mdim[a+dimofs]->v[i] = me->mdim[a]->v[i] += vertofs;
 					}
 				}
 			}
@@ -533,9 +520,6 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	CustomData_free(&me->edata, me->totedge);
 	CustomData_free(&me->ldata, me->totloop);
 	CustomData_free(&me->pdata, me->totpoly);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	CustomData_free(&me->ddata, me->totdim);
-#endif
 
 	me->totvert = totvert;
 	me->totedge = totedge;
@@ -543,15 +527,13 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	me->totpoly = totpoly;
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	me->totdim = totdim;
+	me->mdim = mdim;
 #endif
 
 	me->vdata = vdata;
 	me->edata = edata;
 	me->ldata = ldata;
 	me->pdata = pdata;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	me->ddata = ddata;
-#endif
 
 	/* tessface data removed above, no need to update */
 	BKE_mesh_update_customdata_pointers(me, false);
