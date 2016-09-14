@@ -98,6 +98,9 @@ bool id_type_can_have_animdata(const short id_type)
 		case ID_MSK:
 		case ID_GD:
 		case ID_CF:
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		case ID_DM:
+#endif
 			return true;
 		
 		/* no AnimData */

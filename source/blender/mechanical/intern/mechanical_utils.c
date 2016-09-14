@@ -51,14 +51,18 @@ void tag_vertexs_affected_by_dimension (BMesh *bm, BMDim *edm)
 	BMIter iter;
 	BMVert* eve;
 
-	// Tag all elements to be affected by change
-	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-		if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
-			BM_elem_flag_enable(eve, BM_ELEM_TAG);
-		} else {
-			// Disable as default
-			BM_elem_flag_disable(eve, BM_ELEM_TAG);
+	if (!edm->mdim->adt) {
+		// Tag all elements to be affected by change
+		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+			if (BM_elem_flag_test(eve, BM_ELEM_SELECT)) {
+				BM_elem_flag_enable(eve, BM_ELEM_TAG);
+			} else {
+				// Disable as default
+				BM_elem_flag_disable(eve, BM_ELEM_TAG);
+			}
 		}
+	} else {
+		// Drived value, do not affect selected data
 	}
 
 	// Tag vertexs of dimension

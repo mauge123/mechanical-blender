@@ -2641,6 +2641,16 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
                                  RigidBodyWorld *rbw,
                                  const bool do_proxy_update)
 {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (ob->type == OB_MESH) {
+		Mesh *me = ob->data;
+		if (me->totdim) {
+			for (int i=0;i<me->totdim;i++) {
+				BKE_animsys_evaluate_animdata(scene, &me->mdim[i]->id, me->mdim[i]->adt, BKE_scene_frame_get(scene), ADT_RECALC_DRIVERS);
+			}
+		}
+	}
+#endif
 	if (ob->recalc & OB_RECALC_ALL) {
 		/* speed optimization for animation lookups */
 		if (ob->pose) {

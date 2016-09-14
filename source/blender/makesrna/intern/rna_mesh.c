@@ -1880,6 +1880,16 @@ static void UNUSED_FUNCTION(rna_mesh_unused)(void)
 	/* end unused function block */
 }
 
+static void rna_MDim_set_value(PointerRNA *ptr, const float value)
+{
+	MDim *mdim = ptr->data;
+	mdim->value = value;
+	DAG_id_tag_update(&mdim->ob->id, OB_RECALC_OB | OB_RECALC_DATA);
+	WM_main_add_notifier(NC_OBJECT , &mdim->ob->id);
+}
+
+
+
 #else
 
 static void rna_def_mvert_group(BlenderRNA *brna)
@@ -3798,6 +3808,23 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_api_mesh(srna);
 }
 
+
+static void rna_def_dimension(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "MDim", "ID");
+	RNA_def_struct_ui_text(srna, "Dimension", "Mesh data-block defining dimensions");
+	// RNA_def_struct_ui_icon(srna, ICON_MESH_DATA);
+
+	prop = RNA_def_property(srna, "value", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "value");
+	RNA_def_property_ui_text(prop, "Value", "Dimension value");
+	RNA_def_property_float_funcs (prop, NULL, "rna_MDim_set_value" , NULL );
+
+}
+
 void RNA_def_mesh(BlenderRNA *brna)
 {
 	rna_def_mesh(brna);
@@ -3816,6 +3843,10 @@ void RNA_def_mesh(BlenderRNA *brna)
 	rna_def_mcol(brna);
 	rna_def_mloopcol(brna);
 	rna_def_mproperties(brna);
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	rna_def_dimension(brna);
+#endif
 }
 
 #endif

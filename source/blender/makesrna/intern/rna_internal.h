@@ -191,6 +191,10 @@ void RNA_def_movieclip(struct BlenderRNA *brna);
 void RNA_def_tracking(struct BlenderRNA *brna);
 void RNA_def_mask(struct BlenderRNA *brna);
 
+// WITH_MECHANICAL_MESH_DIMENSIONS
+void RNA_def_dimension(struct BlenderRNA *brna);
+
+
 /* Common Define functions */
 
 void rna_def_animdata_common(struct StructRNA *srna);

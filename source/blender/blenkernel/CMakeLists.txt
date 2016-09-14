@@ -39,6 +39,7 @@ set(INC
 	../modifiers
 	../nodes
 	../physics
+	../editors/include
 	../render/extern/include
 	../../../intern/ghost
 	../../../intern/guardedalloc

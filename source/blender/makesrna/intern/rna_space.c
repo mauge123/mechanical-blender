@@ -489,8 +489,7 @@ EnumPropertyItem *rna_ReferenceDim_itemf(bContext *UNUSED(C), PointerRNA *ptr, P
 		if (ob) {
 			Mesh *me = BKE_mesh_from_object(ob);
 			if (me && me->totdim) {
-				MDim *mdim = me->mdim;
-				for (int n=0;n<me->totdim;mdim++, n++) {
+				for (int n=0; n<me->totdim; n++) {
 					tmp.identifier = me->mdim[n]->id.name;
 					tmp.name = me->mdim[n]->id.name+2;
 					tmp.value = n;

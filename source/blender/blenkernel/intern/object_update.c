@@ -33,6 +33,8 @@
 #include "DNA_key_types.h"
 #include "DNA_material_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_meshdata_types.h"
+#include "DNA_mesh_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -58,12 +60,14 @@
 #include "BKE_material.h"
 #include "BKE_image.h"
 
+#include "ED_mesh.h"
+
+#include "MEM_guardedalloc.h"
+
 #include "DEG_depsgraph.h"
 
 #include "mechanical_geometry.h"
-
-void get_dimension_mid(float mid[3],BMDim *edm);
-void dimension_data_update(BMDim *edm);
+#include "mesh_dimensions.h"
 
 #ifdef WITH_LEGACY_DEPSGRAPH
 #  define DEBUG_PRINT if (!DEG_depsgraph_use_legacy() && G.debug & G_DEBUG_DEPSGRAPH) printf
@@ -192,6 +196,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 		case OB_MESH:
 		{
 			BMEditMesh *em = (ob == scene->obedit) ? BKE_editmesh_from_object(ob) : NULL;
+			Mesh *me = ob->data;
 			uint64_t data_mask = scene->customdata_mask | CD_MASK_BAREMESH;
 #ifdef WITH_FREESTYLE
 			/* make sure Freestyle edge/face marks appear in DM for render (see T40315) */
@@ -206,12 +211,35 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
  * allowing the dimension position be relative to geometry
  */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+			// Check if needs to update dimensions from object
+			bool temp_em = false;
+			if (em == NULL && me->totdim) {
+				if (me->totdim) {
+					for (int i=0;i<me->totdim;i++) {
+						if (me->mdim[i]->adt) {
+							//const bool use_key_index = mesh_needs_keyindex(ob->data);
+							EDBM_mesh_make(scene->toolsettings, ob, false);
+							em = BKE_editmesh_from_object(ob);
+							// Needed for Auto-constraints
+							EDBM_mesh_normals_update(em);
+							temp_em = true;
+							break;
+						}
+					}
+				}
+			}
+
 			if (em) {
 				BMesh *bm = em->bm;
 				BMDim *edm;
 				BMIter iter;
 				int i =0;
 				BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
+					// check diension data udate
+					if (get_dimension_value (edm) != edm->mdim->value) {
+						apply_dimension_value(bm,edm,edm->mdim->value,scene->toolsettings);
+						dimension_data_update(edm);
+					}
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
 						if (!G.moving) {
@@ -246,6 +274,13 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 					dimension_data_update(edm);
 
 				}
+			}
+			if (temp_em) {
+				EDBM_mesh_load(ob);
+				EDBM_mesh_free (em);
+				MEM_freeN(me->edit_btmesh);
+				me->edit_btmesh =NULL;
+				em = NULL;
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY

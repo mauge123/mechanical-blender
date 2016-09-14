@@ -30,6 +30,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -138,7 +139,18 @@ static void rna_ChannelDriver_update_data(Main *bmain, Scene *scene, PointerRNA 
 	
 	/* TODO: this really needs an update guard... */
 	DAG_relations_tag_update(bmain);
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	if (GS(id->name) == ID_DM) {
+		MDim *mdim = (MDim*) id;
+		DAG_id_tag_update((ID*) mdim->ob, OB_RECALC_OB | OB_RECALC_DATA);
+	} else {
+		DAG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA);
+	}
+#else
 	DAG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA);
+#endif
+
 	
 	WM_main_add_notifier(NC_SCENE | ND_FRAME, scene);
 }

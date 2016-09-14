@@ -47,6 +47,8 @@
 
 #include "BLT_translation.h"
 
+#include "RNA_access.h"
+
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -259,11 +261,26 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				edm_sel->mdim->id.name+2, 0, 50, 0, 0, TIP_("Dimension name"));
 
 
-			// At least one dimension
-			tfp->dimension_value = get_dimension_value(edm_sel);
-			but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,
-				&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
-			UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+			// Only one dimension
+			if (totdim == 1) {
+				PointerRNA ptr;
+				PropertyRNA *prop;
+
+				/* create RNA pointers */
+				RNA_pointer_create(&edm_sel->mdim->id, &RNA_MDim, edm_sel->mdim, &ptr);
+				prop = RNA_struct_find_property(&ptr, "value");
+
+				but = uiDefButR_prop(block,UI_BTYPE_NUM,0,IFACE_("Value:"),0,yi -= buth + but_margin, 200, buth,
+				                     &ptr,prop,0, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
+				UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+
+			} else {
+				tfp->dimension_value = get_dimension_value(edm_sel);
+				but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,
+					&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
+				UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
+			}
+
 
 			tfp->dim_txt_pos= edm_sel->mdim->dpos_fact;
 			// Add dimension position
@@ -297,8 +314,11 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 			BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
-					apply_dimension_value (bm, edm, tfp->dimension_value, ts);
-					//apply_txt_dimension_value(edm, tfp->dim_txt_pos);
+					if (totdim > 1) {
+						edm->mdim->value = tfp->dimension_value;
+					} else {
+						//aplyed using RNA
+					}
 					edm->mdim->dpos_fact = tfp->dim_txt_pos;
 					edm->mdim->constraints = tfp->dim_constraints;
 				}

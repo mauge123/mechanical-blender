@@ -4407,9 +4407,12 @@ static void lib_link_mesh(FileData *fd, Main *main)
 				                           ((MultiresLevel*)me->mr->levels.first)->totface);
 			}
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			for (i=0;i<me->totdim;i++) {
 				me->mdim[i] = newlibadr_us(fd, me->id.lib, me->mdim[i]);
+				me->mdim[i]->ob = newlibadr_us(fd,me->id.lib, me->mdim[i]->ob);
 			}
+#endif
 		}
 	}
 

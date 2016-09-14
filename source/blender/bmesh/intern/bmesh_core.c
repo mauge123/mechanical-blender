@@ -3262,8 +3262,6 @@ BMDim *BM_dim_create(
 		edm->mdim->constraints = d_example->mdim->constraints;
 	}
 
-	dimension_data_update (edm);
-
 	BM_CHECK_ELEMENT(edm);
 
 

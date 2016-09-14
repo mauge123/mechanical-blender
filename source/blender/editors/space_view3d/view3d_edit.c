@@ -5334,7 +5334,6 @@ static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent 
 	Scene *scene = CTX_data_scene(C);
 
 	View3D *v3d = CTX_wm_view3d(C);
-	ToolSettings *ts = scene->toolsettings;
 	ScrArea *sa = CTX_wm_area(C);
 	Object *obedit = scene->obedit;
 	Mesh *me = obedit->data;
@@ -5367,7 +5366,7 @@ static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent 
 		if (hasNumInput(num)) {
 			// Apply value only once confirmed
 			edm = get_selected_dimension(bm);
-		    apply_dimension_value(bm,edm,num->val[0],ts);
+			edm->mdim->value = num->val[0];
 		    DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 		    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
 		}

@@ -73,6 +73,9 @@ typedef struct MVert {
 // WITH_MECHANICAL_MESH_DIMENSION
 typedef struct MDim {
 	ID id;
+	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
+
+	Object *ob;
 
 	int totverts;
 	int dim_type;
@@ -97,8 +100,8 @@ typedef struct MDim {
 	unsigned int *v; /* Array of vertexs */
 
 	char flag;
-	char pad[7];
 
+	char pad[7];
 
 } MDim;
 /* */

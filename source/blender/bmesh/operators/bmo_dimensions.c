@@ -37,6 +37,8 @@
 
 #include "bmesh.h"
 
+#include "mesh_dimensions.h"
+
 #include "intern/bmesh_operators_private.h" /* own include */
 
 enum {
@@ -175,6 +177,9 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		BMO_dim_flag_enable(bm, (BMDim *)d, EXT_KEEP);
 		MEM_freeN (v_arr);
 	}
+
+	mdm->value = get_dimension_value (d);
+	dimension_data_update(d);
 
 	BM_ITER_MESH(d, &iter, bm, BM_DIMS_OF_MESH) {
 		if (BMO_dim_flag_test(bm,d, EXT_KEEP)) {

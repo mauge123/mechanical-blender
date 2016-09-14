@@ -73,6 +73,7 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
 #include "DNA_userdef_types.h"
+#include "DNA_meshdata_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -2498,6 +2499,62 @@ static size_t animdata_filter_ds_keyanim(bAnimContext *ac, ListBase *anim_data, 
 	return items;
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static size_t animdata_filter_ds_dim(bAnimContext *ac, ListBase *anim_data, bDopeSheet *ads, MDim *mdim, int filter_mode)
+{
+	ListBase tmp_data = {NULL, NULL};
+	size_t tmp_items = 0;
+	size_t items = 0;
+
+	AnimData *adt = mdim->adt;
+	short type = 0, expanded = 1;
+	void *cdata = NULL;
+
+	/* determine the type of expander channels to use */
+	/* this is the best way to do this for now... */
+	ANIMDATA_FILTER_CASES(mdim,
+		{ /* AnimData - no channel, but consider data */ },
+		{ /* NLA - no channel, but consider data */ },
+		{ /* Drivers */
+			type = ANIMTYPE_FILLDRIVERS;
+			cdata = adt;
+			expanded = EXPANDED_DRVD(adt);
+		},
+		{ /* NLA Strip Controls - no dedicated channel for now (XXX) */ },
+		{ /* Keyframes */
+			type = ANIMTYPE_FILLACTD;
+			cdata = adt->action;
+			expanded = EXPANDED_ACTC(adt->action);
+		});
+
+	/* add object-level animation channels */
+	BEGIN_ANIMFILTER_SUBCHANNELS(expanded)
+	{
+		/* animation data filtering */
+		tmp_items += animfilter_block_data(ac, &tmp_data, ads, (ID *)mdim, filter_mode);
+	}
+	END_ANIMFILTER_SUBCHANNELS;
+
+	/* did we find anything? */
+	if (tmp_items) {
+		/* include anim-expand widget first */
+		if (filter_mode & ANIMFILTER_LIST_CHANNELS) {
+			if (type != ANIMTYPE_NONE) {
+				/* NOTE: active-status (and the associated checks) don't apply here... */
+				ANIMCHANNEL_NEW_CHANNEL(cdata, type, mdim);
+			}
+		}
+
+		/* now add the list of collected channels */
+		BLI_movelisttolist(anim_data, &tmp_data);
+		BLI_assert(BLI_listbase_is_empty(&tmp_data));
+		items += tmp_items;
+	}
+
+	/* return the number of items added to the list */
+	return items;
+}
+#endif
 
 /* object-level animation */
 static size_t animdata_filter_ds_obanim(bAnimContext *ac, ListBase *anim_data, bDopeSheet *ads, Object *ob, int filter_mode)
@@ -2602,6 +2659,16 @@ static size_t animdata_filter_dopesheet_ob(bAnimContext *ac, ListBase *anim_data
 		if ((ob->gpd) && !(ads->filterflag & ADS_FILTER_NOGPENCIL)) {
 			tmp_items += animdata_filter_ds_gpencil(ac, &tmp_data, ads, ob->gpd, filter_mode);
 		}
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+		if (((Mesh*)ob->data)->totdim) {
+			Mesh* me = ob->data;
+			for (int i=0;i<me->totdim;i++) {
+				tmp_items += animdata_filter_ds_dim(ac, &tmp_data, ads, me->mdim[i], filter_mode);
+			}
+		}
+#endif
+
 	}
 	END_ANIMFILTER_SUBCHANNELS;
 	

@@ -706,6 +706,9 @@ extern StructRNA RNA_WorldTextureSlot;
 extern StructRNA RNA_XnorController;
 extern StructRNA RNA_XorController;
 
+// WITH_MECHANICAL_MESH_DIMENSIONS
+extern StructRNA RNA_MDim;
+
 /* Pointer
  *
  * These functions will fill in RNA pointers, this can be done in three ways:
