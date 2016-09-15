@@ -182,25 +182,25 @@ static void apply_scale_factor_clamp(float *val, const int tot, const float ve_m
 static int v3d_mesh_constraints_buts(BMDim *edm, int totdim, uiBlock *block,int *constraints, int yi, int buth, int but_margin) {
 
 	// Enable / Disable according setting
-	bool all = (edm == NULL) || totdim > 1;
-	bool none = (edm != NULL) && ((*constraints & DIM_CONSTRAINT_OVERRIDE) == 0);
+	bool all = totdim > 1;
+	bool none = ((*constraints & DIM_CONSTRAINT_OVERRIDE) == 0);
 
-	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_PLANE_CONSTRAINT))), "Valid Contraint");
+	UI_block_lock_set(block,none || !(all || valid_constraint_setting (edm, DIM_PLANE_CONSTRAINT)), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_PLANE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Plane Constraint"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic plane constraint: Coplanar vertexs get same translation"));
 	UI_block_lock_clear(block);
 
-	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_AXIS_CONSTRAINT))), "Valid Contraint");
+	UI_block_lock_set(block,none || !(all || valid_constraint_setting (edm, DIM_AXIS_CONSTRAINT)), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_AXIS_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Axis Constraint"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic axis constraint: Vertex to same distance to dimension axis get same translation"));
 	UI_block_lock_clear(block);
 
-	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_ALLOW_SLIDE_CONSTRAINT))), "Valid Contraint");
+	UI_block_lock_set(block,none || !(all || valid_constraint_setting (edm, DIM_ALLOW_SLIDE_CONSTRAINT)), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_ALLOW_SLIDE_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Allow Slide"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Allow Slide: Changed vertex by dimension can change position"));
 	UI_block_lock_clear(block);
 
-	UI_block_lock_set(block,none || !(all || (edm && valid_constraint_setting (edm, DIM_CONCENTRIC_CONSTRAINT))), "Valid Contraint");
+	UI_block_lock_set(block,none || !(all || valid_constraint_setting (edm, DIM_CONCENTRIC_CONSTRAINT)), "Valid Contraint");
 	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONCENTRIC_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Concetric"),0, yi -= buth + but_margin, 200, buth,
 		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic concentric constraint: Concentric data will be aplied same distance to axis"));
 	UI_block_lock_clear(block);
@@ -249,8 +249,6 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 
 		/* global dimension settings */
 		tfp->constraints = ts->dimension_constraints;
-
-		yi= v3d_mesh_constraints_buts(NULL, totdim, block,&tfp->constraints, yi, buth, but_margin);
 
 		if (totdim) {
 			/* Individual dimension settings */

@@ -84,8 +84,7 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        with_freestyle = bpy.app.build_options.freestyle
-
+    
         mesh = context.active_object.data
         scene = context.scene
 
@@ -102,8 +101,22 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
         col.prop(scene, "geom_ortho_point", text="Snap to Perpendicular Point")
         col.prop(scene, "geom_tangent_point", text="Snap to Tangent Point")
                 
-
-
+class SCENE_PT_dimenion(SceneButtonsPanel, Panel):
+    bl_label = "Dimensions"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+    
+    def draw(self, context):
+        layout = self.layout
+        
+        split = layout.split()
+        
+        col = split.column() 
+        col.label(text="Default Constraints:")
+        col.prop(context.tool_settings, "dimension_constraint_plane")
+        col.prop(context.tool_settings, "dimension_constraint_axis")
+        col.prop(context.tool_settings, "dimension_constraint_concentric")
+        col.prop(context.tool_settings, "dimension_constraint_allow_slide")
+                
 class SCENE_PT_unit(SceneButtonsPanel, Panel):
     bl_label = "Units"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}

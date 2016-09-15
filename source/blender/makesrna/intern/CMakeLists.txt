@@ -166,9 +166,6 @@ set(SRC
 	../../../../intern/guardedalloc/intern/mmap_win.c
 )
 
-set(INC
-
-)
 
 set(INC_SYS
 
@@ -324,6 +321,10 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 	add_definitions(-DWITH_MECHANICAL_UCS)
+
+	list(APPEND INC
+		../../mechanical/
+	)
 endif()
 
 

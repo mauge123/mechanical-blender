@@ -76,6 +76,8 @@
 
 #include "BLI_threads.h"
 
+#include "mesh_dimensions.h"
+
 #ifdef WITH_OPENEXR
 EnumPropertyItem rna_enum_exr_codec_items[] = {
 	{R_IMF_EXR_CODEC_NONE, "NONE", 0, "None", ""},
@@ -2859,6 +2861,26 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);
 	RNA_def_property_struct_type(prop, "MeshStatVis");
 	RNA_def_property_ui_text(prop, "Mesh Statistics Visualization", NULL);
+
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+
+	prop = RNA_def_property(srna, "dimension_constraint_plane", PROP_BOOLEAN , PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dimension_constraints", DIM_PLANE_CONSTRAINT);
+	RNA_def_property_ui_text(prop, "Plane Constraint", "Enables auto dimension constraint to plane");
+
+	prop = RNA_def_property(srna, "dimension_constraint_axis", PROP_BOOLEAN , PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dimension_constraints", DIM_AXIS_CONSTRAINT);
+	RNA_def_property_ui_text(prop, "Axis Constraint", "Enables auto dimension constraint to axis");
+
+	prop = RNA_def_property(srna, "dimension_constraint_allow_slide", PROP_BOOLEAN , PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dimension_constraints", DIM_ALLOW_SLIDE_CONSTRAINT);
+	RNA_def_property_ui_text(prop, "Allow Slide", "Enables auto dimension constraint allow slide");
+
+	prop = RNA_def_property(srna, "dimension_constraint_concentric", PROP_BOOLEAN , PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dimension_constraints", DIM_CONCENTRIC_CONSTRAINT);
+	RNA_def_property_ui_text(prop, "Concentric Constraint", "Enables auto dimension concentric constraint");
+
+#endif
 }
 
 static void rna_def_unified_paint_settings(BlenderRNA  *brna)
@@ -7220,50 +7242,50 @@ void RNA_def_scene(BlenderRNA *brna)
 	/* Scene API */
 	RNA_api_scene(srna);
 
-//WITH MECHANICAL_GEOMETRY
-	//Line end
+// WITH MECHANICAL_GEOMETRY
+	// Line end
 	prop = RNA_def_property(srna, "geom_line_end_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_LINE_END_POINT);
 	RNA_def_property_ui_text(prop, "Snap to ends geometry points",
 							 "Snap to ends points on Snap Geometry Mode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
 
-	//Line mid
+	// Line mid
 	prop = RNA_def_property(srna, "geom_line_mid_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_LINE_MID_POINT);
 	RNA_def_property_ui_text(prop, "Snap to mid geometry point",
 							 "Snap to Mid Point on Snap Geometry Mode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
 
-	//Arc end
+	// Arc end
 	prop = RNA_def_property(srna, "geom_arc_end_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_ARC_END_POINT);
 	RNA_def_property_ui_text(prop, "Snap to ends geometry points",
 							 "Snap to ends points on Snap Geometry Mode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
 
-	//Mid Arc
+	// Mid Arc
 	prop = RNA_def_property(srna, "geom_arc_mid_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_ARC_MID_POINT);
 	RNA_def_property_ui_text(prop, "Snap to mid geometry point",
 							 "Snap to Mid Point on Snap Geometry Mode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
 
-	//Center Circle and Arc
+	// Center Circle and Arc
 	prop = RNA_def_property(srna, "geom_center_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_CENTER_POINT);
 	RNA_def_property_ui_text(prop, "Snap to Center Geometry Point",
 							 "Snap to Center Point on Snap Geometry Mode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
 
-	//Perpendicular Circle and Arc
+	// Perpendicular Circle and Arc
 	prop = RNA_def_property(srna, "geom_ortho_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_ORTHO_POINT);
 	RNA_def_property_ui_text(prop, "Snap to Ortho Geometry Point",
 							 "Snap to Ortho Point on Snap Geometry Mode");
 	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
 
-	//Tangent Circle and Arc
+	// Tangent Circle and Arc
 	prop = RNA_def_property(srna, "geom_tangent_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_TANGENT_POINT);
 	RNA_def_property_ui_text(prop, "Snap to Tangent Point",
