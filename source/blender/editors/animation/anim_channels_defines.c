@@ -1281,10 +1281,21 @@ static int acf_filldrivers_icon(bAnimListElem *UNUSED(ale))
 	return ICON_DRIVER;
 }
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+static void acf_filldrivers_name(bAnimListElem *ale, char *name)
+{
+	if (GS(ale->id->name) == ID_DM) {
+		BLI_strncpy(name, ale->id->name+2, ANIM_CHAN_NAME_SIZE);
+	} else {
+		BLI_strncpy(name, IFACE_("Drivers"), ANIM_CHAN_NAME_SIZE);
+	}
+}
+#else
 static void acf_filldrivers_name(bAnimListElem *UNUSED(ale), char *name)
 {
 	BLI_strncpy(name, IFACE_("Drivers"), ANIM_CHAN_NAME_SIZE);
 }
+#endif
 
 /* check if some setting exists for this channel */
 // TODO: this could be made more generic

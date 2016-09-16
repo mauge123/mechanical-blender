@@ -2661,10 +2661,12 @@ static size_t animdata_filter_dopesheet_ob(bAnimContext *ac, ListBase *anim_data
 		}
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		if (((Mesh*)ob->data)->totdim) {
+		if (ob->type == OB_MESH) {
 			Mesh* me = ob->data;
-			for (int i=0;i<me->totdim;i++) {
-				tmp_items += animdata_filter_ds_dim(ac, &tmp_data, ads, me->mdim[i], filter_mode);
+			if (me->totdim) {
+				for (int i=0;i<me->totdim;i++) {
+					tmp_items += animdata_filter_ds_dim(ac, &tmp_data, ads, me->mdim[i], filter_mode);
+				}
 			}
 		}
 #endif
