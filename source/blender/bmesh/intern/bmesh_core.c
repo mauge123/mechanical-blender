@@ -3172,8 +3172,7 @@ BMDim *BM_dim_create(
 		((BMDim_OFlag *)edm)->oflags = bm->dtoolflagpool ? BLI_mempool_calloc(bm->dtoolflagpool) : NULL;
 	}
 
-	edm->mdim->dim_type = dim_type;
-	edm->mdim->constraints = 0;
+
 
 	edm->totverts = v_count;
 	edm->v = MEM_mallocN(sizeof(MVert*)*edm->totverts, "Dimension vertex pointer array");
@@ -3188,57 +3187,60 @@ BMDim *BM_dim_create(
 
 	BM_elem_flag_disable (edm, BM_ELEM_TAG);
 
-	switch (dim_type) {
-		case DIM_TYPE_LINEAR:
-			BLI_assert (v_count >= 2);
-			BLI_assert (edm->v[0]  != edm->v[1]);
+	if (create_flag & BM_CREATE_SET_DEFAULT_DATA) {
+		edm->mdim->dim_type = dim_type;
+		edm->mdim->constraints = 0;
 
-			sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
+		switch (dim_type) {
+			case DIM_TYPE_LINEAR:
+				BLI_assert (v_count >= 2);
+				BLI_assert (edm->v[0]  != edm->v[1]);
 
-			// If they are on ref plane, apply normal
-			BM_ITER_MESH(erf, &iter, bm, BM_REFERENCES_OF_MESH) {
-				reference_plane_normal(erf, no1);
-				if (point_on_plane(erf->v1,no1,edm->v[0]->co) && point_on_plane(erf->v1,no1,edm->v[1]->co)){
-					break;
+				sub_v3_v3v3(vect,edm->v[0]->co,edm->v[1]->co);
+
+				// If they are on ref plane, apply normal
+				BM_ITER_MESH(erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+					reference_plane_normal(erf, no1);
+					if (point_on_plane(erf->v1,no1,edm->v[0]->co) && point_on_plane(erf->v1,no1,edm->v[1]->co)){
+						break;
+					}
 				}
-			}
-			if (!erf) {
-				cross_v3_v3v3(no1,vect, edm->v[0]->no);
-			}
+				if (!erf) {
+					cross_v3_v3v3(no1,vect, edm->v[0]->no);
+				}
 
-			cross_v3_v3v3(no2,no1,vect);
-			normalize_v3(no2);
+				cross_v3_v3v3(no2,no1,vect);
+				normalize_v3(no2);
 
-			edm->mdim->dpos_fact = 0.5f;
-			copy_v3_v3(edm->mdim->fpos, no2);
-			break;
-		case DIM_TYPE_DIAMETER:
-		case DIM_TYPE_RADIUS:
-			BLI_assert (v_count >= 3);
+				edm->mdim->dpos_fact = 0.5f;
+				copy_v3_v3(edm->mdim->fpos, no2);
+				break;
+			case DIM_TYPE_DIAMETER:
+			case DIM_TYPE_RADIUS:
+				BLI_assert (v_count >= 3);
 
-			set_dimension_center(edm);
+				set_dimension_center(edm);
 
-			//set direction
-			sub_v3_v3v3(edm->mdim->fpos,edm->v[0]->co, edm->mdim->center);
-			normalize_v3(edm->mdim->fpos);
-			edm->mdim->dpos_fact = 0.5f;
-			break;
-		case DIM_TYPE_ANGLE_3P_CON:
-			BLI_assert (v_count >= 6);
-		case DIM_TYPE_ANGLE_4P:
-			BLI_assert (v_count >= 4);
-		case DIM_TYPE_ANGLE_3P:
-			BLI_assert (v_count >= 3);
-			copy_v3_v3(edm->mdim->center, edm->v[1]->co);
-			//set direction
-			sub_v3_v3v3(edm->mdim->fpos,edm->mdim->center, edm->v[2]->co);
-			normalize_v3(edm->mdim->fpos);
-			edm->mdim->dpos_fact = 0.5f;
-			break;
-		default:
-			BLI_assert(0);
-
-
+				//set direction
+				sub_v3_v3v3(edm->mdim->fpos,edm->v[0]->co, edm->mdim->center);
+				normalize_v3(edm->mdim->fpos);
+				edm->mdim->dpos_fact = 0.5f;
+				break;
+			case DIM_TYPE_ANGLE_3P_CON:
+				BLI_assert (v_count >= 6);
+			case DIM_TYPE_ANGLE_4P:
+				BLI_assert (v_count >= 4);
+			case DIM_TYPE_ANGLE_3P:
+				BLI_assert (v_count >= 3);
+				copy_v3_v3(edm->mdim->center, edm->v[1]->co);
+				//set direction
+				sub_v3_v3v3(edm->mdim->fpos,edm->mdim->center, edm->v[2]->co);
+				normalize_v3(edm->mdim->fpos);
+				edm->mdim->dpos_fact = 0.5f;
+				break;
+			default:
+				BLI_assert(0);
+		}
 	}
 
 

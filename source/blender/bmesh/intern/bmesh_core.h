@@ -43,6 +43,7 @@ typedef enum eBMCreateFlag {
 	BM_CREATE_SKIP_CD   = (1 << 2),
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BM_CREATE_USE_SELECT_ORDER   = (1 << 3),
+	BM_CREATE_SET_DEFAULT_DATA = (1 << 4)
 #endif
 } eBMCreateFlag;
 
