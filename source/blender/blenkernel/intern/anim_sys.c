@@ -2894,6 +2894,10 @@ void BKE_animsys_evaluate_all_animation(Main *main, Scene *scene, float ctime)
 	 */
 	EVAL_ANIM_IDS(main->object.first, 0); 
 
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+	EVAL_ANIM_IDS(main->dimensions.first, ADT_RECALC_ANIM);
+#endif
+
 	/* masks */
 	EVAL_ANIM_IDS(main->mask.first, ADT_RECALC_ANIM);
 	
