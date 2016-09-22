@@ -482,6 +482,9 @@ void bmo_delete_exec(BMesh *bm, BMOperator *op)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	BMO_slot_buffer_flag_enable(bm, delop->slots_in, "dims", BM_ALL_NOLOOP, DEL_INPUT);
 #endif
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BMO_slot_buffer_flag_enable(bm, delop->slots_in, "refs", BM_ALL_NOLOOP, DEL_INPUT);
+#endif
 
 	BMO_mesh_delete_oflag_context(bm, DEL_INPUT, BMO_slot_int_get(op->slots_in, "context"));
 

@@ -1303,7 +1303,8 @@ static BMOpDefine bmo_delete_def = {
 	"delete",
 	/* slots_in */
 	{{"geom", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE}},
-	{"dims", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},
+	 {"dims", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},
+	 {"refs", BMO_OP_SLOT_ELEMENT_BUF, {BM_REFERENCE}},
 	 {"context", BMO_OP_SLOT_INT},  /* enum DEL_VERTS ... */
 	 {{'\0'}},
 	},

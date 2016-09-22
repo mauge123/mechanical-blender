@@ -392,7 +392,7 @@ static int edbm_delete_exec(bContext *C, wmOperator *op)
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 		case MESH_DELETE_REFERENCE:
-			if (!EDBM_op_callf(em, op, "delete geom=%hv context=%i", BM_ELEM_SELECT, DEL_REFERENCE))  /* Erase DIM */
+			if (!EDBM_op_callf(em, op, "delete refs=%hr context=%i", BM_ELEM_SELECT, DEL_REFERENCE))  /* Erase DIM */
 				return OPERATOR_CANCELLED;
 			break;
 #endif

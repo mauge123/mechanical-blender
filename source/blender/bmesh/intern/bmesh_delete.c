@@ -146,10 +146,6 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 {
 	BMEdge *e;
 	BMFace *f;
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BMDim *erf;
-	BMIter riter;
-#endif
 
 	BMIter eiter;
 	BMIter fiter;
@@ -257,11 +253,6 @@ void BMO_mesh_delete_oflag_context(BMesh *bm, const short oflag, const int type)
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 		case DEL_REFERENCE:
 		{
-			BM_ITER_MESH (erf, &riter, bm, BM_REFERENCES_OF_MESH) {
-				if (!BMO_elem_flag_test(bm, erf, oflag)) {
-					BMO_elem_flag_enable(bm, erf, oflag);
-				}
-			}
 			bmo_remove_tagged_references(bm, oflag);
 			break;
 		}
