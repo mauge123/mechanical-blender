@@ -238,12 +238,12 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 				BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
 					// check diension data udate
 					if (get_dimension_value (edm) != edm->mdim->value) {
-						if (!G.moving) {
-							// Not moving, force the dim value
-							apply_dimension_value(bm,edm,edm->mdim->value,scene->toolsettings);
+						if (edm->mdim->value == edm->mdim->value_pr) {
+							// Changed vertex position
+							edm->mdim->value =  get_dimension_value (edm);
 						} else {
-							// Moving: set the dim value
-							edm->mdim->value = get_dimension_value (edm);
+							// Changed dimension value
+							apply_dimension_value(bm,edm,edm->mdim->value,scene->toolsettings);
 						}
 						dimension_data_update(edm);
 					}

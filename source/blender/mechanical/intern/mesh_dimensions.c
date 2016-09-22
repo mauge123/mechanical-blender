@@ -622,6 +622,8 @@ static void ensure_fpos_on_plane (BMDim *edm){
 void dimension_data_update (BMDim *edm) {
 	float axis[3], v1[3],v2[3], l;
 
+	edm->mdim->value_pr = edm->mdim->value;
+
 	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			// Set dimension always perpendicular to edge

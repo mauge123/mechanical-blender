@@ -71,11 +71,16 @@ typedef struct MVert {
 } MVert;
 
 // WITH_MECHANICAL_MESH_DIMENSION
+// Mdim::flag
+// SELECT			(1 << 0)
+
 typedef struct MDim {
 	ID id;
 	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
 
 	Object *ob;
+
+	unsigned int *v; /* Array of vertexs */
 
 	int totverts;
 	int dim_type;
@@ -98,12 +103,11 @@ typedef struct MDim {
 	float tpos[3]; //while moving: used when tagged
 
 	float value; //stored value
+	float value_pr; //previous value
 
 	char flag;
 
-	char pad[3];
-
-	unsigned int *v; /* Array of vertexs */
+	char pad[7];
 
 } MDim;
 /* */

@@ -819,7 +819,7 @@ void BM_mesh_bm_to_me(
 
 		me->mdim[i] = edm->mdim;
 		me->mdim[i]->totverts = edm->totverts;
-		me->mdim[i]->flag = BM_dimension_flag_to_mflag(edm);
+		me->mdim[i]->flag |= BM_dimension_flag_to_mflag(edm);
 		me->mdim[i]->v = MEM_callocN(sizeof(int)*edm->totverts, "Mesh Dimension index array");
 		for (int n=0;n<edm->totverts;n++) {
 			me->mdim[i]->v[n] = BM_elem_index_get(edm->v[n]);
