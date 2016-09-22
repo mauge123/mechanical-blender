@@ -250,7 +250,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
 						if (!G.moving) {
-							// Untag
+							// Just in case
 							BM_elem_flag_disable(edm, BM_ELEM_TAG);
 						}
 					}

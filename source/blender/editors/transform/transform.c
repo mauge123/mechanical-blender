@@ -95,6 +95,7 @@
 #include "transform.h"
 #include "mesh_references.h"
 #include "mechanical_geometry.h"
+#include "mesh_dimensions.h"
 
 /* Disabling, since when you type you know what you are doing, and being able to set it to zero is handy. */
 // #define USE_NUM_NO_ZERO
@@ -2919,10 +2920,21 @@ int transformEnd(bContext *C, TransInfo *t)
 				em = BKE_editmesh_from_object(t->obedit);
 			}
 			if (em) {
-				mechanical_update_mesh_geometry(BKE_editmesh_from_object(t->obedit));
+				mechanical_update_mesh_geometry(em);
 			}
 		}
 #endif
+
+#ifdef WITH_MECHANICAL
+		// Untag the dimension, so tpos will not be considered on movements
+		if (em) {
+			BMDim *edm=get_selected_dimension(em->bm);
+			if (edm) {
+				BM_elem_flag_disable(edm, BM_ELEM_TAG);
+			}
+		}
+#endif
+
 		/* aftertrans does insert keyframes, and clears base flags; doesn't read transdata */
 		special_aftertrans_update(C, t);
 
