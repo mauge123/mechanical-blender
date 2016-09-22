@@ -64,14 +64,23 @@ static int mechanical_dimension_data_action (BMEditMesh *em, int action, wmOpera
 	BMOperator bmop;
 	char op_str [255] = {0};
 
-	sprintf(op_str,"dimension_action %s %s", "dims=%hd", "action=%i");
+	sprintf(op_str,"dimension_action %s %s %s", "verts=%hv", "dims=%hd", "action=%i");
 
-	if (!EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, action)) {
+	if (!EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, BM_ELEM_SELECT, action)) {
 		return false;
 	}
 	BMO_op_exec(em->bm, &bmop);
 
-	BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "verts.out", BM_VERT, BM_ELEM_SELECT, true);
+	switch (action) {
+		case DIM_DATA_ACTION_SELECT:
+		case DIM_DATA_ACTION_SET:
+			BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "verts.out", BM_VERT, BM_ELEM_SELECT, true);
+			break;
+		case DIM_DATA_ACTION_RESET:
+			BMO_slot_buffer_hflag_disable(em->bm, bmop.slots_out, "verts.out", BM_VERT, BM_ELEM_SELECT, true);
+			break;
+	}
+
 
 	if (!EDBM_op_finish(em, &bmop, op, true)) {
 		return false;
@@ -295,7 +304,7 @@ void MESH_OT_mechanical_dimension_data_select(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Select dimension related data";
-	ot->description = "Selects dimensions related data, (vertexs)";
+	ot->description = "Selects dimension related data, (vertexs)";
 	ot->idname = "MESH_OT_mechanical_dimension_data_select";
 
 	/* api callbacks */
@@ -307,6 +316,44 @@ void MESH_OT_mechanical_dimension_data_select(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum(ot->srna,"action",dim_data_actions,DIM_DATA_ACTION_SELECT,"dimension data action","dimension data action");
 }
+
+
+void MESH_OT_mechanical_dimension_data_reset(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Reset dimension related data";
+	ot->description = "Remove extra vertices set on dimension";
+	ot->idname = "MESH_OT_mechanical_dimension_data_reset";
+
+	/* api callbacks */
+	ot->exec = mechanical_dimension_data_action_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"action",dim_data_actions,DIM_DATA_ACTION_RESET,"dimension data action","dimension data action");
+}
+
+
+void MESH_OT_mechanical_dimension_data_set(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Set dimension related data";
+	ot->description = "Replace dimension related data, (vertexs)";
+	ot->idname = "MESH_OT_mechanical_dimension_data_set";
+
+	/* api callbacks */
+	ot->exec = mechanical_dimension_data_action_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"action",dim_data_actions,DIM_DATA_ACTION_SET,"dimension data action","dimension data action");
+}
+
+
 
 
 

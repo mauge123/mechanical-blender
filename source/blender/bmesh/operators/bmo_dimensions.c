@@ -49,6 +49,11 @@ enum {
 };
 
 
+/*
+ * Create Dimension operators
+ *
+ */
+
 static BMVert** create_dimension_from_geometry_4p_angle(BMesh *UNUSED(bm), BMOperator *op){
 	BMOIter siter;
 	BMVert *(*v_arr) = NULL;
@@ -190,18 +195,96 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 	}
 }
 
-static void dimension_data_select (BMesh *bm, BMOperator *op) {
+/*
+ * Dimension data operators
+ *
+ */
+
+static void dimension_data_select(BMesh *bm, BMOperator *op) {
 	BMOIter siter;
 	BMDim *edm;
 
 	edm = BMO_iter_new(&siter, op->slots_in, "dims", BM_DIM);
 	for (; edm; edm = BMO_iter_step(&siter)) {
 		for (int i=0; i< edm->totverts; i++) {
+			// Just flag, select occurs later
 			BMO_vert_flag_enable(bm, edm->v[i], EXT_OUT);
 		}
 	}
 }
 
+static void dimension_data_reset(BMesh *bm, BMOperator *op) {
+	BMOIter siter;
+	BMDim *edm;
+	BMVert **vv;
+
+	edm = BMO_iter_new(&siter, op->slots_in, "dims", BM_DIM);
+	for (; edm; edm = BMO_iter_step(&siter)) {
+		int count = get_necessary_dimension_verts(edm->mdim->dim_type);
+		vv = MEM_callocN(sizeof (BMVert*)*count, "Replaced mdim vertices array");
+		for (int i= 0; i< edm->totverts; i++) {
+			if (i<count) {
+				vv[i] = edm->v[i];
+			} else {
+				// Flag to unselect
+				BMO_vert_flag_enable(bm, edm->v[i], EXT_OUT);
+			}
+		}
+		MEM_freeN(edm->v);
+		edm->v = vv;
+		edm->totverts = count;
+	}
+}
+
+static void dimension_data_set(BMesh *bm, BMOperator *op) {
+	BMOIter diter, viter;
+	BMDim *edm;
+	BMVert **vv;
+	BMVert *v;
+	int i =0;
+
+	edm = BMO_iter_new(&diter, op->slots_in, "dims", BM_DIM);
+	for (; edm; edm = BMO_iter_step(&diter)) {
+		int necessary = get_necessary_dimension_verts(edm->mdim->dim_type);
+		int total = necessary;
+
+		v = BMO_iter_new(&viter, op->slots_in, "verts", BM_VERT);
+		for (; v; v = BMO_iter_step(&viter)) {
+			// do not add already set as necessary verts
+			for (i=0;i<necessary && (v != edm->v[i]) ;i++);
+
+			if (i == necessary) {
+				BMO_vert_flag_enable(bm, v, EXT_KEEP);
+				total++;
+			}
+		}
+		vv = MEM_callocN(sizeof (BMVert*)* total, "Replaced mdim vertices array");
+
+		//set the necessary ones
+		for (i= 0; i< necessary ; i++) {
+			vv[i] = edm->v[i];
+			BMO_vert_flag_enable(bm, vv[i], EXT_OUT);
+		}
+
+		//set the new ones
+		v = BMO_iter_new(&viter, op->slots_in, "verts", BM_VERT);
+		for (; v; v = BMO_iter_step(&viter)) {
+			if (BMO_vert_flag_test(bm, v, EXT_KEEP)) {
+				BMO_vert_flag_disable (bm, v, EXT_KEEP);
+				BMO_vert_flag_enable(bm, v, EXT_OUT);
+				vv[i] = v;
+				i++;
+			} else {
+				//was a necessary vert
+			}
+
+		}
+
+		MEM_freeN(edm->v);
+		edm->v = vv;
+		edm->totverts = total;
+	}
+}
 
 void bmo_dimension_data_exec(BMesh *bm, BMOperator *op)
 {
@@ -211,6 +294,12 @@ void bmo_dimension_data_exec(BMesh *bm, BMOperator *op)
  	switch (BMO_slot_int_get(op->slots_in,"action")) {
 		case DIM_DATA_ACTION_SELECT:
 			dimension_data_select(bm,op);
+			break;
+		case DIM_DATA_ACTION_RESET:
+			dimension_data_reset(bm,op);
+			break;
+		case DIM_DATA_ACTION_SET:
+			dimension_data_set(bm,op);
 			break;
 	}
 

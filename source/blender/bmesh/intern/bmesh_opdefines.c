@@ -2080,6 +2080,7 @@ static BMOpDefine bmo_dimension_data_def = {
 	"dimension_action",
 	/* slots_in */
 	{{"dims", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},    /* input dimensions*/
+	 {"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},    /* input vertices*/
 	 {"action",BMO_OP_SLOT_INT},
 	 {{'\0'}},
 	},
