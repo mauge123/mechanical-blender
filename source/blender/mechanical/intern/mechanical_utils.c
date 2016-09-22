@@ -46,6 +46,21 @@ void tag_vertexs_on_coplanar_faces(BMesh *bm, float *point, float* dir){
 	}
 }
 
+void tag_vertexs_on_plane(BMesh *bm, float *p, float *n) {
+	BMVert *eve;
+	BMIter iter;
+
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		if (!BM_elem_flag_test(eve, BM_ELEM_TAG)) {
+			if (point_on_plane_prec(eve->co, n, p)) {
+				BM_elem_flag_enable(eve, BM_ELEM_TAG);
+			}
+		} else {
+			// Already Tagged
+		}
+	}
+}
+
 void tag_vertexs_affected_by_dimension (BMesh *bm, BMDim *edm)
 {
 	BMIter iter;
@@ -108,8 +123,8 @@ bool point_on_axis (float *c, float *a, float *p) {
 
 bool point_on_axis_prec(float *c, float*a, float *p) {
 	float v2[3];
-	sub_v3_v3v3(v2,p,c);
-	normalize_v3(v2);
+	sub_v3_v3v3_prec(v2,p,c);
+	normalize_v3_prec(v2);
 	return parallel_v3u_v3u_prec(a,v2);
 }
 
@@ -125,6 +140,28 @@ float point_dist_to_plane (float *c, float *a, float *p){
 	float r[3],m[3];
 	sub_v3_v3v3(r,p,c);
 	project_v3_v3v3(m,r,a);
+	return len_v3(m);
+}
+
+
+/**
+ * Project \a p onto \a v_proj
+ */
+void project_v3_v3v3_prec(float out[3], const float p[3], const float v_proj[3])
+{
+	const float mul = dot_v3v3_prec(p, v_proj) / dot_v3v3_prec(v_proj, v_proj);
+
+	out[0] = mul * v_proj[0];
+	out[1] = mul * v_proj[1];
+	out[2] = mul * v_proj[2];
+}
+
+
+
+float point_dist_to_plane_prec (float *c, float *a, float *p){
+	float r[3],m[3];
+	sub_v3_v3v3_prec(r,p,c);
+	project_v3_v3v3_prec(m,r,a);
 	return len_v3(m);
 }
 
@@ -145,6 +182,11 @@ float point_dist_to_axis (float *c, float *a, float *p) {
  */
 bool point_on_plane (float *c, float *a, float *p) {
 	return fabs(point_dist_to_plane(c,a,p))<DIM_CONSTRAINT_PRECISION;
+}
+
+
+bool point_on_plane_prec (float *c, float *a, float *p) {
+	return (point_dist_to_plane_prec(c,a,p) == 0.0);
 }
 
 

@@ -197,15 +197,16 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[1]->co);
 		normalize_v3(d_dir);
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
+		tag_vertexs_on_plane(bm, p , d_dir);
 	}
 	// Untag dimensions vertex
 	untag_dimension_necessary_verts(edm);
 
 
 	// Update Dimension Verts
-	if(edm->mdim->dir==1){
+	if(edm->mdim->dir == DIM_DIR_RIGHT){
 		apply_dimension_linear_value_exec(edm->v[1]->co,edm->v[0]->co, value, v);
-	}else if(edm->mdim->dir==-1){
+	}else if(edm->mdim->dir== DIM_DIR_LEFT){
 		apply_dimension_linear_value_exec(edm->v[0]->co,edm->v[1]->co, value, v);
 	}
 
@@ -316,6 +317,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 	if ((constraints & DIM_PLANE_CONSTRAINT) &&  (~constraints &  DIM_CONCENTRIC_CONSTRAINT )) {
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
+		tag_vertexs_on_plane(bm, p, d_dir);
 	}
 
 	if (edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
