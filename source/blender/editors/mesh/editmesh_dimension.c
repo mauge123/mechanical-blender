@@ -117,6 +117,11 @@ static int mechanical_dimension_data_action_exec(bContext *C, wmOperator *op)
 		ret = OPERATOR_CANCELLED;
 	}
 
+	/* to push this up to edges & faces. */
+	EDBM_selectmode_flush_ex(em, SCE_SELECT_VERTEX);
+
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+
 	return ret;
 }
 
@@ -170,6 +175,9 @@ static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 		BKE_report(op->reports, RPT_ERROR, "invalid selection for dimension");
 		ret = OPERATOR_CANCELLED;
 	}
+
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+
 	return ret;
 }
 

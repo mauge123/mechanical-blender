@@ -98,6 +98,8 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+
 	return OPERATOR_FINISHED;
 
 }
