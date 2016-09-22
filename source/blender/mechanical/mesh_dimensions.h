@@ -9,6 +9,11 @@
 #define DIM_ALLOW_SLIDE_CONSTRAINT (1<<3)
 #define DIM_CONCENTRIC_CONSTRAINT (1<<4)
 
+#define DIM_DIR_LEFT    1
+#define DIM_DIR_RIGHT   2
+#define DIM_DIR_BOTH    3
+#define DIM_DIR_AUTO	4
+
 #include "DNA_scene_types.h"
 
 
@@ -27,7 +32,7 @@ void dimension_data_update(BMDim *edm);
 
 void set_dimension_center(BMDim *edm);
 
-void select_dimension_data(BMDim *edm, void *context);
+void set_dimension_direction(BMDim *edm, void *context);
 
 /* Common use */
 void mid_of_2_points(float *mid, float *p1, float *p2);

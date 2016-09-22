@@ -3190,6 +3190,8 @@ BMDim *BM_dim_create(
 	if (create_flag & BM_CREATE_SET_DEFAULT_DATA) {
 		edm->mdim->dim_type = dim_type;
 		edm->mdim->constraints = 0;
+		edm->mdim->dir_flag = DIM_DIR_BOTH;
+		edm->mdim->dir = DIM_DIR_BOTH;
 
 		switch (dim_type) {
 			case DIM_TYPE_LINEAR:

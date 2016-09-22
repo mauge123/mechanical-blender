@@ -87,6 +87,7 @@ typedef struct MDim {
 
 	// Linear Dimension
 	int dir;  // Direction, to which side the value should be modified
+	int dir_flag; //Wich direction to use
 	float end[3], start[3];  //Points of base line
 
 	// Diameter Dimension
@@ -97,11 +98,12 @@ typedef struct MDim {
 	float tpos[3]; //while moving: used when tagged
 
 	float value; //stored value
-	unsigned int *v; /* Array of vertexs */
 
 	char flag;
 
-	char pad[7];
+	char pad[3];
+
+	unsigned int *v; /* Array of vertexs */
 
 } MDim;
 /* */

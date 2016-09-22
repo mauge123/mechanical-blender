@@ -3694,7 +3694,7 @@ class VIEW3D_PT_transform_orientations(Panel):
             row.operator("transform.delete_orientation", text="", icon='X')
 
             row = layout.row(align=True)
-            layout.column().prop(orientation, "origin", text="Global Origin")
+            layout.column().prop(orientation, "origin", text="Origin Global Coordinates")
 
 
 class VIEW3D_PT_etch_a_ton(Panel):

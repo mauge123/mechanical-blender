@@ -2947,10 +2947,10 @@ static void draw_dimension_direction_points(BMDim *edm)
 	if (BM_elem_flag_test(edm, BM_ELEM_SELECT)){
 
 		glBegin(GL_POINTS);
-		if(edm->mdim->dir==1 || edm->mdim->dir == 0){
+		if(edm->mdim->dir == DIM_DIR_RIGHT || edm->mdim->dir == DIM_DIR_BOTH){
 			glVertex3fv(edm->mdim->end);
 		}
-		if(edm->mdim->dir==-1 || edm->mdim->dir == 0){
+		if(edm->mdim->dir == DIM_DIR_LEFT || edm->mdim->dir == DIM_DIR_BOTH){
 			glVertex3fv(edm->mdim->start);
 		}
 		glEnd();

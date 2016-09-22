@@ -1998,7 +1998,7 @@ void MESH_OT_select_interior_faces(wmOperatorType *ot)
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-void select_dimension_data (BMDim *edm, void *context) {
+void set_dimension_direction (BMDim *edm, void *context) {
 	ViewContext *vc = (ViewContext*) context;
 	float screen_co_start[2];
 	float screen_co_end[2];
@@ -2017,40 +2017,52 @@ void select_dimension_data (BMDim *edm, void *context) {
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_4P:
 		case DIM_TYPE_ANGLE_3P_CON:
+			switch (edm->mdim->dir_flag) {
+				case DIM_DIR_AUTO:
+					ED_view3d_project_float_object(vc->ar,edm->mdim->start, screen_co_start, flag);
+					ED_view3d_project_float_object(vc->ar,edm->mdim->end, screen_co_end, flag);
 
-			ED_view3d_project_float_object(vc->ar,edm->mdim->start, screen_co_start, flag);
-			ED_view3d_project_float_object(vc->ar,edm->mdim->end, screen_co_end, flag);
+					ED_view3d_project_float_object(vc->ar,edm->mdim->dpos, screen_co_dpos, flag);
 
-			ED_view3d_project_float_object(vc->ar,edm->mdim->dpos, screen_co_dpos, flag);
-
-			len_start_end=len_v2v2(screen_co_start, screen_co_end);
-			len_start_click=len_v2v2(screen_co_start,fmval);
-			len_end_click=len_v2v2(screen_co_end, fmval);
-			len_dpos_end=len_v2v2(screen_co_dpos,screen_co_end);
-			len_dpos_start=len_v2v2(screen_co_dpos, screen_co_start);
+					len_start_end=len_v2v2(screen_co_start, screen_co_end);
+					len_start_click=len_v2v2(screen_co_start,fmval);
+					len_end_click=len_v2v2(screen_co_end, fmval);
+					len_dpos_end=len_v2v2(screen_co_dpos,screen_co_end);
+					len_dpos_start=len_v2v2(screen_co_dpos, screen_co_start);
 
 
-			if(len_dpos_end>len_start_end){
-				if(len_dpos_start-len_start_click>5){
-					edm->mdim->dir=-1;
-				}else if(len_dpos_start-len_start_click<-5){
-					edm->mdim->dir=1;
-				}else{
-					edm->mdim->dir=0;
-				}
-			}else {
-				if(len_dpos_end-len_end_click>5){
-					edm->mdim->dir=1;
-				}else if(len_dpos_end-len_end_click<-5){
-					edm->mdim->dir=-1;
-				}else {
-					edm->mdim->dir=0;
-				}
+					if(len_dpos_end>len_start_end){
+						if(len_dpos_start-len_start_click>5){
+							edm->mdim->dir = DIM_DIR_LEFT;
+						}else if(len_dpos_start-len_start_click<-5){
+							edm->mdim->dir= DIM_DIR_RIGHT;
+						}else{
+							edm->mdim->dir= DIM_DIR_BOTH;
+						}
+					}else {
+						if(len_dpos_end-len_end_click>5){
+							edm->mdim->dir = DIM_DIR_RIGHT;
+						}else if(len_dpos_end-len_end_click<-5){
+							edm->mdim->dir = DIM_DIR_LEFT;
+						}else {
+							edm->mdim->dir = DIM_DIR_BOTH;
+						}
+					}
+					break;
+				case DIM_DIR_LEFT:
+					edm->mdim->dir = DIM_DIR_LEFT;
+					break;
+				case DIM_DIR_RIGHT:
+					edm->mdim->dir = DIM_DIR_RIGHT;
+					break;
+				case DIM_DIR_BOTH:
+					edm->mdim->dir = DIM_DIR_BOTH;
+					break;
 			}
 			break;
 		case DIM_TYPE_DIAMETER:
 		case DIM_TYPE_RADIUS:
-			edm->mdim->dir = 0;
+			edm->mdim->dir = DIM_DIR_BOTH;
 			break;
 		default:
 			BLI_assert(0);
@@ -2225,23 +2237,23 @@ bool EDBM_select_pick(bContext *C, const int mval[2], bool extend, bool deselect
 				BM_select_history_remove(vc.em->bm, edm);
 				BM_dim_select_set(vc.em->bm, edm, false);
 				BM_select_history_store(vc.em->bm, edm);
-				select_dimension_data(edm, &vc);
+				set_dimension_direction(edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, true);
 			}
 			else if (deselect) {
 				BM_select_history_remove(vc.em->bm, edm);
-				select_dimension_data(edm, &vc);
+				set_dimension_direction(edm, &vc);
 				BM_dim_select_set(vc.em->bm, edm, false);
 			}
 			else {
 				if (!BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					BM_select_history_store(vc.em->bm, edm);
-					select_dimension_data(edm,&vc);
+					set_dimension_direction(edm,&vc);
 					BM_dim_select_set(vc.em->bm, edm, true);
 				}
 				else if (toggle) {
 					BM_select_history_remove(vc.em->bm, edm);
-					select_dimension_data(edm, &vc);
+					set_dimension_direction(edm, &vc);
 					BM_dim_select_set(vc.em->bm, edm, false);
 				}
 			}

@@ -173,15 +173,15 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 
 	BLI_assert (edm->mdim->dim_type == DIM_TYPE_LINEAR);
 
-	if (edm->mdim->dir == 0){
+	if (edm->mdim->dir == DIM_DIR_BOTH){
 		// Both directions
 		float len=get_dimension_value(edm);
 		float len2=(value-len)/2;
-		edm->mdim->dir = 1;
+		edm->mdim->dir = DIM_DIR_RIGHT;
 		apply_dimension_linear_value(bm, edm,(len+len2), constraints);
-		edm->mdim->dir = -1;
+		edm->mdim->dir = DIM_DIR_LEFT;
 		apply_dimension_linear_value(bm, edm,value,constraints);
-		edm->mdim->dir = 0;
+		edm->mdim->dir = DIM_DIR_BOTH;
 		return;
 	}
 
@@ -189,9 +189,9 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 
 	if (constraints & DIM_PLANE_CONSTRAINT) {
 		float p[3], d_dir[3];
-		if (edm->mdim->dir == -1) {
+		if (edm->mdim->dir == DIM_DIR_LEFT) {
 			copy_v3_v3(p, edm->v[0]->co);
-		} else if (edm->mdim->dir == 1) {
+		} else if (edm->mdim->dir == DIM_DIR_RIGHT) {
 			copy_v3_v3(p, edm->v[1]->co);
 		}
 		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[1]->co);
@@ -291,21 +291,21 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	get_dimension_plane(axis, pp, edm);
 	d = value - get_dimension_value(edm);
 
-	if (edm->mdim->dir == 0) {
+	if (edm->mdim->dir == DIM_DIR_BOTH) {
 		// Both sides
-		edm->mdim->dir = 1;
+		edm->mdim->dir = DIM_DIR_RIGHT;
 		apply_dimension_angle(bm, edm,value - d/2.0f, constraints);
-		edm->mdim->dir = -1;
+		edm->mdim->dir = DIM_DIR_LEFT;
 		apply_dimension_angle(bm, edm,value,constraints);
-		edm->mdim->dir = 0;
+		edm->mdim->dir = DIM_DIR_BOTH;
 		return;
 	}
 
 	// Get Dimension dir
-	if (edm->mdim->dir == 1) {
+	if (edm->mdim->dir == DIM_DIR_RIGHT) {
 		copy_v3_v3(p, edm->v[2]->co);
 		sub_v3_v3v3(r, edm->v[2]->co, edm->mdim->center);
-	} else if (edm->mdim->dir == -1) {
+	} else if (edm->mdim->dir == DIM_DIR_LEFT) {
 		copy_v3_v3(p, edm->v[0]->co);
 		sub_v3_v3v3(r, edm->v[0]->co, edm->mdim->center);
 	}
@@ -321,7 +321,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	if (edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
 
 		int i_ofs =  (edm->mdim->dim_type ==  DIM_TYPE_ANGLE_3P_CON) ? 3 : 4;
-		float *t = (edm->mdim->dir == 1) ? edm->v[2]->co : edm->v[0]->co;
+		float *t = (edm->mdim->dir == DIM_DIR_RIGHT) ? edm->v[2]->co : edm->v[0]->co;
 
 		if (center_of_3_points (ccenter, edm->v[i_ofs]->co, edm->v[i_ofs+1]->co, edm->v[i_ofs+2]->co))
 		{
@@ -380,13 +380,13 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		}
 	}
 
-	if (edm->mdim->dir == 1) {
+	if (edm->mdim->dir == DIM_DIR_RIGHT) {
 		apply_dimension_angle_exec(bm,edm->v[2],edm->mdim->center, axis,d,constraints, p_constraint_axis);
 		if (edm->mdim->dim_type == DIM_TYPE_ANGLE_4P){
 			apply_dimension_angle_exec(bm, edm->v[3],edm->mdim->center, axis,d,constraints, p_constraint_axis);
 		}
 	}
-	if (edm->mdim->dir == -1) {
+	if (edm->mdim->dir == DIM_DIR_LEFT) {
 		d = d*(-1);
 		apply_dimension_angle_exec(bm, edm->v[0],edm->mdim->center, axis, d,constraints, p_constraint_axis);
 		if (edm->mdim->dim_type == DIM_TYPE_ANGLE_4P){
@@ -408,7 +408,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 				// r_constraint_c has sign
 				mul_v3_fl(ncenter,r_constraint_c);
 				add_v3_v3(ncenter,ccenter2);
-				if (edm->mdim->dir == -1) {
+				if (edm->mdim->dir == DIM_DIR_LEFT) {
 					normal_tri_v3(naxis,ccenter1,ccenter2,ncenter);
 				} else {
 					normal_tri_v3(naxis,ccenter2,ccenter1,ncenter);

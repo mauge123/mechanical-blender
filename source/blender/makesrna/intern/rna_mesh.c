@@ -50,6 +50,7 @@
 #include "rna_internal.h"
 
 #include "WM_types.h"
+#include "mesh_dimensions.h"
 
 EnumPropertyItem rna_enum_mesh_delimit_mode_items[] = {
 	{BMO_DELIM_NORMAL, "NORMAL", 0, "Normal", "Delimit by face directions"},
@@ -3808,9 +3809,17 @@ static void rna_def_mesh(BlenderRNA *brna)
 	RNA_api_mesh(srna);
 }
 
-
 static void rna_def_dimension(BlenderRNA *brna)
 {
+
+	static EnumPropertyItem rna_enum_dimension_directions[] = {
+		{DIM_DIR_LEFT, "Left", 0, "LEFT", "Affect left side"},
+		{DIM_DIR_RIGHT, "Rigth", 0, "RIGHT", "Affect right side"},
+	    {DIM_DIR_BOTH, "Both", 0, "BOTH", "Affect both sides"},
+	    {DIM_DIR_AUTO, "Auto", 0, "AUTO", "Affect depending on mouse input"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	StructRNA *srna;
 	PropertyRNA *prop;
 
@@ -3823,6 +3832,10 @@ static void rna_def_dimension(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Value", "Dimension value");
 	RNA_def_property_float_funcs (prop, NULL, "rna_MDim_set_value" , NULL );
 
+	prop = RNA_def_property(srna, "direction", PROP_ENUM , PROP_NONE);
+	RNA_def_property_enum_sdna(prop,  NULL, "dir_flag");
+	RNA_def_property_enum_items(prop, rna_enum_dimension_directions);
+	RNA_def_property_ui_text(prop, "Direction", "Dimension Direction");
 }
 
 void RNA_def_mesh(BlenderRNA *brna)

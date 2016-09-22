@@ -247,10 +247,16 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 		const int buth = 20 * UI_DPI_FAC;
 		const int but_margin = 2;
 
+		PointerRNA ptr;
+		PropertyRNA *prop;
+
 		/* global dimension settings */
 		tfp->constraints = ts->dimension_constraints;
 
 		if (totdim) {
+			/* create RNA pointers */
+			RNA_pointer_create(&edm_sel->mdim->id, &RNA_MDim, edm_sel->mdim, &ptr);
+
 			/* Individual dimension settings */
 			uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("Dimension settings"), 0, yi -= buth + but_margin, 200, 20, NULL, 0, 0, 0, 0, "");
 
@@ -259,13 +265,14 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				edm_sel->mdim->id.name+2, 0, 50, 0, 0, TIP_("Dimension name"));
 
 
-			// Only one dimension
+			/* Dimension default dir */
+			prop = RNA_struct_find_property(&ptr, "direction");
+			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+
 			if (totdim == 1) {
-				PointerRNA ptr;
-				PropertyRNA *prop;
+				// Only one dimension
 
 				/* create RNA pointers */
-				RNA_pointer_create(&edm_sel->mdim->id, &RNA_MDim, edm_sel->mdim, &ptr);
 				prop = RNA_struct_find_property(&ptr, "value");
 
 				but = uiDefButR_prop(block,UI_BTYPE_NUM,0,IFACE_("Value:"),0,yi -= buth + but_margin, 200, buth,
