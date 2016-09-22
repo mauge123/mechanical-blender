@@ -58,6 +58,59 @@
 #include "mesh_dimensions.h"
 
 
+static int mechanical_dimension_data_action (BMEditMesh *em, int action, wmOperator *op)
+{
+
+	BMOperator bmop;
+	char op_str [255] = {0};
+
+	sprintf(op_str,"dimension_action %s %s", "dims=%hd", "action=%i");
+
+	if (!EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, action)) {
+		return false;
+	}
+	BMO_op_exec(em->bm, &bmop);
+
+	BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "verts.out", BM_VERT, BM_ELEM_SELECT, true);
+
+	if (!EDBM_op_finish(em, &bmop, op, true)) {
+		return false;
+	}
+
+	return true;
+}
+
+
+static int mechanical_dimension_data_action_exec(bContext *C, wmOperator *op)
+{
+	int ret = OPERATOR_FINISHED;
+
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = BKE_editmesh_from_object(obedit);
+
+	int action = RNA_enum_get(op->ptr, "action");
+
+	if (em->bm->totdim) {
+		switch (action) {
+			case DIM_DATA_ACTION_SELECT:
+			case DIM_DATA_ACTION_RESET:
+			case DIM_DATA_ACTION_SET:
+				if (!mechanical_dimension_data_action(em, action, op)) {
+					ret = OPERATOR_CANCELLED;
+				}
+				break;
+			default:
+				BKE_report(op->reports, RPT_ERROR, "Invalid action");
+				ret = OPERATOR_CANCELLED;
+		}
+	} else {
+		BKE_report(op->reports, RPT_ERROR, "No dimension selected");
+		ret = OPERATOR_CANCELLED;
+	}
+
+	return ret;
+}
+
 static int mechanical_add_dimension_from_vertexs (int dim_type, MDim *mdm, BMEditMesh *em, wmOperator *op)
 {
 
@@ -118,6 +171,13 @@ static EnumPropertyItem dim_type_items[] = {
     {DIM_TYPE_ANGLE_3P, "angle3p", 0, "Angle3P", "3 Points Angle dimension"},
     {DIM_TYPE_ANGLE_4P, "angle4p", 0, "Angle4P", "4 Points Angle dimension"},
     {DIM_TYPE_ANGLE_3P_CON, "angle3pcon", 0, "Angle3PCon", "3 Points concetrinc Angle dimension"},
+    {0, NULL, 0, NULL, NULL}
+};
+
+static EnumPropertyItem dim_data_actions[] = {
+	{DIM_DATA_ACTION_SELECT, "select", 0, "Select", "Selects dimension data"},
+	{DIM_DATA_ACTION_RESET, "reset", 0, "Reset", "Resets dimension extra data"},
+	{DIM_DATA_ACTION_SET, "set", 0, "Set", "Sets dimension extra data"},
     {0, NULL, 0, NULL, NULL}
 };
 
@@ -229,6 +289,25 @@ void MESH_OT_mechanical_dimension_angle_3p_con_add(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_ANGLE_3P_CON,"dimension type","dimension type");
 }
+
+
+void MESH_OT_mechanical_dimension_data_select(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Select dimension related data";
+	ot->description = "Selects dimensions related data, (vertexs)";
+	ot->idname = "MESH_OT_mechanical_dimension_data_select";
+
+	/* api callbacks */
+	ot->exec = mechanical_dimension_data_action_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"action",dim_data_actions,DIM_DATA_ACTION_SELECT,"dimension data action","dimension data action");
+}
+
 
 
 

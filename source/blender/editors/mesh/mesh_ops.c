@@ -89,6 +89,7 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_mechanical_dimension_angle_3p_add);
 	WM_operatortype_append(MESH_OT_mechanical_dimension_angle_4p_add);
 	WM_operatortype_append(MESH_OT_mechanical_dimension_angle_3p_con_add);
+	WM_operatortype_append(MESH_OT_mechanical_dimension_data_select);
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS

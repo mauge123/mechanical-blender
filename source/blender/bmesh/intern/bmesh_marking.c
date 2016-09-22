@@ -529,34 +529,24 @@ void BM_edge_select_set(BMesh *bm, BMEdge *e, const bool select)
  * @param e
  * @param select
  */
-void BM_dim_select_set(BMesh *bm, BMDim *d, const bool select)
+void BM_dim_select_set(BMesh *bm, BMDim *edm, const bool select)
 {
-	BLI_assert(d->head.htype == BM_DIM);
+	BLI_assert(edm->head.htype == BM_DIM);
 
-	if (BM_elem_flag_test(d, BM_ELEM_HIDDEN)) {
+	if (BM_elem_flag_test(edm, BM_ELEM_HIDDEN)) {
 		return;
 	}
 
 	if (select) {
-		if (!BM_elem_flag_test(d, BM_ELEM_SELECT)) {
-			BM_elem_flag_enable(d, BM_ELEM_SELECT);
+		if (!BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+			BM_elem_flag_enable(edm, BM_ELEM_SELECT);
 			bm->totdimsel += 1;
-
-			if (bm->selectmode != SCE_SELECT_DIMENSION) {
-				// Select all vertices
-				for (int i=0; i< d->totverts; i++) {
-					if (!BM_elem_flag_test(d->v[i], BM_ELEM_SELECT)) {
-						bm->totvertsel += 1;
-						BM_elem_flag_enable(d->v[i], BM_ELEM_SELECT);
-					}
-				}
-			}
 		}
 	}
 	else {
-		if (BM_elem_flag_test(d, BM_ELEM_SELECT)) {
+		if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 			bm->totdimsel -= 1;
-			BM_elem_flag_disable(d, BM_ELEM_SELECT);
+			BM_elem_flag_disable(edm, BM_ELEM_SELECT);
 
 			//Do not De-select all vertices: Allows maintain selected if needed
 		}

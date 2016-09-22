@@ -2051,7 +2051,7 @@ static BMOpDefine bmo_symmetrize_def = {
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 /*
- * Creates a dimension betwen two vertexs.
+ * Creates a dimension from vertexs.
  *
  */
 static BMOpDefine bmo_create_dimension_def = {
@@ -2068,6 +2068,26 @@ static BMOpDefine bmo_create_dimension_def = {
 	 {{'\0'}},
 	},
 	bmo_create_dimension_exec,
+	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
+};
+
+
+/*
+ * Creates a dimension from vertexs.
+ *
+ */
+static BMOpDefine bmo_dimension_data_def = {
+	"dimension_action",
+	/* slots_in */
+	{{"dims", BMO_OP_SLOT_ELEMENT_BUF, {BM_DIM}},    /* input dimensions*/
+	 {"action",BMO_OP_SLOT_INT},
+	 {{'\0'}},
+	},
+	/* slots_out */
+	{{"verts.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},  /* output vertices */
+	 {{'\0'}},
+	},
+	bmo_dimension_data_exec,
 	(BMO_OPTYPE_FLAG_SELECT_FLUSH),
 };
 
@@ -2185,6 +2205,7 @@ const BMOpDefine *bmo_opdefines[] = {
 	&bmo_wireframe_def,
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	&bmo_create_dimension_def,
+    &bmo_dimension_data_def,
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
     &bmo_create_reference_plane_def,

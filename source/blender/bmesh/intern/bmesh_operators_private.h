@@ -116,6 +116,7 @@ void bmo_wireframe_exec(BMesh *bm, BMOperator *op);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 void bmo_create_dimension_exec(BMesh *bm, BMOperator *op);
+void bmo_dimension_data_exec(BMesh *bm, BMOperator *op);
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS

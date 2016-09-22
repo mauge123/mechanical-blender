@@ -212,6 +212,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
  */
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			// Check if needs to update dimensions from object
+			// This occur when needed to change the dimension value from drivers
 			bool temp_em = false;
 			if (em == NULL && me->totdim) {
 				if (me->totdim) {
@@ -237,7 +238,13 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 				BM_ITER_MESH_INDEX (edm, &iter, bm, BM_DIMS_OF_MESH, i) {
 					// check diension data udate
 					if (get_dimension_value (edm) != edm->mdim->value) {
-						apply_dimension_value(bm,edm,edm->mdim->value,scene->toolsettings);
+						if (!G.moving) {
+							// Not moving, force the dim value
+							apply_dimension_value(bm,edm,edm->mdim->value,scene->toolsettings);
+						} else {
+							// Moving: set the dim value
+							edm->mdim->value = get_dimension_value (edm);
+						}
 						dimension_data_update(edm);
 					}
 
@@ -254,6 +261,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 								get_dimension_mid(edm->mdim->fpos,edm);
 								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
 								mul_v3_fl(edm->mdim->fpos,-1.0f);
+								dimension_data_update(edm);
 								break;
 							case DIM_TYPE_DIAMETER:
 							case DIM_TYPE_RADIUS:
@@ -263,6 +271,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 								copy_v3_v3(edm->mdim->fpos,edm->mdim->center);
 								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
 								mul_v3_fl(edm->mdim->fpos,-1.0f);
+								dimension_data_update(edm);
 								break;
 							default:
 								BLI_assert(0);
@@ -271,7 +280,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 
 					}
 
-					dimension_data_update(edm);
+
 
 				}
 			}

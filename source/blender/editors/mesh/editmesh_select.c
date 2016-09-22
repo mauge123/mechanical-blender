@@ -1525,7 +1525,6 @@ void MESH_OT_select_mode(wmOperatorType *ot)
 		{SCE_SELECT_EDGE,   "EDGE", ICON_EDGESEL, "Edges", ""},
 		{SCE_SELECT_FACE,   "FACE", ICON_FACESEL, "Faces", ""},
 		{SCE_SELECT_REFERENCE,   "REFERENCE", ICON_FACESEL, "References", ""},
-		{SCE_SELECT_DIMENSION,   "DIMENSION", ICON_FACESEL, "Dimensions", ""},
 // WITH_MECHANICAL_GEOMETRY
 		{SCE_SELECT_GEOMETRY,   "GEOMETRY", ICON_FACESEL, "GEOMETRY", ""},
 		{0, NULL, 0, NULL, NULL},
@@ -2579,16 +2578,6 @@ bool EDBM_selectmode_toggle(bContext *C, const short selectmode_new,
 		case SCE_SELECT_REFERENCE:
 			if (use_extend == 0 || em->selectmode == 0) {
 				em->selectmode = SCE_SELECT_REFERENCE;
-			}
-			ts->selectmode = em->selectmode;
-			EDBM_selectmode_set(em);
-			ret = true;
-			break;
-#endif
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-		case SCE_SELECT_DIMENSION:
-			if (use_extend == 0 || em->selectmode == 0) {
-				em->selectmode = SCE_SELECT_DIMENSION;
 			}
 			ts->selectmode = em->selectmode;
 			EDBM_selectmode_set(em);

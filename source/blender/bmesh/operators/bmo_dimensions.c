@@ -44,7 +44,8 @@
 enum {
 	EXT_INPUT   = 1,
 	EXT_KEEP    = 2,
-	EXT_DEL     = 4
+	EXT_DEL     = 4,
+	EXT_OUT		= 8
 };
 
 
@@ -187,4 +188,39 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 			BMO_dim_flag_disable(bm, d, EXT_KEEP);
 		}
 	}
+}
+
+static void dimension_data_select (BMesh *bm, BMOperator *op) {
+	BMOIter siter;
+	BMDim *edm;
+
+	edm = BMO_iter_new(&siter, op->slots_in, "dims", BM_DIM);
+	for (; edm; edm = BMO_iter_step(&siter)) {
+		for (int i=0; i< edm->totverts; i++) {
+			BMO_vert_flag_enable(bm, edm->v[i], EXT_OUT);
+		}
+	}
+}
+
+
+void bmo_dimension_data_exec(BMesh *bm, BMOperator *op)
+{
+	BMVert *v;
+	BMIter iter;
+
+ 	switch (BMO_slot_int_get(op->slots_in,"action")) {
+		case DIM_DATA_ACTION_SELECT:
+			dimension_data_select(bm,op);
+			break;
+	}
+
+	BMO_slot_buffer_from_enabled_flag(bm, op, op->slots_out, "verts.out", BM_VERT, EXT_OUT);
+
+	BM_ITER_MESH(v, &iter, bm, BM_VERTS_OF_MESH) {
+		if (BMO_vert_flag_test(bm,v, EXT_OUT)) {
+			BMO_vert_flag_disable(bm, v, EXT_OUT);
+		}
+	}
+
+
 }

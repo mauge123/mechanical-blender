@@ -1961,12 +1961,6 @@ void BM_mesh_rebuild(
 	BMEdge **etable_dst = (remap & BM_EDGE) ? MEM_mallocN(bm->totedge * sizeof(BMEdge *), __func__) : NULL;
 	BMLoop **ltable_dst = (remap & BM_LOOP) ? MEM_mallocN(bm->totloop * sizeof(BMLoop *), __func__) : NULL;
 	BMFace **ftable_dst = (remap & BM_FACE) ? MEM_mallocN(bm->totface * sizeof(BMFace *), __func__) : NULL;
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	BMDim  **dtable_dst = (remap & BM_DIM) ? MEM_callocN(bm->totdim * sizeof(BMDim *), __func__) : NULL;
-#endif
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BMReference **ptable_dst = (remap & BM_REFERENCE) ? MEM_callocN(bm->totref * sizeof(BMReference *), __func__) : NULL;
-#endif
 	const bool use_toolflags = params->use_toolflags;
 
 	if (remap & BM_VERT) {
