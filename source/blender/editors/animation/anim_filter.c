@@ -953,6 +953,9 @@ static bAnimListElem *make_new_animlistelem(void *data, short datatype, ID *owne
  */
 static bool skip_fcurve_selected_data(bDopeSheet *ads, FCurve *fcu, ID *owner_id, int filter_mode)
 {
+	if (fcu->grp != NULL && fcu->grp->flag & ADT_CURVES_ALWAYS_VISIBLE) {
+		return false;
+	}
 	/* hidden items should be skipped if we only care about visible data, but we aren't interested in hidden stuff */
 	const bool skip_hidden = (filter_mode & ANIMFILTER_DATA_VISIBLE) && !(ads->filterflag & ADS_FILTER_INCL_HIDDEN);
 	

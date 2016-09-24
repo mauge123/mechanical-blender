@@ -280,6 +280,8 @@ int ImageManager::add_image(const string& filename,
 
 	ImageDataType type = get_image_metadata(filename, builtin_data, is_linear);
 
+	thread_scoped_lock device_lock(device_mutex);
+
 	/* Do we have a float? */
 	if(type == IMAGE_DATA_TYPE_FLOAT || type == IMAGE_DATA_TYPE_FLOAT4)
 		is_float = true;
@@ -585,8 +587,7 @@ bool ImageManager::file_load_float_image(Image *img, ImageDataType type, device_
 		}
 
 		if(depth <= 1) {
-			int scanlinesize = width*components*sizeof(float);
-
+			size_t scanlinesize = ((size_t)width)*components*sizeof(float);
 			in->read_image(TypeDesc::FLOAT,
 			               (uchar*)readpixels + (height-1)*scanlinesize,
 			               AutoStride,
@@ -694,8 +695,7 @@ bool ImageManager::file_load_half_image(Image *img, ImageDataType type, device_v
 		}
 
 		if(depth <= 1) {
-			int scanlinesize = width*components*sizeof(half);
-
+			size_t scanlinesize = ((size_t)width)*components*sizeof(half);
 			in->read_image(TypeDesc::HALF,
 			               (uchar*)readpixels + (height-1)*scanlinesize,
 			               AutoStride,

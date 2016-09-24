@@ -16,12 +16,14 @@
 
 #include "mesh.h"
 #include "attribute.h"
+#include "camera.h"
 
 #include "subd_split.h"
 #include "subd_patch.h"
 #include "subd_patch_table.h"
 
 #include "util_foreach.h"
+#include "util_algorithm.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -177,7 +179,7 @@ public:
 				Far::TopologyRefinerFactory<Mesh>::Options(type, options));
 
 		/* adaptive refinement */
-		int max_isolation = 10;
+		int max_isolation = calculate_max_isolation();
 		refiner->RefineAdaptive(Far::TopologyRefiner::AdaptiveOptions(max_isolation));
 
 		/* create patch table */
@@ -248,6 +250,42 @@ public:
 		}
 	}
 
+	int calculate_max_isolation()
+	{
+		/* loop over all edges to find longest in screen space */
+		const Far::TopologyLevel& level = refiner->GetLevel(0);
+		Transform objecttoworld = mesh->subd_params->objecttoworld;
+		Camera* cam = mesh->subd_params->camera;
+
+		float longest_edge = 0.0f;
+
+		for(size_t i = 0; i < level.GetNumEdges(); i++) {
+			Far::ConstIndexArray verts = level.GetEdgeVertices(i);
+
+			float3 a = mesh->verts[verts[0]];
+			float3 b = mesh->verts[verts[1]];
+
+			float edge_len;
+
+			if(cam) {
+				a = transform_point(&objecttoworld, a);
+				b = transform_point(&objecttoworld, b);
+
+				edge_len = len(a - b) / cam->world_to_raster_size((a + b) * 0.5f);
+			}
+			else {
+				edge_len = len(a - b);
+			}
+
+			longest_edge = max(longest_edge, edge_len);
+		}
+
+		/* calculate isolation level */
+		int isolation = (int)(log2f(max(longest_edge / mesh->subd_params->dicing_rate, 1.0f)) + 1.0f);
+
+		return min(isolation, 10);
+	}
+
 	friend struct OsdPatch;
 	friend class Mesh;
 };
@@ -284,7 +322,12 @@ struct OsdPatch : Patch {
 
 		if(dPdu) *dPdu = du;
 		if(dPdv) *dPdv = dv;
-		if(N) *N = normalize(cross(du, dv));
+		if(N) {
+			*N = cross(du, dv);
+
+			float t = len(*N);
+			*N = (t != 0.0f) ? *N/t : make_float3(0.0f, 0.0f, 1.0f);
+		}
 	}
 
 	BoundBox bound() { return BoundBox::empty; }
