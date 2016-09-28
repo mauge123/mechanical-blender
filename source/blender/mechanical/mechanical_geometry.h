@@ -15,18 +15,18 @@
 #define GEO_SNAP_POINTS_PER_CIRCLE 4
 
 
-
 typedef struct test_circle_data {
 	float center[3];
 	float angle;
 }test_circle_data;
 
-void mechanical_update_mesh_geometry(BMEditMesh *em);
-void set_geometry_center (BMEditMesh *em, float center[3]);
+void mechanical_update_mesh_geometry(BMesh *bm);
+void set_geometry_center (BMesh *em, float center[3]);
+
+void mechanical_clean_geometry (BMesh *bm);
 
 
-
- int get_max_geom_points(BMEditMesh *em);
+ int get_max_geom_points(BMesh *em);
  void arc_mid_point(BMGeom *egm);
 
 

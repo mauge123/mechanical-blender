@@ -12,12 +12,12 @@
 
 
 
-int get_max_geom_points(BMEditMesh *em)
+int get_max_geom_points(BMesh *bm)
 {
 	BMGeom *egm;
 	BMIter iter;
 	int num=0;
-	BM_ITER_MESH (egm, &iter, em->bm, BM_GEOMETRY_OF_MESH) {
+	BM_ITER_MESH (egm, &iter, bm, BM_GEOMETRY_OF_MESH) {
 		switch (egm->geometry_type) {
 			case BM_GEOMETRY_TYPE_LINE:
 				num=num+GEO_SNAP_POINTS_PER_LINE;

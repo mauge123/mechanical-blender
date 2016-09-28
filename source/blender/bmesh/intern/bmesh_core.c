@@ -47,7 +47,7 @@
 #include "mesh_dimensions.h"
 #include "mesh_references.h"
 #include "mechanical_utils.h"
-
+#include "mechanical_geometry.h"
 
 /* use so valgrinds memcheck alerts us when undefined index is used.
  * TESTING ONLY! */
@@ -807,9 +807,16 @@ static bool vert_on_dimension(BMesh *bm , BMVert* v) {
  */
 static void bm_kill_only_vert(BMesh *bm, BMVert *v)
 {
+#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (vert_on_dimension(bm,v)) {
+		// Do not delete Vert if pertains to a dimension
 		return;
 	}
+#endif
+
+#ifdef WITH_MECHANICAL_GEOMETRY
+	mechanical_clean_geometry(bm);
+#endif
 
 	bm->totvert--;
 	bm->elem_index_dirty |= BM_VERT;

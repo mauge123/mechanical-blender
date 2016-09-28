@@ -294,7 +294,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
 			if (em && !G.moving) {
-				mechanical_update_mesh_geometry(em);
+				mechanical_update_mesh_geometry(em->bm);
 			}
 #endif
 			if (em) {

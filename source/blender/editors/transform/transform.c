@@ -2920,7 +2920,7 @@ int transformEnd(bContext *C, TransInfo *t)
 				em = BKE_editmesh_from_object(t->obedit);
 			}
 			if (em) {
-				mechanical_update_mesh_geometry(em);
+				mechanical_update_mesh_geometry(em->bm);
 			}
 		}
 #endif
