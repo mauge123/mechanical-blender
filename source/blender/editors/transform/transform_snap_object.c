@@ -399,7 +399,7 @@ static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4
 	if(snap_options & GEOM_CENTER_POINT) snap_center_arc_circle = true;
 	if(snap_options & GEOM_ORTHO_POINT) snap_ortho = true;
 	if(snap_options & GEOM_TANGENT_POINT) snap_tangents = true;
-	else BLI_assert(false);
+	else if(!snap_options) BLI_assert(false);
 
 	*points = MEM_callocN(sizeof(snap_geom_point)*max_geom_points, "Snap points array");
 	snap_geom_point *p = *points;

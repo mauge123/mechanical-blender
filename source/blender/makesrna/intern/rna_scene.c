@@ -2154,6 +2154,18 @@ static int rna_gpu_is_hq_supported_get(PointerRNA *UNUSED(ptr))
 	return GPU_instanced_drawing_support() && GPU_geometry_shader_support();
 }
 
+// WITH MECHANICAL
+static void rna_snap_mode_set(struct PointerRNA *ptr, int UNUSED(value))
+{
+	/*
+	 *  Ensure snap is enabled,
+	 *  SHIFT+TAB switches the flag and +CTRL shows enum
+	 *
+	 */
+	ToolSettings *ts = ptr->data;
+	ts->snap_flag |= SCE_SNAP;
+}
+
 #else
 
 /* Grease Pencil Drawing Brushes */
@@ -2636,7 +2648,8 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_enum_items(prop, rna_enum_snap_element_items);
 	RNA_def_property_ui_text(prop, "Snap Element", "Type of element to snap to");
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
-	
+	RNA_def_property_enum_funcs(prop, NULL, "rna_snap_mode_set", NULL);
+
 	/* node editor uses own set of snap modes */
 	prop = RNA_def_property(srna, "snap_node_element", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "snap_node_mode");

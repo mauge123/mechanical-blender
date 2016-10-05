@@ -2424,7 +2424,9 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_int_set(op->ptr, "transform_mode", t->mode);
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
-	RNA_boolean_set(op->ptr, "use_snap_self", t->tsnap.snap_self);
+	if (RNA_struct_find_property(op->ptr, "use_snap_self")) {
+		RNA_boolean_set(op->ptr, "use_snap_self", t->tsnap.snap_self);
+	}
 	RNA_boolean_set(op->ptr, "snap", ts->snap_flag & SCE_SNAP);
 #endif
 
