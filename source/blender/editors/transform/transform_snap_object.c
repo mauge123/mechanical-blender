@@ -378,7 +378,7 @@ static int snap_geom_tangent(const ARegion *ar, BMGeom *egm, float obmat[4][4], 
 
 
 static int init_geom_snap_data (const ARegion *ar, BMEditMesh *em, float obmat[4][4], snap_geom_point **points, float *snap_target, Scene *scene) {
-	int max_geom_points = get_max_geom_points(em);
+	int max_geom_points = get_max_geom_points(em->bm);
 	int n_geom_points = 0;
 	BMGeom *egm;
 	BMIter iter;
