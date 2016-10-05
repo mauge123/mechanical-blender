@@ -2155,7 +2155,7 @@ static int rna_gpu_is_hq_supported_get(PointerRNA *UNUSED(ptr))
 }
 
 // WITH MECHANICAL
-static void rna_snap_mode_set(struct PointerRNA *ptr, int UNUSED(value))
+static void rna_snap_mode_set(struct PointerRNA *ptr, int value)
 {
 	/*
 	 *  Ensure snap is enabled,
@@ -2164,6 +2164,7 @@ static void rna_snap_mode_set(struct PointerRNA *ptr, int UNUSED(value))
 	 */
 	ToolSettings *ts = ptr->data;
 	ts->snap_flag |= SCE_SNAP;
+	ts->snap_mode = value;
 }
 
 #else
