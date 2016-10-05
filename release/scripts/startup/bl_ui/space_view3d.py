@@ -2396,14 +2396,9 @@ class VIEW3D_MT_edit_mesh_select_mode(Menu):
         layout.operator("mesh.select_mode", text="Face", icon='FACESEL').type = 'FACE'
 # WITH_MECHANICAL_MESH_GEOMETRY
         layout.operator("mesh.select_mode", text="Reference", icon='FACESEL').type = 'REFERENCE'
-# WITH_MECHANICAL_MESH_DIMENSIONS
-        layout.operator("mesh.select_mode", text="Dimension", icon='FACESEL').type = 'DIMENSION'
 # WITH_MECHANICAL_GEOMETRY
         layout.operator("mesh.select_mode", text="Geometry", icon='FACESEL').type = 'GEOMETRY'
-        layout.operator("scene.geomsnapflag", text="Line Mid Point", icon='EDGESEL')
-       
-        
-        
+                
 class VIEW3D_MT_snap_options(Menu):
         bl_label = "Select Snap Options"
         

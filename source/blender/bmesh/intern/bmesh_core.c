@@ -761,14 +761,22 @@ int bmesh_elem_check(void *element, const char htype)
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		case BM_DIM:
 		{
-			BMDim *d = element;
-			if (d->v[0] && d->v[0]->head.htype != BM_VERT) {
+			BMDim *edm = element;
+			if (edm->v[0] && edm->v[0]->head.htype != BM_VERT) {
 				err |= IS_DIM_WRONG_VERT_TYPE;
 			}
 
-			if (d->v[1] && d->v[1]->head.htype != BM_VERT) {
+			if (edm->v[1] && edm->v[1]->head.htype != BM_VERT) {
 				err |= IS_DIM_WRONG_VERT_TYPE;
 			}
+			break;
+		}
+#endif
+#ifdef WITH_MECHANICAL_GEOMETRY
+		case BM_REFERENCE:
+		{
+			BMReference* UNUSED(erf) = element;
+			// Nothing to check a this moment
 			break;
 		}
 #endif
