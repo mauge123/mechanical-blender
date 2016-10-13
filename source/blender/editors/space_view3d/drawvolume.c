@@ -382,7 +382,7 @@ static void bind_shader(SmokeDomainSettings *sds, GPUShader *shader, GPUTexture 
 		GPU_shader_uniform_texture(shader, spec_location, tex_spec);
 	}
 	else {
-		float density_scale = 10.0f;
+		float density_scale = 10.0f * sds->display_thickness;
 
 		GPU_shader_uniform_vector(shader, stepsize_location, 1, 1, &sds->dx);
 		GPU_shader_uniform_vector(shader, densityscale_location, 1, 1, &density_scale);
@@ -572,6 +572,7 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 	}
 }
 
+#ifdef WITH_SMOKE
 static void add_tri(float (*verts)[3], float(*colors)[3], int *offset,
                     float p1[3], float p2[3], float p3[3], float rgb[3])
 {
@@ -645,6 +646,7 @@ static void add_streamline(float (*verts)[3], float(*colors)[3], float center[3]
 }
 
 typedef void (*vector_draw_func)(float(*)[3], float(*)[3], float*, float*, float, float, int*);
+#endif  /* WITH_SMOKE */
 
 void draw_smoke_velocity(SmokeDomainSettings *domain, float viewnormal[3])
 {
@@ -652,11 +654,6 @@ void draw_smoke_velocity(SmokeDomainSettings *domain, float viewnormal[3])
 	const float *vel_x = smoke_get_velocity_x(domain->fluid);
 	const float *vel_y = smoke_get_velocity_y(domain->fluid);
 	const float *vel_z = smoke_get_velocity_z(domain->fluid);
-#else
-	const float *vel_x = NULL;
-	const float *vel_y = NULL;
-	const float *vel_z = NULL;
-#endif
 
 	if (ELEM(NULL, vel_x, vel_y, vel_z)) {
 		return;
@@ -683,8 +680,11 @@ void draw_smoke_velocity(SmokeDomainSettings *domain, float viewnormal[3])
 	if (xyz[1] < res_min[1]) xyz[1] += step_size;
 	if (xyz[2] < res_min[2]) xyz[2] += step_size;
 
-	float min[3];
-	add_v3_v3v3(min, domain->p0, domain->obj_shift_f);
+	float min[3] = {
+	    domain->p0[0] - domain->cell_size[0] * domain->adapt_res,
+		domain->p0[1] - domain->cell_size[1] * domain->adapt_res,
+		domain->p0[2] - domain->cell_size[2] * domain->adapt_res,
+	};
 
 	int num_points_v[3] = {
 	    ((float)(res_max[0] - floor(xyz[0])) / step_size) + 0.5f,
@@ -698,7 +698,7 @@ void draw_smoke_velocity(SmokeDomainSettings *domain, float viewnormal[3])
 		const int axis = (domain->slice_axis == SLICE_AXIS_AUTO) ?
 		                     axis_dominant_v3_single(viewnormal) : domain->slice_axis - 1;
 
-		xyz[axis] = (float)res[axis] * domain->slice_depth;
+		xyz[axis] = (float)base_res[axis] * domain->slice_depth;
 		num_points_v[axis] = 1;
 		res_max[axis] = xyz[axis] + 1;
 	}
@@ -755,6 +755,9 @@ void draw_smoke_velocity(SmokeDomainSettings *domain, float viewnormal[3])
 
 	MEM_freeN(verts);
 	MEM_freeN(colors);
+#else
+	UNUSED_VARS(domain, viewnormal);
+#endif
 }
 
 #ifdef SMOKE_DEBUG_HEAT

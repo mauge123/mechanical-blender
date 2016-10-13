@@ -591,6 +591,15 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 	}
 
 /* Space 3D View */
+static void rna_SpaceView3D_camera_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	View3D *v3d = (View3D *)(ptr->data);
+	if (v3d->scenelock) {
+		scene->camera = v3d->camera;
+		BKE_screen_view3d_main_sync(&bmain->screen, scene);
+	}
+}
+
 static void rna_SpaceView3D_lock_camera_and_layers_set(PointerRNA *ptr, int value)
 {
 	View3D *v3d = (View3D *)(ptr->data);
@@ -620,7 +629,7 @@ static void rna_View3D_CursorLocation_get(PointerRNA *ptr, float *values)
 	bScreen *sc = (bScreen *)ptr->id.data;
 	Scene *scene = (Scene *)sc->scene;
 	const float *loc = ED_view3d_cursor3d_get(scene, v3d);
-
+	
 	copy_v3_v3(values, loc);
 }
 
@@ -630,7 +639,7 @@ static void rna_View3D_CursorLocation_set(PointerRNA *ptr, const float *values)
 	bScreen *sc = (bScreen *)ptr->id.data;
 	Scene *scene = (Scene *)sc->scene;
 	float *cursor = ED_view3d_cursor3d_get(scene, v3d);
-
+	
 	copy_v3_v3(cursor, values);
 }
 
@@ -648,6 +657,13 @@ static void rna_SpaceView3D_layer_set(PointerRNA *ptr, const int *values)
 	View3D *v3d = (View3D *)(ptr->data);
 
 	v3d->lay = ED_view3d_scene_layer_set(v3d->lay, values, &v3d->layact);
+}
+
+static int rna_SpaceView3D_active_layer_get(PointerRNA *ptr)
+{
+	View3D *v3d = (View3D *)(ptr->data);
+
+	return (int)(log(v3d->layact) / M_LN2);
 }
 
 static void rna_SpaceView3D_layer_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
@@ -2504,8 +2520,8 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_pointer_sdna(prop, NULL, "camera");
 	RNA_def_property_ui_text(prop, "Camera",
-							 "Active camera used in this view (when unlocked from the scene's active camera)");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	                         "Active camera used in this view (when unlocked from the scene's active camera)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_camera_update");
 
 	/* render border */
 	prop = RNA_def_property(srna, "use_render_border", PROP_BOOLEAN, PROP_NONE);
@@ -2670,19 +2686,19 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "show_all_objects_origin", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_DRAW_CENTERS);
 	RNA_def_property_ui_text(prop, "All Object Origins",
-							 "Show the object origin center dot for all (selected and unselected) objects");
+	                         "Show the object origin center dot for all (selected and unselected) objects");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "show_relationship_lines", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", V3D_HIDE_HELPLINES);
 	RNA_def_property_ui_text(prop, "Relationship Lines",
-							 "Show dashed lines indicating parent or constraint relationships");
+	                         "Show dashed lines indicating parent or constraint relationships");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
-
+	
 	prop = RNA_def_property(srna, "show_grease_pencil", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_SHOW_GPENCIL);
 	RNA_def_property_ui_text(prop, "Show Grease Pencil",
-							 "Show grease pencil for this view");
+	                         "Show grease pencil for this view");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "show_textured_solid", PROP_BOOLEAN, PROP_NONE);
@@ -2714,7 +2730,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_RENDER_OVERRIDE);
 	RNA_def_property_ui_text(prop, "Only Render", "Display only objects which will be rendered");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
-
+	
 	prop = RNA_def_property(srna, "show_world", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag3", V3D_SHOW_WORLD);
 	RNA_def_property_ui_text(prop, "World Background", "Display world colors in the background");
@@ -2736,7 +2752,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "show_background_images", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_DISPBGPICS);
 	RNA_def_property_ui_text(prop, "Display Background Images",
-							 "Display reference images behind objects in the 3D View");
+	                         "Display reference images behind objects in the 3D View");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "pivot_point", PROP_ENUM, PROP_NONE);
@@ -2744,7 +2760,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, pivot_items_full);
 	RNA_def_property_ui_text(prop, "Pivot Point", "Pivot center for rotation/scaling");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_pivot_update");
-
+	
 	prop = RNA_def_property(srna, "use_pivot_point_align", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_ALIGN);
 	RNA_def_property_ui_text(prop, "Align", "Manipulate center points (object and pose mode only)");
@@ -2763,7 +2779,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
 	RNA_def_property_ui_text(prop, "Transform Manipulators", "Transformation manipulators");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
-
+	
 	prop = RNA_def_property(srna, "transform_orientation", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "twmode");
 	RNA_def_property_enum_items(prop, transform_orientation_items);
@@ -2798,7 +2814,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "scenelock", 1);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_SpaceView3D_lock_camera_and_layers_set");
 	RNA_def_property_ui_text(prop, "Lock Camera and Layers",
-							 "Use the scene's active camera and layers in this view, rather than local layers");
+	                         "Use the scene's active camera and layers in this view, rather than local layers");
 	RNA_def_property_ui_icon(prop, ICON_LOCKVIEW_OFF, 1);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
@@ -2809,12 +2825,17 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Visible Layers", "Layers visible in this 3D View");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_layer_update");
 
+	prop = RNA_def_property(srna, "active_layer", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE | PROP_EDITABLE);
+	RNA_def_property_int_funcs(prop, "rna_SpaceView3D_active_layer_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Active Layer", "Active 3D view layer index");
+
 	prop = RNA_def_property(srna, "layers_local_view", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_boolean_sdna(prop, NULL, "lay", 0x01000000);
 	RNA_def_property_array(prop, 8);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Local View Layers", "Local view layers visible in this 3D View");
-
+	
 	prop = RNA_def_property(srna, "layers_used", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_boolean_sdna(prop, NULL, "lay_used", 1);
 	RNA_def_property_array(prop, 20);

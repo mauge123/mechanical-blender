@@ -819,6 +819,8 @@ Scene *BKE_scene_add(Main *bmain, const char *name)
 	Scene *sce;
 
 	sce = BKE_libblock_alloc(bmain, ID_SCE, name);
+	id_us_min(&sce->id);
+	id_us_ensure_real(&sce->id);
 
 	BKE_scene_init(sce);
 
@@ -904,7 +906,7 @@ Scene *BKE_scene_set_name(Main *bmain, const char *name)
 	Scene *sce = (Scene *)BKE_libblock_find_name_ex(bmain, ID_SCE, name);
 	if (sce) {
 		BKE_scene_set_background(bmain, sce);
-		printf("Scene switch: '%s' in file: '%s'\n", name, bmain->name);
+		printf("Scene switch for render: '%s' in file: '%s'\n", name, bmain->name);
 		return sce;
 	}
 

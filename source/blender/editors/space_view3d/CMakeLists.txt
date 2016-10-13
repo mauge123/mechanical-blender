@@ -104,6 +104,10 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_UCS)
 endif()
 
+if(WITH_MOD_SMOKE)
+	add_definitions(-DWITH_SMOKE)
+endif()
+
 if(WITH_LEGACY_DEPSGRAPH)
 	add_definitions(-DWITH_LEGACY_DEPSGRAPH)
 endif()

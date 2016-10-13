@@ -518,14 +518,18 @@ void fsmenu_read_system(struct FSMenu *fsmenu, int read_bookmarks)
 		CFURLEnumeratorRef volEnum = CFURLEnumeratorCreateForMountedVolumes(NULL, kCFURLEnumeratorSkipInvisibles, NULL);
 		
 		while (result != kCFURLEnumeratorEnd) {
-			unsigned char defPath[FILE_MAX];
+			char defPath[FILE_MAX];
 
 			result = CFURLEnumeratorGetNextURL(volEnum, &cfURL, NULL);
 			if (result != kCFURLEnumeratorSuccess)
 				continue;
 			
 			CFURLGetFileSystemRepresentation(cfURL, false, (UInt8 *)defPath, FILE_MAX);
-			fsmenu_insert_entry(fsmenu, FS_CATEGORY_SYSTEM, (char *)defPath, NULL, FS_INSERT_SORTED);
+
+			/* Add end slash for consistency with other platforms */
+			BLI_add_slash(defPath);
+
+			fsmenu_insert_entry(fsmenu, FS_CATEGORY_SYSTEM, defPath, NULL, FS_INSERT_SORTED);
 		}
 		
 		CFRelease(volEnum);
@@ -558,6 +562,9 @@ void fsmenu_read_system(struct FSMenu *fsmenu, int read_bookmarks)
 				
 				if (pathString == NULL || !CFStringGetCString(pathString, line, sizeof(line), kCFStringEncodingUTF8))
 					continue;
+
+				/* Add end slash for consistency with other platforms */
+				BLI_add_slash(line);
 
 				/* Exclude "all my files" as it makes no sense in blender fileselector */
 				/* Exclude "airdrop" if wlan not active as it would show "" ) */
