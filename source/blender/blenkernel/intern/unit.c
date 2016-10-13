@@ -427,7 +427,7 @@ static size_t unit_as_string(char *str, int len_max, double value, int prec, con
  * Return the length of the generated string.
  */
 #ifdef WITH_MECHANICAL_UNIT_FORCE
-float* bUnit_GetScaleLength(UnitSettings *unit, int unit_type){
+float* bUnit_GetScaleLength(const struct UnitSettings *unit, int unit_type){
 	float *scale_length = NULL;
 	if (unit->flag & USER_UNIT_OPT_FORCE_SCALE && (unit_type == B_UNIT_LENGTH)) {
 		scale_length = &unit->scale_length;

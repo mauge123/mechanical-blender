@@ -113,7 +113,7 @@ typedef struct RegionView3D {
 	struct wmTimer *smooth_timer;
 
 
-	/* transform widget matrix */
+	/* transform manipulator matrix */
 	float twmat[4][4];
 
 	float viewquat[4];			/* view rotation, must be kept normalized */
@@ -204,7 +204,7 @@ typedef struct View3D {
 	short gridsubdiv;	/* Number of subdivisions in the grid between each highlighted grid line */
 	char gridflag;
 
-	/* transform widget info */
+	/* transform manipulator info */
 	char twtype, twmode, twflag;
 	
 	short flag3;
@@ -219,8 +219,11 @@ typedef struct View3D {
 
 	char multiview_eye;				/* multiview current eye - for internal use */
 
-	/* built-in shader effects (eGPUFXFlags) */
-	char pad3[4];
+	/* XXX tmp flags for 2.8 viewport transition to avoid compatibility issues that would be caused by
+	 * using usual flag bitfields (which are saved to files). Can be removed when not needed anymore. */
+	char tmp_compat_flag;
+
+	char pad3[3];
 
 	/* note, 'fx_settings.dof' is currently _not_ allocated,
 	 * instead set (temporarily) from camera */
@@ -331,6 +334,11 @@ typedef struct View3D {
 
 /* View3d->flag3 (short) */
 #define V3D_SHOW_WORLD			(1 << 0)
+
+/* View3d->tmp_compat_flag */
+enum {
+	V3D_NEW_VIEWPORT      = (1 << 0),
+};
 
 /* View3D->around */
 enum {

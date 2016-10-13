@@ -32,6 +32,8 @@ set(INC
 	../makesdna
 	../makesrna
 
+	../editors/include
+
 	# For node muting stuff...
 	../nodes
 	../nodes/intern
@@ -47,6 +49,7 @@ set(INC_SYS
 
 set(SRC
 	intern/gpu_basic_shader.c
+	intern/gpu_batch.c
 	intern/gpu_buffers.c
 	intern/gpu_codegen.c
 	intern/gpu_compositing.c
@@ -54,11 +57,29 @@ set(SRC
 	intern/gpu_draw.c
 	intern/gpu_extensions.c
 	intern/gpu_framebuffer.c
+	intern/gpu_immediate.c
 	intern/gpu_init_exit.c
 	intern/gpu_material.c
+	intern/gpu_matrix.c
 	intern/gpu_select.c
 	intern/gpu_shader.c
 	intern/gpu_texture.c
+
+	gawain/attrib_binding.c
+	gawain/attrib_binding.h
+	gawain/batch.c
+	gawain/batch.h
+	gawain/common.h
+	gawain/element.c
+	gawain/element.h
+	gawain/immediate.c
+	gawain/immediate.h
+	gawain/imm_util.c
+	gawain/imm_util.h
+	gawain/vertex_buffer.c
+	gawain/vertex_buffer.h
+	gawain/vertex_format.c
+	gawain/vertex_format.h
 
 	shaders/gpu_shader_fx_lib.glsl
 	shaders/gpu_shader_fx_ssao_frag.glsl
@@ -83,6 +104,7 @@ set(SRC
 	shaders/gpu_shader_smoke_vert.glsl
 
 	GPU_basic_shader.h
+	GPU_batch.h
 	GPU_buffers.h
 	GPU_compositing.h
 	GPU_debug.h
@@ -90,14 +112,46 @@ set(SRC
 	GPU_extensions.h
 	GPU_framebuffer.h
 	GPU_glew.h
+	GPU_immediate.h
 	GPU_init_exit.h
 	GPU_material.h
+	GPU_matrix.h
 	GPU_select.h
 	GPU_shader.h
 	GPU_texture.h
+
 	intern/gpu_codegen.h
 	intern/gpu_private.h
 )
+
+data_to_c_simple(shaders/gpu_shader_depth_only_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_uniform_color_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_flat_color_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_no_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_flat_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_smooth_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_smooth_color_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_texture_2D_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_texture_rect_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_texture_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_no_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_flat_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_smooth_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_smooth_color_frag.glsl SRC)
+
+data_to_c_simple(shaders/gpu_shader_point_uniform_color_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_point_uniform_color_smooth_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_point_uniform_color_outline_smooth_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_point_varying_color_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_point_fixed_size_varying_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_point_varying_size_no_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_point_varying_size_varying_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_point_varying_size_varying_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_point_uniform_size_uniform_color_smooth_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_2D_point_uniform_size_uniform_color_outline_smooth_vert.glsl SRC)
+
+data_to_c_simple(shaders/gpu_shader_text_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_text_frag.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_geometry.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_fire_frag.glsl SRC)

@@ -56,7 +56,9 @@
 #include "IMB_colormanagement.h"
 
 #ifndef BLF_STANDALONE
-#include "GPU_basic_shader.h"
+#include "GPU_shader.h"
+#include "GPU_matrix.h"
+#include "GPU_immediate.h"
 #endif
 
 #include "blf_internal_types.h"
@@ -490,7 +492,7 @@ void BLF_rotation_default(float angle)
 	}
 }
 
-static void blf_draw_gl__start(FontBLF *font, GLint *mode)
+static void blf_draw_gl__start(FontBLF *font)
 {
 	/*
 	 * The pixmap alignment hack is handle
@@ -500,52 +502,46 @@ static void blf_draw_gl__start(FontBLF *font, GLint *mode)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-#ifndef BLF_STANDALONE
-	GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
-#endif
-
-	/* Save the current matrix mode. */
-	glGetIntegerv(GL_MATRIX_MODE, mode);
-
-	glMatrixMode(GL_TEXTURE);
-	glPushMatrix();
-	glLoadIdentity();
-
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
+	gpuMatrixBegin3D_legacy();
 
 	if (font->flags & BLF_MATRIX)
-		glMultMatrixf(font->m);
+		gpuMultMatrix3D(font->m);
 
-	glTranslate3fv(font->pos);
+	gpuTranslate3fv(font->pos);
 
 	if (font->flags & BLF_ASPECT)
-		glScalef(font->aspect[0], font->aspect[1], font->aspect[2]);
+		gpuScale3fv(font->aspect);
 
 	if (font->flags & BLF_ROTATION)  /* radians -> degrees */
-		glRotatef(font->angle * (float)(180.0 / M_PI), 0.0f, 0.0f, 1.0f);
+		gpuRotateAxis(font->angle * (float)(180.0 / M_PI), 'Z');
 
-	if (font->shadow || font->blur)
-		glGetFloatv(GL_CURRENT_COLOR, font->orig_col);
+	glGetFloatv(GL_CURRENT_COLOR, font->orig_col); /* TODO(merwin): new BLF_color function? */
+
+#ifndef BLF_STANDALONE
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned texCoord = add_attrib(format, "texCoord", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned color = add_attrib(format, "color", GL_FLOAT, 4, KEEP_FLOAT);
+
+	BLI_assert(pos == BLF_POS_ID);
+	BLI_assert(texCoord == BLF_COORD_ID);
+	BLI_assert(color == BLF_COLOR_ID);
+
+	immBindBuiltinProgram(GPU_SHADER_TEXT);
+#endif
 
 	/* always bind the texture for the first glyph */
 	font->tex_bind_state = -1;
 }
 
-static void blf_draw_gl__end(GLint mode)
+static void blf_draw_gl__end(void)
 {
-	glMatrixMode(GL_TEXTURE);
-	glPopMatrix();
-
-	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
-
-	if (mode != GL_MODELVIEW)
-		glMatrixMode(mode);
+	gpuMatrixEnd();
 
 #ifndef BLF_STANDALONE
-	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+	immUnbindProgram();
 #endif
+
 	glDisable(GL_BLEND);
 }
 
@@ -554,19 +550,18 @@ void BLF_draw_ex(
         struct ResultBLF *r_info)
 {
 	FontBLF *font = blf_get(fontid);
-	GLint mode;
 
 	BLF_RESULT_CHECK_INIT(r_info);
 
 	if (font && font->glyph_cache) {
-		blf_draw_gl__start(font, &mode);
+		blf_draw_gl__start(font);
 		if (font->flags & BLF_WORD_WRAP) {
 			blf_font_draw__wrap(font, str, len, r_info);
 		}
 		else {
 			blf_font_draw(font, str, len, r_info);
 		}
-		blf_draw_gl__end(mode);
+		blf_draw_gl__end();
 	}
 }
 void BLF_draw(int fontid, const char *str, size_t len)
@@ -579,12 +574,11 @@ void BLF_draw_ascii_ex(
         struct ResultBLF *r_info)
 {
 	FontBLF *font = blf_get(fontid);
-	GLint mode;
 
 	BLF_RESULT_CHECK_INIT(r_info);
 
 	if (font && font->glyph_cache) {
-		blf_draw_gl__start(font, &mode);
+		blf_draw_gl__start(font);
 		if (font->flags & BLF_WORD_WRAP) {
 			/* use non-ascii draw function for word-wrap */
 			blf_font_draw__wrap(font, str, len, r_info);
@@ -592,7 +586,7 @@ void BLF_draw_ascii_ex(
 		else {
 			blf_font_draw_ascii(font, str, len, r_info);
 		}
-		blf_draw_gl__end(mode);
+		blf_draw_gl__end();
 	}
 }
 void BLF_draw_ascii(int fontid, const char *str, size_t len)
@@ -603,13 +597,12 @@ void BLF_draw_ascii(int fontid, const char *str, size_t len)
 int BLF_draw_mono(int fontid, const char *str, size_t len, int cwidth)
 {
 	FontBLF *font = blf_get(fontid);
-	GLint mode;
 	int columns = 0;
 
 	if (font && font->glyph_cache) {
-		blf_draw_gl__start(font, &mode);
+		blf_draw_gl__start(font);
 		columns = blf_font_draw_mono(font, str, len, cwidth);
-		blf_draw_gl__end(mode);
+		blf_draw_gl__end();
 	}
 
 	return columns;

@@ -56,7 +56,6 @@
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
 #include "DNA_view3d_types.h"
-#include "DNA_particle_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -278,7 +277,7 @@ void GPU_set_gpu_mipmapping(int gpu_mipmap)
 	int old_value = GTS.gpu_mipmap;
 
 	/* only actually enable if it's supported */
-	GTS.gpu_mipmap = gpu_mipmap && GLEW_EXT_framebuffer_object;
+	GTS.gpu_mipmap = gpu_mipmap;
 
 	if (old_value != GTS.gpu_mipmap) {
 		GPU_free_images();
@@ -298,11 +297,7 @@ static void gpu_generate_mipmap(GLenum target)
 			glEnable(target);
 	}
 
-	/* TODO: simplify when we transition to GL >= 3 */
-	if (GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object)
-		glGenerateMipmap(target);
-	else if (GLEW_EXT_framebuffer_object)
-		glGenerateMipmapEXT(target);
+	glGenerateMipmap(target);
 
 	if (is_ati && !target_enabled)
 		glDisable(target);
@@ -1870,35 +1865,6 @@ void GPU_begin_object_materials(
 	GPU_object_material_unbind();
 }
 
-static int GPU_get_particle_info(GPUParticleInfo *pi)
-{
-	DupliObject *dob = GMS.dob;
-	if (dob->particle_system) {
-		int ind;
-		if (dob->persistent_id[0] < dob->particle_system->totpart)
-			ind = dob->persistent_id[0];
-		else {
-			ind = dob->particle_system->child[dob->persistent_id[0] - dob->particle_system->totpart].parent;
-		}
-		if (ind >= 0) {
-			ParticleData *p = &dob->particle_system->particles[ind];
-
-			pi->scalprops[0] = ind;
-			pi->scalprops[1] = GMS.gscene->r.cfra - p->time;
-			pi->scalprops[2] = p->lifetime;
-			pi->scalprops[3] = p->size;
-
-			copy_v3_v3(pi->location, p->state.co);
-			copy_v3_v3(pi->velocity, p->state.vel);
-			copy_v3_v3(pi->angular_velocity, p->state.ave);
-			return 1;
-		}
-		else return 0;
-	}
-	else
-		return 0;
-}
-
 int GPU_object_material_bind(int nr, void *attribs)
 {
 	GPUVertexAttribs *gattribs = attribs;
@@ -1957,22 +1923,18 @@ int GPU_object_material_bind(int nr, void *attribs)
 		if (gattribs && GMS.gmatbuf[nr]) {
 			/* bind glsl material and get attributes */
 			Material *mat = GMS.gmatbuf[nr];
-			GPUParticleInfo partile_info;
 
 			float auto_bump_scale;
 
 			GPUMaterial *gpumat = GPU_material_from_blender(GMS.gscene, mat, GMS.is_opensubdiv);
 			GPU_material_vertex_attributes(gpumat, gattribs);
 
-			if (GMS.dob)
-				GPU_get_particle_info(&partile_info);
-
 			GPU_material_bind(
 			        gpumat, GMS.gob->lay, GMS.glay, 1.0, !(GMS.gob->mode & OB_MODE_TEXTURE_PAINT),
 			        GMS.gviewmat, GMS.gviewinv, GMS.gviewcamtexcofac, GMS.gscenelock);
 
 			auto_bump_scale = GMS.gob->derivedFinal != NULL ? GMS.gob->derivedFinal->auto_bump_scale : 1.0f;
-			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, auto_bump_scale, &partile_info);
+			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, auto_bump_scale);
 			GMS.gboundmat = mat;
 
 			/* for glsl use alpha blend mode, unless it's set to solid and
@@ -2285,7 +2247,13 @@ void GPU_state_init(void)
 	glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
 
 	GPU_default_lights();
-	
+
+	GPU_disable_program_point_size();
+
+	/* TODO: remove this when we switch to core profile */
+	glEnable(GL_POINT_SPRITE);
+
+
 	glDepthFunc(GL_LEQUAL);
 	/* scaling matrices */
 	glEnable(GL_NORMALIZE);
@@ -2307,7 +2275,7 @@ void GPU_state_init(void)
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	
+
 	glPixelTransferi(GL_MAP_COLOR, GL_FALSE);
 	glPixelTransferi(GL_RED_SCALE, 1);
 	glPixelTransferi(GL_RED_BIAS, 0);
@@ -2317,7 +2285,7 @@ void GPU_state_init(void)
 	glPixelTransferi(GL_BLUE_BIAS, 0);
 	glPixelTransferi(GL_ALPHA_SCALE, 1);
 	glPixelTransferi(GL_ALPHA_BIAS, 0);
-	
+
 	glPixelTransferi(GL_DEPTH_BIAS, 0);
 	glPixelTransferi(GL_DEPTH_SCALE, 1);
 	glDepthRange(0.0, 1.0);
@@ -2333,6 +2301,26 @@ void GPU_state_init(void)
 	gpu_multisample(false);
 
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+}
+
+void GPU_enable_program_point_size()
+{
+#ifdef __APPLE__
+	/* TODO: remove this when we switch to core profile */
+	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+#else
+	glEnable(GL_PROGRAM_POINT_SIZE);
+#endif
+}
+
+void GPU_disable_program_point_size()
+{
+#ifdef __APPLE__
+	/* TODO: remove this when we switch to core profile */
+	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+#else
+	glDisable(GL_PROGRAM_POINT_SIZE);
+#endif
 }
 
 #ifdef WITH_OPENSUBDIV

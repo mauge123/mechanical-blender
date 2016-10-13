@@ -757,11 +757,6 @@ static void init_internal_icons(void)
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				
 				glBindTexture(GL_TEXTURE_2D, 0);
-				
-				if (glGetError() == GL_OUT_OF_MEMORY) {
-					glDeleteTextures(1, &icongltex.id);
-					icongltex.id = 0;
-				}
 			}
 		}
 	}
@@ -1571,8 +1566,6 @@ int UI_idcode_icon_get(const int idcode)
 			return ICON_NODETREE;
 		case ID_OB:
 			return ICON_OBJECT_DATA;
-		case ID_PA:
-			return ICON_PARTICLE_DATA;
 		case ID_PAL:
 			return ICON_COLOR;  /* TODO! this would need its own icon! */
 		case ID_PC:
