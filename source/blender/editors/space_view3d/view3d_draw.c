@@ -31,11 +31,14 @@
 #include <math.h>
 
 #include "BIF_gl.h"
+#include "BIF_glutil.h"
 
 #include "BKE_camera.h"
 #include "BKE_context.h"
 #include "BKE_scene.h"
 #include "BKE_unit.h"
+
+#include "BLF_api.h"
 
 #include "BLI_math.h"
 #include "BLI_rect.h"
@@ -51,8 +54,14 @@
 #include "ED_screen.h"
 #include "ED_transform.h"
 
+#include "GPU_matrix.h"
 #include "GPU_immediate.h"
+#include "GPU_material.h"
+#include "GPU_viewport.h"
 
+#include "MEM_guardedalloc.h"
+
+#include "UI_interface.h"
 #include "UI_resources.h"
 
 #include "RE_engine.h"
@@ -69,9 +78,10 @@ typedef struct DrawData {
 	bool render_border;
 	bool clip_border;
 	bool is_render;
+	GPUViewport *viewport;
 } DrawData;
 
-static void view3d_draw_data_init(const bContext *C, ARegion *ar, DrawData *draw_data)
+static void view3d_draw_data_init(const bContext *C, ARegion *ar, RegionView3D *rv3d, DrawData *draw_data)
 {
 	Scene *scene = CTX_data_scene(C);
 	View3D *v3d = CTX_wm_view3d(C);
@@ -80,6 +90,8 @@ static void view3d_draw_data_init(const bContext *C, ARegion *ar, DrawData *draw
 
 	draw_data->render_border = ED_view3d_calc_render_border(scene, v3d, ar, &draw_data->border_rect);
 	draw_data->clip_border = (draw_data->render_border && !BLI_rcti_compare(&ar->drawrct, &draw_data->border_rect));
+
+	draw_data->viewport = rv3d->viewport;
 }
 
 /* ******************** general functions ***************** */
@@ -288,6 +300,457 @@ static void view3d_stereo3d_setup(Scene *scene, View3D *v3d, ARegion *ar)
 	}
 }
 
+/* ******************** debug ***************** */
+
+#define VIEW3D_DRAW_DEBUG 1
+/* TODO: expand scope of this flag so UI reflects the underlying code */
+
+#if VIEW3D_DRAW_DEBUG
+
+static void view3d_draw_debug_store_depth(ARegion *ar, DrawData *draw_data)
+{
+	GPUViewport *viewport = draw_data->viewport;
+	GLint viewport_size[4];
+	glGetIntegerv(GL_VIEWPORT, viewport_size);
+
+	const int x = viewport_size[0];
+	const int y = viewport_size[1];
+	const int w = viewport_size[2];
+	const int h = viewport_size[3];
+
+	if (GPU_viewport_debug_depth_is_valid(viewport)) {
+		if ((GPU_viewport_debug_depth_width(viewport) != w) ||
+			(GPU_viewport_debug_depth_height(viewport) != h))
+		{
+			GPU_viewport_debug_depth_free(viewport);
+		}
+	}
+
+	if (!GPU_viewport_debug_depth_is_valid(viewport)) {
+		char error[256];
+		if (!GPU_viewport_debug_depth_create(viewport, w, h, 0, error)) {
+			fprintf(stderr, "Failed to create depth buffer for debug: %s\n", error);
+			return;
+		}
+	}
+
+	GPU_viewport_debug_depth_store(viewport, x, y);
+}
+
+static void view3d_draw_debug_post_solid(const bContext *C, ARegion *ar, DrawData *draw_data)
+{
+	View3D *v3d = CTX_wm_view3d(C);
+
+	if ((v3d->tmp_compat_flag & V3D_DEBUG_SHOW_SCENE_DEPTH) != 0) {
+		view3d_draw_debug_store_depth(ar, draw_data);
+	}
+}
+
+static void view3d_draw_debug(const bContext *C, ARegion *ar, DrawData *draw_data)
+{
+	View3D *v3d = CTX_wm_view3d(C);
+
+	if ((v3d->tmp_compat_flag & V3D_DEBUG_SHOW_COMBINED_DEPTH) != 0) {
+		/* store */
+		view3d_draw_debug_store_depth(ar, draw_data);
+	}
+
+	if (((v3d->tmp_compat_flag & V3D_DEBUG_SHOW_SCENE_DEPTH) != 0) ||
+		((v3d->tmp_compat_flag & V3D_DEBUG_SHOW_COMBINED_DEPTH) != 0))
+	{
+		/* draw */
+		if (GPU_viewport_debug_depth_is_valid(draw_data->viewport)) {
+			GPU_viewport_debug_depth_draw(draw_data->viewport, v3d->debug.znear, v3d->debug.zfar);
+		}
+	}
+	else {
+		/* cleanup */
+		GPU_viewport_debug_depth_free(draw_data->viewport);
+	}
+}
+
+#endif /* VIEW3D_DRAW_DEBUG */
+
+/* ******************** view border ***************** */
+
+static void view3d_camera_border(
+        const Scene *scene, const ARegion *ar, const View3D *v3d, const RegionView3D *rv3d,
+        rctf *r_viewborder, const bool no_shift, const bool no_zoom)
+{
+	CameraParams params;
+	rctf rect_view, rect_camera;
+
+	/* get viewport viewplane */
+	BKE_camera_params_init(&params);
+	BKE_camera_params_from_view3d(&params, v3d, rv3d);
+	if (no_zoom)
+		params.zoom = 1.0f;
+	BKE_camera_params_compute_viewplane(&params, ar->winx, ar->winy, 1.0f, 1.0f);
+	rect_view = params.viewplane;
+
+	/* get camera viewplane */
+	BKE_camera_params_init(&params);
+	/* fallback for non camera objects */
+	params.clipsta = v3d->near;
+	params.clipend = v3d->far;
+	BKE_camera_params_from_object(&params, v3d->camera);
+	if (no_shift) {
+		params.shiftx = 0.0f;
+		params.shifty = 0.0f;
+	}
+	BKE_camera_params_compute_viewplane(&params, scene->r.xsch, scene->r.ysch, scene->r.xasp, scene->r.yasp);
+	rect_camera = params.viewplane;
+
+	/* get camera border within viewport */
+	r_viewborder->xmin = ((rect_camera.xmin - rect_view.xmin) / BLI_rctf_size_x(&rect_view)) * ar->winx;
+	r_viewborder->xmax = ((rect_camera.xmax - rect_view.xmin) / BLI_rctf_size_x(&rect_view)) * ar->winx;
+	r_viewborder->ymin = ((rect_camera.ymin - rect_view.ymin) / BLI_rctf_size_y(&rect_view)) * ar->winy;
+	r_viewborder->ymax = ((rect_camera.ymax - rect_view.ymin) / BLI_rctf_size_y(&rect_view)) * ar->winy;
+}
+
+void ED_view3d_calc_camera_border_size(
+        const Scene *scene, const ARegion *ar, const View3D *v3d, const RegionView3D *rv3d,
+        float r_size[2])
+{
+	rctf viewborder;
+
+	view3d_camera_border(scene, ar, v3d, rv3d, &viewborder, true, true);
+	r_size[0] = BLI_rctf_size_x(&viewborder);
+	r_size[1] = BLI_rctf_size_y(&viewborder);
+}
+
+void ED_view3d_calc_camera_border(
+        const Scene *scene, const ARegion *ar, const View3D *v3d, const RegionView3D *rv3d,
+        rctf *r_viewborder, const bool no_shift)
+{
+	view3d_camera_border(scene, ar, v3d, rv3d, r_viewborder, no_shift, false);
+}
+
+static void drawviewborder_grid3(unsigned pos, float x1, float x2, float y1, float y2, float fac)
+{
+	float x3, y3, x4, y4;
+
+	x3 = x1 + fac * (x2 - x1);
+	y3 = y1 + fac * (y2 - y1);
+	x4 = x1 + (1.0f - fac) * (x2 - x1);
+	y4 = y1 + (1.0f - fac) * (y2 - y1);
+
+	immBegin(GL_LINES, 8);
+	immVertex2f(pos, x1, y3);
+	immVertex2f(pos, x2, y3);
+
+	immVertex2f(pos, x1, y4);
+	immVertex2f(pos, x2, y4);
+
+	immVertex2f(pos, x3, y1);
+	immVertex2f(pos, x3, y2);
+
+	immVertex2f(pos, x4, y1);
+	immVertex2f(pos, x4, y2);
+	immEnd();
+}
+
+/* harmonious triangle */
+static void drawviewborder_triangle(unsigned pos, float x1, float x2, float y1, float y2, const char golden, const char dir)
+{
+	float ofs;
+	float w = x2 - x1;
+	float h = y2 - y1;
+
+	immBegin(GL_LINES, 6);
+	if (w > h) {
+		if (golden) {
+			ofs = w * (1.0f - (1.0f / 1.61803399f));
+		}
+		else {
+			ofs = h * (h / w);
+		}
+		if (dir == 'B') SWAP(float, y1, y2);
+
+		immVertex2f(pos, x1, y1);
+		immVertex2f(pos, x2, y2);
+
+		immVertex2f(pos, x2, y1);
+		immVertex2f(pos, x1 + (w - ofs), y2);
+
+		immVertex2f(pos, x1, y2);
+		immVertex2f(pos, x1 + ofs, y1);
+	}
+	else {
+		if (golden) {
+			ofs = h * (1.0f - (1.0f / 1.61803399f));
+		}
+		else {
+			ofs = w * (w / h);
+		}
+		if (dir == 'B') SWAP(float, x1, x2);
+
+		immVertex2f(pos, x1, y1);
+		immVertex2f(pos, x2, y2);
+
+		immVertex2f(pos, x2, y1);
+		immVertex2f(pos, x1, y1 + ofs);
+
+		immVertex2f(pos, x1, y2);
+		immVertex2f(pos, x2, y1 + (h - ofs));
+	}
+	immEnd();
+}
+
+static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
+{
+	float x1, x2, y1, y2;
+	float x1i, x2i, y1i, y2i;
+
+	rctf viewborder;
+	Camera *ca = NULL;
+	RegionView3D *rv3d = ar->regiondata;
+
+	if (v3d->camera == NULL)
+		return;
+	if (v3d->camera->type == OB_CAMERA)
+		ca = v3d->camera->data;
+
+	ED_view3d_calc_camera_border(scene, ar, v3d, rv3d, &viewborder, false);
+	/* the offsets */
+	x1 = viewborder.xmin;
+	y1 = viewborder.ymin;
+	x2 = viewborder.xmax;
+	y2 = viewborder.ymax;
+
+	glLineWidth(1.0f);
+
+	/* apply offsets so the real 3D camera shows through */
+
+	/* note: quite un-scientific but without this bit extra
+	 * 0.0001 on the lower left the 2D border sometimes
+	 * obscures the 3D camera border */
+	/* note: with VIEW3D_CAMERA_BORDER_HACK defined this error isn't noticeable
+	 * but keep it here in case we need to remove the workaround */
+	x1i = (int)(x1 - 1.0001f);
+	y1i = (int)(y1 - 1.0001f);
+	x2i = (int)(x2 + (1.0f - 0.0001f));
+	y2i = (int)(y2 + (1.0f - 0.0001f));
+
+	/* use the same program for everything */
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
+	/* passepartout, specified in camera edit buttons */
+	if (ca && (ca->flag & CAM_SHOWPASSEPARTOUT) && ca->passepartalpha > 0.000001f) {
+		const float winx = (ar->winx + 1);
+		const float winy = (ar->winy + 1);
+
+		float alpha = 1.0f;
+
+		if (ca->passepartalpha != 1.0f) {
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glEnable(GL_BLEND);
+			alpha = ca->passepartalpha;
+		}
+
+		immUniformColor4f(0.0f, 0.0f, 0.0f, alpha);
+
+		if (x1i > 0.0f)
+			immRectf(pos, 0.0f, winy, x1i, 0.0f);
+		if (x2i < winx)
+			immRectf(pos, x2i, winy, winx, 0.0f);
+		if (y2i < winy)
+			immRectf(pos, x1i, winy, x2i, y2i);
+		if (y2i > 0.0f)
+			immRectf(pos, x1i, y1i, x2i, 0.0f);
+
+		glDisable(GL_BLEND);
+	}
+
+	setlinestyle(0);
+
+	immUniformThemeColor(TH_BACK);
+	imm_draw_line_box(pos, x1i, y1i, x2i, y2i);
+
+#ifdef VIEW3D_CAMERA_BORDER_HACK
+	if (view3d_camera_border_hack_test == true) {
+		immUniformColor3ubv(view3d_camera_border_hack_col);
+		imm_draw_line_box(pos, x1i + 1, y1i + 1, x2i - 1, y2i - 1);
+		view3d_camera_border_hack_test = false;
+	}
+#endif
+
+	setlinestyle(3);
+
+	/* outer line not to confuse with object selecton */
+	if (v3d->flag2 & V3D_LOCK_CAMERA) {
+		immUniformThemeColor(TH_REDALERT);
+		imm_draw_line_box(pos, x1i - 1, y1i - 1, x2i + 1, y2i + 1);
+	}
+
+	immUniformThemeColor(TH_VIEW_OVERLAY);
+	imm_draw_line_box(pos, x1i, y1i, x2i, y2i);
+
+	/* border */
+	if (scene->r.mode & R_BORDER) {
+		float x3, y3, x4, y4;
+
+		x3 = floorf(x1 + (scene->r.border.xmin * (x2 - x1))) - 1;
+		y3 = floorf(y1 + (scene->r.border.ymin * (y2 - y1))) - 1;
+		x4 = floorf(x1 + (scene->r.border.xmax * (x2 - x1))) + (U.pixelsize - 1);
+		y4 = floorf(y1 + (scene->r.border.ymax * (y2 - y1))) + (U.pixelsize - 1);
+
+		imm_cpack(0x4040FF);
+		imm_draw_line_box(pos, x3, y3, x4, y4);
+	}
+
+	/* safety border */
+	if (ca) {
+		if (ca->dtx & CAM_DTX_CENTER) {
+			float x3, y3;
+
+			x3 = x1 + 0.5f * (x2 - x1);
+			y3 = y1 + 0.5f * (y2 - y1);
+
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			immBegin(GL_LINES, 4);
+
+			immVertex2f(pos, x1, y3);
+			immVertex2f(pos, x2, y3);
+
+			immVertex2f(pos, x3, y1);
+			immVertex2f(pos, x3, y2);
+
+			immEnd();
+		}
+
+		if (ca->dtx & CAM_DTX_CENTER_DIAG) {
+
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			immBegin(GL_LINES, 4);
+
+			immVertex2f(pos, x1, y1);
+			immVertex2f(pos, x2, y2);
+
+			immVertex2f(pos, x1, y2);
+			immVertex2f(pos, x2, y1);
+
+			immEnd();
+		}
+
+		if (ca->dtx & CAM_DTX_THIRDS) {
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			drawviewborder_grid3(pos, x1, x2, y1, y2, 1.0f / 3.0f);
+		}
+
+		if (ca->dtx & CAM_DTX_GOLDEN) {
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			drawviewborder_grid3(pos, x1, x2, y1, y2, 1.0f - (1.0f / 1.61803399f));
+		}
+
+		if (ca->dtx & CAM_DTX_GOLDEN_TRI_A) {
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			drawviewborder_triangle(pos, x1, x2, y1, y2, 0, 'A');
+		}
+
+		if (ca->dtx & CAM_DTX_GOLDEN_TRI_B) {
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			drawviewborder_triangle(pos, x1, x2, y1, y2, 0, 'B');
+		}
+
+		if (ca->dtx & CAM_DTX_HARMONY_TRI_A) {
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			drawviewborder_triangle(pos, x1, x2, y1, y2, 1, 'A');
+		}
+
+		if (ca->dtx & CAM_DTX_HARMONY_TRI_B) {
+			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
+			drawviewborder_triangle(pos, x1, x2, y1, y2, 1, 'B');
+		}
+
+		if (ca->flag & CAM_SHOW_SAFE_MARGINS) {
+			UI_draw_safe_areas(
+			        pos, x1, x2, y1, y2,
+			        scene->safe_areas.title,
+			        scene->safe_areas.action);
+
+			if (ca->flag & CAM_SHOW_SAFE_CENTER) {
+				UI_draw_safe_areas(
+				        pos, x1, x2, y1, y2,
+				        scene->safe_areas.title_center,
+				        scene->safe_areas.action_center);
+			}
+		}
+
+		if (ca->flag & CAM_SHOWSENSOR) {
+			/* determine sensor fit, and get sensor x/y, for auto fit we
+			 * assume and square sensor and only use sensor_x */
+			float sizex = scene->r.xsch * scene->r.xasp;
+			float sizey = scene->r.ysch * scene->r.yasp;
+			int sensor_fit = BKE_camera_sensor_fit(ca->sensor_fit, sizex, sizey);
+			float sensor_x = ca->sensor_x;
+			float sensor_y = (ca->sensor_fit == CAMERA_SENSOR_FIT_AUTO) ? ca->sensor_x : ca->sensor_y;
+
+			/* determine sensor plane */
+			rctf rect;
+
+			if (sensor_fit == CAMERA_SENSOR_FIT_HOR) {
+				float sensor_scale = (x2i - x1i) / sensor_x;
+				float sensor_height = sensor_scale * sensor_y;
+
+				rect.xmin = x1i;
+				rect.xmax = x2i;
+				rect.ymin = (y1i + y2i) * 0.5f - sensor_height * 0.5f;
+				rect.ymax = rect.ymin + sensor_height;
+			}
+			else {
+				float sensor_scale = (y2i - y1i) / sensor_y;
+				float sensor_width = sensor_scale * sensor_x;
+
+				rect.xmin = (x1i + x2i) * 0.5f - sensor_width * 0.5f;
+				rect.xmax = rect.xmin + sensor_width;
+				rect.ymin = y1i;
+				rect.ymax = y2i;
+			}
+
+			/* draw */
+			float color[4];
+			UI_GetThemeColorShade4fv(TH_VIEW_OVERLAY, 100, color);
+			UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 2.0f, color);
+		}
+	}
+
+	setlinestyle(0);
+
+	/* camera name - draw in highlighted text color */
+	if (ca && (ca->flag & CAM_SHOWNAME)) {
+		UI_ThemeColor(TH_TEXT_HI);
+		BLF_draw_default(
+		        x1i, y1i - (0.7f * U.widget_unit), 0.0f,
+		        v3d->camera->id.name + 2, sizeof(v3d->camera->id.name) - 2);
+	}
+
+	immUnbindProgram();
+}
+
+static void drawrenderborder(ARegion *ar, View3D *v3d)
+{
+	/* use the same program for everything */
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
+	glLineWidth(1.0f);
+	setlinestyle(3);
+	imm_cpack(0x4040FF);
+
+	imm_draw_line_box(
+	    pos, v3d->render_border.xmin * ar->winx, v3d->render_border.ymin * ar->winy,
+	    v3d->render_border.xmax * ar->winx, v3d->render_border.ymax * ar->winy);
+
+	setlinestyle(0);
+
+	immUnbindProgram();
+}
+
 /* ******************** offline engine ***************** */
 
 static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
@@ -338,7 +801,7 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	/* don't change depth buffer */
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT); /* is this necessary? -- merwin */
 
 	/* render result draw */
 	type = rv3d->render_engine->type;
@@ -357,16 +820,114 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 	return true;
 }
 
+/* ******************** background plates ***************** */
+
+static void view3d_draw_background_gradient()
+{
+	gpuMatrixBegin3D(); /* TODO: finish 2D API */
+
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 3, NORMALIZE_INT_TO_FLOAT);
+	unsigned char col_hi[3], col_lo[3];
+
+	immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
+
+	UI_GetThemeColor3ubv(TH_LOW_GRAD, col_lo);
+	UI_GetThemeColor3ubv(TH_HIGH_GRAD, col_hi);
+
+	immBegin(GL_QUADS, 4);
+	immAttrib3ubv(color, col_lo);
+	immVertex2f(pos, -1.0f, -1.0f);
+	immVertex2f(pos, 1.0f, -1.0f);
+
+	immAttrib3ubv(color, col_hi);
+	immVertex2f(pos, 1.0f, 1.0f);
+	immVertex2f(pos, -1.0f, 1.0f);
+	immEnd();
+
+	immUnbindProgram();
+
+	gpuMatrixEnd();
+}
+
+static void view3d_draw_background_none()
+{
+	if (UI_GetThemeValue(TH_SHOW_BACK_GRAD)) {
+		view3d_draw_background_gradient();
+	}
+	else {
+		UI_ThemeClearColorAlpha(TH_HIGH_GRAD, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+}
+
+static void view3d_draw_background_world(Scene *scene, View3D *v3d, RegionView3D *rv3d)
+{
+	if (scene->world) {
+		GPUMaterial *gpumat = GPU_material_world(scene, scene->world);
+
+		/* calculate full shader for background */
+		GPU_material_bind(gpumat, 1, 1, 1.0f, false, rv3d->viewmat, rv3d->viewinv, rv3d->viewcamtexcofac, (v3d->scenelock != 0));
+
+		if (GPU_material_bound(gpumat)) {
+
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			/* TODO viewport (dfelinto): GPU_material_bind relies on immediate mode,
+			* we can't get rid of the following code without a bigger refactor
+			* or we dropping this functionality. */
+
+			glBegin(GL_TRIANGLE_STRIP);
+			glVertex2f(-1.0f, -1.0f);
+			glVertex2f(1.0f, -1.0f);
+			glVertex2f(-1.0f, 1.0f);
+			glVertex2f(1.0f, 1.0f);
+			glEnd();
+
+			GPU_material_unbind(gpumat);
+		}
+		else {
+			view3d_draw_background_none();
+		}
+	}
+	else {
+		view3d_draw_background_none();
+	}
+}
+
 /* ******************** solid plates ***************** */
 
 /**
- *
+ * Clear the buffer and draw the proper shader
  */
 static void view3d_draw_background(const bContext *C)
 {
-	/* TODO viewport */
-	UI_ThemeClearColor(TH_HIGH_GRAD);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	Scene *scene = CTX_data_scene(C);
+	View3D *v3d = CTX_wm_view3d(C);
+	RegionView3D *rv3d = CTX_wm_region_view3d(C);
+
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+	/* Background functions do not read or write depth, but they do clear or completely
+	 * overwrite color buffer. It's more efficient to clear color & depth in once call, so
+	 * background functions do this even though they don't use depth.
+	 */
+
+	switch (v3d->debug.background) {
+		case V3D_DEBUG_BACKGROUND_WORLD:
+			view3d_draw_background_world(scene, v3d, rv3d);
+			break;
+		case V3D_DEBUG_BACKGROUND_GRADIENT:
+			view3d_draw_background_gradient();
+			break;
+		case V3D_DEBUG_BACKGROUND_NONE:
+		default:
+			view3d_draw_background_none();
+			break;
+	}
 }
 
 /**
@@ -589,7 +1150,9 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 
 	glLineWidth(1.0f);
 
+#if 0 /* TODO: write to UI/widget depth buffer, not scene depth */
 	glDepthMask(GL_FALSE);  /* disable write in zbuffer */
+#endif
 
 	VertexFormat* format = immVertexFormat();
 	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
@@ -723,7 +1286,10 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 
 drawgrid_cleanup:
 	immUnbindProgram();
+
+#if 0 /* depth write is left enabled above */
 	glDepthMask(GL_TRUE);  /* enable write in zbuffer */
+#endif
 }
 
 #undef DEBUG_GRID
@@ -949,11 +1515,13 @@ static void view3d_draw_grid(const bContext *C, ARegion *ar)
 	const char *grid_unit = NULL;
 
 	/* ortho grid goes first, does not write to depth buffer and doesn't need depth test so it will override
-	* objects if done last */
-	/* needs to be done always, gridview is adjusted in drawgrid() now, but only for ortho views. */
-	rv3d->gridview = ED_view3d_grid_scale(scene, v3d, grid_unit);
+	 * objects if done last
+	 * needs to be done always, gridview is adjusted in drawgrid() now, but only for ortho views.
+	 */
+	rv3d->gridview = ED_view3d_grid_scale(scene, v3d, &grid_unit);
 
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE); /* read & test depth, but don't alter it. TODO: separate UI depth buffer */
 
 	if (!draw_floor) {
 		ED_region_pixelspace(ar);
@@ -975,6 +1543,93 @@ static void view3d_draw_grid(const bContext *C, ARegion *ar)
 	}
 
 	glDisable(GL_DEPTH_TEST);
+}
+
+/* ******************** non-meshes ***************** */
+
+static void view3d_draw_non_mesh(
+Scene *scene, Object *ob, Base *base, View3D *v3d,
+RegionView3D *rv3d, const bool is_boundingbox, const unsigned char color[4])
+{
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+
+	/* multiply view with object matrix.
+	* local viewmat and persmat, to calculate projections */
+	ED_view3d_init_mats_rv3d_gl(ob, rv3d);
+
+	switch (ob->type) {
+		case OB_MESH:
+		case OB_FONT:
+		case OB_CURVE:
+		case OB_SURF:
+		case OB_MBALL:
+			if (is_boundingbox) {
+				draw_bounding_volume(ob, ob->boundtype);
+			}
+			break;
+		case OB_EMPTY:
+			drawaxes(rv3d->viewmatob, ob->empty_drawsize, ob->empty_drawtype, color);
+			break;
+		case OB_LAMP:
+			drawlamp(v3d, rv3d, base, OB_SOLID, DRAW_CONSTCOLOR, color, ob == OBACT);
+			break;
+		case OB_CAMERA:
+			drawcamera(scene, v3d, rv3d, base, DRAW_CONSTCOLOR, color);
+			break;
+		case OB_SPEAKER:
+			drawspeaker(color);
+			break;
+		case OB_LATTICE:
+			/* TODO */
+			break;
+		case OB_ARMATURE:
+			/* TODO */
+			break;
+		default:
+		/* TODO Viewport: handle the other cases*/
+			break;
+	}
+
+	if (ob->rigidbody_object) {
+		draw_rigidbody_shape(ob);
+	}
+
+	ED_view3d_clear_mats_rv3d(rv3d);
+
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+}
+
+/* ******************** info ***************** */
+
+/**
+* Render and camera border
+*/
+static void view3d_draw_border(const bContext *C, ARegion *ar)
+{
+	Scene *scene = CTX_data_scene(C);
+	RegionView3D *rv3d = ar->regiondata;
+	View3D *v3d = CTX_wm_view3d(C);
+
+	if (rv3d->persp == RV3D_CAMOB) {
+		drawviewborder(scene, ar, v3d);
+	}
+	else if (v3d->flag2 & V3D_RENDER_BORDER) {
+		drawrenderborder(ar, v3d);
+	}
+}
+
+/**
+* Grease Pencil
+*/
+static void view3d_draw_grease_pencil(const bContext *C)
+{
+	/* TODO viewport */
 }
 
 /* ******************** view loop ***************** */
@@ -1006,6 +1661,8 @@ static void draw_all_objects(const bContext *C, ARegion *ar, const bool only_dep
 
 	if (only_depth || use_depth) {
 		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LESS);
+		glDepthMask(GL_TRUE);
 		v3d->zbuf = true;
 	}
 
@@ -1070,6 +1727,10 @@ static void view3d_draw_solid_plates(const bContext *C, ARegion *ar, DrawData *d
 	if (draw_data->is_render) {
 		view3d_draw_render_draw(C, scene, ar, v3d, draw_data->clip_border, &draw_data->border_rect);
 	}
+
+#if VIEW3D_DRAW_DEBUG
+	view3d_draw_debug_post_solid(C, ar, draw_data);
+#endif
 }
 
 /**
@@ -1081,8 +1742,46 @@ static void view3d_draw_geometry_overlay(const bContext *C)
 	view3d_draw_outline_plates(C);
 }
 
+/* drawing cameras, lamps, ... */
+static void view3d_draw_non_meshes(const bContext *C, ARegion *ar)
+{
+	/* TODO viewport
+	 * for now we draw them all, in the near future
+	 * we filter them based on the plates/layers
+	 */
+	Scene *scene = CTX_data_scene(C);
+	View3D *v3d = CTX_wm_view3d(C);
+	RegionView3D *rv3d = ar->regiondata;
+	Object *ob_act = CTX_data_active_object(C);
+	Base *base;
+
+	bool is_boundingbox = ((v3d->drawtype == OB_BOUNDBOX) ||
+	                        ((v3d->drawtype == OB_RENDER) && (v3d->prev_drawtype == OB_BOUNDBOX)));
+
+	unsigned char ob_wire_col[4];            /* dont initialize this */
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+	/* TODO Viewport
+	 * we are already temporarily writing to zbuffer in draw_object()
+	 * for now let's avoid writing again to zbuffer to prevent glitches
+	 */
+
+	for (base = scene->base.first; base; base = base->next) {
+		if (v3d->lay & base->lay) {
+			Object *ob = base->object;
+
+			draw_object_wire_color(scene, base, ob_wire_col);
+			view3d_draw_non_mesh(scene, ob, base, v3d, rv3d, is_boundingbox, ob_wire_col);
+		}
+	}
+
+	glDepthMask(GL_FALSE);
+	glDisable(GL_DEPTH_TEST);
+}
+
 /**
-* Empties, lamps, parent lines, grid, ...
+* Parent lines, grid, ...
 */
 static void view3d_draw_other_elements(const bContext *C, ARegion *ar)
 {
@@ -1117,10 +1816,21 @@ static void view3d_draw_manipulator(const bContext *C)
 }
 
 /**
- * Grease Pencil
- */
-static void view3d_draw_grease_pencil(const bContext *C)
+* Information drawn on top of the solid plates and composed data
+*/
+static void view3d_draw_region_info(const bContext *C, ARegion *ar)
 {
+	rcti rect;
+
+	/* correct projection matrix */
+	ED_region_pixelspace(ar);
+
+	/* local coordinate visible rect inside region, to accomodate overlapping ui */
+	ED_region_visible_rect(ar, &rect);
+
+	view3d_draw_border(C, ar);
+	view3d_draw_grease_pencil(C);
+
 	/* TODO viewport */
 }
 
@@ -1140,27 +1850,36 @@ static void view3d_draw_view(const bContext *C, ARegion *ar, DrawData *draw_data
 	view3d_draw_prerender_buffers(C, ar, draw_data);
 	view3d_draw_solid_plates(C, ar, draw_data);
 	view3d_draw_geometry_overlay(C);
+	view3d_draw_non_meshes(C, ar);
 	view3d_draw_other_elements(C, ar);
 	view3d_draw_tool_ui(C);
 	view3d_draw_reference_images(C);
 	view3d_draw_manipulator(C);
-	view3d_draw_grease_pencil(C);
+	view3d_draw_region_info(C, ar);
+
+#if VIEW3D_DRAW_DEBUG
+	view3d_draw_debug(C, ar, draw_data);
+#endif
 }
 
 void view3d_main_region_draw(const bContext *C, ARegion *ar)
 {
 	View3D *v3d = CTX_wm_view3d(C);
+	RegionView3D *rv3d = ar->regiondata;
 
 	if (IS_VIEWPORT_LEGACY(v3d)) {
 		view3d_main_region_draw_legacy(C, ar);
 		return;
 	}
 
+	if (!rv3d->viewport)
+		rv3d->viewport = GPU_viewport_create();
+
 	/* TODO viewport - there is so much to be done, in fact a lot will need to happen in the space_view3d.c
 	 * before we even call the drawing routine, but let's move on for now (dfelinto)
 	 * but this is a provisory way to start seeing things in the viewport */
 	DrawData draw_data;
-	view3d_draw_data_init(C, ar, &draw_data);
+	view3d_draw_data_init(C, ar, rv3d, &draw_data);
 	view3d_draw_view(C, ar, &draw_data);
 
 	v3d->flag |= V3D_INVALID_BACKBUF;
@@ -1208,4 +1927,24 @@ void VP_legacy_view3d_stereo3d_setup(Scene *scene, View3D *v3d, ARegion *ar)
 bool VP_legacy_use_depth(Scene *scene, View3D *v3d)
 {
 	return use_depth_doit(scene, v3d);
+}
+
+void VP_drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
+{
+	drawviewborder(scene, ar, v3d);
+}
+
+void VP_drawrenderborder(ARegion *ar, View3D *v3d)
+{
+	drawrenderborder(ar, v3d);
+}
+
+void VP_view3d_draw_background_none(void)
+{
+	view3d_draw_background_none();
+}
+
+void VP_view3d_draw_background_world(Scene *scene, View3D *v3d, RegionView3D *rv3d)
+{
+	view3d_draw_background_world(scene, v3d, rv3d);
 }

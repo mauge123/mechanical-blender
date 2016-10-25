@@ -258,6 +258,12 @@ static CustomData *dm_getPolyCData(DerivedMesh *dm)
 	return &dm->polyData;
 }
 
+static DMCleanupBatchCache cleanupBatchCache = NULL;
+void DM_set_batch_cleanup_callback(DMCleanupBatchCache func)
+{
+	cleanupBatchCache = func;
+}
+
 /**
  * Utility function to initialize a DerivedMesh's function pointers to
  * the default implementation (for those functions which have a default)
@@ -316,7 +322,9 @@ void DM_init(
 	dm->numPolyData = numPolys;
 
 	DM_init_funcs(dm);
-	
+
+	dm->batchCache = NULL; /* necessary? dm->drawObject is not set to NULL yet it works fine */
+
 	dm->needsFree = 1;
 	dm->auto_bump_scale = -1.0f;
 	dm->dirty = 0;
@@ -378,6 +386,10 @@ int DM_release(DerivedMesh *dm)
 	if (dm->needsFree) {
 		bvhcache_free(&dm->bvhCache);
 		GPU_drawobject_free(dm);
+		if (dm->batchCache && cleanupBatchCache) {
+			cleanupBatchCache(dm->batchCache);
+			dm->batchCache = NULL;
+		}
 		CustomData_free(&dm->vertData, dm->numVertData);
 		CustomData_free(&dm->edgeData, dm->numEdgeData);
 		CustomData_free(&dm->faceData, dm->numTessFaceData);
@@ -3260,7 +3272,7 @@ void DM_calc_tangents_names_from_gpu(
 	*r_tangent_names_count = count;
 }
 
-static void DM_calc_loop_tangents_thread(TaskPool *UNUSED(pool), void *taskdata, int UNUSED(threadid))
+static void DM_calc_loop_tangents_thread(TaskPool * __restrict UNUSED(pool), void *taskdata, int UNUSED(threadid))
 {
 	struct SGLSLMeshToTangent *mesh2tangent = taskdata;
 	/* new computation method */
@@ -3679,15 +3691,15 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 			 * We do it based on the specified name.
 			 */
 			if (gattribs->layer[b].name[0]) {
-				layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
-				type = CD_TANGENT;
+				layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
+				type = CD_MTFACE;
 				if (layer == -1) {
 					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPCOL, gattribs->layer[b].name);
 					type = CD_MCOL;
 				}
 				if (layer == -1) {
-					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
-					type = CD_MTFACE;
+					layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
+					type = CD_TANGENT;
 				}
 				if (layer == -1) {
 					continue;

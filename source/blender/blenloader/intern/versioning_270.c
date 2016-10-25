@@ -1305,7 +1305,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 			}
 		}
 	}
-	if (!MAIN_VERSION_ATLEAST(main, 279, 0)) {
+	if (!MAIN_VERSION_ATLEAST(main, 278, 2)) {
 		if (!DNA_struct_elem_find(fd->filesdna, "FFMpegCodecData", "int", "ffmpeg_preset")) {
 			for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
 				/* "medium" is the preset FFmpeg uses when no presets are given. */
@@ -1331,6 +1331,29 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 							smd->domain->slice_per_voxel = 5.0f;
 							smd->domain->slice_depth = 0.5f;
 							smd->domain->display_thickness = 1.0f;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	{
+		if (!DNA_struct_elem_find(fd->filesdna, "View3DDebug", "char", "background")) {
+			bScreen *screen;
+
+			for (screen = main->screen.first; screen; screen = screen->id.next) {
+				ScrArea *sa;
+				for (sa = screen->areabase.first; sa; sa = sa->next) {
+					SpaceLink *sl;
+
+					for (sl = sa->spacedata.first; sl; sl = sl->next) {
+						switch (sl->spacetype) {
+							case SPACE_VIEW3D:
+							{
+								View3D *v3d = (View3D *)sl;
+								v3d->debug.background = V3D_DEBUG_BACKGROUND_NONE;
+							}
 						}
 					}
 				}

@@ -65,10 +65,14 @@ typedef struct TreeElement {
 	 ELEM(GS((_id)->name), ID_SCR, ID_WM, ID_TXT, ID_VF, ID_SO, ID_CF, ID_PAL))  /* Only in 'blendfile' mode ... :/ */
 
 /* TreeElement->flag */
-#define TE_ACTIVE       1
-#define TE_ICONROW      2
-#define TE_LAZY_CLOSED  4
-#define TE_FREE_NAME    8
+enum {
+	TE_ACTIVE      = (1 << 0),
+	/* Closed items display their children as icon within the row. TE_ICONROW is for
+	 * these child-items that are visible but only within the row of the closed parent. */
+	TE_ICONROW     = (1 << 1),
+	TE_LAZY_CLOSED = (1 << 2),
+	TE_FREE_NAME   = (1 << 3),
+};
 
 /* button events */
 #define OL_NAMEBUTTON       1
@@ -133,8 +137,8 @@ void outliner_cleanup_tree(struct SpaceOops *soops);
 TreeElement *outliner_find_tse(struct SpaceOops *soops, const TreeStoreElem *tse);
 TreeElement *outliner_find_tree_element(ListBase *lb, const TreeStoreElem *store_elem);
 TreeElement *outliner_find_id(struct SpaceOops *soops, ListBase *lb, const struct ID *id);
-TreeElement *outliner_find_posechannel(struct SpaceOops *soops, ListBase *lb, const struct bPoseChannel *pchan);
-TreeElement *outliner_find_editbone(struct SpaceOops *soops, ListBase *lb, const struct EditBone *ebone);
+TreeElement *outliner_find_posechannel(ListBase *lb, const struct bPoseChannel *pchan);
+TreeElement *outliner_find_editbone(ListBase *lb, const struct EditBone *ebone);
 struct ID *outliner_search_back(SpaceOops *soops, TreeElement *te, short idcode);
 
 void outliner_build_tree(struct Main *mainvar, struct Scene *scene, struct SpaceOops *soops);
@@ -150,7 +154,7 @@ eOLDrawState tree_element_type_active(
         TreeElement *te, TreeStoreElem *tselem, const eOLSetState set, bool recursive);
 eOLDrawState tree_element_active(struct bContext *C, struct Scene *scene, SpaceOops *soops,
                                  TreeElement *te, const eOLSetState set, const bool handle_all_types);
-int outliner_item_do_activate(struct bContext *C, int x, int y, bool extend, bool recursive);
+int outliner_item_activate_or_toggle_closed(struct bContext *C, int x, int y, bool extend, bool recursive);
 
 /* outliner_edit.c ---------------------------------------------- */
 typedef void (*outliner_operation_cb)(
@@ -166,8 +170,8 @@ void outliner_do_object_operation(
 
 int common_restrict_check(struct bContext *C, struct Object *ob);
 
-int outliner_has_one_flag(struct SpaceOops *soops, ListBase *lb, short flag, const int curlevel);
-void outliner_set_flag(struct SpaceOops *soops, ListBase *lb, short flag, short set);
+int outliner_has_one_flag(ListBase *lb, short flag, const int curlevel);
+bool outliner_set_flag(ListBase *lb, short flag, short set);
 
 void object_toggle_visibility_cb(
         struct bContext *C, struct ReportList *reports, struct Scene *scene,
@@ -208,7 +212,13 @@ void id_remap_cb(
         struct TreeStoreElem *tsep, struct TreeStoreElem *tselem, void *user_data);
 
 TreeElement *outliner_dropzone_find(const struct SpaceOops *soops, const float fmval[2], const bool children);
+
+TreeElement *outliner_find_item_at_y(const SpaceOops *soops, const ListBase *tree, float view_co_y);
+TreeElement *outliner_find_item_at_x_in_row(const SpaceOops *soops, const TreeElement *parent_te, float view_co_x);
+
 /* ...................................................... */
+
+void OUTLINER_OT_highlight_update(struct wmOperatorType *ot);
 
 void OUTLINER_OT_item_activate(struct wmOperatorType *ot);
 void OUTLINER_OT_item_openclose(struct wmOperatorType *ot);

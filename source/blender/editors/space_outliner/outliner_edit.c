@@ -117,9 +117,7 @@ static void outliner_open_reveal(SpaceOops *soops, ListBase *lb, TreeElement *te
 }
 #endif
 
-static TreeElement *outliner_dropzone_element(
-        const SpaceOops *soops, TreeElement *te,
-        const float fmval[2], const bool children)
+static TreeElement *outliner_dropzone_element(TreeElement *te, const float fmval[2], const bool children)
 {
 	if ((fmval[1] > te->ys) && (fmval[1] < (te->ys + UI_UNIT_Y))) {
 		/* name and first icon */
@@ -129,7 +127,7 @@ static TreeElement *outliner_dropzone_element(
 	/* Not it.  Let's look at its children. */
 	if (children && (TREESTORE(te)->flag & TSE_CLOSED) == 0 && (te->subtree.first)) {
 		for (te = te->subtree.first; te; te = te->next) {
-			TreeElement *te_valid = outliner_dropzone_element(soops, te, fmval, children);
+			TreeElement *te_valid = outliner_dropzone_element(te, fmval, children);
 			if (te_valid)
 				return te_valid;
 		}
@@ -143,15 +141,102 @@ TreeElement *outliner_dropzone_find(const SpaceOops *soops, const float fmval[2]
 	TreeElement *te;
 
 	for (te = soops->tree.first; te; te = te->next) {
-		TreeElement *te_valid = outliner_dropzone_element(soops, te, fmval, children);
+		TreeElement *te_valid = outliner_dropzone_element(te, fmval, children);
 		if (te_valid)
 			return te_valid;
 	}
 	return NULL;
 }
 
+/**
+ * Try to find an item under y-coordinate \a view_co_y (view-space).
+ * \note Recursive
+ */
+TreeElement *outliner_find_item_at_y(const SpaceOops *soops, const ListBase *tree, float view_co_y)
+{
+	for (TreeElement *te_iter = tree->first; te_iter; te_iter = te_iter->next) {
+		if (view_co_y < (te_iter->ys + UI_UNIT_Y)) {
+			if (view_co_y > te_iter->ys) {
+				/* co_y is inside this element */
+				return te_iter;
+			}
+			else if (TSELEM_OPEN(te_iter->store_elem, soops)) {
+				/* co_y is lower than current element, possibly inside children */
+				TreeElement *te_sub = outliner_find_item_at_y(soops, &te_iter->subtree, view_co_y);
+				if (te_sub) {
+					return te_sub;
+				}
+			}
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * Collapsed items can show their children as click-able icons. This function tries to find
+ * such an icon that represents the child item at x-coordinate \a view_co_x (view-space).
+ *
+ * \return a hovered child item or \a parent_te (if no hovered child found).
+ */
+TreeElement *outliner_find_item_at_x_in_row(const SpaceOops *soops, const TreeElement *parent_te, float view_co_x)
+{
+	if (!TSELEM_OPEN(TREESTORE(parent_te), soops)) { /* if parent_te is opened, it doesn't show childs in row */
+		/* no recursion, items can only display their direct children in the row */
+		for (TreeElement *child_te = parent_te->subtree.first;
+		     child_te && view_co_x >= child_te->xs; /* don't look further if co_x is smaller than child position*/
+		     child_te = child_te->next)
+		{
+			if ((child_te->flag & TE_ICONROW) && (view_co_x > child_te->xs) && (view_co_x < child_te->xend)) {
+				return child_te;
+			}
+		}
+	}
+
+	/* return parent if no child is hovered */
+	return (TreeElement *)parent_te;
+}
+
+
 /* ************************************************************** */
-/* Click Activated */
+
+/* Highlight --------------------------------------------------- */
+
+static int outliner_highlight_update(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
+{
+	ARegion *ar = CTX_wm_region(C);
+	SpaceOops *soops = CTX_wm_space_outliner(C);
+	const float my = UI_view2d_region_to_view_y(&ar->v2d, event->mval[1]);
+
+	TreeElement *hovered_te = outliner_find_item_at_y(soops, &soops->tree, my);
+	bool changed = false;
+
+	if (!hovered_te || !(hovered_te->store_elem->flag & TSE_HIGHLIGHTED)) {
+		changed = outliner_set_flag(&soops->tree, TSE_HIGHLIGHTED, false);
+		if (hovered_te) {
+			hovered_te->store_elem->flag |= TSE_HIGHLIGHTED;
+			changed = true;
+		}
+	}
+
+	if (changed) {
+		soops->storeflag |= SO_TREESTORE_REDRAW; /* only needs to redraw, no rebuild */
+		ED_region_tag_redraw(ar);
+	}
+
+	return (OPERATOR_FINISHED | OPERATOR_PASS_THROUGH);
+}
+
+void OUTLINER_OT_highlight_update(wmOperatorType *ot)
+{
+	ot->name = "Update Highlight";
+	ot->idname = "OUTLINER_OT_highlight_update";
+	ot->description = "Update the item highlight based on the current mouse position";
+
+	ot->invoke = outliner_highlight_update;
+
+	ot->poll = ED_operator_outliner_active;
+}
 
 /* Toggle Open/Closed ------------------------------------------- */
 
@@ -164,7 +249,7 @@ static int do_outliner_item_openclose(bContext *C, SpaceOops *soops, TreeElement
 		/* all below close/open? */
 		if (all) {
 			tselem->flag &= ~TSE_CLOSED;
-			outliner_set_flag(soops, &te->subtree, TSE_CLOSED, !outliner_has_one_flag(soops, &te->subtree, TSE_CLOSED, 1));
+			outliner_set_flag(&te->subtree, TSE_CLOSED, !outliner_has_one_flag(&te->subtree, TSE_CLOSED, 1));
 		}
 		else {
 			if (tselem->flag & TSE_CLOSED) tselem->flag &= ~TSE_CLOSED;
@@ -252,7 +337,7 @@ void item_rename_cb(
 	do_item_rename(ar, te, tselem, reports);
 }
 
-static int do_outliner_item_rename(ReportList *reports, ARegion *ar, SpaceOops *soops, TreeElement *te, const float mval[2])
+static int do_outliner_item_rename(ReportList *reports, ARegion *ar, TreeElement *te, const float mval[2])
 {
 	if (mval[1] > te->ys && mval[1] < te->ys + UI_UNIT_Y) {
 		TreeStoreElem *tselem = TREESTORE(te);
@@ -266,7 +351,7 @@ static int do_outliner_item_rename(ReportList *reports, ARegion *ar, SpaceOops *
 	}
 	
 	for (te = te->subtree.first; te; te = te->next) {
-		if (do_outliner_item_rename(reports, ar, soops, te, mval)) return 1;
+		if (do_outliner_item_rename(reports, ar, te, mval)) return 1;
 	}
 	return 0;
 }
@@ -282,7 +367,7 @@ static int outliner_item_rename(bContext *C, wmOperator *op, const wmEvent *even
 	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
 	
 	for (te = soops->tree.first; te; te = te->next) {
-		if (do_outliner_item_rename(op->reports, ar, soops, te, fmval)) {
+		if (do_outliner_item_rename(op->reports, ar, te, fmval)) {
 			changed = true;
 			break;
 		}
@@ -713,20 +798,20 @@ void lib_reload_cb(
 
 /* Apply Settings ------------------------------- */
 
-static int outliner_count_levels(SpaceOops *soops, ListBase *lb, const int curlevel)
+static int outliner_count_levels(ListBase *lb, const int curlevel)
 {
 	TreeElement *te;
 	int level = curlevel, lev;
 	
 	for (te = lb->first; te; te = te->next) {
 		
-		lev = outliner_count_levels(soops, &te->subtree, curlevel + 1);
+		lev = outliner_count_levels(&te->subtree, curlevel + 1);
 		if (lev > level) level = lev;
 	}
 	return level;
 }
 
-int outliner_has_one_flag(SpaceOops *soops, ListBase *lb, short flag, const int curlevel)
+int outliner_has_one_flag(ListBase *lb, short flag, const int curlevel)
 {
 	TreeElement *te;
 	TreeStoreElem *tselem;
@@ -736,23 +821,40 @@ int outliner_has_one_flag(SpaceOops *soops, ListBase *lb, short flag, const int 
 		tselem = TREESTORE(te);
 		if (tselem->flag & flag) return curlevel;
 		
-		level = outliner_has_one_flag(soops, &te->subtree, flag, curlevel + 1);
+		level = outliner_has_one_flag(&te->subtree, flag, curlevel + 1);
 		if (level) return level;
 	}
 	return 0;
 }
 
-void outliner_set_flag(SpaceOops *soops, ListBase *lb, short flag, short set)
+/**
+ * Set or unset \a flag for all outliner elements in \a lb and sub-trees.
+ * \return if any flag was modified.
+ */
+bool outliner_set_flag(ListBase *lb, short flag, short set)
 {
 	TreeElement *te;
 	TreeStoreElem *tselem;
-	
+	bool changed = false;
+	bool has_flag;
+
 	for (te = lb->first; te; te = te->next) {
 		tselem = TREESTORE(te);
-		if (set == 0) tselem->flag &= ~flag;
-		else tselem->flag |= flag;
-		outliner_set_flag(soops, &te->subtree, flag, set);
+		has_flag = (tselem->flag & flag);
+		if (set == 0) {
+			if (has_flag) {
+				tselem->flag &= ~flag;
+				changed = true;
+			}
+		}
+		else if (!has_flag){
+			tselem->flag |= flag;
+			changed = true;
+		}
+		changed |= outliner_set_flag(&te->subtree, flag, set);
 	}
+
+	return changed;
 }
 
 /* Restriction Columns ------------------------------- */
@@ -964,10 +1066,10 @@ static int outliner_toggle_expanded_exec(bContext *C, wmOperator *UNUSED(op))
 	SpaceOops *soops = CTX_wm_space_outliner(C);
 	ARegion *ar = CTX_wm_region(C);
 	
-	if (outliner_has_one_flag(soops, &soops->tree, TSE_CLOSED, 1))
-		outliner_set_flag(soops, &soops->tree, TSE_CLOSED, 0);
+	if (outliner_has_one_flag(&soops->tree, TSE_CLOSED, 1))
+		outliner_set_flag(&soops->tree, TSE_CLOSED, 0);
 	else 
-		outliner_set_flag(soops, &soops->tree, TSE_CLOSED, 1);
+		outliner_set_flag(&soops->tree, TSE_CLOSED, 1);
 	
 	ED_region_tag_redraw(ar);
 	
@@ -996,10 +1098,10 @@ static int outliner_toggle_selected_exec(bContext *C, wmOperator *UNUSED(op))
 	ARegion *ar = CTX_wm_region(C);
 	Scene *scene = CTX_data_scene(C);
 	
-	if (outliner_has_one_flag(soops, &soops->tree, TSE_SELECTED, 1))
-		outliner_set_flag(soops, &soops->tree, TSE_SELECTED, 0);
+	if (outliner_has_one_flag(&soops->tree, TSE_SELECTED, 1))
+		outliner_set_flag(&soops->tree, TSE_SELECTED, 0);
 	else 
-		outliner_set_flag(soops, &soops->tree, TSE_SELECTED, 1);
+		outliner_set_flag(&soops->tree, TSE_SELECTED, 1);
 	
 	soops->storeflag |= SO_TREESTORE_REDRAW;
 	
@@ -1097,13 +1199,13 @@ static int outliner_show_active_exec(bContext *C, wmOperator *UNUSED(op))
 		if (obact->mode & OB_MODE_POSE) {
 			bPoseChannel *pchan = CTX_data_active_pose_bone(C);
 			if (pchan) {
-				te = outliner_find_posechannel(so, &te_obact->subtree, pchan);
+				te = outliner_find_posechannel(&te_obact->subtree, pchan);
 			}
 		}
 		else if (obact->mode & OB_MODE_EDIT) {
 			EditBone *ebone = CTX_data_active_bone(C);
 			if (ebone) {
-				te = outliner_find_editbone(so, &te_obact->subtree, ebone);
+				te = outliner_find_editbone(&te_obact->subtree, ebone);
 			}
 		}
 	}
@@ -1298,7 +1400,7 @@ static void outliner_find_panel(Scene *UNUSED(scene), ARegion *ar, SpaceOops *so
 /* Show One Level ----------------------------------------------- */
 
 /* helper function for Show/Hide one level operator */
-static void outliner_openclose_level(SpaceOops *soops, ListBase *lb, int curlevel, int level, int open)
+static void outliner_openclose_level(ListBase *lb, int curlevel, int level, int open)
 {
 	TreeElement *te;
 	TreeStoreElem *tselem;
@@ -1313,7 +1415,7 @@ static void outliner_openclose_level(SpaceOops *soops, ListBase *lb, int curleve
 			if (curlevel >= level) tselem->flag |= TSE_CLOSED;
 		}
 		
-		outliner_openclose_level(soops, &te->subtree, curlevel + 1, level, open);
+		outliner_openclose_level(&te->subtree, curlevel + 1, level, open);
 	}
 }
 
@@ -1324,13 +1426,13 @@ static int outliner_one_level_exec(bContext *C, wmOperator *op)
 	const bool add = RNA_boolean_get(op->ptr, "open");
 	int level;
 	
-	level = outliner_has_one_flag(soops, &soops->tree, TSE_CLOSED, 1);
+	level = outliner_has_one_flag(&soops->tree, TSE_CLOSED, 1);
 	if (add == 1) {
-		if (level) outliner_openclose_level(soops, &soops->tree, 1, level, 1);
+		if (level) outliner_openclose_level(&soops->tree, 1, level, 1);
 	}
 	else {
-		if (level == 0) level = outliner_count_levels(soops, &soops->tree, 0);
-		if (level) outliner_openclose_level(soops, &soops->tree, 1, level - 1, 0);
+		if (level == 0) level = outliner_count_levels(&soops->tree, 0);
+		if (level) outliner_openclose_level(&soops->tree, 1, level - 1, 0);
 	}
 	
 	ED_region_tag_redraw(ar);
@@ -1361,7 +1463,7 @@ void OUTLINER_OT_show_one_level(wmOperatorType *ot)
 /* Show Hierarchy ----------------------------------------------- */
 
 /* helper function for tree_element_shwo_hierarchy() - recursively checks whether subtrees have any objects*/
-static int subtree_has_objects(SpaceOops *soops, ListBase *lb)
+static int subtree_has_objects(ListBase *lb)
 {
 	TreeElement *te;
 	TreeStoreElem *tselem;
@@ -1369,7 +1471,7 @@ static int subtree_has_objects(SpaceOops *soops, ListBase *lb)
 	for (te = lb->first; te; te = te->next) {
 		tselem = TREESTORE(te);
 		if (tselem->type == 0 && te->idcode == ID_OB) return 1;
-		if (subtree_has_objects(soops, &te->subtree)) return 1;
+		if (subtree_has_objects(&te->subtree)) return 1;
 	}
 	return 0;
 }
@@ -1390,7 +1492,7 @@ static void tree_element_show_hierarchy(Scene *scene, SpaceOops *soops, ListBase
 				else tselem->flag &= ~TSE_CLOSED;
 			}
 			else if (te->idcode == ID_OB) {
-				if (subtree_has_objects(soops, &te->subtree)) tselem->flag &= ~TSE_CLOSED;
+				if (subtree_has_objects(&te->subtree)) tselem->flag &= ~TSE_CLOSED;
 				else tselem->flag |= TSE_CLOSED;
 			}
 		}

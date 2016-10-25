@@ -178,6 +178,8 @@ struct wmWindowManager;
 #include "../blender/editors/include/UI_resources.h"
 #include "../blender/editors/include/UI_view2d.h"
 #include "../blender/freestyle/FRS_freestyle.h"
+#include "../blender/gpu/GPU_immediate.h"
+#include "../blender/gpu/GPU_matrix.h"
 #include "../blender/python/BPY_extern.h"
 #include "../blender/render/extern/include/RE_engine.h"
 #include "../blender/render/extern/include/RE_pipeline.h"
@@ -777,5 +779,8 @@ void COM_execute(RenderData *rd, Scene *scene, bNodeTree *editingtree, int rende
 /*multiview*/
 bool RE_RenderResult_is_stereo(RenderResult *res) RET_ZERO
 void uiTemplateImageViews(uiLayout *layout, struct PointerRNA *imfptr) RET_NONE
+
+/* GPU */
+void immBindBuiltinProgram(GPUBuiltinShader shader_id) RET_NONE
 
 #endif // WITH_GAMEENGINE

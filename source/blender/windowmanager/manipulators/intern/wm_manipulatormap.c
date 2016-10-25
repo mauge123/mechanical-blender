@@ -396,7 +396,7 @@ void wm_manipulatormaps_handled_modal_update(
 {
 	const bool modal_running = (handler->op != NULL);
 
-	/* happens on render */
+	/* happens on render or when joining areas */
 	if (!handler->op_region || !handler->op_region->manipulator_map)
 		return;
 

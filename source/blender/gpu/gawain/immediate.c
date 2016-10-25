@@ -13,6 +13,10 @@
 #include "attrib_binding.h"
 #include <string.h>
 
+// necessary functions from matrix API
+extern void gpuBindMatrices(GLuint program);
+extern bool gpuMatricesDirty(void);
+
 typedef struct {
 	// TODO: organize this struct by frequency of change (run-time)
 
@@ -33,7 +37,7 @@ typedef struct {
 	// current vertex
 	unsigned vertex_idx;
 	GLubyte* vertex_data;
-	unsigned short attrib_value_bits; // which attributes of current vertex have been given values?
+	uint16_t unassigned_attrib_bits; // which attributes of current vertex have not been given values?
 
 	GLuint vbo_id;
 	GLuint vao_id;
@@ -116,6 +120,7 @@ void immBindProgram(GLuint program)
 	{
 #if TRUST_NO_ONE
 	assert(imm.bound_program == 0);
+	assert(glIsProgram(program));
 #endif
 
 	if (!imm.vertex_format.packed)
@@ -124,6 +129,8 @@ void immBindProgram(GLuint program)
 	glUseProgram(program);
 	get_attrib_locations(&imm.vertex_format, &imm.attrib_binding, program);
 	imm.bound_program = program;
+
+	gpuBindMatrices(program);
 	}
 
 void immUnbindProgram()
@@ -175,6 +182,8 @@ void immBegin(GLenum primitive, unsigned vertex_ct)
 
 	imm.primitive = primitive;
 	imm.vertex_ct = vertex_ct;
+	imm.vertex_idx = 0;
+	imm.unassigned_attrib_bits = imm.attrib_binding.enabled_bits;
 
 	// how many bytes do we need for this draw call?
 	const unsigned bytes_needed = vertex_buffer_size(&imm.vertex_format, vertex_ct);
@@ -211,7 +220,8 @@ void immBegin(GLenum primitive, unsigned vertex_ct)
 #if APPLE_LEGACY
 	imm.buffer_data = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY) + imm.buffer_offset;
 #else
-	imm.buffer_data = glMapBufferRange(GL_ARRAY_BUFFER, imm.buffer_offset, bytes_needed, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+	imm.buffer_data = glMapBufferRange(GL_ARRAY_BUFFER, imm.buffer_offset, bytes_needed,
+	                                   GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | (imm.strict_vertex_ct ? 0 : GL_MAP_FLUSH_EXPLICIT_BIT));
 #endif
 
 #if TRUST_NO_ONE
@@ -244,6 +254,8 @@ Batch* immBeginBatch(GLenum prim_type, unsigned vertex_ct)
 
 	imm.primitive = prim_type;
 	imm.vertex_ct = vertex_ct;
+	imm.vertex_idx = 0;
+	imm.unassigned_attrib_bits = imm.attrib_binding.enabled_bits;
 
 	VertexBuffer* verts = VertexBuffer_create_with_format(&imm.vertex_format);
 	VertexBuffer_allocate_data(verts, vertex_ct);
@@ -321,6 +333,9 @@ static void immDrawSetup(void)
 				glVertexAttribIPointer(loc, a->comp_ct, a->comp_type, stride, pointer);
 			}
 		}
+
+	if (gpuMatricesDirty())
+		gpuBindMatrices(imm.bound_program);
 	}
 
 void immEnd()
@@ -341,13 +356,27 @@ void immEnd()
 		{
 #if TRUST_NO_ONE
 		assert(imm.vertex_idx <= imm.vertex_ct);
-		assert(imm.vertex_idx == 0 || vertex_count_makes_sense_for_primitive(imm.vertex_idx, imm.primitive));
 #endif
 		// printf("used %u of %u verts,", imm.vertex_idx, imm.vertex_ct);
-		imm.vertex_ct = imm.vertex_idx;
-		buffer_bytes_used = vertex_buffer_size(&imm.vertex_format, imm.vertex_ct);
-		// unused buffer bytes are available to the next immBegin
-		// printf(" %u of %u bytes\n", buffer_bytes_used, imm.buffer_bytes_mapped);
+		if (imm.vertex_idx == imm.vertex_ct)
+			{
+			buffer_bytes_used = imm.buffer_bytes_mapped;
+			}
+		else
+			{
+#if TRUST_NO_ONE
+			assert(imm.vertex_idx == 0 || vertex_count_makes_sense_for_primitive(imm.vertex_idx, imm.primitive));
+#endif
+			imm.vertex_ct = imm.vertex_idx;
+			buffer_bytes_used = vertex_buffer_size(&imm.vertex_format, imm.vertex_ct);
+			// unused buffer bytes are available to the next immBegin
+			// printf(" %u of %u bytes\n", buffer_bytes_used, imm.buffer_bytes_mapped);
+			}
+#if !APPLE_LEGACY
+		// tell OpenGL what range was modified so it doesn't copy the whole mapped range
+		// printf("flushing %u to %u\n", imm.buffer_offset, imm.buffer_offset + buffer_bytes_used - 1);
+		glFlushMappedBufferRange(GL_ARRAY_BUFFER, 0, buffer_bytes_used);
+#endif
 		}
 
 #if IMM_BATCH_COMBO
@@ -367,8 +396,8 @@ void immEnd()
 		{
 #if APPLE_LEGACY
 		// tell OpenGL what range was modified so it doesn't copy the whole buffer
+		// printf("flushing %u to %u\n", imm.buffer_offset, imm.buffer_offset + buffer_bytes_used - 1);
 		glFlushMappedBufferRangeAPPLE(GL_ARRAY_BUFFER, imm.buffer_offset, buffer_bytes_used);
-//		printf("flushing %u to %u\n", imm.buffer_offset, imm.buffer_offset + buffer_bytes_used - 1);
 #endif
 		glUnmapBuffer(GL_ARRAY_BUFFER);
 
@@ -388,19 +417,17 @@ void immEnd()
 	// prep for next immBegin
 	imm.primitive = PRIM_NONE;
 	imm.strict_vertex_ct = true;
-	imm.vertex_idx = 0;
-	imm.attrib_value_bits = 0;
 	}
 
 static void setAttribValueBit(unsigned attrib_id)
 	{
-	unsigned short mask = 1 << attrib_id;
+	uint16_t mask = 1 << attrib_id;
 
 #if TRUST_NO_ONE
-	assert((imm.attrib_value_bits & mask) == 0); // not already set
+	assert(imm.unassigned_attrib_bits & mask); // not already set
 #endif
 
-	imm.attrib_value_bits |= mask;
+	imm.unassigned_attrib_bits &= ~mask;
 	}
 
 
@@ -577,6 +604,17 @@ void immAttrib4ubv(unsigned attrib_id, const unsigned char data[4])
 	immAttrib4ub(attrib_id, data[0], data[1], data[2], data[3]);
 	}
 
+void immSkipAttrib(unsigned attrib_id)
+	{
+#if TRUST_NO_ONE
+	assert(attrib_id < imm.vertex_format.attrib_ct);
+	assert(imm.vertex_idx < imm.vertex_ct);
+	assert(imm.primitive != PRIM_NONE); // make sure we're between a Begin/End pair
+#endif
+
+	setAttribValueBit(attrib_id);
+	}
+
 static void immEndVertex(void) // and move on to the next vertex
 	{
 #if TRUST_NO_ONE
@@ -586,8 +624,7 @@ static void immEndVertex(void) // and move on to the next vertex
 
 	// have all attribs been assigned values?
 	// if not, copy value from previous vertex
-	const unsigned short all_bits = ~(0xFFFFU << imm.vertex_format.attrib_ct);
-	if (imm.attrib_value_bits != all_bits)
+	if (imm.unassigned_attrib_bits)
 		{
 #if TRUST_NO_ONE
 		assert(imm.vertex_idx > 0); // first vertex must have all attribs specified
@@ -595,8 +632,7 @@ static void immEndVertex(void) // and move on to the next vertex
 
 		for (unsigned a_idx = 0; a_idx < imm.vertex_format.attrib_ct; ++a_idx)
 			{
-			const uint16_t mask = 1 << a_idx;
-			if ((imm.attrib_value_bits & mask) == 0)
+			if ((imm.unassigned_attrib_bits >> a_idx) & 1)
 				{
 				const Attrib* a = imm.vertex_format.attribs + a_idx;
 
@@ -604,13 +640,14 @@ static void immEndVertex(void) // and move on to the next vertex
 
 				GLubyte* data = imm.vertex_data + a->offset;
 				memcpy(data, data - imm.vertex_format.stride, a->sz);
+				// TODO: consolidate copy of adjacent attributes
 				}
 			}
 		}
 
 	imm.vertex_idx++;
 	imm.vertex_data += imm.vertex_format.stride;
-	imm.attrib_value_bits = 0;
+	imm.unassigned_attrib_bits = imm.attrib_binding.enabled_bits;
 	}
 
 void immVertex2f(unsigned attrib_id, float x, float y)
@@ -674,6 +711,17 @@ void immUniform4f(const char* name, float x, float y, float z, float w)
 	glUniform4f(loc, x, y, z, w);
 	}
 
+void immUniform4fv(const char* name, const float data[4])
+	{
+	int loc = glGetUniformLocation(imm.bound_program, name);
+
+#if TRUST_NO_ONE
+	assert(loc != -1);
+#endif
+
+	glUniform4fv(loc, 1, data);
+	}
+
 void immUniform1i(const char* name, int x)
 	{
 	int loc = glGetUniformLocation(imm.bound_program, name);
@@ -695,7 +743,12 @@ void immUniformColor4f(float r, float g, float b, float a)
 
 void immUniformColor4fv(const float rgba[4])
 	{
-	immUniform4f("color", rgba[0], rgba[1], rgba[2], rgba[3]);
+	immUniform4fv("color", rgba);
+	}
+
+void immUniformColor3f(float r, float g, float b)
+	{
+	immUniform4f("color", r, g, b, 1.0f);
 	}
 
 void immUniformColor3fv(const float rgb[3])

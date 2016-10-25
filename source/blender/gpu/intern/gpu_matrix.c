@@ -52,7 +52,9 @@ typedef struct {
 
 	MatrixMode mode;
 	unsigned top; /* of current stack (would have to replicate if gpuResume2D/3D are implemented) */
-	
+
+	bool dirty;
+
 	/* TODO: cache of derived matrices (Normal, MVP, inverse MVP, etc)
 	 * generate as needed for shaders, invalidate when original matrices change
 	 *
@@ -90,10 +92,12 @@ void gpuMatrixBegin3D()
 }
 
 #if SUPPORT_LEGACY_MATRIX
-void gpuMatrixBegin3D_legacy() {
+void gpuMatrixBegin3D_legacy()
+{
 	/* copy top matrix from each legacy stack into new fresh stack */
 	state.mode = MATRIX_MODE_3D;
 	state.top = 0;
+	state.dirty = true;
 	glGetFloatv(GL_MODELVIEW_MATRIX, (float*)ModelView3D);
 	glGetFloatv(GL_PROJECTION_MATRIX, (float*)Projection3D);
 }
@@ -145,6 +149,7 @@ void gpuPopMatrix()
 	BLI_assert(state.mode != MATRIX_MODE_INACTIVE);
 	BLI_assert(state.top > 0);
 	state.top--;
+	state.dirty = true;
 }
 
 void gpuLoadMatrix3D(const float m[4][4])
@@ -152,6 +157,7 @@ void gpuLoadMatrix3D(const float m[4][4])
 	BLI_assert(state.mode == MATRIX_MODE_3D);
 	copy_m4_m4(ModelView3D, m);
 	CHECKMAT(ModelView3D);
+	state.dirty = true;
 }
 
 void gpuLoadMatrix2D(const float m[3][3])
@@ -159,6 +165,7 @@ void gpuLoadMatrix2D(const float m[3][3])
 	BLI_assert(state.mode == MATRIX_MODE_2D);
 	copy_m3_m3(ModelView2D, m);
 	CHECKMAT(ModelView2D);
+	state.dirty = true;
 }
 
 void gpuLoadIdentity()
@@ -173,6 +180,7 @@ void gpuLoadIdentity()
 		default:
 			BLI_assert(false);
 	}
+	state.dirty = true;
 }
 
 void gpuTranslate2f(float x, float y)
@@ -191,8 +199,8 @@ void gpuTranslate2fv(const float vec[2])
 
 void gpuTranslate3f(float x, float y, float z)
 {
-#if 1
 	BLI_assert(state.mode == MATRIX_MODE_3D);
+#if 1
 	translate_m4(ModelView3D, x, y, z);
 	CHECKMAT(ModelView3D);
 #else /* above works well in early testing, below is generic version */
@@ -203,6 +211,7 @@ void gpuTranslate3f(float x, float y, float z)
 	m[3][2] = z;
 	gpuMultMatrix3D(m);
 #endif
+	state.dirty = true;
 }
 
 void gpuTranslate3fv(const float vec[3])
@@ -274,6 +283,7 @@ void gpuMultMatrix3D(const float m[4][4])
 	BLI_assert(state.mode == MATRIX_MODE_3D);
 	mul_m4_m4_pre(ModelView3D, m);
 	CHECKMAT(ModelView3D);
+	state.dirty = true;
 }
 
 void gpuMultMatrix2D(const float m[3][3])
@@ -281,6 +291,7 @@ void gpuMultMatrix2D(const float m[3][3])
 	BLI_assert(state.mode == MATRIX_MODE_2D);
 	mul_m3_m3_pre(ModelView2D, m);
 	CHECKMAT(ModelView2D);
+	state.dirty = true;
 }
 
 void gpuRotate3fv(float deg, const float axis[3])
@@ -292,10 +303,11 @@ void gpuRotate3fv(float deg, const float axis[3])
 
 void gpuRotateAxis(float deg, char axis)
 {
-#if 1 /* rotate_m4 works in place, right? */
 	BLI_assert(state.mode == MATRIX_MODE_3D);
+#if 1 /* rotate_m4 works in place, right? */
 	rotate_m4(ModelView3D, axis, DEG2RADF(deg));
 	CHECKMAT(ModelView3D);
+	state.dirty = true;
 #else /* rotate_m4 creates a new matrix */
 	Mat4 m;
 	rotate_m4(m, axis, DEG2RADF(deg));
@@ -324,6 +336,8 @@ static void mat4_ortho_set(float m[4][4], float left, float right, float bottom,
 	m[1][3] = 0.0f;
 	m[2][3] = 0.0f;
 	m[3][3] = 1.0f;
+
+	state.dirty = true;
 }
 
 static void mat4_frustum_set(float m[][4], float left, float right, float bottom, float top, float near, float far)
@@ -347,6 +361,8 @@ static void mat4_frustum_set(float m[][4], float left, float right, float bottom
 	m[1][3] = 0.0f;
 	m[2][3] = -1.0f;
 	m[3][3] = 0.0f;
+
+	state.dirty = true;
 }
 
 static void mat4_look_from_origin(float m[4][4], float lookdir[3], float camup[3])
@@ -411,6 +427,8 @@ static void mat4_look_from_origin(float m[4][4], float lookdir[3], float camup[3
 	m[1][3] = 0.0f;
 	m[2][3] = 0.0f;
 	m[3][3] = 1.0f;
+
+	state.dirty = true;
 }
 
 void gpuOrtho(float left, float right, float bottom, float top, float near, float far)
@@ -418,6 +436,7 @@ void gpuOrtho(float left, float right, float bottom, float top, float near, floa
 	BLI_assert(state.mode == MATRIX_MODE_3D);
 	mat4_ortho_set(Projection3D, left, right, bottom, top, near, far);
 	CHECKMAT(Projection3D);
+	state.dirty = true;
 }
 
 void gpuOrtho2D(float left, float right, float bottom, float top)
@@ -428,6 +447,7 @@ void gpuOrtho2D(float left, float right, float bottom, float top)
 	mat4_ortho_set(m, left, right, bottom, top, -1.0f, 1.0f);
 	copy_m3_m4(Projection2D, m);
 	CHECKMAT(Projection2D);
+	state.dirty = true;
 }
 
 void gpuFrustum(float left, float right, float bottom, float top, float near, float far)
@@ -435,6 +455,7 @@ void gpuFrustum(float left, float right, float bottom, float top, float near, fl
 	BLI_assert(state.mode == MATRIX_MODE_3D);
 	mat4_frustum_set(Projection3D, left, right, bottom, top, near, far);
 	CHECKMAT(Projection3D);
+	state.dirty = true;
 }
 
 void gpuPerspective(float fovy, float aspect, float near, float far)
@@ -594,6 +615,34 @@ const float *gpuGetModelViewProjectionMatrix3D(float m[4][4])
 	return (const float*)m;
 }
 
+const float *gpuGetNormalMatrix(float m[3][3])
+{
+	if (m == NULL) {
+		static Mat3 temp3;
+		m = temp3;
+	}
+
+	copy_m3_m4(m, gpuGetModelViewMatrix3D(NULL));
+
+	invert_m3(m);
+	transpose_m3(m);
+
+	return (const float*)m;
+}
+
+const float *gpuGetNormalMatrixInverse(float m[3][3])
+{
+	if (m == NULL) {
+		static Mat3 temp3;
+		m = temp3;
+	}
+
+	gpuGetNormalMatrix(m);
+	invert_m3(m);
+
+	return (const float*)m;
+}
+
 void gpuBindMatrices(GLuint program)
 {
 	/* TODO: split this into 2 functions
@@ -602,6 +651,7 @@ void gpuBindMatrices(GLuint program)
 	GLint loc_MV = glGetUniformLocation(program, "ModelViewMatrix");
 	GLint loc_P = glGetUniformLocation(program, "ProjectionMatrix");
 	GLint loc_MVP = glGetUniformLocation(program, "ModelViewProjectionMatrix");
+	GLint loc_N = glGetUniformLocation(program, "NormalMatrix");
 
 	/* 2) set uniform values to matrix stack values
 	 * program needs to be bound
@@ -633,4 +683,19 @@ void gpuBindMatrices(GLuint program)
 
 		glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, gpuGetModelViewProjectionMatrix3D(NULL));
 	}
+
+	if (loc_N != -1) {
+		#if DEBUG_MATRIX_BIND
+		puts("setting 3D normal matrix");
+		#endif
+
+		glUniformMatrix3fv(loc_N, 1, GL_FALSE, gpuGetNormalMatrix(NULL));
+	}
+
+	state.dirty = false;
+}
+
+bool gpuMatricesDirty()
+{
+	return state.dirty;
 }

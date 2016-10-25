@@ -23,7 +23,9 @@ unsigned ElementList_size(const ElementList* elem)
 		case GL_UNSIGNED_SHORT: return elem->index_ct * sizeof(GLushort);
 		case GL_UNSIGNED_INT: return elem->index_ct * sizeof(GLuint);
 		default:
+	#if TRUST_NO_ONE
 			assert(false);
+	#endif
 			return 0;
 		}
 
@@ -69,7 +71,10 @@ void ElementListBuilder_init(ElementListBuilder* builder, GLenum prim_type, unsi
 			verts_per_prim = 3;
 			break;
 		default:
+#if TRUST_NO_ONE
 			assert(false);
+#endif
+			return;
 		}
 
 	builder->max_allowed_index = vertex_ct - 1;
@@ -199,7 +204,14 @@ static void squeeze_indices_short(const unsigned values[], ElementList* elem)
 
 #endif // TRACK_INDEX_RANGE
 
-void ElementList_build(ElementListBuilder* builder, ElementList* elem)
+ElementList* ElementList_build(ElementListBuilder* builder)
+	{
+	ElementList* elem = calloc(1, sizeof(ElementList));
+	ElementList_build_in_place(builder, elem);
+	return elem;
+	}
+
+void ElementList_build_in_place(ElementListBuilder* builder, ElementList* elem)
 	{
 #if TRUST_NO_ONE
 	assert(builder->data != NULL);
@@ -254,4 +266,9 @@ void ElementList_build(ElementListBuilder* builder, ElementList* elem)
 		free(builder->data);
 	builder->data = NULL;
 	// other fields are safe to leave
+	}
+
+void ElementList_discard(ElementList* elem)
+	{
+	// TODO: clean up
 	}

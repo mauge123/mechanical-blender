@@ -123,10 +123,75 @@ static void gp_set_point_varying_color(const bGPDspoint *pt, const float ink[4],
 	immAttrib4ub(attrib_id, F2UB(ink[0]), F2UB(ink[1]), F2UB(ink[2]), F2UB(alpha));
 }
 
+/* draw fills for buffer stroke */
+static void gp_draw_stroke_buffer_fill(const tGPspoint *points, int totpoints, float ink[4])
+{
+	if (totpoints < 3) {
+		return;
+	}
+	int tot_triangles = totpoints - 2;
+	/* allocate memory for temporary areas */
+	unsigned int(*tmp_triangles)[3] = MEM_mallocN(sizeof(*tmp_triangles) * tot_triangles, "GP Stroke buffer temp triangulation");
+	float(*points2d)[2] = MEM_mallocN(sizeof(*points2d) * totpoints, "GP Stroke buffer temp 2d points");
+
+	/* Convert points to array and triangulate
+	* Here a cache is not used because while drawing the information changes all the time, so the cache
+	* would be recalculated constantly, so it is better to do direct calculation for each function call
+	*/
+	for (int i = 0; i < totpoints; i++) {
+		const tGPspoint *pt = &points[i];
+		points2d[i][0] = pt->x;
+		points2d[i][1] = pt->y;
+	}
+	BLI_polyfill_calc((const float(*)[2])points2d, (unsigned int)totpoints, 0, (unsigned int(*)[3])tmp_triangles);
+
+	/* draw triangulation data */
+	if (tot_triangles > 0) {
+		VertexFormat *format = immVertexFormat();
+		unsigned pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+		unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+
+		immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
+
+		/* Draw all triangles for filling the polygon */
+		immBegin(GL_TRIANGLES, tot_triangles * 3);
+		/* TODO: use batch instead of immediate mode, to share vertices */
+
+		const tGPspoint *pt;
+		for (int i = 0; i < tot_triangles; i++) {
+			/* vertex 1 */
+			pt = &points[tmp_triangles[i][0]];
+			gp_set_tpoint_varying_color(pt, ink, color);
+			immVertex2iv(pos, &pt->x);
+			/* vertex 2 */
+			pt = &points[tmp_triangles[i][1]];
+			gp_set_tpoint_varying_color(pt, ink, color);
+			immVertex2iv(pos, &pt->x);
+			/* vertex 3 */
+			pt = &points[tmp_triangles[i][2]];
+			gp_set_tpoint_varying_color(pt, ink, color);
+			immVertex2iv(pos, &pt->x);
+		}
+
+		immEnd();
+		immUnbindProgram();
+	}
+
+	/* clear memory */
+	if (tmp_triangles) {
+		MEM_freeN(tmp_triangles);
+	}
+	if (points2d) {
+		MEM_freeN(points2d);
+	}
+}
+
 /* draw stroke defined in buffer (simple ogl lines/points for now, as dotted lines) */
 static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short thickness,
-                                  short dflag, short sflag, float ink[4])
+                                  short dflag, short sflag, float ink[4], float fill_ink[4])
 {
+	int draw_points = 0;
+
 	/* error checking */
 	if ((points == NULL) || (totpoints <= 0))
 		return;
@@ -171,7 +236,15 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 			 * and continue drawing again (since line-width cannot change in middle of GL_LINE_STRIP)
 			 */
 			if (fabsf(pt->pressure - oldpressure) > 0.2f) {
+				/* need to have 2 points to avoid immEnd assert error */
+				if (draw_points < 2) {
+					gp_set_tpoint_varying_color(pt - 1, ink, color);
+					immVertex2iv(pos, &(pt - 1)->x);
+				}
+
 				immEnd();
+				draw_points = 0;
+
 				glLineWidth(max_ff(pt->pressure * thickness, 1.0f));
 				immBeginAtMost(GL_LINE_STRIP, totpoints - i + 1);
 
@@ -179,6 +252,7 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 				if (i != 0) { 
 					gp_set_tpoint_varying_color(pt - 1, ink, color);
 					immVertex2iv(pos, &(pt - 1)->x);
+					++draw_points;
 				}
 
 				oldpressure = pt->pressure; /* reset our threshold */
@@ -187,6 +261,12 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 			/* now the point we want */
 			gp_set_tpoint_varying_color(pt, ink, color);
 			immVertex2iv(pos, &pt->x);
+			++draw_points;
+		}
+		/* need to have 2 points to avoid immEnd assert error */
+		if (draw_points < 2) {
+			gp_set_tpoint_varying_color(pt - 1, ink, color);
+			immVertex2iv(pos, &(pt - 1)->x);
 		}
 
 		if (G.debug & G_DEBUG) setlinestyle(0);
@@ -194,6 +274,11 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 
 	immEnd();
 	immUnbindProgram();
+
+	// draw fill
+	if (fill_ink[3] > GPENCIL_ALPHA_OPACITY_THRESH) {
+		gp_draw_stroke_buffer_fill(points, totpoints, fill_ink);
+	}
 }
 
 /* --------- 2D Stroke Drawing Helpers --------- */
@@ -258,7 +343,7 @@ static void gp_draw_stroke_volumetric_buffer(const tGPspoint *points, int totpoi
 
 /* draw a 2D strokes in "volumetric" style */
 static void gp_draw_stroke_volumetric_2d(const bGPDspoint *points, int totpoints, short thickness,
-                                         short dflag, short sflag,
+                                         short UNUSED(dflag), short sflag,
                                          int offsx, int offsy, int winx, int winy,
                                          const float diff_mat[4][4], const float ink[4])
 {
@@ -531,7 +616,7 @@ static void gp_draw_stroke_fill(
 
 /* draw a given stroke - just a single dot (only one point) */
 static void gp_draw_stroke_point(
-        const bGPDspoint *points, short thickness, short dflag, short sflag,
+        const bGPDspoint *points, short thickness, short UNUSED(dflag), short sflag,
         int offsx, int offsy, int winx, int winy, const float diff_mat[4][4], const float ink[4])
 {
 	const bGPDspoint *pt = points;
@@ -544,10 +629,10 @@ static void gp_draw_stroke_point(
 	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
 
 	if (sflag & GP_STROKE_3DSPACE) {
-		immBindBuiltinProgram(GPU_SHADER_3D_POINT_FIXED_SIZE_UNIFORM_COLOR);
+		immBindBuiltinProgram(GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH);
 	}
 	else {
-		immBindBuiltinProgram(GPU_SHADER_2D_POINT_FIXED_SIZE_UNIFORM_COLOR);
+		immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH);
 
 		/* get 2D coordinates of point */
 		float co[3] = { 0.0f };
@@ -556,9 +641,8 @@ static void gp_draw_stroke_point(
 	}
 
 	gp_set_point_uniform_color(pt, ink);
-
 	/* set point thickness (since there's only one of these) */
-	glPointSize((float)(thickness + 2) * pt->pressure);
+	immUniform1f("size", (float)(thickness + 2) * pt->pressure);
 
 	immBegin(GL_POINTS, 1);
 	immVertex3fv(pos, fpt);
@@ -574,6 +658,14 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 	float curpressure = points[0].pressure;
 	float fpt[3];
 	float cyclic_fpt[3];
+	int draw_points = 0;
+
+	/* if cyclic needs one vertex more */
+	int cyclic_add = 0;
+	if (cyclic) {
+		++cyclic_add;
+	}
+
 
 	VertexFormat *format = immVertexFormat();
 	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
@@ -585,7 +677,7 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 
 	/* draw stroke curve */
 	glLineWidth(max_ff(curpressure * thickness, 1.0f));
-	immBeginAtMost(GL_LINE_STRIP, totpoints);
+	immBeginAtMost(GL_LINE_STRIP, totpoints + cyclic_add);
 	const bGPDspoint *pt = points;
 	for (int i = 0; i < totpoints; i++, pt++) {
 		gp_set_point_varying_color(pt, ink, color);
@@ -595,22 +687,33 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 		 * Note: we want more visible levels of pressures when thickness is bigger.
 		 */
 		if (fabsf(pt->pressure - curpressure) > 0.2f / (float)thickness) {
+			/* if the pressure changes before get at least 2 vertices, need to repeat last point to avoid assert in immEnd() */
+			if (draw_points < 2) {
+				const bGPDspoint *pt2 = pt - 1;
+				mul_v3_m4v3(fpt, diff_mat, &pt2->x);
+				immVertex3fv(pos, fpt);
+			}
 			immEnd();
+			draw_points = 0;
+
 			curpressure = pt->pressure;
 			glLineWidth(max_ff(curpressure * thickness, 1.0f));
-			immBeginAtMost(GL_LINE_STRIP, totpoints - i + 1);
+			immBeginAtMost(GL_LINE_STRIP, totpoints - i + 1 + cyclic_add);
 
 			/* need to roll-back one point to ensure that there are no gaps in the stroke */
 			if (i != 0) { 
 				const bGPDspoint *pt2 = pt - 1;
 				mul_v3_m4v3(fpt, diff_mat, &pt2->x);
+				gp_set_point_varying_color(pt2, ink, color);
 				immVertex3fv(pos, fpt);
+				++draw_points;
 			}
 		}
 
 		/* now the point we want */
 		mul_v3_m4v3(fpt, diff_mat, &pt->x);
 		immVertex3fv(pos, fpt);
+		++draw_points;
 
 		if (cyclic && i == 0) {
 			/* save first point to use in cyclic */
@@ -621,6 +724,15 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 	if (cyclic) {
 		/* draw line to first point to complete the cycle */
 		immVertex3fv(pos, cyclic_fpt);
+		++draw_points;
+	}
+
+	/* if less of two points, need to repeat last point to avoid assert in immEnd() */
+	if (draw_points < 2) {
+		const bGPDspoint *pt2 = pt - 1;
+		mul_v3_m4v3(fpt, diff_mat, &pt2->x);
+		gp_set_point_varying_color(pt2, ink, color);
+		immVertex3fv(pos, fpt);
 	}
 
 	immEnd();
@@ -838,6 +950,8 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 		}
 		glEnd();
 	}
+#else
+	UNUSED_VARS(debug);
 #endif
 }
 
@@ -884,6 +998,8 @@ static void gp_draw_strokes(
 	short sthickness;
 	float ink[4];
 
+	GPU_enable_program_point_size();
+
 	for (bGPDstroke *gps = gpf->strokes.first; gps; gps = gps->next) {
 		/* check if stroke can be drawn */
 		if (gp_can_draw_stroke(gps, dflag) == false) {
@@ -901,6 +1017,10 @@ static void gp_draw_strokes(
 
 		/* calculate thickness */
 		sthickness = gps->thickness + lthick;
+
+		if (sthickness <= 0) {
+			continue;
+		}
 
 		/* check which stroke-drawer to use */
 		if (dflag & GP_DRAWDATA_ONLY3D) {
@@ -1046,6 +1166,8 @@ static void gp_draw_strokes(
 			}
 		}
 	}
+
+	GPU_disable_program_point_size();
 }
 
 /* Draw selected verts for strokes being edited */
@@ -1410,7 +1532,7 @@ static void gp_draw_data_layers(
 				                                 dflag, gpd->scolor);
 			}
 			else {
-				gp_draw_stroke_buffer(gpd->sbuffer, gpd->sbuffer_size, lthick, dflag, gpd->sbuffer_sflag, gpd->scolor);
+				gp_draw_stroke_buffer(gpd->sbuffer, gpd->sbuffer_size, lthick, dflag, gpd->sbuffer_sflag, gpd->scolor, gpd->sfill);
 			}
 		}
 	}

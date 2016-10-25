@@ -2104,6 +2104,13 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
+	static EnumPropertyItem other_uv_filter_items[] = {
+		{SI_FILTER_ALL, "ALL", 0, "All", "No filter, show all islands from other objects"},
+		{SI_FILTER_SAME_IMAGE, "SAME_IMAGE", ICON_IMAGE_DATA, "Same Image",
+		 "Only show others' UV islads who's active image matches image of the active face"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	srna = RNA_def_struct(brna, "SpaceUVEditor", NULL);
 	RNA_def_struct_sdna(srna, "SpaceImage");
 	RNA_def_struct_nested(brna, srna, "SpaceImageEditor");
@@ -2190,6 +2197,13 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SI_LIVE_UNWRAP);
 	RNA_def_property_ui_text(prop, "Live Unwrap",
 							 "Continuously unwrap the selected UV island while transforming pinned vertices");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
+
+	/* Other UV filtering */
+	prop = RNA_def_property(srna, "other_uv_filter", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, other_uv_filter_items);
+	RNA_def_property_ui_text(prop, "Other UV filter",
+	                         "Filter applied on the other object's UV to limit displayed");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 }
 
@@ -2499,6 +2513,13 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 		{ICON_MATCAP_22, "22", ICON_MATCAP_22, "", ""},
 		{ICON_MATCAP_23, "23", ICON_MATCAP_23, "", ""},
 		{ICON_MATCAP_24, "24", ICON_MATCAP_24, "", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+	
+	static EnumPropertyItem debug_background_items[] = {
+		{V3D_DEBUG_BACKGROUND_NONE, "NONE", 0, "None", ""},
+		{V3D_DEBUG_BACKGROUND_GRADIENT, "GRADIENT", 0, "Gradient", ""},
+		{V3D_DEBUG_BACKGROUND_WORLD, "WORLD", 0, "World", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -2932,6 +2953,36 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_modern_viewport", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "tmp_compat_flag", V3D_NEW_VIEWPORT);
 	RNA_def_property_ui_text(prop, "Modern Viewport", "Use modern viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "show_scene_depth", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "tmp_compat_flag", V3D_DEBUG_SHOW_SCENE_DEPTH);
+	RNA_def_property_ui_text(prop, "Show Scene Depth", "Debug option to show the depth in the viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "show_combined_depth", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "tmp_compat_flag", V3D_DEBUG_SHOW_COMBINED_DEPTH);
+	RNA_def_property_ui_text(prop, "Show Combined Depth", "Debug option to show the depth in the viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "debug_near", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "debug.znear");
+	RNA_def_property_ui_text(prop, "Near", "Near distance for depth debugging");
+	RNA_def_property_range(prop, 1e-6f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.001f, FLT_MAX, 10, 3);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "debug_far", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_sdna(prop, NULL, "debug.zfar");
+	RNA_def_property_range(prop, 1e-6f, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.001f, FLT_MAX, 10, 3);
+	RNA_def_property_ui_text(prop, "Far", "Far distance for depth debugging");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "debug_background", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "debug.background");
+	RNA_def_property_enum_items(prop, debug_background_items);
+	RNA_def_property_ui_text(prop, "Background", "");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	/* *** Animated *** */
