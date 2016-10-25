@@ -3072,7 +3072,7 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 }
 
 
-static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Scene *scene)
+static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Scene *UNUSED(scene))
 {
 	BMIter iter;
 	BMDim *edm;
@@ -3759,8 +3759,8 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 }
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-static void draw_em_fancy_dims(ARegion *ar, Scene *scene, View3D *v3d, Object* obedit,
-								BMEditMesh *em, DerivedMesh *cageDM, BMDim *edm_act,
+static void draw_em_fancy_dims(ARegion *UNUSED(ar), Scene *scene, View3D *v3d, Object* obedit,
+								BMEditMesh *em, BMDim *UNUSED(edm_act),
 								RegionView3D* rv3d)
 {
 	int sel;
@@ -4529,7 +4529,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 			if (em->bm->totdim) {
-				draw_em_fancy_dims(ar, scene, v3d, ob, em, cageDM, edm_act, rv3d);
+				draw_em_fancy_dims(ar, scene, v3d, ob, em, edm_act, rv3d);
 			}
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
