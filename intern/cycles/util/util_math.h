@@ -462,12 +462,13 @@ ccl_device_inline float3 operator*(const float f, const float3& a)
 
 ccl_device_inline float3 operator/(const float f, const float3& a)
 {
-#ifdef __KERNEL_SSE__
-	__m128 rc = _mm_rcp_ps(a.m128);
-	return float3(_mm_mul_ps(_mm_set1_ps(f),rc));
-#else
+	/* TODO(sergey): Currently disabled, gives speedup but makes intersection tets non-watertight. */
+// #ifdef __KERNEL_SSE__
+// 	__m128 rc = _mm_rcp_ps(a.m128);
+// 	return float3(_mm_mul_ps(_mm_set1_ps(f),rc));
+// #else
 	return make_float3(f / a.x, f / a.y, f / a.z);
-#endif
+// #endif
 }
 
 ccl_device_inline float3 operator/(const float3& a, const float f)
@@ -1628,6 +1629,14 @@ ccl_device_inline float2 map_to_sphere(const float3 co)
 
 ccl_device_inline int util_max_axis(float3 vec)
 {
+#ifdef __KERNEL_SSE__
+	__m128 a = shuffle<0,0,1,1>(vec.m128);
+	__m128 b = shuffle<1,2,2,1>(vec.m128);
+	__m128 c = _mm_cmpgt_ps(a, b);
+	int mask = _mm_movemask_ps(c) & 0x7;
+	static const char tab[8] = {2, 2, 2, 0, 1, 2, 1, 0};
+	return tab[mask];
+#else
 	if(vec.x > vec.y) {
 		if(vec.x > vec.z)
 			return 0;
@@ -1640,6 +1649,7 @@ ccl_device_inline int util_max_axis(float3 vec)
 		else
 			return 2;
 	}
+#endif
 }
 
 CCL_NAMESPACE_END
