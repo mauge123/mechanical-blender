@@ -142,7 +142,6 @@ struct wmWindowManager;
 #  pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
-#include "../../intern/cycles/blender/CCL_api.h"
 #include "../../intern/dualcon/dualcon.h"
 #include "../../intern/elbeem/extern/elbeem.h"
 #include "../blender/blenkernel/BKE_modifier.h"
@@ -674,6 +673,7 @@ void RE_point_density_sample(struct Scene *scene, struct PointDensity *pd, int r
 void RE_point_density_free(struct PointDensity *pd) RET_NONE;
 void RE_instance_get_particle_info(struct ObjectInstanceRen *obi, float *index, float *age, float *lifetime, float co[3], float *size, float vel[3], float angvel[3]) RET_NONE
 void RE_FreeAllPersistentData(void) RET_NONE
+float RE_fresnel_dielectric(float incoming[3], float normal[3], float eta) RET_ZERO
 
 /* python */
 struct wmOperatorType *WM_operatortype_find(const char *idname, bool quiet) RET_NULL
@@ -769,10 +769,6 @@ void *dualcon(const DualConInput *input_mesh,
               float hermite_num,
               float scale,
               int depth) RET_ZERO
-
-/* intern/cycles */
-struct CCLDeviceInfo;
-struct CCLDeviceInfo *CCL_compute_device_list(int opencl) RET_NULL
 
 /* compositor */
 void COM_execute(RenderData *rd, Scene *scene, bNodeTree *editingtree, int rendering,

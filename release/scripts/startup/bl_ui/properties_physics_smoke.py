@@ -45,6 +45,10 @@ class PHYSICS_PT_smoke(PhysicButtonsPanel, Panel):
     def draw(self, context):
         layout = self.layout
 
+        if not bpy.app.build_options.mod_smoke:
+            layout.label("Built without Smoke modifier")
+            return
+
         md = context.smoke
         ob = context.object
 
@@ -396,6 +400,14 @@ class PHYSICS_PT_smoke_display_settings(PhysicButtonsPanel, Panel):
         col.enabled = domain.draw_velocity
         col.prop(domain, "vector_draw_type")
         col.prop(domain, "vector_scale")
+
+        layout.separator()
+        layout.label(text="Color Mapping:")
+        layout.prop(domain, "use_color_ramp")
+        col = layout.column();
+        col.enabled = domain.use_color_ramp
+        col.prop(domain, "coba_field")
+        col.template_color_ramp(domain, "color_ramp", expand=True)
 
 
 if __name__ == "__main__":  # only for live edit.

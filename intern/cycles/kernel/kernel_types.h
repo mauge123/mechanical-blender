@@ -37,7 +37,7 @@ CCL_NAMESPACE_BEGIN
 /* constants */
 #define OBJECT_SIZE 		12
 #define OBJECT_VECTOR_SIZE	6
-#define LIGHT_SIZE			5
+#define LIGHT_SIZE		11
 #define FILTER_TABLE_SIZE	1024
 #define RAMP_TABLE_SIZE		256
 #define SHUTTER_TABLE_SIZE		256
@@ -192,6 +192,9 @@ CCL_NAMESPACE_BEGIN
 #ifdef __NO_PATCH_EVAL__
 #  undef __PATCH_EVAL__
 #endif
+#ifdef __NO_TRANSPARENT__
+#  undef __TRANSPARENT_SHADOWS__
+#endif
 
 /* Random Numbers */
 
@@ -250,7 +253,7 @@ enum PathTraceDimension {
 	PRNG_LIGHT = 3,
 	PRNG_LIGHT_U = 4,
 	PRNG_LIGHT_V = 5,
-	PRNG_UNUSED_3 = 6,
+	PRNG_LIGHT_TERMINATE = 6,
 	PRNG_TERMINATE = 7,
 
 #ifdef __VOLUME__
@@ -547,25 +550,29 @@ typedef ccl_addr_space struct Intersection {
 /* Primitives */
 
 typedef enum PrimitiveType {
-	PRIMITIVE_NONE = 0,
-	PRIMITIVE_TRIANGLE = 1,
-	PRIMITIVE_MOTION_TRIANGLE = 2,
-	PRIMITIVE_CURVE = 4,
-	PRIMITIVE_MOTION_CURVE = 8,
+	PRIMITIVE_NONE            = 0,
+	PRIMITIVE_TRIANGLE        = (1 << 0),
+	PRIMITIVE_MOTION_TRIANGLE = (1 << 1),
+	PRIMITIVE_CURVE           = (1 << 2),
+	PRIMITIVE_MOTION_CURVE    = (1 << 3),
+	/* Lamp primitive is not included below on purpose,
+	 * since it is no real traceable primitive.
+	 */
+	PRIMITIVE_LAMP            = (1 << 4),
 
 	PRIMITIVE_ALL_TRIANGLE = (PRIMITIVE_TRIANGLE|PRIMITIVE_MOTION_TRIANGLE),
 	PRIMITIVE_ALL_CURVE = (PRIMITIVE_CURVE|PRIMITIVE_MOTION_CURVE),
 	PRIMITIVE_ALL_MOTION = (PRIMITIVE_MOTION_TRIANGLE|PRIMITIVE_MOTION_CURVE),
 	PRIMITIVE_ALL = (PRIMITIVE_ALL_TRIANGLE|PRIMITIVE_ALL_CURVE),
 
-	/* Total number of different primitives.
+	/* Total number of different traceable primitives.
 	 * NOTE: This is an actual value, not a bitflag.
 	 */
 	PRIMITIVE_NUM_TOTAL = 4,
 } PrimitiveType;
 
-#define PRIMITIVE_PACK_SEGMENT(type, segment) ((segment << 16) | type)
-#define PRIMITIVE_UNPACK_SEGMENT(type) (type >> 16)
+#define PRIMITIVE_PACK_SEGMENT(type, segment) ((segment << PRIMITIVE_NUM_TOTAL) | (type))
+#define PRIMITIVE_UNPACK_SEGMENT(type) (type >> PRIMITIVE_NUM_TOTAL)
 
 /* Attributes */
 
@@ -1121,8 +1128,9 @@ typedef struct KernelIntegrator {
 	float volume_step_size;
 	int volume_samples;
 
+	float light_inv_rr_threshold;
+
 	int pad1;
-	int pad2;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 

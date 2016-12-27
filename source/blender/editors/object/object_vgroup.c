@@ -886,7 +886,7 @@ static float get_vert_def_nr(Object *ob, const int def_nr, const int vertnum)
 			const int cd_dvert_offset = CustomData_get_offset(&em->bm->vdata, CD_MDEFORMVERT);
 			/* warning, this lookup is _not_ fast */
 
-			if (cd_dvert_offset != -1) {
+			if (cd_dvert_offset != -1 && vertnum < em->bm->totvert) {
 				BMVert *eve;
 				BM_mesh_elem_table_ensure(em->bm, BM_VERT);
 				eve = BM_vert_at_index(em->bm, vertnum);
@@ -2604,6 +2604,8 @@ static int vertex_group_remove_exec(bContext *C, wmOperator *op)
 
 	if (RNA_boolean_get(op->ptr, "all"))
 		BKE_object_defgroup_remove_all(ob);
+	else if (RNA_boolean_get(op->ptr, "all_unlocked"))
+		BKE_object_defgroup_remove_all_ex(ob, true);
 	else
 		vgroup_delete_active(ob);
 
@@ -2633,6 +2635,7 @@ void OBJECT_OT_vertex_group_remove(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "all", 0, "All", "Remove all vertex groups");
+	RNA_def_boolean(ot->srna, "all_unlocked", 0, "All Unlocked", "Remove all unlocked vertex groups");
 }
 
 static int vertex_group_assign_exec(bContext *C, wmOperator *UNUSED(op))

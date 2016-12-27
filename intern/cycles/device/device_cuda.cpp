@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <climits>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,6 +113,12 @@ public:
 	{
 		string cubins_path = path_get("lib");
 		return path_exists(cubins_path);
+	}
+
+	virtual bool show_samples() const
+	{
+		/* The CUDADevice only processes one tile at a time, so showing samples is fine. */
+		return true;
 	}
 
 /*#ifdef NDEBUG
@@ -213,7 +220,8 @@ public:
 			return;
 
 		int major, minor;
-		cuDeviceComputeCapability(&major, &minor, cuDevId);
+		cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevId);
+		cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevId);
 		cuDevArchitecture = major*100 + minor*10;
 
 		cuda_pop_context();
@@ -233,7 +241,8 @@ public:
 	bool support_device(const DeviceRequestedFeatures& /*requested_features*/)
 	{
 		int major, minor;
-		cuDeviceComputeCapability(&major, &minor, cuDevId);
+		cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevId);
+		cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevId);
 
 		/* We only support sm_20 and above */
 		if(major < 2) {
@@ -315,7 +324,8 @@ public:
 	{
 		/* Compute cubin name. */
 		int major, minor;
-		cuDeviceComputeCapability(&major, &minor, cuDevId);
+		cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevId);
+		cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevId);
 
 		/* Attempt to use kernel provided with Blender. */
 		if(!use_adaptive_compilation()) {
@@ -1263,7 +1273,7 @@ public:
 
 					tile.sample = sample + 1;
 
-					task->update_progress(&tile);
+					task->update_progress(&tile, tile.w*tile.h);
 				}
 
 				task->release_tile(tile);
@@ -1394,8 +1404,8 @@ void device_cuda_info(vector<DeviceInfo>& devices)
 		if(cuDeviceGetName(name, 256, num) != CUDA_SUCCESS)
 			continue;
 
-		int major, minor;
-		cuDeviceComputeCapability(&major, &minor, num);
+		int major;
+		cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, num);
 		if(major < 2) {
 			continue;
 		}
@@ -1404,12 +1414,21 @@ void device_cuda_info(vector<DeviceInfo>& devices)
 
 		info.type = DEVICE_CUDA;
 		info.description = string(name);
-		info.id = string_printf("CUDA_%d", num);
 		info.num = num;
 
 		info.advanced_shading = (major >= 2);
 		info.has_bindless_textures = (major >= 3);
 		info.pack_images = false;
+
+		int pci_location[3] = {0, 0, 0};
+		cuDeviceGetAttribute(&pci_location[0], CU_DEVICE_ATTRIBUTE_PCI_DOMAIN_ID, num);
+		cuDeviceGetAttribute(&pci_location[1], CU_DEVICE_ATTRIBUTE_PCI_BUS_ID, num);
+		cuDeviceGetAttribute(&pci_location[2], CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, num);
+		info.id = string_printf("CUDA_%s_%04x:%02x:%02x",
+		                        name,
+		                        (unsigned int)pci_location[0],
+		                        (unsigned int)pci_location[1],
+		                        (unsigned int)pci_location[2]);
 
 		/* if device has a kernel timeout, assume it is used for display */
 		if(cuDeviceGetAttribute(&attr, CU_DEVICE_ATTRIBUTE_KERNEL_EXEC_TIMEOUT, num) == CUDA_SUCCESS && attr == 1) {

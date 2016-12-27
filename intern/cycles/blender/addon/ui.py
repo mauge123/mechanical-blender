@@ -53,25 +53,26 @@ class CyclesButtonsPanel:
         return rd.engine in cls.COMPAT_ENGINES
 
 
+def get_device_type(context):
+    return context.user_preferences.addons[__package__].preferences.compute_device_type
+
+
 def use_cpu(context):
     cscene = context.scene.cycles
-    device_type = context.user_preferences.system.compute_device_type
 
-    return (device_type == 'NONE' or cscene.device == 'CPU')
+    return (get_device_type(context) == 'NONE' or cscene.device == 'CPU')
 
 
 def use_opencl(context):
     cscene = context.scene.cycles
-    device_type = context.user_preferences.system.compute_device_type
 
-    return (device_type == 'OPENCL' and cscene.device == 'GPU')
+    return (get_device_type(context) == 'OPENCL' and cscene.device == 'GPU')
 
 
 def use_cuda(context):
     cscene = context.scene.cycles
-    device_type = context.user_preferences.system.compute_device_type
 
-    return (device_type == 'CUDA' and cscene.device == 'GPU')
+    return (get_device_type(context) == 'CUDA' and cscene.device == 'GPU')
 
 
 def use_branched_path(context):
@@ -84,6 +85,14 @@ def use_sample_all_lights(context):
     cscene = context.scene.cycles
 
     return cscene.sample_all_lights_direct or cscene.sample_all_lights_indirect
+
+def show_device_selection(context):
+    type = get_device_type(context)
+    if type == 'NETWORK':
+        return True
+    if not type in {'CUDA', 'OPENCL'}:
+        return False
+    return context.user_preferences.addons[__package__].preferences.has_active_device()
 
 
 def draw_samples_info(layout, context):
@@ -141,7 +150,6 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
 
         scene = context.scene
         cscene = scene.cycles
-        device_type = context.user_preferences.system.compute_device_type
 
         row = layout.row(align=True)
         row.menu("CYCLES_MT_sampling_presets", text=bpy.types.CYCLES_MT_sampling_presets.bl_label)
@@ -150,7 +158,7 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
 
         row = layout.row()
         sub = row.row()
-        sub.active = device_type != 'OPENCL' or use_cpu(context)
+        sub.active = get_device_type(context) != 'OPENCL' or use_cpu(context)
         sub.prop(cscene, "progressive", text="")
         row.prop(cscene, "use_square_samples")
 
@@ -166,6 +174,7 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
 
         sub.prop(cscene, "sample_clamp_direct")
         sub.prop(cscene, "sample_clamp_indirect")
+        sub.prop(cscene, "light_sampling_threshold")
 
         if cscene.progressive == 'PATH' or use_branched_path(context) is False:
             col = split.column()
@@ -760,6 +769,8 @@ class CyclesObject_PT_cycles_settings(CyclesButtonsPanel, Panel):
         row = col.row()
         row.active = scene.render.use_simplify and cscene.use_camera_cull
         row.prop(cob, "use_camera_cull")
+        row.active = scene.render.use_simplify and cscene.use_distance_cull
+        row.prop(cob, "use_distance_cull")
 
 
 class CYCLES_OT_use_shading_nodes(Operator):
@@ -1576,24 +1587,40 @@ class CyclesScene_PT_simplify(CyclesButtonsPanel, Panel):
         cscene = scene.cycles
 
         layout.active = rd.use_simplify
+
+        col = layout.column(align=True)
+        col.label(text="Subdivision")
+        row = col.row(align=True)
+        row.prop(rd, "simplify_subdivision", text="Viewport")
+        row.prop(rd, "simplify_subdivision_render", text="Render")
+
+        col = layout.column(align=True)
+        col.label(text="Child Particles")
+        row = col.row(align=True)
+        row.prop(rd, "simplify_child_particles", text="Viewport")
+        row.prop(rd, "simplify_child_particles_render", text="Render")
+
+        col = layout.column(align=True)
+        split = col.split()
+        sub = split.column()
+        sub.label(text="Texture Limit Viewport")
+        sub.prop(cscene, "texture_limit", text="")
+        sub = split.column()
+        sub.label(text="Texture Limit Render")
+        sub.prop(cscene, "texture_limit_render", text="")
+
         split = layout.split()
-
         col = split.column()
-        col.label(text="Viewport:")
-        col.prop(rd, "simplify_subdivision", text="Subdivision")
-        col.prop(rd, "simplify_child_particles", text="Child Particles")
-
-        col = split.column()
-        col.label(text="Render:")
-        col.prop(rd, "simplify_subdivision_render", text="Subdivision")
-        col.prop(rd, "simplify_child_particles_render", text="Child Particles")
-
-        col = layout.column()
         col.prop(cscene, "use_camera_cull")
-        subsub = col.column()
-        subsub.active = cscene.use_camera_cull
-        subsub.prop(cscene, "camera_cull_margin")
+        row = col.row()
+        row.active = cscene.use_camera_cull
+        row.prop(cscene, "camera_cull_margin")
 
+        col = split.column()
+        col.prop(cscene, "use_distance_cull")
+        row = col.row()
+        row.active = cscene.use_distance_cull
+        row.prop(cscene, "distance_cull_margin", text="Distance")
 
 def draw_device(self, context):
     scene = context.scene
@@ -1605,9 +1632,11 @@ def draw_device(self, context):
 
         layout.prop(cscene, "feature_set")
 
-        device_type = context.user_preferences.system.compute_device_type
-        if device_type in {'CUDA', 'OPENCL', 'NETWORK'}:
-            layout.prop(cscene, "device")
+        split = layout.split(percentage=1/3)
+        split.label("Device:")
+        row = split.row()
+        row.active = show_device_selection(context)
+        row.prop(cscene, "device", text="")
 
         if engine.with_osl() and use_cpu(context):
             layout.prop(cscene, "shading_system")

@@ -70,10 +70,10 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 			if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, imval, vec)) {
 				// Ok
 			} else {
-				ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+				ED_view3d_win_to_3d(t->view, t->ar, p, fmval, vec);
 			}
 		} else {
-			ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+			ED_view3d_win_to_3d(t->view, t->ar, p, fmval, vec);
 		}
 		sub_v3_v3v3(output, vec, t->iloc);
 	} else {

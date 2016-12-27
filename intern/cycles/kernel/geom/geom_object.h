@@ -55,6 +55,21 @@ ccl_device_inline Transform object_fetch_transform(KernelGlobals *kg, int object
 	return tfm;
 }
 
+/* Lamp to world space transformation */
+
+ccl_device_inline Transform lamp_fetch_transform(KernelGlobals *kg, int lamp, bool inverse)
+{
+	int offset = lamp*LIGHT_SIZE + (inverse? 8 : 5);
+
+	Transform tfm;
+	tfm.x = kernel_tex_fetch(__light_data, offset + 0);
+	tfm.y = kernel_tex_fetch(__light_data, offset + 1);
+	tfm.z = kernel_tex_fetch(__light_data, offset + 2);
+	tfm.w = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+
+	return tfm;
+}
+
 /* Object to world space transformation for motion vectors */
 
 ccl_device_inline Transform object_fetch_vector_transform(KernelGlobals *kg, int object, enum ObjectVectorTransform type)
@@ -147,10 +162,14 @@ ccl_device_inline void object_inverse_position_transform(KernelGlobals *kg, cons
 ccl_device_inline void object_inverse_normal_transform(KernelGlobals *kg, const ShaderData *sd, float3 *N)
 {
 #ifdef __OBJECT_MOTION__
-	*N = normalize(transform_direction_transposed_auto(&ccl_fetch(sd, ob_tfm), *N));
+	if((ccl_fetch(sd, object) != OBJECT_NONE) || (ccl_fetch(sd, type) == PRIMITIVE_LAMP)) {
+		*N = normalize(transform_direction_transposed_auto(&ccl_fetch(sd, ob_tfm), *N));
+	}
 #else
-	Transform tfm = object_fetch_transform(kg, ccl_fetch(sd, object), OBJECT_TRANSFORM);
-	*N = normalize(transform_direction_transposed(&tfm, *N));
+	if(ccl_fetch(sd, object) != OBJECT_NONE) {
+		Transform tfm = object_fetch_transform(kg, ccl_fetch(sd, object), OBJECT_TRANSFORM);
+		*N = normalize(transform_direction_transposed(&tfm, *N));
+	}
 #endif
 }
 
@@ -397,7 +416,8 @@ ccl_device_inline float3 bvh_clamp_direction(float3 dir)
 
 ccl_device_inline float3 bvh_inverse_direction(float3 dir)
 {
-#ifdef __KERNEL_SSE__
+	/* TODO(sergey): Currently disabled, gives speedup but causes precision issues. */
+#if defined(__KERNEL_SSE__) && 0
 	return rcp(dir);
 #else
 	return 1.0f / dir;

@@ -1257,6 +1257,7 @@ NODE_DEFINE(BrickTextureNode)
 	SOCKET_IN_COLOR(mortar, "Mortar", make_float3(0.0f, 0.0f, 0.0f));
 	SOCKET_IN_FLOAT(scale, "Scale", 5.0f);
 	SOCKET_IN_FLOAT(mortar_size, "Mortar Size", 0.02f);
+	SOCKET_IN_FLOAT(mortar_smooth, "Mortar Smooth", 0.0f);
 	SOCKET_IN_FLOAT(bias, "Bias", 0.0f);
 	SOCKET_IN_FLOAT(brick_width, "Brick Width", 0.5f);
 	SOCKET_IN_FLOAT(row_height, "Row Height", 0.25f);
@@ -1280,6 +1281,7 @@ void BrickTextureNode::compile(SVMCompiler& compiler)
 	ShaderInput *mortar_in = input("Mortar");
 	ShaderInput *scale_in = input("Scale");
 	ShaderInput *mortar_size_in = input("Mortar Size");
+	ShaderInput *mortar_smooth_in = input("Mortar Smooth");
 	ShaderInput *bias_in = input("Bias");
 	ShaderInput *brick_width_in = input("Brick Width");
 	ShaderInput *row_height_in = input("Row Height");
@@ -1303,7 +1305,8 @@ void BrickTextureNode::compile(SVMCompiler& compiler)
 		compiler.encode_uchar4(
 			compiler.stack_assign_if_linked(row_height_in),
 			compiler.stack_assign_if_linked(color_out),
-			compiler.stack_assign_if_linked(fac_out)));
+			compiler.stack_assign_if_linked(fac_out),
+			compiler.stack_assign_if_linked(mortar_smooth_in)));
 			
 	compiler.add_node(compiler.encode_uchar4(offset_frequency, squash_frequency),
 		__float_as_int(scale),
@@ -1314,6 +1317,11 @@ void BrickTextureNode::compile(SVMCompiler& compiler)
 		__float_as_int(row_height),
 		__float_as_int(offset),
 		__float_as_int(squash));
+
+	compiler.add_node(__float_as_int(mortar_smooth),
+		SVM_STACK_INVALID,
+		SVM_STACK_INVALID,
+		SVM_STACK_INVALID);
 
 	tex_mapping.compile_end(compiler, vector_in, vector_offset);
 }
@@ -1434,14 +1442,14 @@ void PointDensityTextureNode::compile(SVMCompiler& compiler)
 		else {
 			if(use_density) {
 				compiler.add_node(NODE_VALUE_F,
-								  __float_as_int(0.0f),
-								  compiler.stack_assign(density_out));
+				                  __float_as_int(0.0f),
+				                  compiler.stack_assign(density_out));
 			}
 			if(use_color) {
 				compiler.add_node(NODE_VALUE_V, compiler.stack_assign(color_out));
 				compiler.add_node(NODE_VALUE_V, make_float3(TEX_IMAGE_MISSING_R,
-															TEX_IMAGE_MISSING_G,
-															TEX_IMAGE_MISSING_B));
+				                                            TEX_IMAGE_MISSING_G,
+				                                            TEX_IMAGE_MISSING_B));
 			}
 		}
 	}
@@ -2413,7 +2421,7 @@ void BackgroundNode::compile(SVMCompiler& compiler)
 	if(color_in->link || strength_in->link) {
 		compiler.add_node(NODE_EMISSION_WEIGHT,
 		                  compiler.stack_assign(color_in),
-						  compiler.stack_assign(strength_in));
+		                  compiler.stack_assign(strength_in));
 	}
 	else
 		compiler.add_node(NODE_CLOSURE_SET_WEIGHT, color*strength);
@@ -3985,7 +3993,7 @@ NODE_DEFINE(SeparateRGBNode)
 
 	SOCKET_IN_COLOR(color, "Image", make_float3(0.0f, 0.0f, 0.0f));
 
-	SOCKET_OUT_FLOAT(g, "R");
+	SOCKET_OUT_FLOAT(r, "R");
 	SOCKET_OUT_FLOAT(g, "G");
 	SOCKET_OUT_FLOAT(b, "B");
 

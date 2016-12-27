@@ -162,6 +162,11 @@ ccl_device_inline float max4(float a, float b, float c, float d)
 	return max(max(a, b), max(c, d));
 }
 
+ccl_device_inline float max3(float3 a)
+{
+	return max(max(a.x, a.y), a.z);
+}
+
 #ifndef __KERNEL_OPENCL__
 
 ccl_device_inline int clamp(int a, int mn, int mx)
@@ -453,8 +458,9 @@ ccl_device_inline float3 operator*(const float3& a, const float f)
 
 ccl_device_inline float3 operator*(const float f, const float3& a)
 {
-#ifdef __KERNEL_SSE__
-	return float3(_mm_mul_ps(a.m128, _mm_set1_ps(f)));
+	/* TODO(sergey): Currently disabled, gives speedup but causes precision issues. */
+#if defined(__KERNEL_SSE__) && 0
+	return float3(_mm_mul_ps(_mm_set1_ps(f), a.m128));
 #else
 	return make_float3(a.x*f, a.y*f, a.z*f);
 #endif
@@ -462,13 +468,13 @@ ccl_device_inline float3 operator*(const float f, const float3& a)
 
 ccl_device_inline float3 operator/(const float f, const float3& a)
 {
-	/* TODO(sergey): Currently disabled, gives speedup but makes intersection tets non-watertight. */
-// #ifdef __KERNEL_SSE__
-// 	__m128 rc = _mm_rcp_ps(a.m128);
-// 	return float3(_mm_mul_ps(_mm_set1_ps(f),rc));
-// #else
+	/* TODO(sergey): Currently disabled, gives speedup but causes precision issues. */
+#if defined(__KERNEL_SSE__) && 0
+	__m128 rc = _mm_rcp_ps(a.m128);
+	return float3(_mm_mul_ps(_mm_set1_ps(f),rc));
+#else
 	return make_float3(f / a.x, f / a.y, f / a.z);
-// #endif
+#endif
 }
 
 ccl_device_inline float3 operator/(const float3& a, const float f)
@@ -479,7 +485,8 @@ ccl_device_inline float3 operator/(const float3& a, const float f)
 
 ccl_device_inline float3 operator/(const float3& a, const float3& b)
 {
-#ifdef __KERNEL_SSE__
+	/* TODO(sergey): Currently disabled, gives speedup but causes precision issues. */
+#if defined(__KERNEL_SSE__) && 0
 	__m128 rc = _mm_rcp_ps(b.m128);
 	return float3(_mm_mul_ps(a, rc));
 #else
@@ -799,7 +806,7 @@ ccl_device_inline float4 operator*(const float4& a, const float4& b)
 
 ccl_device_inline float4 operator*(const float4& a, float f)
 {
-#ifdef __KERNEL_SSE__
+#if defined(__KERNEL_SSE__)
 	return a * make_float4(f);
 #else
 	return make_float4(a.x*f, a.y*f, a.z*f, a.w*f);
@@ -1574,7 +1581,7 @@ ccl_device_inline bool ray_triangle_intersect_uv(
 
 ccl_device bool ray_quad_intersect(float3 ray_P, float3 ray_D, float ray_mint, float ray_maxt,
                                    float3 quad_P, float3 quad_u, float3 quad_v, float3 quad_n,
-                                   float3 *isect_P, float *isect_t)
+                                   float3 *isect_P, float *isect_t, float *isect_u, float *isect_v)
 {
 	float t = -(dot(ray_P, quad_n) - dot(quad_P, quad_n)) / dot(ray_D, quad_n);
 	if(t < ray_mint || t > ray_maxt)
@@ -1582,13 +1589,19 @@ ccl_device bool ray_quad_intersect(float3 ray_P, float3 ray_D, float ray_mint, f
 
 	float3 hit = ray_P + t*ray_D;
 	float3 inplane = hit - quad_P;
-	if(fabsf(dot(inplane, quad_u) / dot(quad_u, quad_u)) > 0.5f)
+
+	float u = dot(inplane, quad_u) / dot(quad_u, quad_u) + 0.5f;
+	if(u < 0.0f || u > 1.0f)
 		return false;
-	if(fabsf(dot(inplane, quad_v) / dot(quad_v, quad_v)) > 0.5f)
+
+	float v = dot(inplane, quad_v) / dot(quad_v, quad_v) + 0.5f;
+	if(v < 0.0f || v > 1.0f)
 		return false;
 
 	if(isect_P) *isect_P = hit;
 	if(isect_t) *isect_t = t;
+	if(isect_u) *isect_u = u;
+	if(isect_v) *isect_v = v;
 
 	return true;
 }
