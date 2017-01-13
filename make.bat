@@ -47,7 +47,12 @@ if NOT "%1" == "" (
 		set BUILD_DIR=%BUILD_DIR%_bpy
 		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% ^
 		    -C"%BLENDER_DIR%\build_files\cmake\config\bpy_module.cmake"
-	) else if "%1" == "release" (
+	) else if "%1" == "mechanical" (
+		set TARGET_SET=1
+		set BUILD_DIR=%BUILD_DIR%_mechanical
+		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% ^
+		    -C"%BLENDER_DIR%\build_files\cmake\config\blender_mechanical.cmake"
+    ) else if "%1" == "release" (
 		set TARGET_SET=1
 		if "%CUDA_PATH_V7_5%"=="" (
 			echo Cuda 7.5 Not found, aborting!
