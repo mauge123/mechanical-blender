@@ -77,6 +77,10 @@ static wmKeyMapItem *wm_keymap_item_copy(wmKeyMapItem *kmi)
 		kmin->properties = IDP_CopyProperty(kmin->properties);
 		kmin->ptr->data = kmin->properties;
 	}
+	else {
+		kmin->properties = NULL;
+		kmin->ptr = NULL;
+	}
 
 	return kmin;
 }
@@ -87,6 +91,8 @@ static void wm_keymap_item_free(wmKeyMapItem *kmi)
 	if (kmi->ptr) {
 		WM_operator_properties_free(kmi->ptr);
 		MEM_freeN(kmi->ptr);
+		kmi->ptr = NULL;
+		kmi->properties = NULL;
 	}
 }
 
@@ -120,7 +126,7 @@ static void wm_keymap_item_properties_update_ot(wmKeyMapItem *kmi)
 		}
 		else {
 			/* zombie keymap item */
-			MEM_SAFE_FREE(kmi->ptr);
+			wm_keymap_item_free(kmi);
 		}
 	}
 }

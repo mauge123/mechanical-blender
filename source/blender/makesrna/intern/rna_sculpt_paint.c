@@ -75,6 +75,14 @@ EnumPropertyItem rna_enum_gpencil_sculpt_brush_items[] = {
 	{ 0, NULL, 0, NULL, NULL }
 };
 
+EnumPropertyItem rna_enum_gpencil_lockaxis_items[] = {
+	{ GP_LOCKAXIS_NONE, "GP_LOCKAXIS_NONE", 0, "None", "" },
+	{ GP_LOCKAXIS_X, "GP_LOCKAXIS_X", 0, "X", "Project strokes to plane locked to X" },
+	{ GP_LOCKAXIS_Y, "GP_LOCKAXIS_Y", 0, "Y", "Project strokes to plane locked to Y" },
+	{ GP_LOCKAXIS_Z, "GP_LOCKAXIS_Z", 0, "Z", "Project strokes to plane locked to Z" },
+	{ 0, NULL, 0, NULL, NULL }
+};
+
 EnumPropertyItem rna_enum_symmetrize_direction_items[] = {
 	{BMO_SYMMETRIZE_NEGATIVE_X, "NEGATIVE_X", 0, "-X to +X", ""},
 	{BMO_SYMMETRIZE_POSITIVE_X, "POSITIVE_X", 0, "+X to -X", ""},
@@ -592,10 +600,12 @@ static void rna_def_sculpt(BlenderRNA  *brna)
 	RNA_def_property_ui_text(prop, "Detail Percentage", "Maximum edge length for dynamic topology sculpting (in brush percenage)");
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 
-	prop = RNA_def_property(srna, "constant_detail", PROP_FLOAT, PROP_PERCENTAGE);
-	RNA_def_property_range(prop, 0.001, 10000.0);
-	RNA_def_property_ui_range(prop, 0.1, 100.0, 10, 2);
-	RNA_def_property_ui_text(prop, "Detail Size", "Maximum edge length for dynamic topology sculpting (as percentage of blender unit)");
+	prop = RNA_def_property(srna, "constant_detail_resolution", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "constant_detail");
+	RNA_def_property_range(prop, 0.0001, FLT_MAX);
+	RNA_def_property_ui_range(prop, 0.001, 1000.0, 10, 2);
+	RNA_def_property_ui_text(prop, "Resolution", "Maximum edge length for dynamic topology sculpting (as divisor "
+	                         "of blender unit - higher value means smaller edge length)");
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 
 	prop = RNA_def_property(srna, "use_smooth_shading", PROP_BOOLEAN, PROP_NONE);
@@ -1052,6 +1062,13 @@ static void rna_def_gpencil_sculpt(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Alpha", "Alpha value for selected vertices");
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, "rna_GPencil_update");
+
+	/* lock axis */
+	prop = RNA_def_property(srna, "lockaxis", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "lock_axis");
+	RNA_def_property_enum_items(prop, rna_enum_gpencil_lockaxis_items);
+	RNA_def_property_ui_text(prop, "Lock", "");
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 
 	/* brush */
 	srna = RNA_def_struct(brna, "GPencilSculptBrush", NULL);

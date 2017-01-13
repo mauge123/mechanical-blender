@@ -383,7 +383,7 @@ typedef struct DisplaceModifierData {
 	int direction;
 	char defgrp_name[64];   /* MAX_VGROUP_NAME */
 	float midlevel;
-	int pad;
+	int space;
 } DisplaceModifierData;
 
 /* DisplaceModifierData->direction */
@@ -402,6 +402,12 @@ enum {
 	MOD_DISP_MAP_GLOBAL = 1,
 	MOD_DISP_MAP_OBJECT = 2,
 	MOD_DISP_MAP_UV     = 3,
+};
+
+/* DisplaceModifierData->space */
+enum {
+	MOD_DISP_SPACE_LOCAL  = 0,
+	MOD_DISP_SPACE_GLOBAL = 1,
 };
 
 typedef struct UVProjectModifierData {
@@ -621,6 +627,9 @@ typedef struct CollisionModifierData {
 	unsigned int mvert_num;
 	unsigned int tri_num;
 	float time_x, time_xnew;    /* cfra time of modifier */
+	char is_static;             /* collider doesn't move this frame, i.e. x[].co==xnew[].co */
+	char pad[7];
+
 	struct BVHTree *bvhtree;    /* bounding volume hierarchy for this cloth object */
 } CollisionModifierData;
 
@@ -1546,6 +1555,7 @@ typedef struct MeshSeqCacheModifierData {
 	ModifierData modifier;
 
 	struct CacheFile *cache_file;
+	struct CacheReader *reader;
 	char object_path[1024];  /* 1024 = FILE_MAX */
 
 	char read_flag;

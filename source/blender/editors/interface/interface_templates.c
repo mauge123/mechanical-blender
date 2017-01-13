@@ -303,7 +303,10 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 			break;
 		case UI_ID_LOCAL:
 			if (id) {
-				if (id_make_local(CTX_data_main(C), id, false, false)) {
+				Main *bmain = CTX_data_main(C);
+				if (id_make_local(bmain, id, false, false)) {
+					BKE_main_id_clear_newpoins(bmain);
+
 					/* reassign to get get proper updates/notifiers */
 					idptr = RNA_property_pointer_get(&template->ptr, template->prop);
 					RNA_property_pointer_set(&template->ptr, template->prop, idptr);
@@ -3886,6 +3889,8 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 		return;
 	}
 
+	SpaceButs *sbuts = CTX_wm_space_buts(C);
+
 	uiLayout *row = uiLayoutRow(layout, false);
 	uiBlock *block = uiLayoutGetBlock(row);
 	uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_("File Path:"), 0, 19, 145, 19, NULL, 0, 0, 0, 0, "");
@@ -3911,6 +3916,7 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 	uiItemL(row, IFACE_("Manual Transform:"), ICON_NONE);
 
 	row = uiLayoutRow(layout, false);
+	uiLayoutSetEnabled(row, (sbuts->mainb == BCONTEXT_CONSTRAINT));
 	uiItemR(row, &fileptr, "scale", 0, "Scale", ICON_NONE);
 
 	/* TODO: unused for now, so no need to expose. */

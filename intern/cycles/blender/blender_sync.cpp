@@ -255,8 +255,17 @@ void BlenderSync::sync_integrator()
 	integrator->filter_glossy = get_float(cscene, "blur_glossy");
 
 	integrator->seed = get_int(cscene, "seed");
-	if(get_boolean(cscene, "use_animated_seed"))
-		integrator->seed = hash_int_2d(b_scene.frame_current(), get_int(cscene, "seed"));
+	if(get_boolean(cscene, "use_animated_seed")) {
+		integrator->seed = hash_int_2d(b_scene.frame_current(),
+		                               get_int(cscene, "seed"));
+		if(b_scene.frame_subframe() != 0.0f) {
+			/* TODO(sergey): Ideally should be some sort of hash_merge,
+			 * but this is good enough for now.
+			 */
+			integrator->seed += hash_int_2d((int)(b_scene.frame_subframe() * (float)INT_MAX),
+			                                get_int(cscene, "seed"));
+		}
+	}
 
 	integrator->sampling_pattern = (SamplingPattern)get_enum(
 	        cscene,
@@ -284,6 +293,7 @@ void BlenderSync::sync_integrator()
 
 	integrator->sample_all_lights_direct = get_boolean(cscene, "sample_all_lights_direct");
 	integrator->sample_all_lights_indirect = get_boolean(cscene, "sample_all_lights_indirect");
+	integrator->light_sampling_threshold = get_float(cscene, "light_sampling_threshold");
 
 	int diffuse_samples = get_int(cscene, "diffuse_samples");
 	int glossy_samples = get_int(cscene, "glossy_samples");
@@ -494,6 +504,20 @@ SceneParams BlenderSync::get_scene_params(BL::Scene& b_scene,
 	else
 		params.persistent_data = false;
 
+	int texture_limit;
+	if(background) {
+		texture_limit = RNA_enum_get(&cscene, "texture_limit_render");
+	}
+	else {
+		texture_limit = RNA_enum_get(&cscene, "texture_limit");
+	}
+	if(texture_limit > 0 && b_scene.render().use_simplify()) {
+		params.texture_limit = 1 << (texture_limit + 6);
+	}
+	else {
+		params.texture_limit = 0;
+	}
+
 #if !(defined(__GNUC__) && (defined(i386) || defined(_M_IX86)))
 	if(is_cpu) {
 		params.use_qbvh = DebugFlags().cpu.qbvh && system_cpu_support_sse2();
@@ -530,7 +554,12 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine& b_engine,
 	vector<DeviceInfo>& devices = Device::available_devices();
 	
 	/* device default CPU */
-	params.device = devices[0];
+	foreach(DeviceInfo& device, devices) {
+		if(device.type == DEVICE_CPU) {
+			params.device = device;
+			break;
+		}
+	}
 
 	if(get_enum(cscene, "device") == 2) {
 		/* find network device */
@@ -539,17 +568,39 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine& b_engine,
 				params.device = info;
 	}
 	else if(get_enum(cscene, "device") == 1) {
-		/* find GPU device with given id */
-		PointerRNA systemptr = b_userpref.system().ptr;
-		PropertyRNA *deviceprop = RNA_struct_find_property(&systemptr, "compute_device");
-		int device_id = b_userpref.system().compute_device();
+		PointerRNA b_preferences;
 
-		const char *id;
+		BL::UserPreferences::addons_iterator b_addon_iter;
+		for(b_userpref.addons.begin(b_addon_iter); b_addon_iter != b_userpref.addons.end(); ++b_addon_iter) {
+			if(b_addon_iter->module() == "cycles") {
+				b_preferences = b_addon_iter->preferences().ptr;
+				break;
+			}
+		}
 
-		if(RNA_property_enum_identifier(NULL, &systemptr, deviceprop, device_id, &id)) {
-			foreach(DeviceInfo& info, devices)
-				if(info.id == id)
-					params.device = info;
+		int compute_device = get_enum(b_preferences, "compute_device_type");
+
+		if(compute_device != 0) {
+			vector<DeviceInfo> used_devices;
+			RNA_BEGIN(&b_preferences, device, "devices") {
+				if(get_enum(device, "type") == compute_device && get_boolean(device, "use")) {
+					string id = get_string(device, "id");
+					foreach(DeviceInfo& info, devices) {
+						if(info.id == id) {
+							used_devices.push_back(info);
+							break;
+						}
+					}
+				}
+			} RNA_END
+
+			if(used_devices.size() == 1) {
+				params.device = used_devices[0];
+			}
+			else if(used_devices.size() > 1) {
+				params.device = Device::get_multi_device(used_devices);
+			}
+			/* Else keep using the CPU device that was set before. */
 		}
 	}
 

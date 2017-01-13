@@ -320,7 +320,8 @@ void BKE_sequencer_free_clipboard(void)
 /* Manage pointers in the clipboard.
  * note that these pointers should _never_ be access in the sequencer,
  * they are only for storage while in the clipboard
- * notice 'newid' is used for temp pointer storage here, validate on access.
+ * notice 'newid' is used for temp pointer storage here, validate on access (this is safe usage,
+ * since those datablocks are fully out of Main lists).
  */
 #define ID_PT (*id_pt)
 static void seqclipboard_ptr_free(ID **id_pt)
@@ -3447,7 +3448,13 @@ static ImBuf *do_render_strip_uncached(
 					state->scene_parents = &scene_parent;
 					/* end check */
 
-					ibuf = do_render_strip_seqbase(context, state, seq, nr, use_preprocess);
+					/* Use the Scene Seq's scene for the context when rendering the scene's sequences
+					 * (necessary for Multicam Selector among others).
+					 */
+					SeqRenderData local_context = *context;
+					local_context.scene = seq->scene;
+
+					ibuf = do_render_strip_seqbase(&local_context, state, seq, nr, use_preprocess);
 
 					/* step back in the list */
 					state->scene_parents = state->scene_parents->next;

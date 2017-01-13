@@ -390,7 +390,10 @@ static bool acf_generic_dataexpand_setting_valid(bAnimContext *ac, bAnimListElem
 		/* select is ok for most "ds*" channels (e.g. dsmat) */
 		case ACHANNEL_SETTING_SELECT:
 			return true;
-			
+
+		case ACHANNEL_SETTING_ALWAYS_VISIBLE:
+			return true;
+
 		/* other flags are never supported */
 		default:
 			return false;
@@ -1715,7 +1718,10 @@ static int acf_dscam_setting_flag(bAnimContext *UNUSED(ac), eAnimChannel_Setting
 			
 		case ACHANNEL_SETTING_SELECT: /* selected */
 			return ADT_UI_SELECTED;
-		
+
+		case ACHANNEL_SETTING_ALWAYS_VISIBLE:
+			return ADT_CURVES_ALWAYS_VISIBLE;
+
 		default: /* unsupported */
 			return 0;
 	}
@@ -1736,6 +1742,7 @@ static void *acf_dscam_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings set
 		case ACHANNEL_SETTING_SELECT: /* selected */
 		case ACHANNEL_SETTING_MUTE: /* muted (for NLA only) */
 		case ACHANNEL_SETTING_VISIBLE: /* visible (for Graph Editor only) */
+		case ACHANNEL_SETTING_ALWAYS_VISIBLE:
 			if (ca->adt)
 				return GET_ACF_FLAG_PTR(ca->adt->flag, type);
 			return NULL;
@@ -2710,6 +2717,84 @@ static bAnimChannelType ACF_DSGPENCIL =
 	acf_dsgpencil_setting_ptr               /* pointer for setting */
 };
 
+/* World Expander  ------------------------------------------- */
+
+// TODO: just get this from RNA?
+static int acf_dsmclip_icon(bAnimListElem *UNUSED(ale))
+{
+	return ICON_SEQUENCE;
+}
+
+/* get the appropriate flag(s) for the setting when it is valid  */
+static int acf_dsmclip_setting_flag(bAnimContext *UNUSED(ac), eAnimChannel_Settings setting, bool *neg)
+{
+	/* clear extra return data first */
+	*neg = false;
+
+	switch (setting) {
+		case ACHANNEL_SETTING_EXPAND: /* expanded */
+			return MCLIP_DATA_EXPAND;
+
+		case ACHANNEL_SETTING_MUTE: /* mute (only in NLA) */
+			return ADT_NLA_EVAL_OFF;
+
+		case ACHANNEL_SETTING_VISIBLE: /* visible (only in Graph Editor) */
+			*neg = true;
+			return ADT_CURVES_NOT_VISIBLE;
+
+		case ACHANNEL_SETTING_SELECT: /* selected */
+			return ADT_UI_SELECTED;
+
+		default: /* unsupported */
+			return 0;
+	}
+}
+
+/* get pointer to the setting */
+static void *acf_dsmclip_setting_ptr(bAnimListElem *ale, eAnimChannel_Settings setting, short *type)
+{
+	MovieClip *clip = (MovieClip *)ale->data;
+
+	/* clear extra return data first */
+	*type = 0;
+
+	switch (setting) {
+		case ACHANNEL_SETTING_EXPAND: /* expanded */
+			return GET_ACF_FLAG_PTR(clip->flag, type);
+
+		case ACHANNEL_SETTING_SELECT: /* selected */
+		case ACHANNEL_SETTING_MUTE: /* muted (for NLA only) */
+		case ACHANNEL_SETTING_VISIBLE: /* visible (for Graph Editor only) */
+			if (clip->adt != NULL) {
+				return GET_ACF_FLAG_PTR(clip->adt->flag, type);
+			}
+			return NULL;
+
+		default: /* unsupported */
+			return NULL;
+	}
+}
+
+/* world expander type define */
+static bAnimChannelType ACF_DSMCLIP =
+{
+	"Movieclip Expander",           /* type name */
+	ACHANNEL_ROLE_EXPANDER,         /* role */
+
+	acf_generic_dataexpand_color,    /* backdrop color */
+	acf_generic_dataexpand_backdrop, /* backdrop */
+	acf_generic_indention_1,         /* indent level */
+	acf_generic_basic_offset,        /* offset */
+
+	acf_generic_idblock_name ,       /* name */
+	acf_generic_idfill_name_prop,    /* name prop */
+	acf_dsmclip_icon,                /* icon */
+
+	acf_generic_dataexpand_setting_valid,   /* has setting */
+	acf_dsmclip_setting_flag,               /* flag for setting */
+	acf_dsmclip_setting_ptr                 /* pointer for setting */
+};
+
 /* ShapeKey Entry  ------------------------------------------- */
 
 /* name for ShapeKey */
@@ -3515,6 +3600,7 @@ static void ANIM_init_channel_typeinfo_data(void)
 		animchannelTypeInfo[type++] = &ACF_DSLINESTYLE;  /* LineStyle Channel */
 		animchannelTypeInfo[type++] = &ACF_DSSPK;        /* Speaker Channel */
 		animchannelTypeInfo[type++] = &ACF_DSGPENCIL;    /* GreasePencil Channel */
+		animchannelTypeInfo[type++] = &ACF_DSMCLIP;      /* MovieClip Channel */
 		
 		animchannelTypeInfo[type++] = &ACF_SHAPEKEY;     /* ShapeKey */
 		

@@ -602,41 +602,41 @@ void set_sca_new_poins_ob(Object *ob)
 		if (act->flag & ACT_NEW) {
 			if (act->type==ACT_EDIT_OBJECT) {
 				bEditObjectActuator *eoa= act->data;
-				ID_NEW(eoa->ob);
+				ID_NEW_REMAP(eoa->ob);
 			}
 			else if (act->type==ACT_SCENE) {
 				bSceneActuator *sca= act->data;
-				ID_NEW(sca->camera);
+				ID_NEW_REMAP(sca->camera);
 			}
 			else if (act->type==ACT_CAMERA) {
 				bCameraActuator *ca= act->data;
-				ID_NEW(ca->ob);
+				ID_NEW_REMAP(ca->ob);
 			}
 			else if (act->type==ACT_OBJECT) {
 				bObjectActuator *oa= act->data;
-				ID_NEW(oa->reference);
+				ID_NEW_REMAP(oa->reference);
 			}
 			else if (act->type==ACT_MESSAGE) {
 				bMessageActuator *ma= act->data;
-				ID_NEW(ma->toObject);
+				ID_NEW_REMAP(ma->toObject);
 			}
 			else if (act->type==ACT_PARENT) {
 				bParentActuator *para = act->data;
-				ID_NEW(para->ob);
+				ID_NEW_REMAP(para->ob);
 			}
 			else if (act->type==ACT_ARMATURE) {
 				bArmatureActuator *aa = act->data;
-				ID_NEW(aa->target);
-				ID_NEW(aa->subtarget);
+				ID_NEW_REMAP(aa->target);
+				ID_NEW_REMAP(aa->subtarget);
 			}
 			else if (act->type==ACT_PROPERTY) {
 				bPropertyActuator *pa= act->data;
-				ID_NEW(pa->ob);
+				ID_NEW_REMAP(pa->ob);
 			}
 			else if (act->type==ACT_STEERING) {
 				bSteeringActuator *sta = act->data;
-				ID_NEW(sta->navmesh);
-				ID_NEW(sta->target);
+				ID_NEW_REMAP(sta->navmesh);
+				ID_NEW_REMAP(sta->target);
 			}
 		}
 		act= act->next;
@@ -666,14 +666,15 @@ void set_sca_new_poins(void)
  *     ...and forces us to add yet another very ugly hack to get remapping with logic bricks working. */
 void BKE_sca_logic_links_remap(Main *bmain, Object *ob_old, Object *ob_new)
 {
+	if (ob_new == NULL || (ob_old->controllers.first == NULL && ob_old->actuators.first == NULL)) {
+		/* Nothing to do here... */
+		return;
+	}
+
 	GHash *controllers_map = ob_old->controllers.first ?
 	                             BLI_ghash_ptr_new_ex(__func__, BLI_listbase_count(&ob_old->controllers)) : NULL;
 	GHash *actuators_map = ob_old->actuators.first ?
 	                           BLI_ghash_ptr_new_ex(__func__, BLI_listbase_count(&ob_old->actuators)) : NULL;
-
-	if (!(controllers_map || actuators_map)) {
-		return;
-	}
 
 	/* We try to remap old controllers/actuators to new ones - in a very basic way. */
 	for (bController *cont_old = ob_old->controllers.first, *cont_new = ob_new->controllers.first;
@@ -788,7 +789,7 @@ void BKE_sca_logic_copy(Object *ob_new, Object *ob)
 	copy_controllers(&ob_new->controllers, &ob->controllers);
 	copy_actuators(&ob_new->actuators, &ob->actuators);
 
-	for (bSensor *sens = ob->sensors.first; sens; sens = sens->next) {
+	for (bSensor *sens = ob_new->sensors.first; sens; sens = sens->next) {
 		if (sens->flag & SENS_NEW) {
 			for (int a = 0; a < sens->totlinks; a++) {
 				if (sens->links[a] && sens->links[a]->mynew) {
@@ -798,7 +799,7 @@ void BKE_sca_logic_copy(Object *ob_new, Object *ob)
 		}
 	}
 
-	for (bController *cont = ob->controllers.first; cont; cont = cont->next) {
+	for (bController *cont = ob_new->controllers.first; cont; cont = cont->next) {
 		if (cont->flag & CONT_NEW) {
 			for (int a = 0; a < cont->totlinks; a++) {
 				if (cont->links[a] && cont->links[a]->mynew) {

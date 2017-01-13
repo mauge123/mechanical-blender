@@ -378,6 +378,18 @@ static void libblock_remap_data_postprocess_obdata_relink(Main *UNUSED(bmain), O
 	}
 }
 
+static void libblock_remap_data_postprocess_nodetree_update(Main *bmain, ID *new_id)
+{
+	/* Verify all nodetree user nodes. */
+	ntreeVerifyNodes(bmain, new_id);
+
+	/* Update node trees as necessary. */
+	FOREACH_NODETREE(bmain, ntree, id) {
+		/* make an update call for the tree */
+		ntreeUpdateTree(bmain, ntree);
+	} FOREACH_NODETREE_END
+}
+
 /**
  * Execute the 'data' part of the remapping (that is, all ID pointers from other ID datablocks).
  *
@@ -551,6 +563,8 @@ void BKE_libblock_remap_locked(
 		default:
 			break;
 	}
+	/* Node trees may virtually use any kind of data-block... */
+	libblock_remap_data_postprocess_nodetree_update(bmain, new_id);
 
 	/* Full rebuild of DAG! */
 	DAG_relations_tag_update(bmain);
@@ -666,46 +680,52 @@ void BKE_libblock_relink_ex(
 	}
 }
 
-static void animdata_dtar_clear_cb(ID *UNUSED(id), AnimData *adt, void *userdata)
+static int id_relink_to_newid_looper(void *UNUSED(user_data), ID *UNUSED(self_id), ID **id_pointer, const int cd_flag)
 {
-	ChannelDriver *driver;
-	FCurve *fcu;
-
-	/* find the driver this belongs to and update it */
-	for (fcu = adt->drivers.first; fcu; fcu = fcu->next) {
-		driver = fcu->driver;
-		
-		if (driver) {
-			DriverVar *dvar;
-			for (dvar = driver->variables.first; dvar; dvar = dvar->next) {
-				DRIVER_TARGETS_USED_LOOPER(dvar) 
-				{
-					if (dtar->id == userdata)
-						dtar->id = NULL;
-				}
-				DRIVER_TARGETS_LOOPER_END
-			}
+	ID *id = *id_pointer;
+	if (id) {
+		/* See: NEW_ID macro */
+		if (id->newid) {
+			BKE_library_update_ID_link_user(id->newid, id, cd_flag);
+			*id_pointer = id->newid;
+		}
+		else if (id->tag & LIB_TAG_NEW) {
+			id->tag &= ~LIB_TAG_NEW;
+			BKE_libblock_relink_to_newid(id);
 		}
 	}
+	return IDWALK_RET_NOP;
 }
 
-void BKE_libblock_free_data(Main *bmain, ID *id)
+/** Similar to libblock_relink_ex, but is remapping IDs to their newid value if non-NULL, in given \a id.
+ *
+ * Very specific usage, not sure we'll keep it on the long run, currently only used in Object duplication code...
+ */
+void BKE_libblock_relink_to_newid(ID *id)
+{
+	if (ID_IS_LINKED_DATABLOCK(id))
+		return;
+
+	BKE_library_foreach_ID_link(id, id_relink_to_newid_looper, NULL, 0);
+}
+
+void BKE_libblock_free_data(Main *UNUSED(bmain), ID *id)
 {
 	if (id->properties) {
 		IDP_FreeProperty(id->properties);
 		MEM_freeN(id->properties);
 	}
-	
-	/* this ID may be a driver target! */
-	BKE_animdata_main_cb(bmain, animdata_dtar_clear_cb, (void *)id);
 }
 
 /**
  * used in headerbuttons.c image.c mesh.c screen.c sound.c and library.c
  *
  * \param do_id_user: if \a true, try to release other ID's 'references' hold by \a idv.
+ *                    (only applies to main database)
+ * \param do_ui_user: similar to do_id_user but makes sure UI does not hold references to
+ *                    \a id.
  */
-void BKE_libblock_free_ex(Main *bmain, void *idv, const bool do_id_user)
+void BKE_libblock_free_ex(Main *bmain, void *idv, const bool do_id_user, const bool do_ui_user)
 {
 	ID *id = idv;
 	short type = GS(id->name);
@@ -830,12 +850,14 @@ void BKE_libblock_free_ex(Main *bmain, void *idv, const bool do_id_user)
 	/* avoid notifying on removed data */
 	BKE_main_lock(bmain);
 
-	if (free_notifier_reference_cb) {
-		free_notifier_reference_cb(id);
-	}
+	if (do_ui_user) {
+		if (free_notifier_reference_cb) {
+			free_notifier_reference_cb(id);
+		}
 
-	if (remap_editor_id_reference_cb) {
-		remap_editor_id_reference_cb(id, NULL);
+		if (remap_editor_id_reference_cb) {
+			remap_editor_id_reference_cb(id, NULL);
+		}
 	}
 
 	BLI_remlink(lb, id);
@@ -848,7 +870,7 @@ void BKE_libblock_free_ex(Main *bmain, void *idv, const bool do_id_user)
 
 void BKE_libblock_free(Main *bmain, void *idv)
 {
-	BKE_libblock_free_ex(bmain, idv, true);
+	BKE_libblock_free_ex(bmain, idv, true, true);
 }
 
 void BKE_libblock_free_us(Main *bmain, void *idv)      /* test users */

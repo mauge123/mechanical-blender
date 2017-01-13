@@ -333,7 +333,7 @@ option(WITH_ALEMBIC             "Enable Alembic Support" OFF)
 option(WITH_ALEMBIC_HDF5        "Enable Legacy Alembic Support (not officially supported)" OFF)
 
 if(APPLE)
-	option(WITH_CODEC_QUICKTIME     "Enable Quicktime Support" ON)
+	option(WITH_CODEC_QUICKTIME     "Enable Quicktime Support" OFF)
 endif()
 
 # 3D format support
@@ -343,9 +343,9 @@ option(WITH_OPENCOLLADA   "Enable OpenCollada Support (http://www.opencollada.or
 # Sound output
 option(WITH_SDL           "Enable SDL for sound and joystick support" ${_init_SDL})
 option(WITH_OPENAL        "Enable OpenAL Support (http://www.openal.org)" ON)
-option(WITH_JACK          "Enable Jack Support (http://www.jackaudio.org)" ${_init_JACK})
+option(WITH_JACK          "Enable JACK Support (http://www.jackaudio.org)" ${_init_JACK})
 if(UNIX AND NOT APPLE)
-	option(WITH_JACK_DYNLOAD  "Enable runtime dynamic Jack libraries loading" OFF)
+	option(WITH_JACK_DYNLOAD  "Enable runtime dynamic JACK libraries loading" OFF)
 endif()
 if(UNIX AND NOT APPLE)
 	option(WITH_SDL_DYNLOAD  "Enable runtime dynamic SDL libraries loading" OFF)
@@ -407,7 +407,7 @@ option(WITH_CYCLES_STANDALONE_GUI	"Build Cycles standalone with GUI" OFF)
 option(WITH_CYCLES_OSL				"Build Cycles with OSL support" ${_init_CYCLES_OSL})
 option(WITH_CYCLES_OPENSUBDIV		"Build Cycles with OpenSubdiv support" ${_init_CYCLES_OPENSUBDIV})
 option(WITH_CYCLES_CUDA_BINARIES	"Build Cycles CUDA binaries" OFF)
-set(CYCLES_CUDA_BINARIES_ARCH sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 CACHE STRING "CUDA architectures to build binaries for")
+set(CYCLES_CUDA_BINARIES_ARCH sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_61 CACHE STRING "CUDA architectures to build binaries for")
 mark_as_advanced(CYCLES_CUDA_BINARIES_ARCH)
 unset(PLATFORM_DEFAULT)
 option(WITH_CYCLES_LOGGING	"Build Cycles with logging support" ON)
@@ -510,6 +510,12 @@ option(WITH_C11 "Build with C11 standard enabled, for development use only!" ${_
 mark_as_advanced(WITH_C11)
 option(WITH_CXX11 "Build with C++11 standard enabled, for development use only!" ${_cxx11_init})
 mark_as_advanced(WITH_CXX11)
+
+# Compiler toolchain
+if(CMAKE_COMPILER_IS_GNUCC)
+	option(WITH_LINKER_GOLD "Use ld.gold linker which is usually faster than ld.bfd" ON)
+	mark_as_advanced(WITH_LINKER_GOLD)
+endif()
 
 # Dependency graph
 option(WITH_LEGACY_DEPSGRAPH "Build Blender with legacy dependency graph" ON)
@@ -625,6 +631,12 @@ if(APPLE)
 			# to silence sdk not found warning, just overrides CMAKE_OSX_SYSROOT
 			set(CMAKE_XCODE_ATTRIBUTE_SDKROOT macosx${OSX_SYSTEM})
 		endif()
+
+		# QuickTime framework is no longer available in SDK 10.12+
+		if(WITH_CODEC_QUICKTIME AND ${OSX_SYSTEM} VERSION_GREATER 10.11)
+			set(WITH_CODEC_QUICKTIME OFF)
+			message(STATUS "QuickTime not supported by SDK ${OSX_SYSTEM}, disabling WITH_CODEC_QUICKTIME")
+		endif()
 	endif()
 
 	if(OSX_SYSTEM MATCHES 10.9)
@@ -632,9 +644,21 @@ if(APPLE)
 		set(CMAKE_FIND_ROOT_PATH ${CMAKE_OSX_SYSROOT})
 	endif()
 
-	if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-		# 10.6 is our min. target, if you use higher sdk, weak linking happens
-		set(CMAKE_OSX_DEPLOYMENT_TARGET "10.6" CACHE STRING "" FORCE)
+	if(WITH_CXX11)
+		# 10.9 is our min. target, if you use higher sdk, weak linking happens
+		if(CMAKE_OSX_DEPLOYMENT_TARGET)
+			if(${CMAKE_OSX_DEPLOYMENT_TARGET} VERSION_LESS 10.9)
+				message(STATUS "Setting deployment target to 10.9, lower versions are incompatible with WITH_CXX11")
+				set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "" FORCE)
+			endif()
+		else()
+			set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9" CACHE STRING "" FORCE)
+		endif()
+	else()
+		if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+			# 10.6 is our min. target, if you use higher sdk, weak linking happens
+			set(CMAKE_OSX_DEPLOYMENT_TARGET "10.6" CACHE STRING "" FORCE)
+		endif()
 	endif()
 	
 	if(NOT ${CMAKE_GENERATOR} MATCHES "Xcode")
@@ -722,7 +746,7 @@ elseif(WITH_CYCLES OR WITH_OPENIMAGEIO OR WITH_AUDASPACE OR WITH_INTERNATIONAL O
 	# Keep enabled
 else()
 	# New dependency graph needs either Boost or C++11 for function bindings.
-	if(NOT USE_CXX11)
+	if(NOT WITH_CXX11)
 		# Enabled but we don't need it
 		set(WITH_BOOST OFF)
 	endif()
@@ -977,7 +1001,7 @@ if(SUPPORT_SSE_BUILD)
 	add_definitions(-D__SSE__ -D__MMX__)
 endif()
 if(SUPPORT_SSE2_BUILD)
-	set(PLATFORM_CFLAGS " ${COMPILER_SSE2_FLAG} ${PLATFORM_CFLAGS}")
+	set(PLATFORM_CFLAGS " ${PLATFORM_CFLAGS} ${COMPILER_SSE2_FLAG}")
 	add_definitions(-D__SSE2__)
 	if(NOT SUPPORT_SSE_BUILD) # dont double up
 		add_definitions(-D__MMX__)
@@ -1552,7 +1576,7 @@ if(WITH_CXX11)
 	if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
 		# TODO(sergey): Do we want c++11 or gnu-c++11 here?
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-	elseif(MSVC12)
+	elseif(MSVC)
 		# Nothing special is needed, C++11 features are available by default.
 	else()
 		message(FATAL_ERROR "Compiler ${CMAKE_C_COMPILER_ID} is not supported for C++11 build yet")

@@ -242,7 +242,8 @@ ccl_device_inline void shader_setup_from_sample(KernelGlobals *kg,
                                                 int shader, int object, int prim,
                                                 float u, float v, float t,
                                                 float time,
-                                                bool object_space)
+                                                bool object_space,
+                                                int lamp)
 {
 	/* vectors */
 	ccl_fetch(sd, P) = P;
@@ -250,7 +251,12 @@ ccl_device_inline void shader_setup_from_sample(KernelGlobals *kg,
 	ccl_fetch(sd, Ng) = Ng;
 	ccl_fetch(sd, I) = I;
 	ccl_fetch(sd, shader) = shader;
-	ccl_fetch(sd, type) = (prim == PRIM_NONE)? PRIMITIVE_NONE: PRIMITIVE_TRIANGLE;
+	if(prim != PRIM_NONE)
+		ccl_fetch(sd, type) = PRIMITIVE_TRIANGLE;
+	else if(lamp != LAMP_NONE)
+		ccl_fetch(sd, type) = PRIMITIVE_LAMP;
+	else
+		ccl_fetch(sd, type) = PRIMITIVE_NONE;
 
 	/* primitive */
 #ifdef __INSTANCING__
@@ -270,12 +276,13 @@ ccl_device_inline void shader_setup_from_sample(KernelGlobals *kg,
 
 #ifdef __OBJECT_MOTION__
 		shader_setup_object_transforms(kg, sd, time);
+		ccl_fetch(sd, time) = time;
 	}
-
-	ccl_fetch(sd, time) = time;
-#else
-	}
+	else if(lamp != LAMP_NONE) {
+		ccl_fetch(sd, ob_tfm)  = lamp_fetch_transform(kg, lamp, false);
+		ccl_fetch(sd, ob_itfm) = lamp_fetch_transform(kg, lamp, true);
 #endif
+	}
 
 	/* transform into world space */
 	if(object_space) {
@@ -357,7 +364,8 @@ ccl_device void shader_setup_from_displace(KernelGlobals *kg, ShaderData *sd,
 	                         P, Ng, I,
 	                         shader, object, prim,
 	                         u, v, 0.0f, 0.5f,
-	                         !(kernel_tex_fetch(__object_flag, object) & SD_TRANSFORM_APPLIED));
+	                         !(kernel_tex_fetch(__object_flag, object) & SD_TRANSFORM_APPLIED),
+	                         LAMP_NONE);
 }
 
 /* ShaderData setup from ray into background */
@@ -561,7 +569,7 @@ void shader_bsdf_eval(KernelGlobals *kg,
 		_shader_bsdf_multi_eval(kg, sd, omega_in, &pdf, -1, eval, 0.0f, 0.0f);
 		if(use_mis) {
 			float weight = power_heuristic(light_pdf, pdf);
-			bsdf_eval_mul(eval, make_float3(weight, weight, weight));
+			bsdf_eval_mul(eval, weight);
 		}
 	}
 }
@@ -851,11 +859,11 @@ ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd, ccl_addr_
 #ifdef __SVM__
 		svm_eval_nodes(kg, sd, state, SHADER_TYPE_SURFACE, path_flag);
 #else
-		ccl_fetch_array(sd, closure, 0)->weight = make_float3(0.8f, 0.8f, 0.8f);
-		ccl_fetch_array(sd, closure, 0)->N = ccl_fetch(sd, N);
-		ccl_fetch_array(sd, closure, 0)->data0 = 0.0f;
-		ccl_fetch_array(sd, closure, 0)->data1 = 0.0f;
-		ccl_fetch(sd, flag) |= bsdf_diffuse_setup(ccl_fetch_array(sd, closure, 0));
+		DiffuseBsdf *bsdf = (DiffuseBsdf*)bsdf_alloc(sd,
+		                                             sizeof(DiffuseBsdf),
+		                                             make_float3(0.8f, 0.8f, 0.8f));
+		bsdf->N = ccl_fetch(sd, N);
+		ccl_fetch(sd, flag) |= bsdf_diffuse_setup(bsdf);
 #endif
 	}
 

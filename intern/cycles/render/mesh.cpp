@@ -471,16 +471,12 @@ void Mesh::add_face_normals()
 
 	/* compute face normals */
 	size_t triangles_size = num_triangles();
-	bool flip = transform_negative_scaled;
 
 	if(triangles_size) {
 		float3 *verts_ptr = verts.data();
 
 		for(size_t i = 0; i < triangles_size; i++) {
 			fN[i] = compute_face_normal(get_triangle(i), verts_ptr);
-
-			if(flip)
-				fN[i] = -fN[i];
 		}
 	}
 
@@ -1088,7 +1084,7 @@ void MeshManager::update_svm_attributes(Device *device, DeviceScene *dscene, Sce
 		}
 
 		/* terminator */
-		for(int i = 0; i < ATTR_PRIM_TYPES; i++) {
+		for(int j = 0; j < ATTR_PRIM_TYPES; j++) {
 			attr_map[index].x = ATTR_STD_NONE;
 			attr_map[index].y = 0;
 			attr_map[index].z = 0;
@@ -1466,7 +1462,7 @@ void MeshManager::device_update_mesh(Device *device,
 	else {
 		PackedBVH& pack = bvh->pack;
 		for(size_t i = 0; i < pack.prim_index.size(); ++i) {
-			if ((pack.prim_type[i] & PRIMITIVE_ALL_TRIANGLE) != 0) {
+			if((pack.prim_type[i] & PRIMITIVE_ALL_TRIANGLE) != 0) {
 				tri_prim_index[pack.prim_index[i]] = pack.prim_tri_index[i];
 			}
 		}
@@ -1669,6 +1665,7 @@ void MeshManager::device_update_displacement_images(Device *device,
 						 */
 						image_manager->device_update(device,
 						                             dscene,
+						                             scene,
 						                             progress);
 						return;
 					}
@@ -1686,6 +1683,7 @@ void MeshManager::device_update_displacement_images(Device *device,
 		                        image_manager,
 		                        device,
 		                        dscene,
+		                        scene,
 		                        slot,
 		                        &progress));
 	}

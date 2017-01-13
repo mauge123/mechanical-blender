@@ -455,6 +455,17 @@ int ED_operator_posemode(bContext *C)
 	return 0;
 }
 
+int ED_operator_posemode_local(bContext *C)
+{
+	if (ED_operator_posemode(C)) {
+		Object *ob = BKE_object_pose_armature_get(CTX_data_active_object(C));
+		bArmature *arm = ob->data;
+		return !(ID_IS_LINKED_DATABLOCK(&ob->id) ||
+		         ID_IS_LINKED_DATABLOCK(&arm->id));
+	}
+	return false;
+}
+
 /* wrapper for ED_space_image_show_uvedit */
 int ED_operator_uvedit(bContext *C)
 {
@@ -2149,7 +2160,8 @@ static void SCREEN_OT_frame_offset(wmOperatorType *ot)
 	ot->exec = frame_offset_exec;
 	
 	ot->poll = ED_operator_screenactive_norender;
-	ot->flag = 0;
+	ot->flag = OPTYPE_UNDO_GROUPED;
+	ot->undo_group = "FRAME_CHANGE";
 	
 	/* rna */
 	RNA_def_int(ot->srna, "delta", 0, INT_MIN, INT_MAX, "Delta", "", INT_MIN, INT_MAX);
@@ -2202,7 +2214,8 @@ static void SCREEN_OT_frame_jump(wmOperatorType *ot)
 	ot->exec = frame_jump_exec;
 	
 	ot->poll = ED_operator_screenactive_norender;
-	ot->flag = OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO_GROUPED;
+	ot->undo_group = "FRAME_CHANGE";
 	
 	/* rna */
 	RNA_def_boolean(ot->srna, "end", 0, "Last Frame", "Jump to the last frame of the frame range");
@@ -2308,7 +2321,8 @@ static void SCREEN_OT_keyframe_jump(wmOperatorType *ot)
 	ot->exec = keyframe_jump_exec;
 	
 	ot->poll = ED_operator_screenactive_norender;
-	ot->flag = OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO_GROUPED;
+	ot->undo_group = "FRAME_CHANGE";
 	
 	/* properties */
 	RNA_def_boolean(ot->srna, "next", true, "Next Keyframe", "");
@@ -2370,7 +2384,8 @@ static void SCREEN_OT_marker_jump(wmOperatorType *ot)
 	ot->exec = marker_jump_exec;
 
 	ot->poll = ED_operator_screenactive_norender;
-	ot->flag = OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO_GROUPED;
+	ot->undo_group = "FRAME_CHANGE";
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "next", true, "Next Marker", "");
@@ -4237,7 +4252,7 @@ static int space_context_cycle_poll(bContext *C)
 
 /**
  * Helper to get the correct RNA pointer/property pair for changing
- * the display context of active space type in \sa.
+ * the display context of active space type in \a sa.
  */
 static void context_cycle_prop_get(
         bScreen *screen, const ScrArea *sa,
@@ -4254,6 +4269,9 @@ static void context_cycle_prop_get(
 			RNA_pointer_create(NULL, &RNA_UserPreferences, &U, r_ptr);
 			propname = "active_section";
 			break;
+		default:
+			BLI_assert(0);
+			propname = "";
 	}
 
 	*r_prop = RNA_struct_find_property(r_ptr, propname);

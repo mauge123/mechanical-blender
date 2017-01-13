@@ -656,11 +656,6 @@ doc_id = StringProperty(
         options={'HIDDEN'},
         )
 
-doc_new = StringProperty(
-        name="Edit Description",
-        maxlen=1024,
-        )
-
 data_path_iter = StringProperty(
         description="The data path relative to the context, must point to an iterable")
 
@@ -935,16 +930,23 @@ def _wm_doc_get_id(doc_id, do_url=True, url_prefix=""):
 
                 # detect if this is a inherited member and use that name instead
                 rna_parent = rna_class.bl_rna
-                rna_prop = rna_parent.properties[class_prop]
-                rna_parent = rna_parent.base
-                while rna_parent and rna_prop == rna_parent.properties.get(class_prop):
-                    class_name = rna_parent.identifier
+                rna_prop = rna_parent.properties.get(class_prop)
+                if rna_prop:
                     rna_parent = rna_parent.base
+                    while rna_parent and rna_prop == rna_parent.properties.get(class_prop):
+                        class_name = rna_parent.identifier
+                        rna_parent = rna_parent.base
 
-                if do_url:
-                    url = ("%s/bpy.types.%s.html#bpy.types.%s.%s" % (url_prefix, class_name, class_name, class_prop))
+                    if do_url:
+                        url = ("%s/bpy.types.%s.html#bpy.types.%s.%s" % (url_prefix, class_name, class_name, class_prop))
+                    else:
+                        rna = ("bpy.types.%s.%s" % (class_name, class_prop))
                 else:
-                    rna = ("bpy.types.%s.%s" % (class_name, class_prop))
+                    # We assume this is custom property, only try to generate generic url/rna_id...
+                    if do_url:
+                        url = ("%s/bpy.types.bpy_struct.html#bpy.types.bpy_struct.items" % (url_prefix,))
+                    else:
+                        rna = "bpy.types.bpy_struct"
 
     return url if do_url else rna
 
@@ -1006,10 +1008,10 @@ class WM_OT_doc_view(Operator):
 
     doc_id = doc_id
     if bpy.app.version_cycle == "release":
-        _prefix = ("http://www.blender.org/documentation/blender_python_api_%s%s_release" %
+        _prefix = ("https://www.blender.org/api/blender_python_api_%s%s_release" %
                    ("_".join(str(v) for v in bpy.app.version[:2]), bpy.app.version_char))
     else:
-        _prefix = ("http://www.blender.org/documentation/blender_python_api_%s" %
+        _prefix = ("https://www.blender.org/api/blender_python_api_%s" %
                    "_".join(str(v) for v in bpy.app.version))
 
     def execute(self, context):
@@ -1021,79 +1023,6 @@ class WM_OT_doc_view(Operator):
         webbrowser.open(url)
 
         return {'FINISHED'}
-
-
-'''
-class WM_OT_doc_edit(Operator):
-    """Edit online reference docs"""
-    bl_idname = "wm.doc_edit"
-    bl_label = "Edit Documentation"
-
-    doc_id = doc_id
-    doc_new = doc_new
-
-    _url = "http://www.mindrones.com/blender/svn/xmlrpc.php"
-
-    def _send_xmlrpc(self, data_dict):
-        print("sending data:", data_dict)
-
-        import xmlrpc.client
-        user = "blenderuser"
-        pwd = "blender>user"
-
-        docblog = xmlrpc.client.ServerProxy(self._url)
-        docblog.metaWeblog.newPost(1, user, pwd, data_dict, 1)
-
-    def execute(self, context):
-
-        doc_id = self.doc_id
-        doc_new = self.doc_new
-
-        class_name, class_prop = doc_id.split('.')
-
-        if not doc_new:
-            self.report({'ERROR'}, "No input given for '%s'" % doc_id)
-            return {'CANCELLED'}
-
-        # check if this is an operator
-        op_name = class_name.upper() + '_OT_' + class_prop
-        op_class = getattr(bpy.types, op_name, None)
-
-        # Upload this to the web server
-        upload = {}
-
-        if op_class:
-            rna = op_class.bl_rna
-            doc_orig = rna.description
-            if doc_orig == doc_new:
-                return {'RUNNING_MODAL'}
-
-            print("op - old:'%s' -> new:'%s'" % (doc_orig, doc_new))
-            upload["title"] = 'OPERATOR %s:%s' % (doc_id, doc_orig)
-        else:
-            rna = getattr(bpy.types, class_name).bl_rna
-            doc_orig = rna.properties[class_prop].description
-            if doc_orig == doc_new:
-                return {'RUNNING_MODAL'}
-
-            print("rna - old:'%s' -> new:'%s'" % (doc_orig, doc_new))
-            upload["title"] = 'RNA %s:%s' % (doc_id, doc_orig)
-
-        upload["description"] = doc_new
-
-        self._send_xmlrpc(upload)
-
-        return {'FINISHED'}
-
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text="Descriptor ID: '%s'" % self.doc_id)
-        layout.prop(self, "doc_new", text="")
-
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self, width=600)
-'''
 
 
 rna_path = StringProperty(
@@ -2234,5 +2163,34 @@ class WM_OT_addon_expand(Operator):
         if mod is not None:
             info = addon_utils.module_bl_info(mod)
             info["show_expanded"] = not info["show_expanded"]
+
+        return {'FINISHED'}
+
+class WM_OT_addon_userpref_show(Operator):
+    "Show add-on user preferences"
+    bl_idname = "wm.addon_userpref_show"
+    bl_label = ""
+    bl_options = {'INTERNAL'}
+
+    module = StringProperty(
+            name="Module",
+            description="Module name of the add-on to expand",
+            )
+
+    def execute(self, context):
+        import addon_utils
+
+        module_name = self.module
+
+        modules = addon_utils.modules(refresh=False)
+        mod = addon_utils.addons_fake_modules.get(module_name)
+        if mod is not None:
+            info = addon_utils.module_bl_info(mod)
+            info["show_expanded"] = True
+
+            bpy.context.user_preferences.active_section = 'ADDONS'
+            context.window_manager.addon_filter = 'All'
+            context.window_manager.addon_search = info["name"]
+            bpy.ops.screen.userpref_show('INVOKE_DEFAULT')
 
         return {'FINISHED'}

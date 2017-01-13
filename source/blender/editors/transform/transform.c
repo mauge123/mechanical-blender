@@ -108,7 +108,7 @@ static void drawEdgeSlide(TransInfo *t);
 static void drawVertSlide(TransInfo *t);
 static void postInputRotation(TransInfo *t, float values[3]);
 
-static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short around);
+static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], const short around);
 static void initSnapSpatial(TransInfo *t, float r_snap[3]);
 
 
@@ -2424,7 +2424,9 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 #ifdef WITH_MECHANICAL_TRANSFORM_MULTIPLE
 	RNA_int_set(op->ptr, "transform_mode", t->mode);
 	RNA_boolean_set(op->ptr, "transform_multiple", (t->flag & T_TRANSFORM_MULTIPLE) != 0);
-	RNA_boolean_set(op->ptr, "use_snap_self", t->tsnap.snap_self);
+	if (RNA_struct_find_property(op->ptr, "use_snap_self")) {
+		RNA_boolean_set(op->ptr, "use_snap_self", t->tsnap.snap_self);
+	}
 	RNA_boolean_set(op->ptr, "snap", ts->snap_flag & SCE_SNAP);
 #endif
 
@@ -2609,13 +2611,13 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 					if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, event->mval, t->iloc)) {
 						// Ok
 					} else {
-						ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+						ED_view3d_win_to_3d_int(t->view, t->ar, p, event->mval, t->iloc);
 					}
 				}else{
-					ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+					ED_view3d_win_to_3d_int(t->view, t->ar, p, event->mval, t->iloc);
 				}
 			} else {
-				ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+				ED_view3d_win_to_3d_int(t->view, t->ar, p, event->mval, t->iloc);
 			}
 		}
 #endif
@@ -2920,7 +2922,7 @@ int transformEnd(bContext *C, TransInfo *t)
 				em = BKE_editmesh_from_object(t->obedit);
 			}
 			if (em) {
-				mechanical_update_mesh_geometry(em);
+				mechanical_update_mesh_geometry(em->bm);
 			}
 		}
 #endif
@@ -3389,7 +3391,7 @@ static void initBend(TransInfo *t)
 
 	curs = ED_view3d_cursor3d_get(t->scene, t->view);
 	copy_v3_v3(data->warp_sta, curs);
-	ED_view3d_win_to_3d(t->ar, curs, mval_fl, data->warp_end);
+	ED_view3d_win_to_3d(t->sa->spacedata.first, t->ar, curs, mval_fl, data->warp_end);
 
 	copy_v3_v3(data->warp_nor, t->viewinv[2]);
 	if (t->flag & T_EDIT) {
@@ -3901,8 +3903,9 @@ static void ElementResize(TransInfo *t, TransData *td, float mat[3][3])
 	}
 
 	protectedTransBits(td->protectflag, vec);
-	add_v3_v3v3(td->loc, td->iloc, vec);
-
+	if (td->loc) {
+		add_v3_v3v3(td->loc, td->iloc, vec);
+	}
 	constraintTransLim(t, td);
 }
 

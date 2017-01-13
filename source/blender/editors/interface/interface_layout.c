@@ -184,11 +184,8 @@ static const char *ui_item_name_add_colon(const char *name, char namestr[UI_MAX_
 	return name;
 }
 
-static int ui_item_fit(int item, int pos, int all, int available, bool is_last, int alignment, int *offset)
+static int ui_item_fit(int item, int pos, int all, int available, bool is_last, int alignment)
 {
-	if (offset)
-		*offset = 0;
-
 	/* available == 0 is unlimited */
 	if (available == 0)
 		return item;
@@ -573,8 +570,13 @@ static void ui_item_enum_expand(
 
 	/* we dont want nested rows, cols in menus */
 	if (radial) {
-		layout_radial = uiLayoutRadial(layout);
-		UI_block_layout_set_current(block, layout_radial);
+		if (layout->root->layout == layout) {
+			layout_radial = uiLayoutRadial(layout);
+			UI_block_layout_set_current(block, layout_radial);
+		}
+		else {
+			UI_block_layout_set_current(block, layout);
+		}
 	}
 	else if (layout->root->type != UI_LAYOUT_MENU) {
 		UI_block_layout_set_current(block, ui_item_local_sublayout(layout, layout, 1));
@@ -1233,8 +1235,15 @@ static void ui_item_rna_size(
 		}
 	}
 
-	if (!w)
-		w = ui_text_icon_width(layout, name, icon, 0);
+	if (!w) {
+		if (type == PROP_ENUM && icon_only) {
+			w = ui_text_icon_width(layout, "", ICON_BLANK1, 0);
+			w += 0.6f * UI_UNIT_X;
+		}
+		else {
+			w = ui_text_icon_width(layout, name, icon, 0);
+		}
+	}
 	h = UI_UNIT_Y;
 
 	/* increase height for arrays */
@@ -1252,7 +1261,7 @@ static void ui_item_rna_size(
 	else if (ui_layout_vary_direction(layout) == UI_ITEM_VARY_X) {
 		if (type == PROP_BOOLEAN && name[0])
 			w += UI_UNIT_X / 5;
-		else if (type == PROP_ENUM)
+		else if (type == PROP_ENUM && !icon_only)
 			w += UI_UNIT_X / 4;
 		else if (type == PROP_FLOAT || type == PROP_INT)
 			w += UI_UNIT_X * 3;
@@ -1662,7 +1671,7 @@ void ui_but_add_search(uiBut *but, PointerRNA *ptr, PropertyRNA *prop, PointerRN
 		but->rnasearchprop = searchprop;
 		but->drawflag |= UI_BUT_ICON_LEFT | UI_BUT_TEXT_LEFT;
 		if (RNA_property_is_unlink(prop)) {
-			but->flag |= UI_BUT_SEARCH_UNLINK;
+			but->flag |= UI_BUT_VALUE_CLEAR;
 		}
 
 		if (RNA_property_type(prop) == PROP_ENUM) {
@@ -2110,7 +2119,7 @@ static void ui_litem_layout_row(uiLayout *litem)
 			minw = ui_litem_min_width(itemw);
 
 			if (w - lastw > 0)
-				neww = ui_item_fit(itemw, x, totw, w - lastw, !item->next, litem->alignment, NULL);
+				neww = ui_item_fit(itemw, x, totw, w - lastw, !item->next, litem->alignment);
 			else
 				neww = 0;  /* no space left, all will need clamping to minimum size */
 
@@ -2144,12 +2153,12 @@ static void ui_litem_layout_row(uiLayout *litem)
 
 		if (item->flag) {
 			/* fixed minimum size items */
-			itemw = ui_item_fit(minw, fixedx, fixedw, min_ii(w, fixedw), !item->next, litem->alignment, NULL);
+			itemw = ui_item_fit(minw, fixedx, fixedw, min_ii(w, fixedw), !item->next, litem->alignment);
 			fixedx += itemw;
 		}
 		else {
 			/* free size item */
-			itemw = ui_item_fit(itemw, freex, freew, w - fixedw, !item->next, litem->alignment, NULL);
+			itemw = ui_item_fit(itemw, freex, freew, w - fixedw, !item->next, litem->alignment);
 			freex += itemw;
 		}
 
@@ -2469,7 +2478,7 @@ static void ui_litem_layout_column_flow(uiLayout *litem)
 	uiLayoutItemFlow *flow = (uiLayoutItemFlow *)litem;
 	uiItem *item;
 	int col, x, y, w, emh, emy, miny, itemw, itemh;
-	int toth, totitem, offset;
+	int toth, totitem;
 
 	/* compute max needed width and total height */
 	toth = 0;
@@ -2491,22 +2500,27 @@ static void ui_litem_layout_column_flow(uiLayout *litem)
 
 	/* create column per column */
 	col = 0;
+	w = (litem->w - (flow->totcol - 1) * style->columnspace) / flow->totcol;
 	for (item = litem->items.first; item; item = item->next) {
-		ui_item_size(item, NULL, &itemh);
-		itemw = ui_item_fit(1, x - litem->x, flow->totcol, w, col == flow->totcol - 1, litem->alignment, &offset);
-	
+		ui_item_size(item, &itemw, &itemh);
+
+		itemw = (litem->alignment == UI_LAYOUT_ALIGN_EXPAND) ? w : min_ii(w, itemw);
+
 		y -= itemh;
 		emy -= itemh;
-		ui_item_position(item, x + offset, y, itemw, itemh);
+		ui_item_position(item, x, y, itemw, itemh);
 		y -= style->buttonspacey;
 		miny = min_ii(miny, y);
 
 		/* decide to go to next one */
 		if (col < flow->totcol - 1 && emy <= -emh) {
-			x += itemw + style->columnspace;
+			x += w + style->columnspace;
 			y = litem->y;
 			emy = 0; /* need to reset height again for next column */
 			col++;
+
+			/*  (<     remaining width     > - <      space between remaining columns      >) / <remamining columns > */
+			w = ((litem->w - (x - litem->x)) - (flow->totcol - col - 1) * style->columnspace) / (flow->totcol - col);
 		}
 	}
 

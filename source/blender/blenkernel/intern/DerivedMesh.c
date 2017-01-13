@@ -230,7 +230,9 @@ static MPoly *dm_dupPolyArray(DerivedMesh *dm)
 
 static int dm_getNumLoopTri(DerivedMesh *dm)
 {
-	return dm->looptris.num;
+	const int numlooptris = poly_to_tri_count(dm->getNumPolys(dm), dm->getNumLoops(dm));
+	BLI_assert(ELEM(dm->looptris.num, 0, numlooptris));
+	return numlooptris;
 }
 
 static CustomData *dm_getVertCData(DerivedMesh *dm)
@@ -3260,7 +3262,7 @@ void DM_calc_tangents_names_from_gpu(
 	*r_tangent_names_count = count;
 }
 
-static void DM_calc_loop_tangents_thread(TaskPool *UNUSED(pool), void *taskdata, int UNUSED(threadid))
+static void DM_calc_loop_tangents_thread(TaskPool * __restrict UNUSED(pool), void *taskdata, int UNUSED(threadid))
 {
 	struct SGLSLMeshToTangent *mesh2tangent = taskdata;
 	/* new computation method */
@@ -3679,15 +3681,15 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 			 * We do it based on the specified name.
 			 */
 			if (gattribs->layer[b].name[0]) {
-				layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
-				type = CD_TANGENT;
+				layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
+				type = CD_MTFACE;
 				if (layer == -1) {
 					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPCOL, gattribs->layer[b].name);
 					type = CD_MCOL;
 				}
 				if (layer == -1) {
-					layer = CustomData_get_named_layer_index(ldata, CD_MLOOPUV, gattribs->layer[b].name);
-					type = CD_MTFACE;
+					layer = CustomData_get_named_layer_index(&dm->loopData, CD_TANGENT, gattribs->layer[b].name);
+					type = CD_TANGENT;
 				}
 				if (layer == -1) {
 					continue;

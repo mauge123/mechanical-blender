@@ -1,6 +1,5 @@
 /*
- * Adapted from code Copyright 2009-2010 NVIDIA Corporation
- * Modifications Copyright 2011, Blender Foundation.
+ * Copyright 2011-2013 Blender Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -324,11 +323,11 @@ ccl_device_noinline void motion_triangle_shader_setup(KernelGlobals *kg, ShaderD
  * time and do a ray intersection with the resulting triangle */
 
 ccl_device_inline bool motion_triangle_intersect(KernelGlobals *kg, Intersection *isect,
-	float3 P, float3 dir, float time, uint visibility, int object, int triAddr)
+	float3 P, float3 dir, float time, uint visibility, int object, int prim_addr)
 {
 	/* primitive index for vertex location lookup */
-	int prim = kernel_tex_fetch(__prim_index, triAddr);
-	int fobject = (object == OBJECT_NONE)? kernel_tex_fetch(__prim_object, triAddr): object;
+	int prim = kernel_tex_fetch(__prim_index, prim_addr);
+	int fobject = (object == OBJECT_NONE)? kernel_tex_fetch(__prim_object, prim_addr): object;
 
 	/* get vertex locations for intersection */
 	float3 verts[3];
@@ -341,13 +340,13 @@ ccl_device_inline bool motion_triangle_intersect(KernelGlobals *kg, Intersection
 #ifdef __VISIBILITY_FLAG__
 		/* visibility flag test. we do it here under the assumption
 		 * that most triangles are culled by node flags */
-		if(kernel_tex_fetch(__prim_visibility, triAddr) & visibility)
+		if(kernel_tex_fetch(__prim_visibility, prim_addr) & visibility)
 #endif
 		{
 			isect->t = t;
 			isect->u = u;
 			isect->v = v;
-			isect->prim = triAddr;
+			isect->prim = prim_addr;
 			isect->object = object;
 			isect->type = PRIMITIVE_MOTION_TRIANGLE;
 		
@@ -370,14 +369,14 @@ ccl_device_inline void motion_triangle_intersect_subsurface(
         float3 dir,
         float time,
         int object,
-        int triAddr,
+        int prim_addr,
         float tmax,
         uint *lcg_state,
         int max_hits)
 {
 	/* primitive index for vertex location lookup */
-	int prim = kernel_tex_fetch(__prim_index, triAddr);
-	int fobject = (object == OBJECT_NONE)? kernel_tex_fetch(__prim_object, triAddr): object;
+	int prim = kernel_tex_fetch(__prim_index, prim_addr);
+	int fobject = (object == OBJECT_NONE)? kernel_tex_fetch(__prim_object, prim_addr): object;
 
 	/* get vertex locations for intersection */
 	float3 verts[3];
@@ -414,7 +413,7 @@ ccl_device_inline void motion_triangle_intersect_subsurface(
 		isect->t = t;
 		isect->u = u;
 		isect->v = v;
-		isect->prim = triAddr;
+		isect->prim = prim_addr;
 		isect->object = object;
 		isect->type = PRIMITIVE_MOTION_TRIANGLE;
 

@@ -1028,26 +1028,24 @@ void bmo_create_icosphere_exec(BMesh *bm, BMOperator *op)
 	int uvi = 0;
 	const int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
 	for (a = 0; a < 20; a++) {
-		BMFace *eftemp;
+		BMFace *f;
 		BMVert *v1, *v2, *v3;
 
 		v1 = eva[icoface[a][0]];
 		v2 = eva[icoface[a][1]];
 		v3 = eva[icoface[a][2]];
 
-		eftemp = BM_face_create_quad_tri(bm, v1, v2, v3, NULL, NULL, BM_CREATE_NOP);
+		f = BM_face_create_quad_tri(bm, v1, v2, v3, NULL, NULL, BM_CREATE_NOP);
 		
-		BM_ITER_ELEM (l, &liter, eftemp, BM_LOOPS_OF_FACE) {
+		BM_ITER_ELEM (l, &liter, f, BM_LOOPS_OF_FACE) {
 			BMO_edge_flag_enable(bm, l->e, EDGE_MARK);
 		}
 
 		/* Set the UVs here, the iteration order of the faces is not guaranteed,
 		 * so it's best to set the UVs right after the face is created. */
-		if(calc_uvs) {
-			BMLoop* l;
-			BMIter liter2;
+		if (calc_uvs) {
 			int loop_index;
-			BM_ITER_ELEM_INDEX (l, &liter2, eftemp, BM_LOOPS_OF_FACE, loop_index) {
+			BM_ITER_ELEM_INDEX (l, &liter, f, BM_LOOPS_OF_FACE, loop_index) {
 				MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
 				luv->uv[0] = icouvs[uvi][0];
 				luv->uv[1] = icouvs[uvi][1];
@@ -1176,7 +1174,7 @@ void BM_mesh_calc_uvs_sphere(BMesh *bm, const short oflag)
 	}
 
 	BMIter iter2;
-	BMLoop* l;
+	BMLoop *l;
 	int loop_index;
 	float minx = 1.0f;
 
@@ -1238,14 +1236,14 @@ void bmo_create_monkey_exec(BMesh *bm, BMOperator *op)
 	int uvi = 0;
 	const int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
 	for (i = 0; i < monkeynf; i++) {
-		BMFace* temp1 = BM_face_create_quad_tri(bm,
+		BMFace *f_new_a = BM_face_create_quad_tri(bm,
 		                        tv[monkeyf[i][0] + i - monkeyo],
 		                        tv[monkeyf[i][1] + i - monkeyo],
 		                        tv[monkeyf[i][2] + i - monkeyo],
 		                        (monkeyf[i][3] != monkeyf[i][2]) ? tv[monkeyf[i][3] + i - monkeyo] : NULL,
 		                        NULL, BM_CREATE_NOP);
 
-		BMFace* temp2 = BM_face_create_quad_tri(bm,
+		BMFace *f_new_b = BM_face_create_quad_tri(bm,
 		                        tv[monkeynv + monkeyf[i][2] + i - monkeyo],
 		                        tv[monkeynv + monkeyf[i][1] + i - monkeyo],
 		                        tv[monkeynv + monkeyf[i][0] + i - monkeyo],
@@ -1254,20 +1252,19 @@ void bmo_create_monkey_exec(BMesh *bm, BMOperator *op)
 
 		/* Set the UVs here, the iteration order of the faces is not guaranteed,
 		 * so it's best to set the UVs right after the face is created. */
-		if(calc_uvs) {
-			BMLoop* l;
+		if (calc_uvs) {
+			BMLoop *l;
 			BMIter liter;
-			int loop_index;
-			BM_ITER_ELEM_INDEX (l, &liter, temp1, BM_LOOPS_OF_FACE, loop_index) {
+			BM_ITER_ELEM (l, &liter, f_new_a, BM_LOOPS_OF_FACE) {
 				MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-				luv->uv[0] = monkeyuvs[uvi*2 + 0];
-				luv->uv[1] = monkeyuvs[uvi*2 + 1];
+				luv->uv[0] = monkeyuvs[uvi * 2 + 0];
+				luv->uv[1] = monkeyuvs[uvi * 2 + 1];
 				uvi++;
 			}
-			BM_ITER_ELEM_INDEX (l, &liter, temp2, BM_LOOPS_OF_FACE, loop_index) {
+			BM_ITER_ELEM (l, &liter, f_new_b, BM_LOOPS_OF_FACE) {
 				MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-				luv->uv[0] = monkeyuvs[uvi*2 + 0];
-				luv->uv[1] = monkeyuvs[uvi*2 + 1];
+				luv->uv[0] = monkeyuvs[uvi * 2 + 0];
+				luv->uv[1] = monkeyuvs[uvi * 2 + 1];
 				uvi++;
 			}
 

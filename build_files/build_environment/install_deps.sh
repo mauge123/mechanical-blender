@@ -25,7 +25,8 @@
 ARGS=$( \
 getopt \
 -o s:i:t:h \
---long source:,install:,tmp:,info:,threads:,help,show-deps,no-sudo,no-build,no-confirm,with-all,with-opencollada,\
+--long source:,install:,tmp:,info:,threads:,help,show-deps,no-sudo,no-build,no-confirm,use-cxx11,\
+with-all,with-opencollada,\
 ver-ocio:,ver-oiio:,ver-llvm:,ver-osl:,ver-osd:,ver-openvdb:,\
 force-all,force-python,force-numpy,force-boost,\
 force-ocio,force-openexr,force-oiio,force-llvm,force-osl,force-osd,force-openvdb,\
@@ -102,6 +103,11 @@ ARGUMENTS_INFO="\"COMMAND LINE ARGUMENTS:
 
     --no-confirm
         Disable any interaction with user (suitable for automated run).
+
+    --use-cxx11
+        Build all libraries in cpp11 'mode' (will be mandatory soon in blender2.8 branch).
+        NOTE: If your compiler is gcc-6.0 or above, you probably *want* to enable this option (since it's default
+              standard starting from this version).
 
     --with-all
         By default, a number of optional and not-so-often needed libraries are not installed.
@@ -281,8 +287,9 @@ SUDO="sudo"
 
 NO_BUILD=false
 NO_CONFIRM=false
+USE_CXX11=false
 
-PYTHON_VERSION="3.5.1"
+PYTHON_VERSION="3.5.2"
 PYTHON_VERSION_MIN="3.5"
 PYTHON_FORCE_BUILD=false
 PYTHON_FORCE_REBUILD=false
@@ -315,7 +322,7 @@ OPENEXR_FORCE_REBUILD=false
 OPENEXR_SKIP=false
 _with_built_openexr=false
 
-OIIO_VERSION="1.6.9"
+OIIO_VERSION="1.7.8"
 OIIO_VERSION_MIN="1.6.0"
 OIIO_VERSION_MAX="1.9.0"  # UNKNOWN currently # Not supported by current OSL...
 OIIO_FORCE_BUILD=false
@@ -330,14 +337,14 @@ LLVM_FORCE_REBUILD=false
 LLVM_SKIP=false
 
 # OSL needs to be compiled for now!
-OSL_VERSION="1.7.3"
+OSL_VERSION="1.7.5"
 OSL_VERSION_MIN=$OSL_VERSION
 OSL_FORCE_BUILD=false
 OSL_FORCE_REBUILD=false
 OSL_SKIP=false
 
 # OpenSubdiv needs to be compiled for now
-OSD_VERSION="3.0.5"
+OSD_VERSION="3.1.0"
 OSD_VERSION_MIN=$OSD_VERSION
 OSD_FORCE_BUILD=false
 OSD_FORCE_REBUILD=false
@@ -365,7 +372,7 @@ OPENCOLLADA_FORCE_BUILD=false
 OPENCOLLADA_FORCE_REBUILD=false
 OPENCOLLADA_SKIP=false
 
-FFMPEG_VERSION="2.8.4"
+FFMPEG_VERSION="3.2.1"
 FFMPEG_VERSION_MIN="2.8.4"
 FFMPEG_FORCE_BUILD=false
 FFMPEG_FORCE_REBUILD=false
@@ -491,6 +498,9 @@ while true; do
     ;;
     --no-confirm)
       NO_CONFIRM=true; shift; continue
+    ;;
+    --use-cxx11)
+      USE_CXX11=true; shift; continue
     ;;
     --with-all)
       WITH_ALL=true; shift; continue
@@ -703,6 +713,21 @@ if [ "$WITH_ALL" = true -a "$OPENCOLLADA_SKIP" = false ]; then
 fi
 
 
+WARNING "****WARNING****"
+PRINT "If you are experiencing issues building Blender, _*TRY A FRESH, CLEAN BUILD FIRST*_!"
+PRINT "The same goes for install_deps itself, if you encounter issues, please first erase everything in $SRC and $INST"
+PRINT "(provided obviously you did not add anything yourself in those dirs!), and run install_deps.sh again!"
+PRINT "Often, changes in the libs built by this script, or in your distro package, cannot be handled simply, so..."
+PRINT ""
+PRINT "You may also try to use the '--build-foo' options to bypass your distribution's packages"
+PRINT "for some troublesome/buggy libraries..."
+PRINT ""
+PRINT ""
+PRINT "Ran with:"
+PRINT "    install_deps.sh $COMMANDLINE"
+PRINT ""
+PRINT ""
+
 
 # This has to be done here, because user might force some versions...
 PYTHON_SOURCE=( "https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz" )
@@ -766,7 +791,20 @@ OPENCOLLADA_REPO_BRANCH="master"
 
 FFMPEG_SOURCE=( "http://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2" )
 
+CXXFLAGS_BACK=$CXXFLAGS
+if [ "$USE_CXX11" = true ]; then
+  WARNING "You are trying to use c++11, this *should* go smoothely with any very recent distribution
+However, if you are experiencing linking errors (also when building Blender itself), please try the following:
+    * Re-run this script with `--build-all --force-all` options.
+    * Ensure your gcc version is at the very least 4.8, if possible you should really rather use gcc-5.1 or above.
 
+Please note that until the transition to C++11-built libraries if completed in your distribution, situation will
+remain fuzzy and incompatibilities may happen..."
+  PRINT ""
+  PRINT ""
+  CXXFLAGS="$CXXFLAGS -std=c++11"
+  export CXXFLAGS
+fi
 
 #### Show Dependencies ####
 
@@ -779,7 +817,7 @@ Those libraries should be available as packages in all recent distributions (opt
     * libjpeg, libpng, libtiff, [libopenjpeg], [libopenal].
     * libx11, libxcursor, libxi, libxrandr, libxinerama (and other libx... as needed).
     * libsqlite3, libbz2, libssl, libfftw3, libxml2, libtinyxml, yasm, libyaml-cpp.
-    * libsdl1.2, libglew, libglewmx.\""
+    * libsdl1.2, libglew, [libglewmx].\""
 
 DEPS_SPECIFIC_INFO="\"BUILDABLE DEPENDENCIES:
 
@@ -953,7 +991,7 @@ prepare_opt() {
 
 # Check whether the current package needs to be recompiled, based on a dummy file containing a magic number in its name...
 magic_compile_check() {
-  if [ -f $INST/.$1-magiccheck-$2 ]; then
+  if [ -f $INST/.$1-magiccheck-$2-$USE_CXX11 ]; then
     return 0
   else
     return 1
@@ -962,7 +1000,7 @@ magic_compile_check() {
 
 magic_compile_set() {
   rm -f $INST/.$1-magiccheck-*
-  touch $INST/.$1-magiccheck-$2
+  touch $INST/.$1-magiccheck-$2-$USE_CXX11
 }
 
 # Note: should clean nicely in $INST, but not in $SRC, when we switch to a new version of a lib...
@@ -1622,6 +1660,10 @@ compile_OIIO() {
 #    fi
     cmake_d="$cmake_d -D USE_OCIO=OFF"
 
+    if [ "$USE_CXX11" = true ]; then
+      cmake_d="$cmake_d -D OIIO_BUILD_CPP11=ON"
+    fi
+
     if file /bin/cp | grep -q '32-bit'; then
       cflags="-fPIC -m32 -march=i686"
     else
@@ -1833,6 +1875,9 @@ compile_OSL() {
     cmake_d="$cmake_d -D OSL_BUILD_PLUGINS=OFF"
     cmake_d="$cmake_d -D OSL_BUILD_TESTS=OFF"
     cmake_d="$cmake_d -D USE_SIMD=sse2"
+    if [ "$USE_CXX11" = true ]; then
+        cmake_d="$cmake_d -D OSL_BUILD_CPP11=1"
+    fi
 
     #~ cmake_d="$cmake_d -D ILMBASE_VERSION=$ILMBASE_VERSION"
 
@@ -2435,7 +2480,7 @@ compile_FFmpeg() {
         --enable-avfilter --disable-vdpau \
         --disable-bzlib --disable-libgsm --disable-libspeex \
         --enable-pthreads --enable-zlib --enable-stripping --enable-runtime-cpudetect \
-        --disable-vaapi --disable-libfaac --disable-nonfree --enable-gpl \
+        --disable-vaapi --disable-nonfree --enable-gpl \
         --disable-postproc --disable-librtmp --disable-libopencore-amrnb \
         --disable-libopencore-amrwb --disable-libdc1394 --disable-version3 --disable-outdev=sdl \
         --disable-libxcb \
@@ -2562,8 +2607,9 @@ install_DEB() {
              git libfreetype6-dev libx11-dev flex bison libtbb-dev libxxf86vm-dev \
              libxcursor-dev libxi-dev wget libsqlite3-dev libxrandr-dev libxinerama-dev \
              libbz2-dev libncurses5-dev libssl-dev liblzma-dev libreadline-dev $OPENJPEG_DEV \
-             libopenal-dev libglew-dev libglewmx-dev yasm $THEORA_DEV $VORBIS_DEV $OGG_DEV \
+             libopenal-dev libglew-dev yasm $THEORA_DEV $VORBIS_DEV $OGG_DEV \
              libsdl1.2-dev libfftw3-dev patch bzip2 libxml2-dev libtinyxml-dev libjemalloc-dev"
+             # libglewmx-dev  (broken in deb testing currently...)
 
   OPENJPEG_USE=true
   VORBIS_USE=true
@@ -3997,9 +4043,6 @@ install_OTHER() {
   fi
 
   if [ "$_do_compile_llvm" = true ]; then
-    install_packages_DEB libffi-dev
-    # LLVM can't find the debian ffi header dir
-    _FFI_INCLUDE_DIR=`dpkg -L libffi-dev | grep -e ".*/ffi.h" | sed -r 's/(.*)\/ffi.h/\1/'`
     PRINT ""
     compile_LLVM
     have_llvm=true
@@ -4018,7 +4061,6 @@ install_OTHER() {
 
   if [ "$_do_compile_osl" = true ]; then
     if [ "$have_llvm" = true ]; then
-      install_packages_DEB flex bison libtbb-dev
       PRINT ""
       compile_OSL
     else
@@ -4037,7 +4079,6 @@ install_OTHER() {
   fi
 
   if [ "$_do_compile_osd" = true ]; then
-    install_packages_DEB flex bison libtbb-dev
     PRINT ""
     compile_OSD
   fi
@@ -4054,10 +4095,6 @@ install_OTHER() {
     fi
 
     if [ "$_do_compile_collada" = true ]; then
-      install_packages_DEB libpcre3-dev
-      # Find path to libxml shared lib...
-      _XML2_LIB=`dpkg -L libxml2-dev | grep -e ".*/libxml2.so"`
-      # No package
       PRINT ""
       compile_OpenCOLLADA
     fi
@@ -4144,16 +4181,6 @@ print_info_ffmpeglink() {
 print_info() {
   PRINT ""
   PRINT ""
-  WARNING "****WARNING****"
-  PRINT "If you are experiencing issues building Blender, _*TRY A FRESH, CLEAN BUILD FIRST*_!"
-  PRINT "The same goes for install_deps itself, if you encounter issues, please first erase everything in $SRC and $INST"
-  PRINT "(provided obviously you did not add anything yourself in those dirs!), and run install_deps.sh again!"
-  PRINT "Often, changes in the libs built by this script, or in your distro package, cannot be handled simply, so..."
-  PRINT ""
-  PRINT "You may also try to use the '--build-foo' options to bypass your distribution's packages"
-  PRINT "for some troublesome/buggy libraries..."
-  PRINT ""
-  PRINT ""
   PRINT "Ran with:"
   PRINT "    install_deps.sh $COMMANDLINE"
   PRINT ""
@@ -4163,6 +4190,12 @@ print_info() {
   _buildargs="-U *SNDFILE* -U *PYTHON* -U *BOOST* -U *Boost*"
   _buildargs="$_buildargs -U *OPENCOLORIO* -U *OPENEXR* -U *OPENIMAGEIO* -U *LLVM* -U *CYCLES*"
   _buildargs="$_buildargs -U *OPENSUBDIV* -U *OPENVDB* -U *COLLADA* -U *FFMPEG* -U *ALEMBIC*"
+
+  if [ "$USE_CXX11" = true ]; then
+    _1="-D WITH_CXX11=ON"
+    PRINT "  $_1"
+    _buildargs="$_buildargs $_1"
+  fi
 
   _1="-D WITH_CODEC_SNDFILE=ON"
   PRINT "  $_1"
@@ -4327,3 +4360,6 @@ PRINT ""
 # Switch back to user language.
 LANG=LANG_BACK
 export LANG
+
+CXXFLAGS=$CXXFLAGS_BACK
+export CXXFLAGS

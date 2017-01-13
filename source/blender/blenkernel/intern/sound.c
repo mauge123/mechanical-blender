@@ -251,7 +251,8 @@ void BKE_sound_init(struct Main *bmain)
 void BKE_sound_init_main(struct Main *bmain)
 {
 #ifdef WITH_JACK
-	AUD_setSynchronizerCallback(sound_sync_callback, bmain);
+	if (sound_device)
+		AUD_setSynchronizerCallback(sound_sync_callback, bmain);
 #else
 	(void)bmain; /* unused */
 #endif
@@ -865,7 +866,7 @@ char **BKE_sound_get_device_names(void)
 		audio_device_names = AUD_getDeviceNames();
 #else
 		static const char *names[] = {
-			"Null", "SDL", "OpenAL", "Jack", NULL
+			"Null", "SDL", "OpenAL", "JACK", NULL
 		};
 		audio_device_names = (char **)names;
 #endif

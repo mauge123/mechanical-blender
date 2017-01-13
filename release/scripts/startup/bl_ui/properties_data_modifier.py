@@ -146,6 +146,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.row().prop(md, "offset_type", expand=True)
 
     def BOOLEAN(self, layout, ob, md):
+        if not bpy.app.build_options.mod_boolean:
+            layout.label("Built without Boolean modifier")
+            return
+
         split = layout.split()
 
         col = split.column()
@@ -336,6 +340,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col = split.column(align=True)
         col.label(text="Direction:")
         col.prop(md, "direction", text="")
+        if md.direction in {'X', 'Y', 'Z', 'RGB_TO_XYZ'}:
+            col.label(text="Space:")
+            col.prop(md, "space", text="")
         col.label(text="Vertex Group:")
         col.prop_search(md, "vertex_group", ob, "vertex_groups", text="")
 
@@ -1074,6 +1081,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "narrowness", slider=True)
 
     def REMESH(self, layout, ob, md):
+        if not bpy.app.build_options.mod_remesh:
+            layout.label("Built without Remesh modifier")
+            return
+
         layout.prop(md, "mode")
 
         row = layout.row()
