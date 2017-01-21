@@ -91,6 +91,8 @@ static IDType idtypes[] = {
 	{ ID_VF,   "VFont",              "fonts",           BLT_I18NCONTEXT_ID_VFONT,              IDTYPE_FLAGS_ISLINKABLE },
 	{ ID_WO,   "World",              "worlds",          BLT_I18NCONTEXT_ID_WORLD,              IDTYPE_FLAGS_ISLINKABLE },
 	{ ID_WM,   "WindowManager",      "window_managers", BLT_I18NCONTEXT_ID_WINDOWMANAGER,      0                       },
+// WITH_MECHANICAL
+	{ ID_DM,   "Dimension",          "dimensions",		BLT_I18NCONTEXT_ID_DIMENSION,	       IDTYPE_FLAGS_ISLINKABLE },
 
 	/** Keep last, not an ID exactly, only include for completeness */
 	{ ID_ID,   "ID",                 "ids",             BLT_I18NCONTEXT_ID_ID,                 0                       }, /* plural is fake */

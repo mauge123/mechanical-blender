@@ -838,9 +838,9 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[INDEX_ID_SCE] = &(main->scene);
 	lb[INDEX_ID_WM]  = &(main->wm);
 	lb[INDEX_ID_MSK] = &(main->mask);
+// WITH_MECHANICAL
+	lb[INDEX_ID_DM]  = &(main->dimensions);
 
-	lb[INDEX_ID_DM]  = &(main->object);
-	
 	lb[INDEX_ID_NULL] = NULL;
 
 	return (MAX_LIBARRAY - 1);
