@@ -1820,7 +1820,8 @@ endif()
 
 
 # Additional linking libraries
-set(CMAKE_EXE_LINKER_FLAGS   "-lrt -static-libstdc++"  CACHE STRING "" FORCE)
+# MECHANICAL: Results on MacOsX build error, works fine in linux, windows
+#set(CMAKE_EXE_LINKER_FLAGS   "-lrt -static-libstdc++"  CACHE STRING "" FORCE)
 
 if(0)
 	print_all_vars()
