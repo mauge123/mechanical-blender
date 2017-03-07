@@ -50,6 +50,7 @@
 #include "BKE_main.h"
 #include "BKE_modifier.h"
 #include "BKE_screen.h"
+#include "BKE_pointcache.h"
 
 #include "ED_anim_api.h"
 #include "ED_keyframes_draw.h"
@@ -69,6 +70,7 @@
 #include "ED_markers.h"
 
 #include "GPU_immediate.h"
+#include "GPU_matrix.h"
 
 #include "time_intern.h"
 
@@ -113,24 +115,134 @@ static void time_draw_sfra_efra(Scene *scene, View2D *v2d)
 	immUnbindProgram();
 }
 
-static void time_cache_free(SpaceTime *stime)
+static void time_draw_cache(SpaceTime *stime, Object *ob, Scene *scene)
 {
-	SpaceTimeCache *stc;
+	PTCacheID *pid;
+	ListBase pidlist;
+	const float cache_draw_height = (4.0f * UI_DPI_FAC * U.pixelsize);
+	float yoffs = 0.f;
 	
-	for (stc = stime->caches.first; stc; stc = stc->next) {
-		if (stc->array) {
-			MEM_freeN(stc->array);
-			stc->array = NULL;
-		}
-	}
-	
-	BLI_freelistN(&stime->caches);
-}
+	if (!(stime->cache_display & TIME_CACHE_DISPLAY) || (!ob))
+		return;
 
-static void time_cache_refresh(SpaceTime *stime)
-{
-	/* Free previous caches to indicate full refresh */
-	time_cache_free(stime);
+	BKE_ptcache_ids_from_object(&pidlist, ob, scene, 0);
+
+	gpuMatrixBegin3D_legacy();
+	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
+	/* iterate over pointcaches on the active object, 
+	 * add spacetimecache and vertex array for each */
+	for (pid = pidlist.first; pid; pid = pid->next) {
+		float col[4];
+
+		switch (pid->type) {
+			case PTCACHE_TYPE_SOFTBODY:
+				if (!(stime->cache_display & TIME_CACHE_SOFTBODY)) continue;
+				break;
+			case PTCACHE_TYPE_PARTICLES:
+				if (!(stime->cache_display & TIME_CACHE_PARTICLES)) continue;
+				break;
+			case PTCACHE_TYPE_CLOTH:
+				if (!(stime->cache_display & TIME_CACHE_CLOTH)) continue;
+				break;
+			case PTCACHE_TYPE_SMOKE_DOMAIN:
+			case PTCACHE_TYPE_SMOKE_HIGHRES:
+				if (!(stime->cache_display & TIME_CACHE_SMOKE)) continue;
+				break;
+			case PTCACHE_TYPE_DYNAMICPAINT:
+				if (!(stime->cache_display & TIME_CACHE_DYNAMICPAINT)) continue;
+				break;
+			case PTCACHE_TYPE_RIGIDBODY:
+				if (!(stime->cache_display & TIME_CACHE_RIGIDBODY)) continue;
+				break;
+		}
+
+		if (pid->cache->cached_frames == NULL)
+			continue;
+
+		gpuPushMatrix();
+		gpuTranslate3f(0.0, (float)V2D_SCROLL_HEIGHT + yoffs, 0.0);
+		gpuScale3f(1.0, cache_draw_height, 0.0);
+		
+		switch (pid->type) {
+			case PTCACHE_TYPE_SOFTBODY:
+				col[0] = 1.0;   col[1] = 0.4;   col[2] = 0.02;
+				col[3] = 0.1;
+				break;
+			case PTCACHE_TYPE_PARTICLES:
+				col[0] = 1.0;   col[1] = 0.1;   col[2] = 0.02;
+				col[3] = 0.1;
+				break;
+			case PTCACHE_TYPE_CLOTH:
+				col[0] = 0.1;   col[1] = 0.1;   col[2] = 0.75;
+				col[3] = 0.1;
+				break;
+			case PTCACHE_TYPE_SMOKE_DOMAIN:
+			case PTCACHE_TYPE_SMOKE_HIGHRES:
+				col[0] = 0.2;   col[1] = 0.2;   col[2] = 0.2;
+				col[3] = 0.1;
+				break;
+			case PTCACHE_TYPE_DYNAMICPAINT:
+				col[0] = 1.0;   col[1] = 0.1;   col[2] = 0.75;
+				col[3] = 0.1;
+				break;
+			case PTCACHE_TYPE_RIGIDBODY:
+				col[0] = 1.0;   col[1] = 0.6;   col[2] = 0.0;
+				col[3] = 0.1;
+				break;
+			default:
+				col[0] = 1.0;   col[1] = 0.0;   col[2] = 1.0;
+				col[3] = 0.1;
+				BLI_assert(0);
+				break;
+		}
+
+		int sta = pid->cache->startframe, end = pid->cache->endframe;
+		int len = (end - sta + 1) * 4;
+
+		glEnable(GL_BLEND);
+
+		immUniformColor4fv(col);
+		immRectf(pos, (float)sta, 0.0, (float)end, 1.0);
+
+		col[3] = 0.4f;
+		if (pid->cache->flag & PTCACHE_BAKED) {
+			col[0] -= 0.4f; col[1] -= 0.4f; col[2] -= 0.4f;
+		}
+		else if (pid->cache->flag & PTCACHE_OUTDATED) {
+			col[0] += 0.4f; col[1] += 0.4f; col[2] += 0.4f;
+		}
+
+		immUniformColor4fv(col);
+
+		if (len > 0) {
+			immBeginAtMost(GL_QUADS, len);
+
+			/* draw a quad for each cached frame */
+			for (int i = sta; i <= end; i++) {
+				if (pid->cache->cached_frames[i - sta]) {
+					immVertex2f(pos, (float)i - 0.5f, 0.0f);
+					immVertex2f(pos, (float)i - 0.5f, 1.0f);
+					immVertex2f(pos, (float)i + 0.5f, 1.0f);
+					immVertex2f(pos, (float)i + 0.5f, 0.0f);
+				}
+			}
+
+			immEnd();
+		}
+
+		glDisable(GL_BLEND);
+
+		gpuPopMatrix();
+
+		yoffs += cache_draw_height;
+	}
+
+	immUnbindProgram();
+	gpuMatrixEnd();
+
+	BLI_freelistN(&pidlist);
 }
 
 /* helper function - find actkeycolumn that occurs on cframe, or the nearest one if not found */
@@ -234,7 +346,7 @@ static void time_draw_idblock_keyframes(View2D *v2d, ID *id, short onlysel, cons
 	BLI_dlrbTree_free(&keys);
 }
 
-static void time_draw_caches_keyframes(Main *bmain, Scene *scene, View2D *v2d, bool onlysel, const unsigned char color[3])
+static void time_draw_caches_keyframes(Main *bmain, SceneLayer *sl, View2D *v2d, bool onlysel, const unsigned char color[3])
 {
 	CacheFile *cache_file;
 
@@ -245,7 +357,7 @@ static void time_draw_caches_keyframes(Main *bmain, Scene *scene, View2D *v2d, b
 		cache_file->draw_flag &= ~CACHEFILE_KEYFRAME_DRAWN;
 	}
 
-	for (Base *base = scene->base.first; base; base = base->next) {
+	for (Base *base = sl->object_bases.first; base; base = base->next) {
 		Object *ob = base->object;
 
 		ModifierData *md = modifiers_findByType(ob, eModifierType_MeshSequenceCache);
@@ -288,6 +400,7 @@ static void time_draw_caches_keyframes(Main *bmain, Scene *scene, View2D *v2d, b
 static void time_draw_keyframes(const bContext *C, ARegion *ar)
 {
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *ob = CTX_data_active_object(C);
 	View2D *v2d = &ar->v2d;
 	bool onlysel = ((scene->flag & SCE_KEYS_NO_SELONLY) == 0);
@@ -298,7 +411,7 @@ static void time_draw_keyframes(const bContext *C, ARegion *ar)
 
 	/* draw cache files keyframes (if available) */
 	UI_GetThemeColor3ubv(TH_TIME_KEYFRAME, color);
-	time_draw_caches_keyframes(CTX_data_main(C), scene, v2d, onlysel, color);
+	time_draw_caches_keyframes(CTX_data_main(C), sl, v2d, onlysel, color);
 
 	/* draw grease pencil keyframes (if available) */	
 	UI_GetThemeColor3ubv(TH_TIME_GP_KEYFRAME, color);
@@ -354,16 +467,6 @@ static void time_draw_keyframes(const bContext *C, ARegion *ar)
 
 /* ---------------- */
 
-static void time_refresh(const bContext *UNUSED(C), ScrArea *sa)
-{
-	/* find the main timeline region and refresh cache display*/
-	ARegion *ar = BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
-	if (ar) {
-		SpaceTime *stime = (SpaceTime *)sa->spacedata.first;
-		time_cache_refresh(stime);
-	}
-}
-
 /* editor level listener */
 static void time_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *wmn)
 {
@@ -377,6 +480,7 @@ static void time_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *wmn)
 				case ND_BONE_ACTIVE:
 				case ND_POINTCACHE:
 				case ND_MODIFIER:
+				case ND_PARTICLE:
 				case ND_KEYS:
 					ED_area_tag_refresh(sa);
 					ED_area_tag_redraw(sa);
@@ -451,6 +555,7 @@ static void time_main_region_draw(const bContext *C, ARegion *ar)
 	/* draw entirely, view changes should be handled here */
 	Scene *scene = CTX_data_scene(C);
 	SpaceTime *stime = CTX_wm_space_time(C);
+	Object *obact = CTX_data_active_object(C);
 	View2D *v2d = &ar->v2d;
 	View2DGrid *grid;
 	View2DScrollers *scrollers;
@@ -487,6 +592,9 @@ static void time_main_region_draw(const bContext *C, ARegion *ar)
 	/* markers */
 	UI_view2d_view_orthoSpecial(ar, v2d, 1);
 	ED_markers_draw(C, 0);
+	
+	/* caches */
+	time_draw_cache(stime, obact, scene);
 	
 	/* callback */
 	UI_view2d_view_ortho(v2d);
@@ -630,21 +738,12 @@ static SpaceLink *time_new(const bContext *C)
 	return (SpaceLink *)stime;
 }
 
-/* not spacelink itself */
-static void time_free(SpaceLink *sl)
-{
-	SpaceTime *stime = (SpaceTime *)sl;
-	
-	time_cache_free(stime);
-}
 /* spacetype; init callback in ED_area_initialize() */
 /* init is called to (re)initialize an existing editor (file read, screen changes) */
 /* validate spacedata, add own area level handlers */
 static void time_init(wmWindowManager *UNUSED(wm), ScrArea *sa)
 {
 	SpaceTime *stime = (SpaceTime *)sa->spacedata.first;
-	
-	time_cache_free(stime);
 	
 	/* enable all cache display */
 	stime->cache_display |= TIME_CACHE_DISPLAY;
@@ -674,13 +773,11 @@ void ED_spacetype_time(void)
 	strncpy(st->name, "Timeline", BKE_ST_MAXNAME);
 	
 	st->new = time_new;
-	st->free = time_free;
 	st->init = time_init;
 	st->duplicate = time_duplicate;
 	st->operatortypes = time_operatortypes;
 	st->keymap = NULL;
 	st->listener = time_listener;
-	st->refresh = time_refresh;
 	
 	/* regions: main window */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype time region");

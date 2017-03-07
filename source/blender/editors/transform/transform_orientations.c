@@ -43,7 +43,7 @@
 #include "BLI_math.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
-#include "BLI_path_util.h"
+#include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_action.h"
@@ -689,10 +689,10 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3], const short around)
 #endif
 {
-	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *obedit = CTX_data_edit_object(C);
 	Base *base;
-	Object *ob = OBACT;
+	Object *ob = OBACT_NEW;
 	int result = ORIENTATION_NONE;
 	const bool activeOnly = (around == V3D_AROUND_ACTIVE);
 
@@ -1140,21 +1140,21 @@ int getTransformOrientation_ex(const bContext *C, float normal[3], float plane[3
 			result = ORIENTATION_EDGE;
 		}
 	}
-	else if (ob && (ob->mode & OB_MODE_ALL_PAINT)) {
+	else if (ob && (ob->mode & (OB_MODE_ALL_PAINT | OB_MODE_PARTICLE_EDIT))) {
 		/* pass */
 	}
 	else {
 		/* we need the one selected object, if its not active */
-		View3D *v3d = CTX_wm_view3d(C);
-		ob = OBACT;
-		if (ob && (ob->flag & SELECT)) {
+		base = BASACT_NEW;
+		ob = OBACT_NEW;
+		if (base && ((base->flag & BASE_SELECTED) != 0)) {
 			/* pass */
 		}
 		else {
 			/* first selected */
 			ob = NULL;
-			for (base = scene->base.first; base; base = base->next) {
-				if (TESTBASELIB(v3d, base)) {
+			for (base = sl->object_bases.first; base; base = base->next) {
+				if (TESTBASELIB_NEW(base)) {
 					ob = base->object;
 					break;
 				}

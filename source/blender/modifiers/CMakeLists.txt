@@ -79,6 +79,8 @@ set(SRC
 	intern/MOD_none.c
 	intern/MOD_normal_edit.c
 	intern/MOD_ocean.c
+	intern/MOD_particleinstance.c
+	intern/MOD_particlesystem.c
 	intern/MOD_remesh.c
 	intern/MOD_screw.c
 	intern/MOD_shapekey.c
@@ -91,6 +93,7 @@ set(SRC
 	intern/MOD_solidify.c
 	intern/MOD_subsurf.c
 	intern/MOD_surface.c
+	intern/MOD_surfacedeform.c
 	intern/MOD_triangulate.c
 	intern/MOD_util.c
 	intern/MOD_uvwarp.c

@@ -34,13 +34,13 @@
 
 #include <stdio.h>
 
-#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_force.h"
 
 #include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_particle.h"
 #include "BKE_softbody.h"
 
 #include "depsgraph_private.h"
@@ -60,18 +60,6 @@ static void deformVerts(ModifierData *md, Object *ob,
 static bool dependsOnTime(ModifierData *UNUSED(md))
 {
 	return true;
-}
-
-static void updateDepgraph(ModifierData *UNUSED(md), DagForest *forest,
-                           struct Main *UNUSED(bmain),
-                           Scene *scene, Object *ob, DagNode *obNode)
-{
-	if (ob->soft) {
-		/* Actual code uses ccd_build_deflector_hash */
-		dag_add_collision_relations(forest, scene, ob, obNode, ob->soft->collision_group, ob->lay, eModifierType_Collision, NULL, false, "Softbody Collision");
-
-		dag_add_forcefield_relations(forest, scene, ob, obNode, ob->soft->effector_weights, true, 0, "Softbody Field");
-	}
 }
 
 static void updateDepsgraph(ModifierData *UNUSED(md),
@@ -109,7 +97,6 @@ ModifierTypeInfo modifierType_Softbody = {
 	/* requiredDataMask */  NULL,
 	/* freeData */          NULL,
 	/* isDisabled */        NULL,
-	/* updateDepgraph */    updateDepgraph,
 	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     dependsOnTime,
 	/* dependsOnNormals */	NULL,

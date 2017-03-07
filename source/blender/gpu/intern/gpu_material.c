@@ -117,6 +117,11 @@ struct GPUMaterial {
 	int obcolloc, obautobumpscaleloc;
 	int cameratexcofacloc;
 
+	int partscalarpropsloc;
+	int partcoloc;
+	int partvel;
+	int partangvel;
+
 	ListBase lamps;
 	bool bound;
 
@@ -255,6 +260,14 @@ static int GPU_material_construct_end(GPUMaterial *material, const char *passnam
 			material->obautobumpscaleloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_AUTO_BUMPSCALE));
 		if (material->builtins & GPU_CAMERA_TEXCO_FACTORS)
 			material->cameratexcofacloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_CAMERA_TEXCO_FACTORS));
+		if (material->builtins & GPU_PARTICLE_SCALAR_PROPS)
+			material->partscalarpropsloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_SCALAR_PROPS));
+		if (material->builtins & GPU_PARTICLE_LOCATION)
+			material->partcoloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_LOCATION));
+		if (material->builtins & GPU_PARTICLE_VELOCITY)
+			material->partvel = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_VELOCITY));
+		if (material->builtins & GPU_PARTICLE_ANG_VELOCITY)
+			material->partangvel = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_PARTICLE_ANG_VELOCITY));
 		return 1;
 	}
 	else {
@@ -387,7 +400,7 @@ void GPU_material_bind(
 
 void GPU_material_bind_uniforms(
         GPUMaterial *material, float obmat[4][4], float viewmat[4][4], float obcol[4],
-        float autobumpscale)
+        float autobumpscale, GPUParticleInfo *pi)
 {
 	if (material->pass) {
 		GPUShader *shader = GPU_pass_shader(material->pass);
@@ -423,6 +436,18 @@ void GPU_material_bind_uniforms(
 		}
 		if (material->builtins & GPU_AUTO_BUMPSCALE) {
 			GPU_shader_uniform_vector(shader, material->obautobumpscaleloc, 1, 1, &autobumpscale);
+		}
+		if (material->builtins & GPU_PARTICLE_SCALAR_PROPS) {
+			GPU_shader_uniform_vector(shader, material->partscalarpropsloc, 4, 1, pi->scalprops);
+		}
+		if (material->builtins & GPU_PARTICLE_LOCATION) {
+			GPU_shader_uniform_vector(shader, material->partcoloc, 3, 1, pi->location);
+		}
+		if (material->builtins & GPU_PARTICLE_VELOCITY) {
+			GPU_shader_uniform_vector(shader, material->partvel, 3, 1, pi->velocity);
+		}
+		if (material->builtins & GPU_PARTICLE_ANG_VELOCITY) {
+			GPU_shader_uniform_vector(shader, material->partangvel, 3, 1, pi->angular_velocity);
 		}
 
 	}
@@ -584,7 +609,7 @@ static GPUNodeLink *lamp_get_visibility(GPUMaterial *mat, GPULamp *lamp, GPUNode
 			
 			GPU_link(mat, "lamp_visibility_spot",
 			         GPU_dynamic_uniform(&lamp->spotsi, GPU_DYNAMIC_LAMP_SPOTSIZE, lamp->ob),
-			         GPU_dynamic_uniform(&lamp->spotbl, GPU_DYNAMIC_LAMP_SPOTSIZE, lamp->ob),
+			         GPU_dynamic_uniform(&lamp->spotbl, GPU_DYNAMIC_LAMP_SPOTBLEND, lamp->ob),
 			         inpr, visifac, &visifac);
 		}
 
@@ -2344,6 +2369,11 @@ static void gpu_lamp_shadow_free(GPULamp *lamp)
 	}
 }
 
+static GPUTexture *gpu_lamp_create_vsm_shadow_map(int size)
+{
+	return GPU_texture_create_2D_custom(size, size, 2, GPU_RG32F, NULL, NULL);
+}
+
 GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 {
 	Lamp *la;
@@ -2390,7 +2420,7 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 			}
 
 			/* Shadow color map */
-			lamp->tex = GPU_texture_create_vsm_shadow_map(lamp->size, NULL);
+			lamp->tex = gpu_lamp_create_vsm_shadow_map(lamp->size);
 			if (!lamp->tex) {
 				gpu_lamp_shadow_free(lamp);
 				return lamp;
@@ -2413,7 +2443,7 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 				return lamp;
 			}
 
-			lamp->blurtex = GPU_texture_create_vsm_shadow_map(lamp->size * 0.5, NULL);
+			lamp->blurtex = gpu_lamp_create_vsm_shadow_map(lamp->size * 0.5);
 			if (!lamp->blurtex) {
 				gpu_lamp_shadow_free(lamp);
 				return lamp;

@@ -1602,7 +1602,30 @@ static bool snapObjectsRay(
 	bool retval = false;
 	unsigned int ob_index = 0;
 	Object *obedit = use_object_edit_cage ? sctx->scene->obedit : NULL;
+
+	/* Need an exception for particle edit because the base is flagged with BA_HAS_RECALC_DATA
+	 * which makes the loop skip it, even the derived mesh will never change
+	 *
+	 * To solve that problem, we do it first as an exception.
+	 * */
 	Base *base_act = sctx->scene->basact;
+	if (base_act && base_act->object && base_act->object->mode & OB_MODE_PARTICLE_EDIT) {
+		Object *ob = base_act->object;
+
+#ifdef WITH_MECHANICAL
+		retval |= snapObject(
+		        sctx, ob, ob->obmat, false, snap_to,
+		        mval, dist_px, ob_index++,
+		        ray_start, ray_normal, ray_origin, ray_depth,
+				r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list, snap_select, snap_target, scene);
+#else
+		retval |= snapObject(
+		        sctx, ob, ob->obmat, false, snap_to,
+		        mval, dist_px, ob_index++,
+		        ray_start, ray_normal, ray_origin, ray_depth,
+		        r_loc, r_no, r_index, r_ob, r_obmat, r_hit_list);
+#endif
+	}
 
 	bool ignore_object_selected = false, ignore_object_active = false;
 	switch (snap_select) {

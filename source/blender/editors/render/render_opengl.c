@@ -92,6 +92,7 @@ typedef struct OGLRender {
 	Main *bmain;
 	Render *re;
 	Scene *scene;
+	SceneLayer *scene_layer;
 
 	View3D *v3d;
 	RegionView3D *rv3d;
@@ -277,6 +278,7 @@ static void screen_opengl_views_setup(OGLRender *oglrender)
 static void screen_opengl_render_doit(OGLRender *oglrender, RenderResult *rr)
 {
 	Scene *scene = oglrender->scene;
+	SceneLayer *sl = oglrender->scene_layer;
 	ARegion *ar = oglrender->ar;
 	View3D *v3d = oglrender->v3d;
 	RegionView3D *rv3d = oglrender->rv3d;
@@ -312,6 +314,12 @@ static void screen_opengl_render_doit(OGLRender *oglrender, RenderResult *rr)
 				imb_freerectfloatImBuf(out);
 			}
 			BLI_assert((oglrender->sizex == ibuf->x) && (oglrender->sizey == ibuf->y));
+			RE_render_result_rect_from_ibuf(rr, &scene->r, out, oglrender->view_id);
+			IMB_freeImBuf(out);
+		}
+		else if (gpd) {
+			/* If there are no strips, Grease Pencil still needs a buffer to draw on */
+			ImBuf *out = IMB_allocImBuf(oglrender->sizex, oglrender->sizey, 32, IB_rect);
 			RE_render_result_rect_from_ibuf(rr, &scene->r, out, oglrender->view_id);
 			IMB_freeImBuf(out);
 		}
@@ -352,7 +360,7 @@ static void screen_opengl_render_doit(OGLRender *oglrender, RenderResult *rr)
 
 		if (view_context) {
 			ibuf_view = ED_view3d_draw_offscreen_imbuf(
-			       scene, v3d, ar, sizex, sizey,
+			       scene, sl, v3d, ar, sizex, sizey,
 			       IB_rect, draw_bgpic,
 			       alpha_mode, oglrender->ofs_samples, oglrender->ofs_full_samples, viewname,
 			       oglrender->fx, oglrender->ofs, err_out);
@@ -364,7 +372,7 @@ static void screen_opengl_render_doit(OGLRender *oglrender, RenderResult *rr)
 		}
 		else {
 			ibuf_view = ED_view3d_draw_offscreen_imbuf_simple(
-			        scene, scene->camera, oglrender->sizex, oglrender->sizey,
+			        scene, sl, scene->camera, oglrender->sizex, oglrender->sizey,
 			        IB_rect, OB_SOLID, false, true, true,
 			        alpha_mode, oglrender->ofs_samples, oglrender->ofs_full_samples, viewname,
 			        oglrender->fx, oglrender->ofs, err_out);
@@ -479,23 +487,24 @@ static void add_gpencil_renderpass(OGLRender *oglrender, RenderResult *rr, Rende
 		/* copy image data from rectf */
 		// XXX: Needs conversion.
 		unsigned char *src = (unsigned char *)RE_RenderViewGetById(rr, oglrender->view_id)->rect32;
-		float *dest = rp->rect;
+		if (src != NULL) {
+			float *dest = rp->rect;
 
-		int x, y, rectx, recty;
-		rectx = rr->rectx;
-		recty = rr->recty;
-		for (y = 0; y < recty; y++) {
-			for (x = 0; x < rectx; x++) {
-				unsigned char *pixSrc = src + 4 * (rectx * y + x);
-				if (pixSrc[3] > 0) {
-					float *pixDest = dest + 4 * (rectx * y + x);
-					float float_src[4];
-					srgb_to_linearrgb_uchar4(float_src, pixSrc);
-					addAlphaOverFloat(pixDest, float_src);
+			int x, y, rectx, recty;
+			rectx = rr->rectx;
+			recty = rr->recty;
+			for (y = 0; y < recty; y++) {
+				for (x = 0; x < rectx; x++) {
+					unsigned char *pixSrc = src + 4 * (rectx * y + x);
+					if (pixSrc[3] > 0) {
+						float *pixDest = dest + 4 * (rectx * y + x);
+						float float_src[4];
+						srgb_to_linearrgb_uchar4(float_src, pixSrc);
+						addAlphaOverFloat(pixDest, float_src);
+					}
 				}
 			}
 		}
-
 		/* back layer status */
 		i = 0;
 		for (bGPDlayer *gph = gpd->layers.first; gph; gph = gph->next) {
@@ -545,8 +554,11 @@ static void screen_opengl_render_apply(OGLRender *oglrender)
 		BLI_assert(view_id < oglrender->views_len);
 		RE_SetActiveRenderView(oglrender->re, rv->name);
 		oglrender->view_id = view_id;
-		/* add grease pencil passes */
-		add_gpencil_renderpass(oglrender, rr, rv);
+		/* add grease pencil passes. For sequencer, the render does not include renderpasses
+		 * TODO: The sequencer render of grease pencil should be rethought */
+		if (!oglrender->is_sequencer) {
+			add_gpencil_renderpass(oglrender, rr, rv);
+		}
 		/* render composite */
 		screen_opengl_render_doit(oglrender, rr);
 	}
@@ -640,6 +652,7 @@ static bool screen_opengl_render_init(bContext *C, wmOperator *op)
 	oglrender->sizey = sizey;
 	oglrender->bmain = CTX_data_main(C);
 	oglrender->scene = scene;
+	oglrender->scene_layer = CTX_data_scene_layer(C);
 	oglrender->cfrao = scene->r.cfra;
 
 	oglrender->write_still = is_write_still && !is_animation;
@@ -876,14 +889,15 @@ static void write_result_func(TaskPool * __restrict pool,
 	 */
 	ReportList reports;
 	BKE_reports_init(&reports, oglrender->reports->flag & ~RPT_PRINT);
-	/* Do actual save logic here, depending on the file format. */
+	/* Do actual save logic here, depending on the file format.
+	 *
+	 * NOTE: We have to construct temporary scene with proper scene->r.cfra.
+	 * This is because underlying calls do not use r.cfra but use scene
+	 * for that.
+	 */
+	Scene tmp_scene = *scene;
+	tmp_scene.r.cfra = cfra;
 	if (is_movie) {
-		/* We have to construct temporary scene with proper scene->r.cfra.
-		 * This is because underlying calls do not use r.cfra but use scene
-		 * for that.
-		 */
-		Scene tmp_scene = *scene;
-		tmp_scene.r.cfra = cfra;
 		ok = RE_WriteRenderViewsMovie(&reports,
 		                              rr,
 		                              &tmp_scene,
@@ -907,8 +921,8 @@ static void write_result_func(TaskPool * __restrict pool,
 		                             true,
 		                             NULL);
 
-		BKE_render_result_stamp_info(scene, scene->camera, rr, false);
-		ok = RE_WriteRenderViewsImage(NULL, rr, scene, true, name);
+		BKE_render_result_stamp_info(&tmp_scene, tmp_scene.camera, rr, false);
+		ok = RE_WriteRenderViewsImage(NULL, rr, &tmp_scene, true, name);
 		if (!ok) {
 			BKE_reportf(&reports,
 			            RPT_ERROR,

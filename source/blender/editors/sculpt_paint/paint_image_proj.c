@@ -5305,11 +5305,12 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 {
 	Image *image = BLI_findlink(&CTX_data_main(C)->image, RNA_enum_get(op->ptr, "image"));
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	ProjPaintState ps = {NULL};
 	int orig_brush_size;
 	IDProperty *idgroup;
 	IDProperty *view_data = NULL;
-	Object *ob = OBACT;
+	Object *ob = OBACT_NEW;
 	bool uvs, mat, tex;
 
 	if (ob == NULL || ob->type != OB_MESH) {
@@ -5438,6 +5439,7 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	char filename[FILE_MAX];
 
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	ToolSettings *settings = scene->toolsettings;
 	int w = settings->imapaint.screen_grab_size[0];
 	int h = settings->imapaint.screen_grab_size[1];
@@ -5452,7 +5454,7 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	if (h > maxsize) h = maxsize;
 
 	ibuf = ED_view3d_draw_offscreen_imbuf(
-	        scene, CTX_wm_view3d(C), CTX_wm_region(C),
+	        scene, sl, CTX_wm_view3d(C), CTX_wm_region(C),
 	        w, h, IB_rect, false, R_ALPHAPREMUL, 0, false, NULL,
 	        NULL, NULL, err_out);
 	if (!ibuf) {
@@ -5711,21 +5713,16 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 			/* successful creation of mtex layer, now create set */
 			if (mtex) {
 				int type = MAP_COL;
-				int type_id = 0;
+				char imagename_buff[MAX_ID_NAME - 2];
+				const char *imagename = DATA_("Diffuse Color");
 
 				if (op) {
-					int i;
 					type = RNA_enum_get(op->ptr, "type");
-
-					for (i = 0; i < ARRAY_SIZE(layer_type_items); i++) {
-						if (layer_type_items[i].value == type) {
-							type_id = i;
-							break;
-						}
-					}
+					RNA_string_get(op->ptr, "name", imagename_buff);
+					imagename = imagename_buff;
 				}
 
-				mtex->tex = BKE_texture_add(bmain, DATA_(layer_type_items[type_id].name));
+				mtex->tex = BKE_texture_add(bmain, imagename);
 				mtex->mapto = type;
 
 				if (mtex->tex) {

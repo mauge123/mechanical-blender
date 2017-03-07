@@ -94,7 +94,9 @@ typedef enum eDrawStrokeFlags {
 
 
 /* thickness above which we should use special drawing */
+#if 0
 #define GP_DRAWTHICKNESS_SPECIAL    3
+#endif
 
 /* conversion utility (float --> normalized unsigned byte) */
 #define F2UB(x) (unsigned char)(255.0f * x)
@@ -629,10 +631,10 @@ static void gp_draw_stroke_point(
 	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
 
 	if (sflag & GP_STROKE_3DSPACE) {
-		immBindBuiltinProgram(GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH);
+		immBindBuiltinProgram(GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
 	}
 	else {
-		immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH);
+		immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
 
 		/* get 2D coordinates of point */
 		float co[3] = { 0.0f };
@@ -1487,9 +1489,17 @@ static void gp_draw_data_layers(
 		GP_DRAWFLAG_APPLY((gpl->flag & GP_LAYER_HQ_FILL), GP_DRAWDATA_HQ_FILL);
 
 #undef GP_DRAWFLAG_APPLY
-
-		/* draw 'onionskins' (frame left + right) */
-		if ((gpl->flag & GP_LAYER_ONIONSKIN) && !(dflag & GP_DRAWDATA_NO_ONIONS)) {
+		
+		/* Draw 'onionskins' (frame left + right)
+		 *   - It is only possible to show these if the option is enabled
+		 *   - The "no onions" flag prevents ghosts from appearing during animation playback/scrubbing
+		 *     and in renders
+		 *   - The per-layer "always show" flag however overrides the playback/render restriction,
+		 *     allowing artists to selectively turn onionskins on/off during playback
+		 */
+		if ((gpl->flag & GP_LAYER_ONIONSKIN) && 
+		    ((dflag & GP_DRAWDATA_NO_ONIONS) == 0 || (gpl->flag & GP_LAYER_GHOST_ALWAYS))) 
+		{
 			/* Drawing method - only immediately surrounding (gstep = 0),
 			 * or within a frame range on either side (gstep > 0)
 			 */
@@ -1555,13 +1565,15 @@ static void gp_draw_status_text(const bGPdata *gpd, ARegion *ar)
 		const char *printable = IFACE_("GPencil Stroke Editing");
 		float       printable_size[2];
 
-		BLF_width_and_height_default(printable, BLF_DRAW_STR_DUMMY_MAX, &printable_size[0], &printable_size[1]);
+		int font_id = BLF_default();
+
+		BLF_width_and_height(font_id, printable, BLF_DRAW_STR_DUMMY_MAX, &printable_size[0], &printable_size[1]);
 		
 		int xco = (rect.xmax - U.widget_unit) - (int)printable_size[0];
 		int yco = (rect.ymax - U.widget_unit);
 
 		/* text label */
-		UI_ThemeColor(TH_TEXT_HI);
+		UI_FontThemeColor(font_id, TH_TEXT_HI);
 #ifdef WITH_INTERNATIONAL
 		BLF_draw_default(xco, yco, 0.0f, printable, BLF_DRAW_STR_DUMMY_MAX);
 #else
@@ -1623,8 +1635,17 @@ static void gp_draw_data_all(Scene *scene, bGPdata *gpd, int offsx, int offsy, i
                              int cfra, int dflag, const char spacetype)
 {
 	bGPdata *gpd_source = NULL;
-
+	ToolSettings *ts;
+	bGPDbrush *brush = NULL;
 	if (scene) {
+		ts = scene->toolsettings;
+		brush = BKE_gpencil_brush_getactive(ts);
+		/* if no brushes, create default set */
+		if (brush == NULL) {
+			BKE_gpencil_brush_init_presets(ts);
+			brush = BKE_gpencil_brush_getactive(ts);
+		}
+
 		if (spacetype == SPACE_VIEW3D) {
 			gpd_source = (scene->gpd ? scene->gpd : NULL);
 		}
@@ -1634,8 +1655,6 @@ static void gp_draw_data_all(Scene *scene, bGPdata *gpd, int offsx, int offsy, i
 		}
 
 		if (gpd_source) {
-			ToolSettings *ts = scene->toolsettings;
-			bGPDbrush *brush = BKE_gpencil_brush_getactive(ts);
 			if (brush != NULL) {
 				gp_draw_data(brush, ts->gp_sculpt.alpha, gpd_source,
 				             offsx, offsy, winx, winy, cfra, dflag);
@@ -1646,8 +1665,6 @@ static void gp_draw_data_all(Scene *scene, bGPdata *gpd, int offsx, int offsy, i
 	/* scene/clip data has already been drawn, only object/track data is drawn here
 	 * if gpd_source == gpd, we don't have any object/track data and we can skip */
 	if (gpd_source == NULL || (gpd_source && gpd_source != gpd)) {
-		ToolSettings *ts = scene->toolsettings;
-		bGPDbrush *brush = BKE_gpencil_brush_getactive(ts);
 		if (brush != NULL) {
 			gp_draw_data(brush, ts->gp_sculpt.alpha, gpd,
 			             offsx, offsy, winx, winy, cfra, dflag);

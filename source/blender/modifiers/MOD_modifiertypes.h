@@ -50,6 +50,8 @@ extern ModifierTypeInfo modifierType_UVProject;
 extern ModifierTypeInfo modifierType_Smooth;
 extern ModifierTypeInfo modifierType_Cast;
 extern ModifierTypeInfo modifierType_MeshDeform;
+extern ModifierTypeInfo modifierType_ParticleSystem;
+extern ModifierTypeInfo modifierType_ParticleInstance;
 extern ModifierTypeInfo modifierType_Explode;
 extern ModifierTypeInfo modifierType_Cloth;
 extern ModifierTypeInfo modifierType_Collision;
@@ -83,6 +85,7 @@ extern ModifierTypeInfo modifierType_DataTransfer;
 extern ModifierTypeInfo modifierType_NormalEdit;
 extern ModifierTypeInfo modifierType_CorrectiveSmooth;
 extern ModifierTypeInfo modifierType_MeshSequenceCache;
+extern ModifierTypeInfo modifierType_SurfaceDeform;
 
 /* MOD_util.c */
 void modifier_type_init(ModifierTypeInfo *types[]);

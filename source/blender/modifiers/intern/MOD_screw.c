@@ -798,13 +798,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 		if (ltmd->ob_axis) {
 			axis_angle_normalized_to_mat3(mat3, axis_vec, step_angle);
-			copy_m4_m3(mat, mat3);
 		}
 		else {
-			unit_m4(mat);
-			rotate_m4(mat, axis_char, step_angle);
-			copy_m3_m4(mat3, mat);
+			axis_angle_to_mat3_single(mat3, axis_char, step_angle);
 		}
+		copy_m4_m3(mat, mat3);
 
 		if (screw_ofs)
 			madd_v3_v3fl(mat[3], axis_vec, screw_ofs * ((float)step / (float)(step_tot - 1)));
@@ -1059,24 +1057,6 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	return result;
 }
 
-
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Main *UNUSED(bmain),
-                           struct Scene *UNUSED(scene),
-                           Object *UNUSED(ob),
-                           DagNode *obNode)
-{
-	ScrewModifierData *ltmd = (ScrewModifierData *) md;
-
-	if (ltmd->ob_axis) {
-		DagNode *curNode = dag_get_node(forest, ltmd->ob_axis);
-
-		dag_add_relation(forest, curNode, obNode,
-		                 DAG_RL_DATA_DATA | DAG_RL_OB_DATA,
-		                 "Screw Modifier");
-	}
-}
-
 static void updateDepsgraph(ModifierData *md,
                             struct Main *UNUSED(bmain),
                             struct Scene *UNUSED(scene),
@@ -1095,7 +1075,7 @@ static void foreachObjectLink(
 {
 	ScrewModifierData *ltmd = (ScrewModifierData *) md;
 
-	walk(userData, ob, &ltmd->ob_axis, IDWALK_NOP);
+	walk(userData, ob, &ltmd->ob_axis, IDWALK_CB_NOP);
 }
 
 ModifierTypeInfo modifierType_Screw = {
@@ -1120,7 +1100,6 @@ ModifierTypeInfo modifierType_Screw = {
 	/* requiredDataMask */  NULL,
 	/* freeData */          NULL,
 	/* isDisabled */        NULL,
-	/* updateDepgraph */    updateDepgraph,
 	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     NULL,
 	/* dependsOnNormals */	NULL,

@@ -42,6 +42,7 @@
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_screen_types.h"
 #include "DNA_texture_types.h"
 #include "DNA_world_types.h"
 #include "DNA_brush_types.h"
@@ -143,7 +144,7 @@ static PreviewImage *previewimg_create_ex(size_t deferred_data_size)
 	memset(prv_img, 0, sizeof(*prv_img));  /* leave deferred data dirty */
 
 	if (deferred_data_size) {
-		prv_img->use_deferred = true;
+		prv_img->tag |= PRV_TAG_DEFFERED;
 	}
 
 	for (i = 0; i < NUM_ICON_SIZES; ++i) {
@@ -252,6 +253,7 @@ PreviewImage **BKE_previewimg_id_get_p(ID *id)
 		ID_PRV_CASE(ID_OB, Object);
 		ID_PRV_CASE(ID_GR, Group);
 		ID_PRV_CASE(ID_SCE, Scene);
+		ID_PRV_CASE(ID_SCR, bScreen);
 #undef ID_PRV_CASE
 	}
 
@@ -355,11 +357,14 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(
 	return prv;
 }
 
-void BKE_previewimg_cached_release(const char *name)
+void BKE_previewimg_cached_release_pointer(PreviewImage *prv)
 {
-	PreviewImage *prv = BLI_ghash_popkey(gCachedPreviews, name, MEM_freeN);
-
 	if (prv) {
+		if (prv->tag & PRV_TAG_DEFFERED_RENDERING) {
+			/* We cannot delete the preview while it is being loaded in another thread... */
+			prv->tag |= PRV_TAG_DEFFERED_DELETE;
+			return;
+		}
 		if (prv->icon_id) {
 			BKE_icon_delete(prv->icon_id);
 		}
@@ -367,11 +372,18 @@ void BKE_previewimg_cached_release(const char *name)
 	}
 }
 
+void BKE_previewimg_cached_release(const char *name)
+{
+	PreviewImage *prv = BLI_ghash_popkey(gCachedPreviews, name, MEM_freeN);
+
+	BKE_previewimg_cached_release_pointer(prv);
+}
+
 /** Handle deferred (lazy) loading/generation of preview image, if needed.
  * For now, only used with file thumbnails. */
 void BKE_previewimg_ensure(PreviewImage *prv, const int size)
 {
-	if (prv->use_deferred) {
+	if ((prv->tag & PRV_TAG_DEFFERED) != 0) {
 		const bool do_icon = ((size == ICON_SIZE_ICON) && !prv->rect[ICON_SIZE_ICON]);
 		const bool do_preview = ((size == ICON_SIZE_PREVIEW) && !prv->rect[ICON_SIZE_PREVIEW]);
 

@@ -36,6 +36,7 @@
 #include "BLI_array_utils.h"
 #include "BLI_bitmap.h"
 #include "BLI_stack.h"
+#include "BLI_string_utils.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -43,6 +44,7 @@
 
 #include "DNA_armature_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_object_types.h"
@@ -274,7 +276,7 @@ static int wpaint_mirror_vgroup_ensure(Object *ob, const int vgroup_active)
 		int mirrdef;
 		char name_flip[MAXBONENAME];
 
-		BKE_deform_flip_side_name(name_flip, defgroup->name, false);
+		BLI_string_flip_side_name(name_flip, defgroup->name, false, sizeof(name_flip));
 		mirrdef = defgroup_name_index(ob, name_flip);
 		if (mirrdef == -1) {
 			if (BKE_defgroup_new(ob, name_flip)) {
@@ -2421,6 +2423,21 @@ static void wpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 	
 	/* frees prev buffer */
 	copy_wpaint_prev(ts->wpaint, NULL, 0);
+	
+	/* and particles too */
+	if (ob->particlesystem.first) {
+		ParticleSystem *psys;
+		int i;
+		
+		for (psys = ob->particlesystem.first; psys; psys = psys->next) {
+			for (i = 0; i < PSYS_TOT_VG; i++) {
+				if (psys->vgroup[i] == ob->actdef) {
+					psys->recalc |= PSYS_RECALC_RESET;
+					break;
+				}
+			}
+		}
+	}
 
 	DAG_id_tag_update(ob->data, 0);
 

@@ -37,20 +37,6 @@
 
 /********************************** Polygons *********************************/
 
-void cent_tri_v3(float cent[3], const float v1[3], const float v2[3], const float v3[3])
-{
-	cent[0] = (v1[0] + v2[0] + v3[0]) / 3.0f;
-	cent[1] = (v1[1] + v2[1] + v3[1]) / 3.0f;
-	cent[2] = (v1[2] + v2[2] + v3[2]) / 3.0f;
-}
-
-void cent_quad_v3(float cent[3], const float v1[3], const float v2[3], const float v3[3], const float v4[3])
-{
-	cent[0] = 0.25f * (v1[0] + v2[0] + v3[0] + v4[0]);
-	cent[1] = 0.25f * (v1[1] + v2[1] + v3[1] + v4[1]);
-	cent[2] = 0.25f * (v1[2] + v2[2] + v3[2] + v4[2]);
-}
-
 void cross_tri_v3(float n[3], const float v1[3], const float v2[3], const float v3[3])
 {
 	float n1[3], n2[3];
@@ -2323,6 +2309,34 @@ bool isect_ray_aabb_v3(
 	return true;
 }
 
+/*
+ * Test a bounding box (AABB) for ray intersection
+ * assumes the ray is already local to the boundbox space
+ */
+bool isect_ray_aabb_v3_simple(
+        const float orig[3], const float dir[3],
+        const float bb_min[3], const float bb_max[3],
+        float *tmin, float *tmax)
+{
+	double t[7];
+	float hit_dist[2];
+	t[1] = (double)(bb_min[0] - orig[0]) / dir[0];
+	t[2] = (double)(bb_max[0] - orig[0]) / dir[0];
+	t[3] = (double)(bb_min[1] - orig[1]) / dir[1];
+	t[4] = (double)(bb_max[1] - orig[1]) / dir[1];
+	t[5] = (double)(bb_min[2] - orig[2]) / dir[2];
+	t[6] = (double)(bb_max[2] - orig[2]) / dir[2];
+	hit_dist[0] = (float)fmax(fmax(fmin(t[1], t[2]), fmin(t[3], t[4])), fmin(t[5], t[6]));
+	hit_dist[1] = (float)fmin(fmin(fmax(t[1], t[2]), fmax(t[3], t[4])), fmax(t[5], t[6]));
+	if ((hit_dist[1] < 0 || hit_dist[0] > hit_dist[1]))
+		return false;
+	else {
+		if (tmin) *tmin = hit_dist[0];
+		if (tmax) *tmax = hit_dist[1];
+		return true;
+	}
+}
+
 void dist_squared_ray_to_aabb_v3_precalc(
         struct NearestRayToAABB_Precalc *data,
         const float ray_origin[3], const float ray_direction[3])
@@ -2885,142 +2899,6 @@ bool clip_segment_v3_plane_n(
 	return true;
 }
 
-void plot_line_v2v2i(const int p1[2], const int p2[2], bool (*callback)(int, int, void *), void *userData)
-{
-	int x1 = p1[0];
-	int y1 = p1[1];
-	int x2 = p2[0];
-	int y2 = p2[1];
-
-	int ix;
-	int iy;
-
-	/* if x1 == x2 or y1 == y2, then it does not matter what we set here */
-	int delta_x = (x2 > x1 ? ((void)(ix = 1), x2 - x1) : ((void)(ix = -1), x1 - x2)) << 1;
-	int delta_y = (y2 > y1 ? ((void)(iy = 1), y2 - y1) : ((void)(iy = -1), y1 - y2)) << 1;
-
-	if (callback(x1, y1, userData) == 0) {
-		return;
-	}
-
-	if (delta_x >= delta_y) {
-		/* error may go below zero */
-		int error = delta_y - (delta_x >> 1);
-
-		while (x1 != x2) {
-			if (error >= 0) {
-				if (error || (ix > 0)) {
-					y1 += iy;
-					error -= delta_x;
-				}
-				/* else do nothing */
-			}
-			/* else do nothing */
-
-			x1 += ix;
-			error += delta_y;
-
-			if (callback(x1, y1, userData) == 0) {
-				return;
-			}
-		}
-	}
-	else {
-		/* error may go below zero */
-		int error = delta_x - (delta_y >> 1);
-
-		while (y1 != y2) {
-			if (error >= 0) {
-				if (error || (iy > 0)) {
-					x1 += ix;
-					error -= delta_y;
-				}
-				/* else do nothing */
-			}
-			/* else do nothing */
-
-			y1 += iy;
-			error += delta_x;
-
-			if (callback(x1, y1, userData) == 0) {
-				return;
-			}
-		}
-	}
-}
-
-/**
- * \param callback: Takes the x, y coords and x-span (\a x_end is not inclusive),
- * note that \a x_end will always be greater than \a x, so we can use:
- *
- * \code{.c}
- * do {
- *     func(x, y);
- * } while (++x != x_end);
- * \endcode
- */
-void fill_poly_v2i_n(
-        const int xmin, const int ymin, const int xmax, const int ymax,
-        const int verts[][2], const int nr,
-        void (*callback)(int x, int x_end, int y, void *), void *userData)
-{
-	/* originally by Darel Rex Finley, 2007 */
-
-	int  nodes, pixel_y, i, j, swap;
-	int *node_x = MEM_mallocN(sizeof(*node_x) * (size_t)(nr + 1), __func__);
-
-	/* Loop through the rows of the image. */
-	for (pixel_y = ymin; pixel_y < ymax; pixel_y++) {
-
-		/* Build a list of nodes. */
-		nodes = 0; j = nr - 1;
-		for (i = 0; i < nr; i++) {
-			if ((verts[i][1] < pixel_y && verts[j][1] >= pixel_y) ||
-			    (verts[j][1] < pixel_y && verts[i][1] >= pixel_y))
-			{
-				node_x[nodes++] = (int)(verts[i][0] +
-				                        ((double)(pixel_y - verts[i][1]) / (verts[j][1] - verts[i][1])) *
-				                        (verts[j][0] - verts[i][0]));
-			}
-			j = i;
-		}
-
-		/* Sort the nodes, via a simple "Bubble" sort. */
-		i = 0;
-		while (i < nodes - 1) {
-			if (node_x[i] > node_x[i + 1]) {
-				SWAP_TVAL(swap, node_x[i], node_x[i + 1]);
-				if (i) i--;
-			}
-			else {
-				i++;
-			}
-		}
-
-		/* Fill the pixels between node pairs. */
-		for (i = 0; i < nodes; i += 2) {
-			if (node_x[i] >= xmax) break;
-			if (node_x[i + 1] >  xmin) {
-				if (node_x[i    ] < xmin) node_x[i    ] = xmin;
-				if (node_x[i + 1] > xmax) node_x[i + 1] = xmax;
-
-#if 0
-				/* for many x/y calls */
-				for (j = node_x[i]; j < node_x[i + 1]; j++) {
-					callback(j - xmin, pixel_y - ymin, userData);
-				}
-#else
-				/* for single call per x-span */
-				if (node_x[i] < node_x[i + 1]) {
-					callback(node_x[i] - xmin, node_x[i + 1] - xmin, pixel_y - ymin, userData);
-				}
-#endif
-			}
-		}
-	}
-	MEM_freeN(node_x);
-}
-
 /****************************** Axis Utils ********************************/
 
 /**
@@ -3100,7 +2978,15 @@ static bool barycentric_weights(const float v1[3], const float v2[3], const floa
 	}
 }
 
-void interp_weights_face_v3(float w[4], const float v1[3], const float v2[3], const float v3[3], const float v4[3], const float co[3])
+void interp_weights_tri_v3(float w[3], const float v1[3], const float v2[3], const float v3[3], const float co[3])
+{
+	float n[3];
+
+	normal_tri_v3(n, v1, v2, v3);
+	barycentric_weights(v1, v2, v3, co, n, w);
+}
+
+void interp_weights_quad_v3(float w[4], const float v1[3], const float v2[3], const float v3[3], const float v4[3], const float co[3])
 {
 	float w2[3];
 
@@ -3113,7 +2999,7 @@ void interp_weights_face_v3(float w[4], const float v1[3], const float v2[3], co
 		w[1] = 1.0f;
 	else if (equals_v3v3(co, v3))
 		w[2] = 1.0f;
-	else if (v4 && equals_v3v3(co, v4))
+	else if (equals_v3v3(co, v4))
 		w[3] = 1.0f;
 	else {
 		/* otherwise compute barycentric interpolation weights */
@@ -3121,34 +3007,23 @@ void interp_weights_face_v3(float w[4], const float v1[3], const float v2[3], co
 		bool degenerate;
 
 		sub_v3_v3v3(n1, v1, v3);
-		if (v4) {
-			sub_v3_v3v3(n2, v2, v4);
-		}
-		else {
-			sub_v3_v3v3(n2, v2, v3);
-		}
+		sub_v3_v3v3(n2, v2, v4);
 		cross_v3_v3v3(n, n1, n2);
 
-		/* OpenGL seems to split this way, so we do too */
-		if (v4) {
-			degenerate = barycentric_weights(v1, v2, v4, co, n, w);
-			SWAP(float, w[2], w[3]);
+		degenerate = barycentric_weights(v1, v2, v4, co, n, w);
+		SWAP(float, w[2], w[3]);
 
-			if (degenerate || (w[0] < 0.0f)) {
-				/* if w[1] is negative, co is on the other side of the v1-v3 edge,
-				 * so we interpolate using the other triangle */
-				degenerate = barycentric_weights(v2, v3, v4, co, n, w2);
+		if (degenerate || (w[0] < 0.0f)) {
+			/* if w[1] is negative, co is on the other side of the v1-v3 edge,
+			 * so we interpolate using the other triangle */
+			degenerate = barycentric_weights(v2, v3, v4, co, n, w2);
 
-				if (!degenerate) {
-					w[0] = 0.0f;
-					w[1] = w2[0];
-					w[2] = w2[1];
-					w[3] = w2[2];
-				}
+			if (!degenerate) {
+				w[0] = 0.0f;
+				w[1] = w2[0];
+				w[2] = w2[1];
+				w[3] = w2[2];
 			}
-		}
-		else {
-			barycentric_weights(v1, v2, v3, co, n, w);
 		}
 	}
 }
@@ -3899,6 +3774,9 @@ void interp_barycentric_tri_v3(float data[3][3], float u, float v, float res[3])
 
 /***************************** View & Projection *****************************/
 
+/**
+ * Matches `glOrtho` result.
+ */
 void orthographic_m4(float matrix[4][4], const float left, const float right, const float bottom, const float top,
                      const float nearClip, const float farClip)
 {
@@ -3919,6 +3797,9 @@ void orthographic_m4(float matrix[4][4], const float left, const float right, co
 	matrix[3][2] = -(farClip + nearClip) / Zdelta;
 }
 
+/**
+ * Matches `glFrustum` result.
+ */
 void perspective_m4(float mat[4][4], const float left, const float right, const float bottom, const float top,
                     const float nearClip, const float farClip)
 {
@@ -4053,10 +3934,9 @@ void lookat_m4(float mat[4][4], float vx, float vy, float vz, float px, float py
 	float sine, cosine, hyp, hyp1, dx, dy, dz;
 	float mat1[4][4];
 
-	unit_m4(mat);
 	unit_m4(mat1);
 
-	rotate_m4(mat, 'Z', -twist);
+	axis_angle_to_mat4_single(mat, 'Z', -twist);
 
 	dx = px - vx;
 	dy = py - vy;
@@ -4194,6 +4074,26 @@ void map_to_sphere(float *r_u, float *r_v, const float x, const float y, const f
 	else {
 		*r_v = *r_u = 0.0f; /* to avoid un-initialized variables */
 	}
+}
+
+void map_to_plane_v2_v3v3(float r_co[2], const float co[3], const float no[3])
+{
+	float target[3] = {0.0f, 0.0f, 1.0f};
+	float axis[3];
+
+	cross_v3_v3v3(axis, no, target);
+	normalize_v3(axis);
+
+	map_to_plane_axis_angle_v2_v3v3fl(r_co, co, axis, angle_normalized_v3v3(no, target));
+}
+
+void map_to_plane_axis_angle_v2_v3v3fl(float r_co[2], const float co[3], const float axis[3], const float angle)
+{
+	float tmp[3];
+
+	rotate_normalized_v3_v3v3fl(tmp, co, axis, angle);
+
+	copy_v2_v2(r_co, tmp);
 }
 
 /********************************* Normals **********************************/

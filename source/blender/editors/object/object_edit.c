@@ -41,6 +41,7 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
+#include "BLI_string_utils.h"
 
 #include "BLT_translation.h"
 
@@ -75,6 +76,7 @@
 #include "BKE_mball.h"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
+#include "BKE_pointcache.h"
 #include "BKE_property.h"
 #include "BKE_sca.h"
 #include "BKE_softbody.h"
@@ -129,189 +131,6 @@ Object *ED_object_active_context(bContext *C)
 	return ob;
 }
 
-
-/* ********* clear/set restrict view *********/
-static int object_hide_view_clear_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	Main *bmain = CTX_data_main(C);
-	ScrArea *sa = CTX_wm_area(C);
-	View3D *v3d = sa->spacedata.first;
-	Scene *scene = CTX_data_scene(C);
-	Base *base;
-	bool changed = false;
-	
-	/* XXX need a context loop to handle such cases */
-	for (base = FIRSTBASE; base; base = base->next) {
-		if ((base->lay & v3d->lay) && base->object->restrictflag & OB_RESTRICT_VIEW) {
-			if (!(base->object->restrictflag & OB_RESTRICT_SELECT)) {
-				base->flag |= SELECT;
-			}
-			base->object->flag = base->flag;
-			base->object->restrictflag &= ~OB_RESTRICT_VIEW; 
-			changed = true;
-		}
-	}
-	if (changed) {
-		DAG_id_type_tag(bmain, ID_OB);
-		DAG_relations_tag_update(bmain);
-		WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
-	}
-
-	return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_hide_view_clear(wmOperatorType *ot)
-{
-	
-	/* identifiers */
-	ot->name = "Clear Restrict View";
-	ot->description = "Reveal the object by setting the hide flag";
-	ot->idname = "OBJECT_OT_hide_view_clear";
-	
-	/* api callbacks */
-	ot->exec = object_hide_view_clear_exec;
-	ot->poll = ED_operator_view3d_active;
-	
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-static int object_hide_view_set_exec(bContext *C, wmOperator *op)
-{
-	Main *bmain = CTX_data_main(C);
-	Scene *scene = CTX_data_scene(C);
-	bool changed = false;
-	const bool unselected = RNA_boolean_get(op->ptr, "unselected");
-	
-	CTX_DATA_BEGIN(C, Base *, base, visible_bases)
-	{
-		if (!unselected) {
-			if (base->flag & SELECT) {
-				base->flag &= ~SELECT;
-				base->object->flag = base->flag;
-				base->object->restrictflag |= OB_RESTRICT_VIEW;
-				changed = true;
-				if (base == BASACT) {
-					ED_base_object_activate(C, NULL);
-				}
-			}
-		}
-		else {
-			if (!(base->flag & SELECT)) {
-				base->object->restrictflag |= OB_RESTRICT_VIEW;
-				changed = true;
-				if (base == BASACT) {
-					ED_base_object_activate(C, NULL);
-				}
-			}
-		}
-	}
-	CTX_DATA_END;
-
-	if (changed) {
-		DAG_id_type_tag(bmain, ID_OB);
-		DAG_relations_tag_update(bmain);
-		
-		WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
-		
-	}
-
-	return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_hide_view_set(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Set Restrict View";
-	ot->description = "Hide the object by setting the hide flag";
-	ot->idname = "OBJECT_OT_hide_view_set";
-	
-	/* api callbacks */
-	ot->exec = object_hide_view_set_exec;
-	ot->poll = ED_operator_view3d_active;
-	
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-	
-	RNA_def_boolean(ot->srna, "unselected", 0, "Unselected", "Hide unselected rather than selected objects");
-	
-}
-
-/* 99% same as above except no need for scene refreshing (TODO, update render preview) */
-static int object_hide_render_clear_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	bool changed = false;
-
-	/* XXX need a context loop to handle such cases */
-	CTX_DATA_BEGIN(C, Object *, ob, selected_editable_objects)
-	{
-		if (ob->restrictflag & OB_RESTRICT_RENDER) {
-			ob->restrictflag &= ~OB_RESTRICT_RENDER;
-			changed = true;
-		}
-	}
-	CTX_DATA_END;
-
-	if (changed)
-		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_OUTLINER, NULL);
-
-	return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_hide_render_clear(wmOperatorType *ot)
-{
-
-	/* identifiers */
-	ot->name = "Clear Restrict Render";
-	ot->description = "Reveal the render object by setting the hide render flag";
-	ot->idname = "OBJECT_OT_hide_render_clear";
-
-	/* api callbacks */
-	ot->exec = object_hide_render_clear_exec;
-	ot->poll = ED_operator_view3d_active;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-static int object_hide_render_set_exec(bContext *C, wmOperator *op)
-{
-	const bool unselected = RNA_boolean_get(op->ptr, "unselected");
-
-	CTX_DATA_BEGIN(C, Base *, base, visible_bases)
-	{
-		if (!unselected) {
-			if (base->flag & SELECT) {
-				base->object->restrictflag |= OB_RESTRICT_RENDER;
-			}
-		}
-		else {
-			if (!(base->flag & SELECT)) {
-				base->object->restrictflag |= OB_RESTRICT_RENDER;
-			}
-		}
-	}
-	CTX_DATA_END;
-	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_OUTLINER, NULL);
-	return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_hide_render_set(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Set Restrict Render";
-	ot->description = "Hide the render object by setting the hide render flag";
-	ot->idname = "OBJECT_OT_hide_render_set";
-
-	/* api callbacks */
-	ot->exec = object_hide_render_set_exec;
-	ot->poll = ED_operator_view3d_active;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-
-	RNA_def_boolean(ot->srna, "unselected", 0, "Unselected", "Hide unselected rather than selected objects");
-}
 
 /* ******************* toggle editmode operator  ***************** */
 
@@ -429,8 +248,21 @@ void ED_object_editmode_exit(bContext *C, int flag)
 
 	/* freedata only 0 now on file saves and render */
 	if (freedata) {
+		ListBase pidlist;
+		PTCacheID *pid;
+
 		/* for example; displist make is different in editmode */
 		scene->obedit = NULL; // XXX for context
+
+		/* flag object caches as outdated */
+		BKE_ptcache_ids_from_object(&pidlist, obedit, scene, 0);
+		for (pid = pidlist.first; pid; pid = pid->next) {
+			if (pid->type != PTCACHE_TYPE_PARTICLES) /* particles don't need reset on geometry change */
+				pid->cache->flag |= PTCACHE_OUTDATED;
+		}
+		BLI_freelistN(&pidlist);
+		
+		BKE_ptcache_object_reset(scene, obedit, PTCACHE_RESET_OUTDATED);
 
 		/* also flush ob recalc, doesn't take much overhead, but used for particles */
 		DAG_id_tag_update(&obedit->id, OB_RECALC_OB | OB_RECALC_DATA);
@@ -450,31 +282,22 @@ void ED_object_editmode_exit(bContext *C, int flag)
 void ED_object_editmode_enter(bContext *C, int flag)
 {
 	Scene *scene = CTX_data_scene(C);
-	Base *base = NULL;
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *ob;
-	ScrArea *sa = CTX_wm_area(C);
-	View3D *v3d = NULL;
 	bool ok = false;
 
 	if (ID_IS_LINKED_DATABLOCK(scene)) return;
 
-	if (sa && sa->spacetype == SPACE_VIEW3D)
-		v3d = sa->spacedata.first;
-
 	if ((flag & EM_IGNORE_LAYER) == 0) {
-		base = CTX_data_active_base(C); /* active layer checked here for view3d */
+		ob = CTX_data_active_object(C); /* active layer checked here for view3d */
 
-		if (base == NULL) return;
-		else if (v3d && (base->lay & v3d->lay) == 0) return;
-		else if (!v3d && (base->lay & scene->lay) == 0) return;
+		if (ob == NULL) return;
 	}
 	else {
-		base = scene->basact;
+		ob = sl->basact->object;
 	}
 
-	if (ELEM(NULL, base, base->object, base->object->data)) return;
-
-	ob = base->object;
+	if (ELEM(NULL, ob, ob->data)) return;
 
 	/* this checks actual object->data, for cases when other scenes have it in editmode context */
 	if (BKE_object_is_in_editmode(ob))
@@ -683,7 +506,7 @@ static void copymenu_properties(Scene *scene, View3D *v3d, Object *ob)
 {	
 //XXX no longer used - to be removed - replaced by game_properties_copy_exec
 	bProperty *prop;
-	Base *base;
+	BaseLegacy *base;
 	int nr, tot = 0;
 	char *str;
 	
@@ -743,7 +566,7 @@ static void copymenu_properties(Scene *scene, View3D *v3d, Object *ob)
 static void copymenu_logicbricks(Scene *scene, View3D *v3d, Object *ob)
 {
 //XXX no longer used - to be removed - replaced by logicbricks_copy_exec
-	Base *base;
+	BaseLegacy *base;
 	
 	for (base = FIRSTBASE; base; base = base->next) {
 		if (base->object != ob) {
@@ -826,7 +649,7 @@ static void copy_texture_space(Object *to, Object *ob)
 }
 
 /* UNUSED, keep in case we want to copy functionality for use elsewhere */
-static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
+static void copy_attr(Main *bmain, Scene *scene, SceneLayer *sl, View3D *v3d, short event)
 {
 	Object *ob;
 	Base *base;
@@ -836,7 +659,7 @@ static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
 	
 	if (ID_IS_LINKED_DATABLOCK(scene)) return;
 
-	if (!(ob = OBACT)) return;
+	if (!(ob = OBACT_NEW)) return;
 	
 	if (scene->obedit) { // XXX get from context
 		/* obedit_copymenu(); */
@@ -856,9 +679,9 @@ static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
 		return;
 	}
 
-	for (base = FIRSTBASE; base; base = base->next) {
-		if (base != BASACT) {
-			if (TESTBASELIB(v3d, base)) {
+	for (base = FIRSTBASE_NEW; base; base = base->next) {
+		if (base != BASACT_NEW) {
+			if (TESTBASELIB_NEW(base)) {
 				DAG_id_tag_update(&base->object->id, OB_RECALC_DATA);
 				
 				if (event == 1) {  /* loc */
@@ -1077,13 +900,13 @@ static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
 		DAG_relations_tag_update(bmain);
 }
 
-static void UNUSED_FUNCTION(copy_attr_menu) (Main *bmain, Scene *scene, View3D *v3d)
+static void UNUSED_FUNCTION(copy_attr_menu) (Main *bmain, Scene *scene, SceneLayer *sl, View3D *v3d)
 {
 	Object *ob;
 	short event;
 	char str[512];
 	
-	if (!(ob = OBACT)) return;
+	if (!(ob = OBACT_NEW)) return;
 	
 	if (scene->obedit) { /* XXX get from context */
 /*		if (ob->type == OB_MESH) */
@@ -1131,7 +954,7 @@ static void UNUSED_FUNCTION(copy_attr_menu) (Main *bmain, Scene *scene, View3D *
 	event = pupmenu(str);
 	if (event <= 0) return;
 	
-	copy_attr(bmain, scene, v3d, event);
+	copy_attr(bmain, scene, sl, v3d, event);
 }
 
 /* ******************* force field toggle operator ***************** */
@@ -1497,7 +1320,7 @@ void OBJECT_OT_shade_smooth(wmOperatorType *ot)
 static void UNUSED_FUNCTION(image_aspect) (Scene *scene, View3D *v3d)
 {
 	/* all selected objects with an image map: scale in image aspect */
-	Base *base;
+	BaseLegacy *base;
 	Object *ob;
 	Material *ma;
 	Tex *tex;
@@ -1569,9 +1392,13 @@ static EnumPropertyItem *object_mode_set_itemsf(bContext *C, PointerRNA *UNUSED(
 
 	ob = CTX_data_active_object(C);
 	if (ob) {
+		const bool use_mode_particle_edit = (BLI_listbase_is_empty(&ob->particlesystem) == false) ||
+		                                    (ob->soft != NULL) ||
+		                                    (modifiers_findByType(ob, eModifierType_Cloth) != NULL);
 		while (input->identifier) {
 			if ((input->value == OB_MODE_EDIT && OB_TYPE_SUPPORT_EDITMODE(ob->type)) ||
 			    (input->value == OB_MODE_POSE && (ob->type == OB_ARMATURE)) ||
+			    (input->value == OB_MODE_PARTICLE_EDIT && use_mode_particle_edit) ||
 			    (ELEM(input->value, OB_MODE_SCULPT, OB_MODE_VERTEX_PAINT,
 			           OB_MODE_WEIGHT_PAINT, OB_MODE_TEXTURE_PAINT) && (ob->type == OB_MESH)) ||
 			    (input->value == OB_MODE_OBJECT))
@@ -1613,6 +1440,8 @@ static const char *object_mode_op_string(int mode)
 		return "PAINT_OT_weight_paint_toggle";
 	if (mode == OB_MODE_TEXTURE_PAINT)
 		return "PAINT_OT_texture_paint_toggle";
+	if (mode == OB_MODE_PARTICLE_EDIT)
+		return "PARTICLE_OT_particle_edit_toggle";
 	if (mode == OB_MODE_POSE)
 		return "OBJECT_OT_posemode_toggle";
 	if (mode == OB_MODE_GPENCIL)
@@ -1634,7 +1463,7 @@ static bool object_mode_compat_test(Object *ob, ObjectMode mode)
 		switch (ob->type) {
 			case OB_MESH:
 				if (mode & (OB_MODE_EDIT | OB_MODE_SCULPT | OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT |
-				            OB_MODE_TEXTURE_PAINT))
+				            OB_MODE_TEXTURE_PAINT | OB_MODE_PARTICLE_EDIT))
 				{
 					return true;
 				}

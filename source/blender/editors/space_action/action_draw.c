@@ -61,6 +61,7 @@
 #include "ED_keyframes_draw.h"
 
 #include "action_intern.h"
+#include "GPU_immediate.h"
 
 /* ************************************************************************* */
 /* Channel List */
@@ -156,19 +157,18 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 {
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
-	int filter;
 	
 	View2D *v2d = &ar->v2d;
 	bDopeSheet *ads = &saction->ads;
 	AnimData *adt = NULL;
 	
 	float act_start, act_end, y;
-	size_t items;
-	int height;
 	
 	unsigned char col1[3], col2[3];
 	unsigned char col1a[3], col2a[3];
 	unsigned char col1b[3], col2b[3];
+	
+	const bool show_group_colors = !(saction->flag & SACTION_NODRAWGCOLORS);
 	
 	
 	/* get theme colors */
@@ -192,10 +192,10 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 	}
 	
 	/* build list of channels to draw */
-	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_LIST_CHANNELS);
-	items = ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+	int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_LIST_CHANNELS);
+	size_t items = ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
-	height = ((items * ACHANNEL_STEP(ac)) + (ACHANNEL_HEIGHT(ac)));
+	int height = ((items * ACHANNEL_STEP(ac)) + (ACHANNEL_HEIGHT(ac)));
 	/* don't use totrect set, as the width stays the same 
 	 * (NOTE: this is ok here, the configuration is pretty straightforward) 
 	 */
@@ -203,6 +203,12 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 	
 	/* first backdrop strips */
 	y = (float)(-ACHANNEL_HEIGHT(ac));
+
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
 	glEnable(GL_BLEND);
 	
 	for (ale = anim_data.first; ale; ale = ale->next) {
@@ -221,72 +227,100 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 				/* determine if channel is selected */
 				if (acf->has_setting(ac, ale, ACHANNEL_SETTING_SELECT))
 					sel = ANIM_channel_setting_get(ac, ale, ACHANNEL_SETTING_SELECT);
-				
+
 				if (ELEM(ac->datatype, ANIMCONT_ACTION, ANIMCONT_DOPESHEET, ANIMCONT_SHAPEKEY)) {
 					switch (ale->type) {
 						case ANIMTYPE_SUMMARY:
 						{
 							/* reddish color from NLA */
-							UI_ThemeColor4(TH_ANIM_ACTIVE);
+							immUniformThemeColor(TH_ANIM_ACTIVE);
 							break;
 						}
 						case ANIMTYPE_SCENE:
 						case ANIMTYPE_OBJECT:
 						{
-							if (sel) glColor4ub(col1b[0], col1b[1], col1b[2], 0x45); 
-							else glColor4ub(col1b[0], col1b[1], col1b[2], 0x22); 
+							if (sel) immUniformColor4ub(col1b[0], col1b[1], col1b[2], 0x45);
+							else immUniformColor4ub(col1b[0], col1b[1], col1b[2], 0x22);
 							break;
 						}
 						case ANIMTYPE_FILLACTD:
 						case ANIMTYPE_DSSKEY:
 						case ANIMTYPE_DSWOR:
 						{
-							if (sel) glColor4ub(col2b[0], col2b[1], col2b[2], 0x45); 
-							else glColor4ub(col2b[0], col2b[1], col2b[2], 0x22); 
+							if (sel) immUniformColor4ub(col2b[0], col2b[1], col2b[2], 0x45);
+							else immUniformColor4ub(col2b[0], col2b[1], col2b[2], 0x22);
 							break;
 						}
 						case ANIMTYPE_GROUP:
 						{
-							if (sel) glColor4ub(col1a[0], col1a[1], col1a[2], 0x22);
-							else glColor4ub(col2a[0], col2a[1], col2a[2], 0x22);
+							bActionGroup *agrp = ale->data;
+							if (show_group_colors && agrp->customCol) {
+								if (sel) {
+									char *cp = agrp->cs.select;
+									immUniformColor4ub(cp[0], cp[1], cp[2], 0x45);
+								}
+								else {
+									char *cp = agrp->cs.solid;
+									immUniformColor4ub(cp[0], cp[1], cp[2], 0x1D);
+								}
+							}
+							else {
+								if (sel) immUniformColor4ub(col1a[0], col1a[1], col1a[2], 0x22);
+								else immUniformColor4ub(col2a[0], col2a[1], col2a[2], 0x22);
+							}
+							break;
+						}
+						case ANIMTYPE_FCURVE:
+						{
+							FCurve *fcu = ale->data;
+							if (show_group_colors && fcu->grp && fcu->grp->customCol) {
+								unsigned char *cp = (unsigned char *)fcu->grp->cs.active;
+								
+								if (sel) immUniformColor4ub(cp[0], cp[1], cp[2], 0x65);
+								else immUniformColor4ub(cp[0], cp[1], cp[2], 0x0B);
+							}
+							else {
+								if (sel) immUniformColor4ub(col1[0], col1[1], col1[2], 0x22);
+								else immUniformColor4ub(col2[0], col2[1], col2[2], 0x22);
+							}
 							break;
 						}
 						default:
 						{
-							if (sel) glColor4ub(col1[0], col1[1], col1[2], 0x22);
-							else glColor4ub(col2[0], col2[1], col2[2], 0x22);
+							if (sel) immUniformColor4ub(col1[0], col1[1], col1[2], 0x22);
+							else immUniformColor4ub(col2[0], col2[1], col2[2], 0x22);
 							break;
 						}
 					}
 					
 					/* draw region twice: firstly backdrop, then the current range */
-					glRectf(v2d->cur.xmin,  (float)y - ACHANNEL_HEIGHT_HALF(ac),  v2d->cur.xmax + EXTRA_SCROLL_PAD,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
+					immRectf(pos, v2d->cur.xmin,  (float)y - ACHANNEL_HEIGHT_HALF(ac),  v2d->cur.xmax + EXTRA_SCROLL_PAD,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
 					
 					if (ac->datatype == ANIMCONT_ACTION)
-						glRectf(act_start,  (float)y - ACHANNEL_HEIGHT_HALF(ac),  act_end,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
+						immRectf(pos, act_start,  (float)y - ACHANNEL_HEIGHT_HALF(ac),  act_end,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
 				}
 				else if (ac->datatype == ANIMCONT_GPENCIL) {
 					/* frames less than one get less saturated background */
-					if (sel) glColor4ub(col1[0], col1[1], col1[2], 0x22);
-					else glColor4ub(col2[0], col2[1], col2[2], 0x22);
-					glRectf(0.0f, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmin, (float)y + ACHANNEL_HEIGHT_HALF(ac));
+					if (sel) immUniformColor4ub(col1[0], col1[1], col1[2], 0x22);
+					else immUniformColor4ub(col2[0], col2[1], col2[2], 0x22);
+					immRectf(pos, 0.0f, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmin, (float)y + ACHANNEL_HEIGHT_HALF(ac));
 					
 					/* frames one and higher get a saturated background */
-					if (sel) glColor4ub(col1[0], col1[1], col1[2], 0x44);
-					else glColor4ub(col2[0], col2[1], col2[2], 0x44);
-					glRectf(v2d->cur.xmin, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmax + EXTRA_SCROLL_PAD,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
+					if (sel) immUniformColor4ub(col1[0], col1[1], col1[2], 0x44);
+					else immUniformColor4ub(col2[0], col2[1], col2[2], 0x44);
+					immRectf(pos, v2d->cur.xmin, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmax + EXTRA_SCROLL_PAD,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
 				}
 				else if (ac->datatype == ANIMCONT_MASK) {
 					/* TODO --- this is a copy of gpencil */
 					/* frames less than one get less saturated background */
-					if (sel) glColor4ub(col1[0], col1[1], col1[2], 0x22);
-					else glColor4ub(col2[0], col2[1], col2[2], 0x22);
-					glRectf(0.0f, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmin, (float)y + ACHANNEL_HEIGHT_HALF(ac));
+					if (sel) immUniformColor4ub(col1[0], col1[1], col1[2], 0x22);
+					else immUniformColor4ub(col2[0], col2[1], col2[2], 0x22);
+					immRectf(pos, 0.0f, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmin, (float)y + ACHANNEL_HEIGHT_HALF(ac));
 
 					/* frames one and higher get a saturated background */
-					if (sel) glColor4ub(col1[0], col1[1], col1[2], 0x44);
-					else glColor4ub(col2[0], col2[1], col2[2], 0x44);
-					glRectf(v2d->cur.xmin, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmax + EXTRA_SCROLL_PAD,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
+					if (sel) immUniformColor4ub(col1[0], col1[1], col1[2], 0x44);
+					else immUniformColor4ub(col2[0], col2[1], col2[2], 0x44);
+					immRectf(pos, v2d->cur.xmin, (float)y - ACHANNEL_HEIGHT_HALF(ac), v2d->cur.xmax + EXTRA_SCROLL_PAD,  (float)y + ACHANNEL_HEIGHT_HALF(ac));
 				}
 			}
 		}
@@ -295,18 +329,29 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 		y -= ACHANNEL_STEP(ac);
 	}
 	glDisable(GL_BLEND);
-	
-	/* Draw keyframes 
+
+	/* black line marking 'current frame' for Time-Slide transform mode */
+	if (saction->flag & SACTION_MOVING) {
+		immUniformColor3f(0.0f, 0.0f, 0.0f);
+
+		immBegin(GL_LINES, 2);
+		immVertex2f(pos, saction->timeslide, v2d->cur.ymin - EXTRA_SCROLL_PAD);
+		immVertex2f(pos, saction->timeslide, v2d->cur.ymax);
+		immEnd();
+	}
+	immUnbindProgram();
+
+	/* Draw keyframes
 	 *	1) Only channels that are visible in the Action Editor get drawn/evaluated.
 	 *	   This is to try to optimize this for heavier data sets
 	 *	2) Keyframes which are out of view horizontally are disregarded 
 	 */
 	y = (float)(-ACHANNEL_HEIGHT(ac));
-	
+
 	for (ale = anim_data.first; ale; ale = ale->next) {
 		const float yminc = (float)(y - ACHANNEL_HEIGHT_HALF(ac));
 		const float ymaxc = (float)(y + ACHANNEL_HEIGHT_HALF(ac));
-		
+
 		/* check if visible */
 		if (IN_RANGE(yminc, v2d->cur.ymin, v2d->cur.ymax) ||
 		    IN_RANGE(ymaxc, v2d->cur.ymin, v2d->cur.ymax) )
@@ -314,7 +359,7 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 			/* check if anything to show for this channel */
 			if (ale->datatype != ALE_NONE) {
 				adt = ANIM_nla_mapping_get(ac, ale);
-				
+
 				/* draw 'keyframes' for each specific datatype */
 				switch (ale->datatype) {
 					case ALE_ALL:
@@ -344,20 +389,10 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 				}
 			}
 		}
-		
+
 		y -= ACHANNEL_STEP(ac);
 	}
-	
-	/* free tempolary channels used for drawing */
-	ANIM_animdata_freelist(&anim_data);
 
-	/* black line marking 'current frame' for Time-Slide transform mode */
-	if (saction->flag & SACTION_MOVING) {
-		glColor3f(0.0f, 0.0f, 0.0f);
-		
-		glBegin(GL_LINES);
-		glVertex2f(saction->timeslide, v2d->cur.ymin - EXTRA_SCROLL_PAD);
-		glVertex2f(saction->timeslide, v2d->cur.ymax);
-		glEnd();
-	}
+	/* free temporary channels used for drawing */
+	ANIM_animdata_freelist(&anim_data);
 }

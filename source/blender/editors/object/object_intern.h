@@ -70,7 +70,6 @@ void OBJECT_OT_make_local(struct wmOperatorType *ot);
 void OBJECT_OT_make_single_user(struct wmOperatorType *ot);
 void OBJECT_OT_make_links_scene(struct wmOperatorType *ot);
 void OBJECT_OT_make_links_data(struct wmOperatorType *ot);
-void OBJECT_OT_move_to_layer(struct wmOperatorType *ot);
 void OBJECT_OT_drop_named_material(struct wmOperatorType *ot);
 void OBJECT_OT_unlink_data(struct wmOperatorType *ot);
 
@@ -78,10 +77,6 @@ void OBJECT_OT_unlink_data(struct wmOperatorType *ot);
 void OBJECT_OT_mode_set(struct wmOperatorType *ot);
 void OBJECT_OT_editmode_toggle(struct wmOperatorType *ot);
 void OBJECT_OT_posemode_toggle(struct wmOperatorType *ot);
-void OBJECT_OT_hide_view_set(struct wmOperatorType *ot);
-void OBJECT_OT_hide_view_clear(struct wmOperatorType *ot);
-void OBJECT_OT_hide_render_set(struct wmOperatorType *ot);
-void OBJECT_OT_hide_render_clear(struct wmOperatorType *ot);
 void OBJECT_OT_proxy_make(struct wmOperatorType *ot);
 void OBJECT_OT_shade_smooth(struct wmOperatorType *ot);
 void OBJECT_OT_shade_flat(struct wmOperatorType *ot);
@@ -169,6 +164,7 @@ void OBJECT_OT_modifier_remove(struct wmOperatorType *ot);
 void OBJECT_OT_modifier_move_up(struct wmOperatorType *ot);
 void OBJECT_OT_modifier_move_down(struct wmOperatorType *ot);
 void OBJECT_OT_modifier_apply(struct wmOperatorType *ot);
+void OBJECT_OT_modifier_convert(struct wmOperatorType *ot);
 void OBJECT_OT_modifier_copy(struct wmOperatorType *ot);
 void OBJECT_OT_multires_subdivide(struct wmOperatorType *ot);
 void OBJECT_OT_multires_reshape(struct wmOperatorType *ot);
@@ -185,6 +181,7 @@ void OBJECT_OT_skin_loose_mark_clear(struct wmOperatorType *ot);
 void OBJECT_OT_skin_radii_equalize(struct wmOperatorType *ot);
 void OBJECT_OT_skin_armature_create(struct wmOperatorType *ot);
 void OBJECT_OT_laplaciandeform_bind(struct wmOperatorType *ot);
+void OBJECT_OT_surfacedeform_bind(struct wmOperatorType *ot);
 
 /* object_constraint.c */
 void OBJECT_OT_constraint_add(struct wmOperatorType *ot);

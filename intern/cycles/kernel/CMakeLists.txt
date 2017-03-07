@@ -164,6 +164,8 @@ set(SRC_GEOM_HEADERS
 	geom/geom_curve.h
 	geom/geom_motion_curve.h
 	geom/geom_motion_triangle.h
+	geom/geom_motion_triangle_intersect.h
+	geom/geom_motion_triangle_shader.h
 	geom/geom_object.h
 	geom/geom_patch.h
 	geom/geom_primitive.h
@@ -177,6 +179,7 @@ set(SRC_UTIL_HEADERS
 	../util/util_atomic.h
 	../util/util_color.h
 	../util/util_half.h
+	../util/util_hash.h
 	../util/util_math.h
 	../util/util_math_fast.h
 	../util/util_static_assert.h

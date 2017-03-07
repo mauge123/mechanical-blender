@@ -63,7 +63,9 @@
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
 #include "BKE_camera.h"
+#include "BKE_collection.h"
 #include "BKE_context.h"
+#include "BKE_constraint.h"
 #include "BKE_curve.h"
 #include "BKE_depsgraph.h"
 #include "BKE_DerivedMesh.h"
@@ -73,8 +75,10 @@
 #include "BKE_group.h"
 #include "BKE_lamp.h"
 #include "BKE_lattice.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_library_query.h"
+#include "BKE_library_remap.h"
 #include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -82,6 +86,7 @@
 #include "BKE_mesh.h"
 #include "BKE_nla.h"
 #include "BKE_object.h"
+#include "BKE_particle.h"
 #include "BKE_report.h"
 #include "BKE_sca.h"
 #include "BKE_scene.h"
@@ -419,10 +424,11 @@ Object *ED_object_add_type(
         bContext *C,
         int type, const char *name,
         const float loc[3], const float rot[3],
-        bool enter_editmode, unsigned int layer)
+        bool enter_editmode, unsigned int UNUSED(layer))
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *ob;
 
 	/* for as long scene has editmode... */
@@ -430,13 +436,12 @@ Object *ED_object_add_type(
 		ED_object_editmode_exit(C, EM_FREEDATA | EM_FREEUNDO | EM_WAITCURSOR | EM_DO_UNDO);  /* freedata, and undo */
 
 	/* deselects all, sets scene->basact */
-	ob = BKE_object_add(bmain, scene, type, name);
-	BASACT->lay = ob->lay = layer;
+	ob = BKE_object_add(bmain, scene, sl, type, name);
 	/* editor level activate, notifiers */
-	ED_base_object_activate(C, BASACT);
+	ED_object_base_activate(C, sl->basact);
 
 	/* more editor stuff */
-	ED_object_base_init_transform(C, BASACT, loc, rot);
+	ED_object_base_init_transform(C, sl->basact, loc, rot);
 
 	/* Ignore collisions by default for non-mesh objects */
 	if (type != OB_MESH) {
@@ -844,7 +849,7 @@ static int empty_drop_named_image_invoke(bContext *C, wmOperator *op, const wmEv
 {
 	Scene *scene = CTX_data_scene(C);
 
-	Base *base = NULL;
+	BaseLegacy *base = NULL;
 	Image *ima = NULL;
 	Object *ob = NULL;
 
@@ -1123,19 +1128,19 @@ static void object_delete_check_glsl_update(Object *ob)
 
 /* remove base from a specific scene */
 /* note: now unlinks constraints as well */
-void ED_base_object_free_and_unlink(Main *bmain, Scene *scene, Base *base)
+void ED_base_object_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
 {
-	if (BKE_library_ID_is_indirectly_used(bmain, base->object) && ID_REAL_USERS(base->object) <= 1) {
+	if (BKE_library_ID_is_indirectly_used(bmain, ob) &&
+	    ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0)
+	{
 		/* We cannot delete indirectly used object... */
 		printf("WARNING, undeletable object '%s', should have been catched before reaching this function!",
-		       base->object->id.name + 2);
+		       ob->id.name + 2);
 		return;
 	}
 
-	BKE_scene_base_unlink(scene, base);
-	object_delete_check_glsl_update(base->object);
-	BKE_libblock_free_us(bmain, base->object);
-	MEM_freeN(base);
+	object_delete_check_glsl_update(ob);
+	BKE_collections_object_remove(bmain, scene, ob, true);
 	DAG_id_type_tag(bmain, ID_OB);
 }
 
@@ -1151,56 +1156,46 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 	if (CTX_data_edit_object(C)) 
 		return OPERATOR_CANCELLED;
 
-	CTX_DATA_BEGIN (C, Base *, base, selected_bases)
+	CTX_DATA_BEGIN (C, Object *, ob, selected_objects)
 	{
-		const bool is_indirectly_used = BKE_library_ID_is_indirectly_used(bmain, base->object);
-		if (base->object->id.tag & LIB_TAG_INDIRECT) {
+		const bool is_indirectly_used = BKE_library_ID_is_indirectly_used(bmain, ob);
+		if (ob->id.tag & LIB_TAG_INDIRECT) {
 			/* Can this case ever happen? */
-			BKE_reportf(op->reports, RPT_WARNING, "Cannot delete indirectly linked object '%s'", base->object->id.name + 2);
+			BKE_reportf(op->reports, RPT_WARNING, "Cannot delete indirectly linked object '%s'", ob->id.name + 2);
 			continue;
 		}
-		else if (is_indirectly_used && ID_REAL_USERS(base->object) <= 1) {
+		else if (is_indirectly_used && ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0) {
 			BKE_reportf(op->reports, RPT_WARNING,
 			        "Cannot delete object '%s' from scene '%s', indirectly used objects need at least one user",
-			        base->object->id.name + 2, scene->id.name + 2);
+			        ob->id.name + 2, scene->id.name + 2);
 			continue;
 		}
 		/* remove from Grease Pencil parent */
 		for (bGPdata *gpd = bmain->gpencil.first; gpd; gpd = gpd->id.next) {
 			for (bGPDlayer *gpl = gpd->layers.first; gpl; gpl = gpl->next) {
 				if (gpl->parent != NULL) {
-					Object *ob = gpl->parent;
-					Object *curob = base->object;
-					if (ob == curob) {
+					if (gpl->parent == ob) {
 						gpl->parent = NULL;
 					}
 				}
 			}
 		}
 
-		/* deselect object -- it could be used in other scenes */
-		base->object->flag &= ~SELECT;
-
 		/* remove from current scene only */
-		ED_base_object_free_and_unlink(bmain, scene, base);
+		ED_base_object_free_and_unlink(bmain, scene, ob);
 		changed = true;
 
 		if (use_global) {
 			Scene *scene_iter;
-			Base *base_other;
-
 			for (scene_iter = bmain->scene.first; scene_iter; scene_iter = scene_iter->id.next) {
 				if (scene_iter != scene && !ID_IS_LINKED_DATABLOCK(scene_iter)) {
-					base_other = BKE_scene_base_find(scene_iter, base->object);
-					if (base_other) {
-						if (is_indirectly_used && ID_REAL_USERS(base->object) <= 1) {
-							BKE_reportf(op->reports, RPT_WARNING,
-							            "Cannot delete object '%s' from scene '%s', indirectly used objects need at least one user",
-							            base->object->id.name + 2, scene_iter->id.name + 2);
-							break;
-						}
-						ED_base_object_free_and_unlink(bmain, scene_iter, base_other);
+					if (is_indirectly_used && ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0) {
+						BKE_reportf(op->reports, RPT_WARNING,
+						            "Cannot delete object '%s' from scene '%s', indirectly used objects need at least one user",
+						            ob->id.name + 2, scene_iter->id.name + 2);
+						break;
 					}
+					ED_base_object_free_and_unlink(bmain, scene_iter, ob);
 				}
 			}
 		}
@@ -1256,7 +1251,7 @@ static void copy_object_set_idnew(bContext *C)
 
 	CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects)
 	{
-		BKE_libblock_relink(&ob->id);
+		BKE_libblock_relink_to_newid(&ob->id);
 	}
 	CTX_DATA_END;
 
@@ -1268,10 +1263,10 @@ static void copy_object_set_idnew(bContext *C)
 /********************* Make Duplicates Real ************************/
 
 /**
- * \note regarding hashing dupli-objects, skip the first member of #DupliObject.persistent_id
+ * \note regarding hashing dupli-objects when using OB_DUPLIGROUP, skip the first member of #DupliObject.persistent_id
  * since its a unique index and we only want to know if the group objects are from the same dupli-group instance.
  */
-static unsigned int dupliobject_hash(const void *ptr)
+static unsigned int dupliobject_group_hash(const void *ptr)
 {
 	const DupliObject *dob = ptr;
 	unsigned int hash = BLI_ghashutil_ptrhash(dob->ob);
@@ -1282,7 +1277,20 @@ static unsigned int dupliobject_hash(const void *ptr)
 	return hash;
 }
 
-static bool dupliobject_cmp(const void *a_, const void *b_)
+/**
+ * \note regarding hashing dupli-objects when NOT using OB_DUPLIGROUP, include the first member of #DupliObject.persistent_id
+ * since its the index of the vertex/face the object is instantiated on and we want to identify objects on the same vertex/face.
+ */
+static unsigned int dupliobject_hash(const void *ptr)
+{
+	const DupliObject *dob = ptr;
+	unsigned int hash = BLI_ghashutil_ptrhash(dob->ob);
+	hash ^= (dob->persistent_id[0] ^ 0);
+	return hash;
+}
+
+/* Compare function that matches dupliobject_group_hash */
+static bool dupliobject_group_cmp(const void *a_, const void *b_)
 {
 	const DupliObject *a = a_;
 	const DupliObject *b = b_;
@@ -1305,11 +1313,30 @@ static bool dupliobject_cmp(const void *a_, const void *b_)
 	return false;
 }
 
+/* Compare function that matches dupliobject_hash */
+static bool dupliobject_cmp(const void *a_, const void *b_)
+{
+	const DupliObject *a = a_;
+	const DupliObject *b = b_;
+
+	if (a->ob != b->ob) {
+		return true;
+	}
+
+	if (a->persistent_id[0] != b->persistent_id[0]) {
+		return true;
+	}
+
+	/* matching */
+	return false;
+}
+
 static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
                                        const bool use_base_parent,
                                        const bool use_hierarchy)
 {
 	Main *bmain = CTX_data_main(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	ListBase *lb;
 	DupliObject *dob;
 	GHash *dupli_gh = NULL, *parent_gh = NULL;
@@ -1322,24 +1349,29 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 
 	if (use_hierarchy || use_base_parent) {
 		dupli_gh = BLI_ghash_ptr_new(__func__);
-		parent_gh = BLI_ghash_new(dupliobject_hash, dupliobject_cmp, __func__);
+		if (use_hierarchy) {
+			if (base->object->transflag & OB_DUPLIGROUP) {
+				parent_gh = BLI_ghash_new(dupliobject_group_hash, dupliobject_group_cmp, __func__);
+			}
+			else {
+				parent_gh = BLI_ghash_new(dupliobject_hash, dupliobject_cmp, __func__);
+			}
+		}
 	}
 
 	for (dob = lb->first; dob; dob = dob->next) {
 		Base *basen;
-		Object *ob = BKE_object_copy(bmain, dob->ob);
+		Object *ob = ID_NEW_SET(dob->ob, BKE_object_copy(bmain, dob->ob));
 
 		/* font duplis can have a totcol without material, we get them from parent
 		 * should be implemented better...
 		 */
 		if (ob->mat == NULL) ob->totcol = 0;
 
-		basen = MEM_dupallocN(base);
-		basen->flag &= ~(OB_FROMDUPLI | OB_FROMGROUP);
-		ob->flag = basen->flag;
-		basen->lay = base->lay;
-		BLI_addhead(&scene->base, basen);   /* addhead: othwise eternal loop */
-		basen->object = ob;
+		BKE_collection_object_add_from(scene, dob->ob, ob);
+		basen = BKE_scene_layer_base_find(sl, ob);
+
+		BKE_scene_object_base_flag_sync_from_base(basen);
 
 		/* make sure apply works */
 		BKE_animdata_free(&ob->id, true);
@@ -1351,18 +1383,29 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		ob->proxy = NULL;
 
 		ob->parent = NULL;
-		BLI_listbase_clear(&ob->constraints);
+		BKE_constraints_free(&ob->constraints);
 		ob->curve_cache = NULL;
 		ob->transflag &= ~OB_DUPLI;
-		ob->lay = base->lay;
 
 		copy_m4_m4(ob->obmat, dob->mat);
 		BKE_object_apply_mat4(ob, ob->obmat, false, false);
 
-		if (dupli_gh)
+		if (dupli_gh) {
 			BLI_ghash_insert(dupli_gh, dob, ob);
-		if (parent_gh)
-			BLI_ghash_insert(parent_gh, dob, ob);
+		}
+		if (parent_gh) {
+			void **val;
+			/* Due to nature of hash/comparison of this ghash, a lot of duplis may be considered as 'the same',
+			 * this avoids trying to insert same key several time and raise asserts in debug builds... */
+			if (!BLI_ghash_ensure_p(parent_gh, dob, &val)) {
+				*val = ob;
+			}
+		}
+
+		/* Remap new object to itself, and clear again newid pointer of orig object. */
+		BKE_libblock_relink_to_newid(&ob->id);
+		set_sca_new_poins_ob(ob);
+		BKE_id_clear_newpoin(&dob->ob->id);
 
 		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	}
@@ -1382,9 +1425,14 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 				 * they won't be read, this is simply for a hash lookup. */
 				DupliObject dob_key;
 				dob_key.ob = ob_src_par;
-				memcpy(&dob_key.persistent_id[1],
-				       &dob->persistent_id[1],
-				       sizeof(dob->persistent_id[1]) * (MAX_DUPLI_RECUR - 1));
+				if (base->object->transflag & OB_DUPLIGROUP) {
+					memcpy(&dob_key.persistent_id[1],
+						   &dob->persistent_id[1],
+						   sizeof(dob->persistent_id[1]) * (MAX_DUPLI_RECUR - 1));
+				}
+				else {
+					dob_key.persistent_id[0] = dob->persistent_id[0];
+				}
 				ob_dst_par = BLI_ghash_lookup(parent_gh, &dob_key);
 			}
 
@@ -1448,8 +1496,6 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		BLI_ghash_free(dupli_gh, NULL, NULL);
 	if (parent_gh)
 		BLI_ghash_free(parent_gh, NULL, NULL);
-
-	copy_object_set_idnew(C);
 
 	free_object_duplilist(lb);
 
@@ -1548,7 +1594,7 @@ static int convert_poll(bContext *C)
 }
 
 /* Helper for convert_exec */
-static Base *duplibase_for_convert(Main *bmain, Scene *scene, Base *base, Object *ob)
+static Base *duplibase_for_convert(Main *bmain, Scene *scene, SceneLayer *sl, Base *base, Object *ob)
 {
 	Object *obn;
 	Base *basen;
@@ -1559,16 +1605,11 @@ static Base *duplibase_for_convert(Main *bmain, Scene *scene, Base *base, Object
 
 	obn = BKE_object_copy(bmain, ob);
 	DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
+	BKE_collection_object_add_from(scene, ob, obn);
 
-	basen = MEM_mallocN(sizeof(Base), "duplibase");
-	*basen = *base;
-	BLI_addhead(&scene->base, basen);   /* addhead: otherwise eternal loop */
-	basen->object = obn;
-	basen->flag |= SELECT;
-	obn->flag |= SELECT;
-	base->flag &= ~SELECT;
-	ob->flag &= ~SELECT;
-
+	basen = BKE_scene_layer_base_find(sl, obn);
+	ED_object_base_select(basen, BA_SELECT);
+	ED_object_base_select(basen, BA_DESELECT);
 	return basen;
 }
 
@@ -1576,6 +1617,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Base *basen = NULL, *basact = NULL;
 	Object *ob, *ob1, *newob, *obact = CTX_data_active_object(C);
 	DerivedMesh *dm;
@@ -1590,7 +1632,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 	/* don't forget multiple users! */
 
 	{
-		Base *base;
+		BaseLegacy *base;
 
 		for (base = scene->base.first; base; base = base->next) {
 			ob = base->object;
@@ -1637,7 +1679,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			ob->flag |= OB_DONE;
 
 			if (keep_original) {
-				basen = duplibase_for_convert(bmain, scene, base, NULL);
+				basen = duplibase_for_convert(bmain, scene, sl, base, NULL);
 				newob = basen->object;
 
 				/* decrement original mesh's usage count  */
@@ -1662,7 +1704,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			ob->flag |= OB_DONE;
 
 			if (keep_original) {
-				basen = duplibase_for_convert(bmain, scene, base, NULL);
+				basen = duplibase_for_convert(bmain, scene, sl, base, NULL);
 				newob = basen->object;
 
 				/* decrement original mesh's usage count  */
@@ -1694,7 +1736,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			ob->flag |= OB_DONE;
 
 			if (keep_original) {
-				basen = duplibase_for_convert(bmain, scene, base, NULL);
+				basen = duplibase_for_convert(bmain, scene, sl, base, NULL);
 				newob = basen->object;
 
 				/* decrement original curve's usage count  */
@@ -1765,7 +1807,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 			if (target == OB_MESH) {
 				if (keep_original) {
-					basen = duplibase_for_convert(bmain, scene, base, NULL);
+					basen = duplibase_for_convert(bmain, scene, sl, base, NULL);
 					newob = basen->object;
 
 					/* decrement original curve's usage count  */
@@ -1800,7 +1842,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 			if (!(baseob->flag & OB_DONE)) {
 				baseob->flag |= OB_DONE;
 
-				basen = duplibase_for_convert(bmain, scene, base, baseob);
+				basen = duplibase_for_convert(bmain, scene, sl, base, baseob);
 				newob = basen->object;
 
 				mb = newob->data;
@@ -1851,23 +1893,20 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 	if (!keep_original) {
 		if (mballConverted) {
-			Base *base, *base_next;
-
-			for (base = scene->base.first; base; base = base_next) {
-				base_next = base->next;
-
-				ob = base->object;
+			FOREACH_SCENE_OBJECT(scene, ob_mball)
+			{
 				if (ob->type == OB_MBALL) {
 					if (ob->flag & OB_DONE) {
 						Object *ob_basis = NULL;
-						if (BKE_mball_is_basis(ob) ||
-						    ((ob_basis = BKE_mball_basis_find(scene, ob)) && (ob_basis->flag & OB_DONE)))
+						if (BKE_mball_is_basis(ob_mball) ||
+						    ((ob_basis = BKE_mball_basis_find(scene, ob_mball)) && (ob_basis->flag & OB_DONE)))
 						{
-							ED_base_object_free_and_unlink(bmain, scene, base);
+							ED_base_object_free_and_unlink(bmain, scene, ob_mball);
 						}
 					}
 				}
 			}
+			FOREACH_SCENE_OBJECT_END
 		}
 
 		/* delete object should renew depsgraph */
@@ -1879,12 +1918,12 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 	if (basact) {
 		/* active base was changed */
-		ED_base_object_activate(C, basact);
-		BASACT = basact;
+		ED_object_base_activate(C, basact);
+		BASACT_NEW = basact;
 	}
-	else if (BASACT->object->flag & OB_DONE) {
-		WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, BASACT->object);
-		WM_event_add_notifier(C, NC_OBJECT | ND_DATA, BASACT->object);
+	else if (BASACT_NEW->object->flag & OB_DONE) {
+		WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, BASACT_NEW->object);
+		WM_event_add_notifier(C, NC_OBJECT | ND_DATA, BASACT_NEW->object);
 	}
 
 	DAG_relations_tag_update(bmain);
@@ -1925,56 +1964,76 @@ void OBJECT_OT_convert(wmOperatorType *ot)
 
 /* used below, assumes id.new is correct */
 /* leaves selection of base/object unaltered */
-static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base, int dupflag)
+/* Does set ID->newid pointers. */
+static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, SceneLayer *sl, Object *ob, int dupflag)
 {
+#define ID_NEW_REMAP_US(a)	if (      (a)->id.newid) { (a) = (void *)(a)->id.newid;       (a)->id.us++; }
+#define ID_NEW_REMAP_US2(a)	if (((ID *)a)->newid)    { (a) = ((ID  *)a)->newid;     ((ID *)a)->us++;    }
+
 	Base *basen = NULL;
 	Material ***matarar;
-	Object *ob, *obn;
+	Object *obn;
 	ID *id;
 	int a, didit;
 
-	ob = base->object;
 	if (ob->mode & OB_MODE_POSE) {
 		; /* nothing? */
 	}
 	else {
-		obn = BKE_object_copy(bmain, ob);
+		obn = ID_NEW_SET(ob, BKE_object_copy(bmain, ob));
 		DAG_id_tag_update(&obn->id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
 
-		basen = MEM_mallocN(sizeof(Base), "duplibase");
-		*basen = *base;
-		BLI_addhead(&scene->base, basen);   /* addhead: prevent eternal loop */
-		basen->object = obn;
+		BKE_collection_object_add_from(scene, ob, obn);
+		basen = BKE_scene_layer_base_find(sl, obn);
 
 		/* 1) duplis should end up in same group as the original
 		 * 2) Rigid Body sim participants MUST always be part of a group...
 		 */
 		// XXX: is 2) really a good measure here?
-		if ((basen->flag & OB_FROMGROUP) || ob->rigidbody_object || ob->rigidbody_constraint) {
+		if ((ob->flag & OB_FROMGROUP) != 0 || ob->rigidbody_object || ob->rigidbody_constraint) {
 			Group *group;
 			for (group = bmain->group.first; group; group = group->id.next) {
 				if (BKE_group_object_exists(group, ob))
-					BKE_group_object_add(group, obn, scene, basen);
+					BKE_group_object_add(group, obn);
 			}
 		}
 
 		/* duplicates using userflags */
 		if (dupflag & USER_DUP_ACT) {
-			BKE_animdata_copy_id_action(&obn->id);
+			BKE_animdata_copy_id_action(&obn->id, true);
 		}
 
 		if (dupflag & USER_DUP_MAT) {
 			for (a = 0; a < obn->totcol; a++) {
 				id = (ID *)obn->mat[a];
 				if (id) {
-					ID_NEW_US(obn->mat[a])
-					else
-						obn->mat[a] = BKE_material_copy(bmain, obn->mat[a]);
+					ID_NEW_REMAP_US(obn->mat[a])
+					else {
+						obn->mat[a] = ID_NEW_SET(obn->mat[a], BKE_material_copy(bmain, obn->mat[a]));
+					}
 					id_us_min(id);
 
 					if (dupflag & USER_DUP_ACT) {
-						BKE_animdata_copy_id_action(&obn->mat[a]->id);
+						BKE_animdata_copy_id_action(&obn->mat[a]->id, true);
 					}
+				}
+			}
+		}
+		if (dupflag & USER_DUP_PSYS) {
+			ParticleSystem *psys;
+			for (psys = obn->particlesystem.first; psys; psys = psys->next) {
+				id = (ID *) psys->part;
+				if (id) {
+					ID_NEW_REMAP_US(psys->part)
+					else {
+						psys->part = ID_NEW_SET(psys->part, BKE_particlesettings_copy(bmain, psys->part));
+					}
+
+					if (dupflag & USER_DUP_ACT) {
+						BKE_animdata_copy_id_action(&psys->part->id, true);
+					}
+
+					id_us_min(id);
 				}
 			}
 		}
@@ -1985,9 +2044,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 		switch (obn->type) {
 			case OB_MESH:
 				if (dupflag & USER_DUP_MESH) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_mesh_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_mesh_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -1995,9 +2054,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_CURVE:
 				if (dupflag & USER_DUP_CURVE) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_curve_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_curve_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2005,9 +2064,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_SURF:
 				if (dupflag & USER_DUP_SURF) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_curve_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_curve_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2015,9 +2074,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_FONT:
 				if (dupflag & USER_DUP_FONT) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_curve_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_curve_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2025,9 +2084,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_MBALL:
 				if (dupflag & USER_DUP_MBALL) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_mball_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_mball_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2035,9 +2094,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_LAMP:
 				if (dupflag & USER_DUP_LAMP) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_lamp_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_lamp_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2048,9 +2107,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				if (obn->pose)
 					BKE_pose_tag_recalc(bmain, obn->pose);
 				if (dupflag & USER_DUP_ARM) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_armature_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_armature_copy(bmain, obn->data));
 						BKE_pose_rebuild(obn, obn->data);
 						didit = 1;
 					}
@@ -2059,9 +2118,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_LATTICE:
 				if (dupflag != 0) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_lattice_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_lattice_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2069,9 +2128,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_CAMERA:
 				if (dupflag != 0) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_camera_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_camera_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2079,9 +2138,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				break;
 			case OB_SPEAKER:
 				if (dupflag != 0) {
-					ID_NEW_US2(obn->data)
+					ID_NEW_REMAP_US2(obn->data)
 					else {
-						obn->data = BKE_speaker_copy(bmain, obn->data);
+						obn->data = ID_NEW_SET(obn->data, BKE_speaker_copy(bmain, obn->data));
 						didit = 1;
 					}
 					id_us_min(id);
@@ -2096,12 +2155,15 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 			if (dupflag & USER_DUP_ACT) {
 				bActuator *act;
 
-				BKE_animdata_copy_id_action((ID *)obn->data);
+				BKE_animdata_copy_id_action((ID *)obn->data, true);
 				if (key) {
-					BKE_animdata_copy_id_action((ID *)key);
+					BKE_animdata_copy_id_action((ID *)key, true);
 				}
 
 				/* Update the duplicated action in the action actuators */
+				/* XXX TODO this code is all wrong! actact->act is user-refcounted (see readfile.c),
+				 * and what about other ID pointers of other BGE logic bricks,
+				 * and since this is object-level, why is it only ran if obdata was duplicated??? -mont29 */
 				for (act = obn->actuators.first; act; act = act->next) {
 					if (act->type == ACT_ACTION) {
 						bActionActuator *actact = (bActionActuator *) act->data;
@@ -2118,9 +2180,10 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 					for (a = 0; a < obn->totcol; a++) {
 						id = (ID *)(*matarar)[a];
 						if (id) {
-							ID_NEW_US((*matarar)[a])
-							else
-								(*matarar)[a] = BKE_material_copy(bmain, (*matarar)[a]);
+							ID_NEW_REMAP_US((*matarar)[a])
+							else {
+								(*matarar)[a] = ID_NEW_SET((*matarar)[a], BKE_material_copy(bmain, (*matarar)[a]));
+							}
 							id_us_min(id);
 						}
 					}
@@ -2129,6 +2192,9 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 		}
 	}
 	return basen;
+
+#undef ID_NEW_REMAP_US
+#undef ID_NEW_REMAP_US2
 }
 
 /* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
@@ -2136,15 +2202,14 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
  * note: don't call this within a loop since clear_* funcs loop over the entire database.
  * note: caller must do DAG_relations_tag_update(bmain);
  *       this is not done automatic since we may duplicate many objects in a batch */
-Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag)
+Base *ED_object_add_duplicate(Main *bmain, Scene *scene, SceneLayer *sl, Base *base, int dupflag)
 {
 	Base *basen;
 	Object *ob;
 
-	BKE_main_id_clear_newpoins(bmain);
-	clear_sca_new_poins();  /* sensor/contr/act */
+	clear_sca_new_poins();  /* BGE logic */
 
-	basen = object_add_duplicate_internal(bmain, scene, base, dupflag);
+	basen = object_add_duplicate_internal(bmain, scene, sl, base->object, dupflag);
 	if (basen == NULL) {
 		return NULL;
 	}
@@ -2152,7 +2217,7 @@ Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag
 	ob = basen->object;
 
 	/* link own references to the newly duplicated data [#26816] */
-	BKE_libblock_relink(&ob->id);
+	BKE_libblock_relink_to_newid(&ob->id);
 	set_sca_new_poins_ob(ob);
 
 	/* DAG_relations_tag_update(bmain); */ /* caller must do */
@@ -2160,6 +2225,8 @@ Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag
 	if (ob->data) {
 		ED_render_id_flush_update(bmain, ob->data);
 	}
+
+	BKE_main_id_clear_newpoins(bmain);
 
 	return basen;
 }
@@ -2169,27 +2236,27 @@ static int duplicate_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	const bool linked = RNA_boolean_get(op->ptr, "linked");
 	int dupflag = (linked) ? 0 : U.dupflag;
 
-	BKE_main_id_clear_newpoins(bmain);
-	clear_sca_new_poins();  /* sensor/contr/act */
+	clear_sca_new_poins();  /* BGE logic */
 
 	CTX_DATA_BEGIN (C, Base *, base, selected_bases)
 	{
-		Base *basen = object_add_duplicate_internal(bmain, scene, base, dupflag);
+		Base *basen = object_add_duplicate_internal(bmain, scene, sl, base->object, dupflag);
 
 		/* note that this is safe to do with this context iterator,
 		 * the list is made in advance */
-		ED_base_object_select(base, BA_DESELECT);
+		ED_object_base_select(base, BA_DESELECT);
 
 		if (basen == NULL) {
 			continue;
 		}
 
 		/* new object becomes active */
-		if (BASACT == base)
-			ED_base_object_activate(C, basen);
+		if (BASACT_NEW == base)
+			ED_object_base_activate(C, basen);
 
 		if (basen->object->data) {
 			DAG_id_tag_update(basen->object->data, 0);
@@ -2198,6 +2265,8 @@ static int duplicate_exec(bContext *C, wmOperator *op)
 	CTX_DATA_END;
 
 	copy_object_set_idnew(C);
+
+	BKE_main_id_clear_newpoins(bmain);
 
 	DAG_relations_tag_update(bmain);
 
@@ -2235,9 +2304,9 @@ static int add_named_exec(bContext *C, wmOperator *op)
 	wmWindow *win = CTX_wm_window(C);
 	const wmEvent *event = win ? win->eventstate : NULL;
 	Main *bmain = CTX_data_main(C);
-	View3D *v3d = CTX_wm_view3d(C);  /* may be NULL */
 	Scene *scene = CTX_data_scene(C);
-	Base *basen, *base;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Base *basen;
 	Object *ob;
 	const bool linked = RNA_boolean_get(op->ptr, "linked");
 	int dupflag = (linked) ? 0 : U.dupflag;
@@ -2252,23 +2321,17 @@ static int add_named_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	base = MEM_callocN(sizeof(Base), "duplibase");
-	base->object = ob;
-	base->flag = ob->flag;
-
 	/* prepare dupli */
-	BKE_main_id_clear_newpoins(bmain);
-	clear_sca_new_poins();  /* sensor/contr/act */
+	clear_sca_new_poins();  /* BGE logic */
 
-	basen = object_add_duplicate_internal(bmain, scene, base, dupflag);
+	basen = object_add_duplicate_internal(bmain, scene, sl, ob, dupflag);
+	BKE_scene_object_base_flag_sync_from_object(basen);
 
 	if (basen == NULL) {
-		MEM_freeN(base);
 		BKE_report(op->reports, RPT_ERROR, "Object could not be duplicated");
 		return OPERATOR_CANCELLED;
 	}
 
-	basen->lay = basen->object->lay = BKE_screen_view3d_layer_active(v3d, scene);
 	basen->object->restrictflag &= ~OB_RESTRICT_VIEW;
 
 	if (event) {
@@ -2279,14 +2342,14 @@ static int add_named_exec(bContext *C, wmOperator *op)
 		ED_view3d_cursor3d_position(C, basen->object->loc, mval);
 	}
 	
-	ED_base_object_select(basen, BA_SELECT);
-	ED_base_object_activate(C, basen);
+	ED_object_base_select(basen, BA_SELECT);
+	ED_object_base_activate(C, basen);
 
 	copy_object_set_idnew(C);
 
-	DAG_relations_tag_update(bmain);
+	BKE_main_id_clear_newpoins(bmain);
 
-	MEM_freeN(base);
+	DAG_relations_tag_update(bmain);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT | ND_OB_ACTIVE, scene);
 

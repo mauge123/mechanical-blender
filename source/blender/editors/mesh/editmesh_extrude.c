@@ -592,15 +592,14 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 			if (erf && reference_plane_project_input (vc.obedit, erf, vc.ar, vc.v3d, event->mval, min)) {
 				// Ok
 			} else {
-				ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+				ED_view3d_win_to_3d_int(vc.v3d, vc.ar, min, event->mval, min);
 			}
 		} else {
-			ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+			ED_view3d_win_to_3d_int(vc.v3d, vc.ar, min, event->mval, min);
 		}
 #else
-		ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+		ED_view3d_win_to_3d_int(vc.v3d, vc.ar, min, event->mval, min);
 #endif
-
 
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
 
@@ -656,13 +655,13 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 			if (erf && reference_plane_project_input (vc.obedit, erf, vc.ar, vc.v3d, event->mval, min)) {
 				// Ok
 			} else {
-				ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+				ED_view3d_win_to_3d_int(vc.v3d, vc.ar, min, event->mval, min);
 			}
 		} else {
-			ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+			ED_view3d_win_to_3d_int(vc.v3d, vc.ar, min, event->mval, min);
 		}
 #else
-		ED_view3d_win_to_3d_int(vc.ar, min, event->mval, min);
+		ED_view3d_win_to_3d_int(vc.v3d, vc.ar, min, event->mval, min);
 #endif
 		invert_m4_m4(vc.obedit->imat, vc.obedit->obmat);
 		mul_m4_v3(vc.obedit->imat, min); // back in object space

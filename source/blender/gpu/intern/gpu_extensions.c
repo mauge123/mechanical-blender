@@ -69,6 +69,8 @@ static struct GPUGlobal {
 	GLint maxtexsize;
 	GLint maxcubemapsize;
 	GLint maxtextures;
+	GLint maxubosize;
+	GLint maxubobinds;
 	bool extdisabled;
 	int colordepth;
 	int samples_color_texture_max;
@@ -121,6 +123,16 @@ int GPU_max_cube_map_size(void)
 	return GG.maxcubemapsize;
 }
 
+int GPU_max_ubo_binds(void)
+{
+	return GG.maxubobinds;
+}
+
+int GPU_max_ubo_size(void)
+{
+	return GG.maxubosize;
+}
+
 void GPU_get_dfdy_factors(float fac[2])
 {
 	copy_v2_v2(fac, GG.dfdyfactors);
@@ -154,6 +166,9 @@ void gpu_extensions_init(void)
 	else
 		GG.max_anisotropy = 1.0f;
 
+	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &GG.maxubobinds);
+	glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &GG.maxubosize);
+
 	GLint r, g, b;
 	glGetIntegerv(GL_RED_BITS, &r);
 	glGetIntegerv(GL_GREEN_BITS, &g);
@@ -184,7 +199,10 @@ void gpu_extensions_init(void)
 		GG.device = GPU_DEVICE_INTEL;
 		GG.driver = GPU_DRIVER_OFFICIAL;
 	}
-	else if (strstr(renderer, "Mesa DRI R") || (strstr(renderer, "Gallium ") && strstr(renderer, " on ATI "))) {
+	else if ((strstr(renderer, "Mesa DRI R")) ||
+	         (strstr(renderer, "Gallium ") && strstr(renderer, " on ATI ")) ||
+	         (strstr(renderer, "Gallium ") && strstr(renderer, " on AMD ")))
+	{
 		GG.device = GPU_DEVICE_ATI;
 		GG.driver = GPU_DRIVER_OPENSOURCE;
 	}

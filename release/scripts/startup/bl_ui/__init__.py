@@ -29,6 +29,7 @@ if "bpy" in locals():
 
 _modules = [
     "properties_animviz",
+    "properties_collection",
     "properties_constraint",
     "properties_data_armature",
     "properties_data_bone",
@@ -47,6 +48,7 @@ _modules = [
     "properties_object",
     "properties_paint_common",
     "properties_grease_pencil_common",
+    "properties_particle",
     "properties_physics_cloth",
     "properties_physics_common",
     "properties_physics_dynamicpaint",

@@ -500,6 +500,7 @@ static int ui_but_calc_float_precision(uiBut *but, double value)
 static void ui_draw_linkline(uiLinkLine *line, int highlightActiveLines, int dashInactiveLines)
 {
 	rcti rect;
+	float color[4] = {1.0f};
 
 	if (line->from == NULL || line->to == NULL) return;
 	
@@ -509,15 +510,15 @@ static void ui_draw_linkline(uiLinkLine *line, int highlightActiveLines, int das
 	rect.ymax = BLI_rctf_cent_y(&line->to->rect);
 	
 	if (dashInactiveLines)
-		UI_ThemeColor(TH_GRID);
+		UI_GetThemeColor4fv(TH_GRID, color);
 	else if (line->flag & UI_SELECT)
-		glColor3ub(100, 100, 100);
+		rgba_float_args_set_ch(color, 100, 100, 100, 255);
 	else if (highlightActiveLines && ((line->from->flag & UI_ACTIVE) || (line->to->flag & UI_ACTIVE)))
-		UI_ThemeColor(TH_TEXT_HI);
+		UI_GetThemeColor4fv(TH_TEXT_HI, color);
 	else
-		glColor3ub(0, 0, 0);
+		rgba_float_args_set_ch(color, 0, 0, 0, 255);
 
-	ui_draw_link_bezier(&rect);
+	ui_draw_link_bezier(&rect, color);
 }
 
 static void ui_draw_links(uiBlock *block)
@@ -1988,22 +1989,29 @@ uiBut *ui_but_drag_multi_edit_get(uiBut *but)
 /** \name Check to show extra icons
  *
  * Extra icons are shown on the right hand side of buttons.
+ * This could (should!) definitely become more generic, but for now this is good enough.
  * \{ */
+
+static bool ui_but_icon_extra_is_visible_text_clear(const uiBut *but)
+{
+	BLI_assert(but->type == UI_BTYPE_TEXT);
+	return ((but->flag & UI_BUT_VALUE_CLEAR) && but->drawstr[0]);
+}
 
 static bool ui_but_icon_extra_is_visible_search_unlink(const uiBut *but)
 {
 	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
 	return ((but->editstr == NULL) &&
 	        (but->drawstr[0] != '\0') &&
-	        (but->flag & UI_BUT_SEARCH_UNLINK));
+	        (but->flag & UI_BUT_VALUE_CLEAR));
 }
 
-static bool ui_but_icon_extra_is_visible_eyedropper(uiBut *but)
+static bool ui_but_icon_extra_is_visible_search_eyedropper(uiBut *but)
 {
 	StructRNA *type;
 	short idcode;
 
-	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU && (but->flag & UI_BUT_SEARCH_UNLINK));
+	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU && (but->flag & UI_BUT_VALUE_CLEAR));
 
 	if (but->rnaprop == NULL) {
 		return false;
@@ -2012,21 +2020,31 @@ static bool ui_but_icon_extra_is_visible_eyedropper(uiBut *but)
 	type = RNA_property_pointer_type(&but->rnapoin, but->rnaprop);
 	idcode = RNA_type_to_ID_code(type);
 
-
 	return ((but->editstr == NULL) &&
 	        (idcode == ID_OB || OB_DATA_SUPPORT_ID(idcode)));
 }
 
 uiButExtraIconType ui_but_icon_extra_get(uiBut *but)
 {
-	if ((but->flag & UI_BUT_SEARCH_UNLINK) == 0) {
-		/* pass */
-	}
-	else if (ui_but_icon_extra_is_visible_search_unlink(but)) {
-		return UI_BUT_ICONEXTRA_UNLINK;
-	}
-	else if (ui_but_icon_extra_is_visible_eyedropper(but)) {
-		return UI_BUT_ICONEXTRA_EYEDROPPER;
+	switch (but->type) {
+		case UI_BTYPE_TEXT:
+			if (ui_but_icon_extra_is_visible_text_clear(but)) {
+				return UI_BUT_ICONEXTRA_CLEAR;
+			}
+			break;
+		case UI_BTYPE_SEARCH_MENU:
+			if ((but->flag & UI_BUT_VALUE_CLEAR) == 0) {
+				/* pass */
+			}
+			else if (ui_but_icon_extra_is_visible_search_unlink(but)) {
+				return UI_BUT_ICONEXTRA_CLEAR;
+			}
+			else if (ui_but_icon_extra_is_visible_search_eyedropper(but)) {
+				return UI_BUT_ICONEXTRA_EYEDROPPER;
+			}
+			break;
+		default:
+			break;
 	}
 
 	return UI_BUT_ICONEXTRA_NONE;

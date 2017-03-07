@@ -47,6 +47,8 @@ extern "C" {
 #include "DNA_ID.h"
 #include "DNA_freestyle_types.h"
 #include "DNA_gpu_types.h"
+#include "DNA_layer_types.h"
+#include "DNA_material_types.h"
 #include "DNA_userdef_types.h"
 
 struct CurveMapping;
@@ -65,18 +67,13 @@ struct bGPdata;
 struct bGPDbrush;
 struct MovieClip;
 struct ColorSpace;
+struct SceneCollection;
 
 /* ************************************************************* */
 /* Scene Data */
 
 /* Base - Wrapper for referencing Objects in a Scene */
-typedef struct Base {
-	struct Base *next, *prev;
-	unsigned int lay, selcol;
-	int flag;
-	short sx, sy;
-	struct Object *object;
-} Base;
+#define BaseLegacy Base
 
 /* ************************************************************* */
 /* Output Format Data */
@@ -541,6 +538,50 @@ typedef enum BakePassFilter {
 } BakePassFilter;
 
 #define R_BAKE_PASS_FILTER_ALL (~0)
+
+/* *************************************************************** */
+/* Engine Settings */
+
+typedef struct RenderEngineSettings {
+	struct RenderEngineSettings *next, *prev;
+	char name[32]; /* engine name */
+	void *data;
+} RenderEngineSettings;
+
+/* Render Data */
+typedef struct RenderEngineSettingsClay {
+	/* Use same layout as MaterialEngineSettingsClay so this struct
+	 * can be used as Material Settings. */
+	short type;
+	short matcap_icon; /* Icon ID */
+
+	float matcap_rot;
+	float matcap_hue;
+	float matcap_sat;
+	float matcap_val;
+
+	float ssao_distance;
+	float ssao_attenuation;
+	float ssao_factor_cavity;
+	float ssao_factor_edge;
+
+	short flag;
+	short pad;
+	int ubo_index;
+	/* end of MaterialEngineSettingsClay */
+
+	/* Global Settings */
+	short options;
+	short pad1;
+	int ssao_samples;
+	int pad2[2];
+} RenderEngineSettingsClay;
+
+/* RenderEngineSettingsClay.options */
+typedef enum ClayFlagSettings {
+	CLAY_USE_AO     = (1 << 0),
+	CLAY_USE_HSV    = (1 << 1),
+} ClayFlagSettings;
 
 /* *************************************************************** */
 /* Render Data */
@@ -1046,6 +1087,40 @@ typedef struct ImagePaintSettings {
 } ImagePaintSettings;
 
 /* ------------------------------------------- */
+/* Particle Edit */
+
+/* Settings for a Particle Editing Brush */
+typedef struct ParticleBrushData {
+	short size;						/* common setting */
+	short step, invert, count;		/* for specific brushes only */
+	int flag;
+	float strength;
+} ParticleBrushData;
+
+/* Particle Edit Mode Settings */
+typedef struct ParticleEditSettings {
+	short flag;
+	short totrekey;
+	short totaddkey;
+	short brushtype;
+
+	ParticleBrushData brush[7]; /* 7 = PE_TOT_BRUSH */
+	void *paintcursor;			/* runtime */
+
+	float emitterdist, rt;
+
+	int selectmode;
+	int edittype;
+
+	int draw_step, fade_frames;
+
+	struct Scene *scene;
+	struct SceneLayer *scene_layer;
+	struct Object *object;
+	struct Object *shape_object;
+} ParticleEditSettings;
+
+/* ------------------------------------------- */
 /* Sculpt */
 
 /* Sculpt */
@@ -1070,7 +1145,7 @@ typedef struct Sculpt {
 	float gravity_factor;
 
 	/* scale for constant detail size */
-	float constant_detail;
+	float constant_detail; /* Constant detail resolution (Blender unit / constant_detail) */
 	float detail_percent;
 	float pad;
 
@@ -1179,12 +1254,51 @@ typedef enum eGP_BrushEdit_SettingsFlag {
 	GP_BRUSHEDIT_FLAG_APPLY_STRENGTH = (1 << 2),
 	/* apply brush to thickness */
 	GP_BRUSHEDIT_FLAG_APPLY_THICKNESS = (1 << 3),
-	/* apply interpolation to all layers */
-	GP_BRUSHEDIT_FLAG_INTERPOLATE_ALL_LAYERS = (1 << 4),
-	/* apply interpolation to only selected */
-	GP_BRUSHEDIT_FLAG_INTERPOLATE_ONLY_SELECTED = (1 << 5)
-
 } eGP_BrushEdit_SettingsFlag;
+
+
+/* Settings for GP Interpolation Operators */
+typedef struct GP_Interpolate_Settings {
+	short flag;                        /* eGP_Interpolate_SettingsFlag */
+	
+	char type;                         /* eGP_Interpolate_Type - Interpolation Mode */ 
+	char easing;                       /* eBezTriple_Easing - Easing mode (if easing equation used) */
+	
+	float back;                        /* BEZT_IPO_BACK */
+	float amplitude, period;           /* BEZT_IPO_ELASTIC */
+	
+	struct CurveMapping *custom_ipo;   /* custom interpolation curve (for use with GP_IPO_CURVEMAP) */
+} GP_Interpolate_Settings;
+
+/* GP_Interpolate_Settings.flag */
+typedef enum eGP_Interpolate_SettingsFlag {
+	/* apply interpolation to all layers */
+	GP_TOOLFLAG_INTERPOLATE_ALL_LAYERS    = (1 << 0),
+	/* apply interpolation to only selected */
+	GP_TOOLFLAG_INTERPOLATE_ONLY_SELECTED = (1 << 1),
+} eGP_Interpolate_SettingsFlag;
+
+/* GP_Interpolate_Settings.type */
+typedef enum eGP_Interpolate_Type {
+	/* Traditional Linear Interpolation */
+	GP_IPO_LINEAR   = 0,
+	
+	/* CurveMap Defined Interpolation */
+	GP_IPO_CURVEMAP = 1,
+	
+	/* Easing Equations */
+	GP_IPO_BACK = 3,
+	GP_IPO_BOUNCE = 4,
+	GP_IPO_CIRC = 5,
+	GP_IPO_CUBIC = 6,
+	GP_IPO_ELASTIC = 7,
+	GP_IPO_EXPO = 8,
+	GP_IPO_QUAD = 9,
+	GP_IPO_QUART = 10,
+	GP_IPO_QUINT = 11,
+	GP_IPO_SINE = 12,
+} eGP_Interpolate_Type;
+
 
 /* *************************************************************** */
 /* Transform Orientations */
@@ -1404,13 +1518,19 @@ typedef struct ToolSettings {
 	
 	/* Grease Pencil Sculpt */
 	struct GP_BrushEdit_Settings gp_sculpt;
-
+	
+	/* Grease Pencil Interpolation Tool(s) */
+	struct GP_Interpolate_Settings gp_interpolate;
+	
 	/* Grease Pencil Drawing Brushes (bGPDbrush) */
 	ListBase gp_brushes; 
 
 	/* Image Paint (8 byttse aligned please!) */
 	struct ImagePaintSettings imapaint;
 
+	/* Particle Editing */
+	struct ParticleEditSettings particle;
+	
 	/* Transform Proportional Area of Effect */
 	float proportional_size;
 
@@ -1559,7 +1679,7 @@ typedef struct Scene {
 	struct Scene *set;
 	
 	ListBase base;
-	struct Base *basact;		/* active base */
+	struct BaseLegacy *basact;		/* active base */
 	struct Object *obedit;		/* name replaces old G.obedit */
 	
 	float cursor[3];			/* 3d cursor location */
@@ -1638,8 +1758,20 @@ typedef struct Scene {
 
 	struct PreviewImage *preview;
 
+	ListBase render_layers;
+	struct SceneCollection *collection;
+	int active_layer;
+	int pad4;
+
+	ListBase engines_settings; /* RenderEngineSettings */
+
+	// WITH_MECHANICAL_GEOMETRY
 	int geomsnapflag;
-	char pad4[4];
+
+	// ELSE
+	int pad5[1];
+
+
 } Scene;
 
 /* **************** RENDERDATA ********************* */
@@ -1650,6 +1782,7 @@ typedef struct Scene {
 #define SCER_LOCK_FRAME_SELECTION	(1<<1)
 	/* timeline/keyframe jumping - only selected items (on by default) */
 #define SCE_KEYS_NO_SELONLY	(1<<2)
+#define SCER_SHOW_SUBFRAME	(1<<3)
 
 /* mode (int now) */
 #define R_OSA			0x0001
@@ -1828,6 +1961,7 @@ enum {
 /* scene->r.engine (scene.c) */
 extern const char *RE_engine_id_BLENDER_RENDER;
 extern const char *RE_engine_id_BLENDER_GAME;
+extern const char *RE_engine_id_BLENDER_CLAY;
 extern const char *RE_engine_id_CYCLES;
 
 /* **************** SCENE ********************* */
@@ -1846,16 +1980,16 @@ extern const char *RE_engine_id_CYCLES;
 
 /* depricate this! */
 #define TESTBASE(v3d, base)  (                                                \
-	((base)->flag & SELECT) &&                                                \
+	((base)->flag_legacy & SELECT) &&                                         \
 	((base)->lay & v3d->lay) &&                                               \
 	(((base)->object->restrictflag & OB_RESTRICT_VIEW) == 0))
 #define TESTBASELIB(v3d, base)  (                                             \
-	((base)->flag & SELECT) &&                                                \
+	((base)->flag_legacy & SELECT) &&                                         \
 	((base)->lay & v3d->lay) &&                                               \
 	((base)->object->id.lib == NULL) &&                                       \
 	(((base)->object->restrictflag & OB_RESTRICT_VIEW) == 0))
 #define TESTBASELIB_BGMODE(v3d, scene, base)  (                               \
-	((base)->flag & SELECT) &&                                                \
+	((base)->flag_legacy & SELECT) &&                                         \
 	((base)->lay & (v3d ? v3d->lay : scene->lay)) &&                          \
 	((base)->object->id.lib == NULL) &&                                       \
 	(((base)->object->restrictflag & OB_RESTRICT_VIEW) == 0))
@@ -1864,19 +1998,43 @@ extern const char *RE_engine_id_CYCLES;
 	((base)->object->id.lib == NULL) &&                                       \
 	(((base)->object->restrictflag & OB_RESTRICT_VIEW) == 0))
 #define BASE_SELECTABLE(v3d, base)  (                                         \
-	(base->lay & v3d->lay) &&                                                 \
-	(base->object->restrictflag & (OB_RESTRICT_SELECT | OB_RESTRICT_VIEW)) == 0)
+	(v3d != NULL) &&                                                          \
+	((base)->object->restrictflag & (OB_RESTRICT_SELECT | OB_RESTRICT_VIEW)) == 0)
 #define BASE_VISIBLE(v3d, base)  (                                            \
-	(base->lay & v3d->lay) &&                                                 \
-	(base->object->restrictflag & OB_RESTRICT_VIEW) == 0)
+	((base)->lay & v3d->lay) &&                                               \
+	((base)->object->restrictflag & OB_RESTRICT_VIEW) == 0)
 #define BASE_VISIBLE_BGMODE(v3d, scene, base)  (                              \
-	(base->lay & (v3d ? v3d->lay : scene->lay)) &&                            \
-	(base->object->restrictflag & OB_RESTRICT_VIEW) == 0)
+	((base)->lay & (v3d ? v3d->lay : scene->lay)) &&                          \
+	((base)->object->restrictflag & OB_RESTRICT_VIEW) == 0)
+
+#define TESTBASE_NEW(base)  (                                                 \
+	(((base)->flag & BASE_SELECTED) != 0) &&                                  \
+	(((base)->flag & BASE_VISIBLED) != 0))
+#define TESTBASELIB_NEW(base)  (                                              \
+	(((base)->flag & BASE_SELECTED) != 0) &&                                  \
+	((base)->object->id.lib == NULL) &&                                       \
+	(((base)->flag & BASE_VISIBLED) != 0))
+#define TESTBASELIB_BGMODE_NEW(base)  (                                       \
+	(((base)->flag & BASE_SELECTED) != 0) &&                                  \
+	((base)->object->id.lib == NULL) &&                                       \
+	(((base)->flag & BASE_VISIBLED) != 0))
+#define BASE_EDITABLE_BGMODE_NEW(base)  (                                     \
+	((base)->object->id.lib == NULL) &&                                       \
+	(((base)->flag & BASE_VISIBLED) != 0))
+#define BASE_SELECTABLE_NEW(base)                                             \
+	(((base)->flag & BASE_SELECTABLED) != 0)
+#define BASE_VISIBLE_NEW(base)  (                                             \
+	((base)->flag & BASE_VISIBLED) != 0)
 
 #define FIRSTBASE		scene->base.first
 #define LASTBASE		scene->base.last
 #define BASACT			(scene->basact)
 #define OBACT			(BASACT ? BASACT->object: NULL)
+
+#define FIRSTBASE_NEW	(sl)->object_bases.first
+#define LASTBASE_NEW	(sl)->object_bases.last
+#define BASACT_NEW		((sl)->basact)
+#define OBACT_NEW		(BASACT_NEW ? BASACT_NEW->object: NULL)
 
 #define V3D_CAMERA_LOCAL(v3d) ((!(v3d)->scenelock && (v3d)->camera) ? (v3d)->camera : NULL)
 #define V3D_CAMERA_SCENE(scene, v3d) ((!(v3d)->scenelock && (v3d)->camera) ? (v3d)->camera : (scene)->camera)
@@ -1892,7 +2050,7 @@ extern const char *RE_engine_id_CYCLES;
 #define TIME2FRA(a)     ((((double) scene->r.frs_sec) * (double)(a)) / (double)scene->r.frs_sec_base)
 #define FPS              (((double) scene->r.frs_sec) / (double)scene->r.frs_sec_base)
 
-/* base->flag is in DNA_object_types.h */
+/* base->legacy_flag is in DNA_object_types.h */
 
 /* toolsettings->snap_flag */
 #define SCE_SNAP				1

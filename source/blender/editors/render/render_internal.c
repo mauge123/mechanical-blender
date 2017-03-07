@@ -81,6 +81,7 @@
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf_types.h"
 
+#include "GPU_shader.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -780,7 +781,7 @@ static void screen_render_cancel(bContext *C, wmOperator *op)
 	WM_jobs_kill_type(wm, scene, WM_JOB_TYPE_RENDER);
 }
 
-static void clean_viewport_memory(Main *bmain, Scene *scene, int renderlay)
+static void clean_viewport_memory(Main *bmain, Scene *scene)
 {
 	Object *object;
 	Scene *sce_iter;
@@ -791,7 +792,7 @@ static void clean_viewport_memory(Main *bmain, Scene *scene, int renderlay)
 	}
 
 	for (SETLOOPER(scene, sce_iter, base)) {
-		if ((base->lay & renderlay) == 0) {
+		if ((base->flag & BASE_VISIBLED) == 0) {
 			continue;
 		}
 		if (RE_allow_render_generic_object(base->object)) {
@@ -927,8 +928,6 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
 
 	/* Lock the user interface depending on render settings. */
 	if (scene->r.use_lock_interface) {
-		int renderlay = rj->lay_override ? rj->lay_override : scene->lay;
-
 		WM_set_locked_interface(CTX_wm_manager(C), true);
 
 		/* Set flag interface need to be unlocked.
@@ -942,7 +941,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
 		rj->interface_locked = true;
 
 		/* Clean memory used by viewport? */
-		clean_viewport_memory(rj->main, scene, renderlay);
+		clean_viewport_memory(rj->main, scene);
 	}
 
 	/* setup job */
@@ -1539,11 +1538,10 @@ void render_view3d_draw(RenderEngine *engine, const bContext *C)
 		if (force_fallback == false) {
 			if (IMB_colormanagement_setup_glsl_draw(&scene->view_settings, &scene->display_settings, dither, true)) {
 				glEnable(GL_BLEND);
-				glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-				glPixelZoom(scale_x, scale_y);
-				glaDrawPixelsTex(xof, yof, rres.rectx, rres.recty,
-				                 GL_RGBA, GL_FLOAT, GL_NEAREST, rres.rectf);
-				glPixelZoom(1.0f, 1.0f);
+				immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+				immDrawPixelsTex(xof, yof, rres.rectx, rres.recty,
+				                 GL_RGBA, GL_FLOAT, GL_NEAREST, rres.rectf,
+				                 scale_x, scale_y, NULL);;
 				glDisable(GL_BLEND);
 
 				IMB_colormanagement_finish_glsl_draw();
@@ -1560,12 +1558,11 @@ void render_view3d_draw(RenderEngine *engine, const bContext *C)
 			                                              4, dither, &scene->view_settings, &scene->display_settings);
 
 			glEnable(GL_BLEND);
-			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-			glPixelZoom(scale_x, scale_y);
-			glaDrawPixelsAuto(xof, yof, rres.rectx, rres.recty,
-			                  GL_RGBA, GL_UNSIGNED_BYTE,
-			                  GL_NEAREST, display_buffer);
-			glPixelZoom(1.0f, 1.0f);
+			immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+			immDrawPixelsTex(xof, yof, rres.rectx, rres.recty,
+			                 GL_RGBA, GL_UNSIGNED_BYTE,
+			                 GL_NEAREST, display_buffer,
+			                 scale_x, scale_y, NULL);
 			glDisable(GL_BLEND);
 
 			MEM_freeN(display_buffer);

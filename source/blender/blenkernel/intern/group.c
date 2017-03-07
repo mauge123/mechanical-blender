@@ -40,6 +40,7 @@
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_particle_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -129,18 +130,11 @@ static bool group_object_add_internal(Group *group, Object *ob)
 	return true;
 }
 
-bool BKE_group_object_add(Group *group, Object *object, Scene *scene, Base *base)
+bool BKE_group_object_add(Group *group, Object *object)
 {
 	if (group_object_add_internal(group, object)) {
 		if ((object->flag & OB_FROMGROUP) == 0) {
-
-			if (scene && base == NULL)
-				base = BKE_scene_base_find(scene, object);
-
 			object->flag |= OB_FROMGROUP;
-
-			if (base)
-				base->flag |= OB_FROMGROUP;
 		}
 		return true;
 	}
@@ -207,18 +201,12 @@ bool BKE_group_object_cyclic_check(Main *bmain, Object *object, Group *group)
 	return group_object_cyclic_check_internal(object, group);
 }
 
-bool BKE_group_object_unlink(Group *group, Object *object, Scene *scene, Base *base)
+bool BKE_group_object_unlink(Group *group, Object *object)
 {
 	if (group_object_unlink_internal(group, object)) {
 		/* object can be NULL */
 		if (object && BKE_group_object_find(NULL, object) == NULL) {
-			if (scene && base == NULL)
-				base = BKE_scene_base_find(scene, object);
-
 			object->flag &= ~OB_FROMGROUP;
-
-			if (base)
-				base->flag &= ~OB_FROMGROUP;
 		}
 		return true;
 	}

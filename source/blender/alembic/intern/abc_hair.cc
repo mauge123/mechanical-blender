@@ -37,6 +37,7 @@ extern "C" {
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_object.h"
+#include "BKE_particle.h"
 }
 
 using Alembic::Abc::P3fArraySamplePtr;
@@ -53,15 +54,13 @@ AbcHairWriter::AbcHairWriter(Scene *scene,
                              AbcTransformWriter *parent,
                              uint32_t time_sampling,
                              ExportSettings &settings,
-                             void *UNUSED(psys))
+                             ParticleSystem *psys)
     : AbcObjectWriter(scene, ob, time_sampling, settings, parent)
 {
-	m_psys = NULL; // = psys;
+	m_psys = psys;
 
-#if 0
 	OCurves curves(parent->alembicXform(), psys->name, m_time_sampling);
 	m_schema = curves.getSchema();
-#endif
 }
 
 void AbcHairWriter::do_write()
@@ -69,7 +68,7 @@ void AbcHairWriter::do_write()
 	if (!m_psys) {
 		return;
 	}
-#if 0
+
 	ParticleSystemModifierData *psmd = psys_get_modifier(m_object, m_psys);
 
 	if (!psmd->dm_final) {
@@ -78,7 +77,6 @@ void AbcHairWriter::do_write()
 
 	DerivedMesh *dm = mesh_create_derived_view(m_scene, m_object, CD_MASK_MESH);
 	DM_ensure_tessface(dm);
-	DM_update_tessface_data(dm);
 
 	std::vector<Imath::V3f> verts;
 	std::vector<int32_t> hvertices;
@@ -117,17 +115,15 @@ void AbcHairWriter::do_write()
 
 	m_sample.setSelfBounds(bounds());
 	m_schema.set(m_sample);
-#endif
 }
 
 void AbcHairWriter::write_hair_sample(DerivedMesh *dm,
-                                      void *part,
+                                      ParticleSettings *part,
                                       std::vector<Imath::V3f> &verts,
                                       std::vector<Imath::V3f> &norm_values,
                                       std::vector<Imath::V2f> &uv_values,
                                       std::vector<int32_t> &hvertices)
 {
-#if 0
 	/* Get untransformed vertices, there's a xform under the hair. */
 	float inv_mat[4][4];
 	invert_m4_m4_safe(inv_mat, m_object->obmat);
@@ -167,7 +163,7 @@ void AbcHairWriter::write_hair_sample(DerivedMesh *dm,
 
 					psys_interpolate_face(mverts, face, tface, NULL, mapfw, vec, normal, NULL, NULL, NULL, NULL);
 
-					copy_zup_yup(tmp_nor.getValue(), normal);
+					copy_yup_from_zup(tmp_nor.getValue(), normal);
 					norm_values.push_back(tmp_nor);
 				}
 			}
@@ -201,7 +197,7 @@ void AbcHairWriter::write_hair_sample(DerivedMesh *dm,
 						MVert *mv = mverts + vtx[o];
 
 						normal_short_to_float_v3(normal, mv->no);
-						copy_zup_yup(tmp_nor.getValue(), normal);
+						copy_yup_from_zup(tmp_nor.getValue(), normal);
 						norm_values.push_back(tmp_nor);
 						found = true;
 						break;
@@ -228,17 +224,15 @@ void AbcHairWriter::write_hair_sample(DerivedMesh *dm,
 			++path;
 		}
 	}
-#endif
 }
 
 void AbcHairWriter::write_hair_child_sample(DerivedMesh *dm,
-                                            void *part,
+                                            ParticleSettings *part,
                                             std::vector<Imath::V3f> &verts,
                                             std::vector<Imath::V3f> &norm_values,
                                             std::vector<Imath::V2f> &uv_values,
                                             std::vector<int32_t> &hvertices)
 {
-#if 0
 	/* Get untransformed vertices, there's a xform under the hair. */
 	float inv_mat[4][4];
 	invert_m4_m4_safe(inv_mat, m_object->obmat);
@@ -292,5 +286,4 @@ void AbcHairWriter::write_hair_child_sample(DerivedMesh *dm,
 			++path;
 		}
 	}
-#endif
 }

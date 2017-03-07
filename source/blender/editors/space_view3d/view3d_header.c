@@ -284,9 +284,10 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	ScrArea *sa = CTX_wm_area(C);
 	View3D *v3d = sa->spacedata.first;
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	PointerRNA v3dptr, toolsptr, sceneptr;
-	Object *ob = OBACT;
+	Object *ob = OBACT_NEW;
 	Object *obedit = CTX_data_edit_object(C);
 	bGPdata *gpd = CTX_data_gpencil_data(C);
 	uiBlock *block;
@@ -339,15 +340,15 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		uiItemR(layout, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 	}
 
-	if (obedit == NULL && is_paint) {
-		if (ob->mode & OB_MODE_ALL_PAINT) {
-			/* Only for Weight Paint. makes no sense in other paint modes. */
-			row = uiLayoutRow(layout, true);
-			uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-		}
+	row = uiLayoutRow(layout, true);
+	uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	if (!ob || ELEM(ob->mode, OB_MODE_OBJECT, OB_MODE_POSE, OB_MODE_WEIGHT_PAINT)) {
+		uiItemR(row, &v3dptr, "use_pivot_point_align", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	}
 
+	if (obedit == NULL && is_paint) {
 		/* Manipulators aren't used in paint modes */
-		if (ob->mode != OB_MODE_SCULPT) {
+		if (!ELEM(ob->mode, OB_MODE_SCULPT, OB_MODE_PARTICLE_EDIT)) {
 			/* masks aren't used for sculpt and particle painting */
 			PointerRNA meshptr;
 
@@ -363,17 +364,6 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		}
 	}
 	else {
-		row = uiLayoutRow(layout, true);
-		uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-
-		/* pose/object only however we want to allow in weight paint mode too
-		 * so don't be totally strict and just check not-editmode for now 
-		 * XXX We never get here when we are in Weight Paint mode
-		 */
-		if (obedit == NULL) {
-			uiItemR(row, &v3dptr, "use_pivot_point_align", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-		}
-
 		/* Transform widget / manipulators */
 		row = uiLayoutRow(layout, true);
 		uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
@@ -390,11 +380,6 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 #endif
 
 	if (obedit == NULL && v3d->localvd == NULL) {
-		unsigned int ob_lay = ob ? ob->lay : 0;
-
-		/* Layers */
-		uiTemplateLayers(layout, v3d->scenelock ? &sceneptr : &v3dptr, "layers", &v3dptr, "layers_used", ob_lay);
-
 		/* Scene lock */
 		uiItemR(layout, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 	}

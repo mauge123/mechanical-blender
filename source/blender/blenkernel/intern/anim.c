@@ -41,7 +41,6 @@
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_key_types.h"
-#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
 #include "BKE_curve.h"
@@ -50,6 +49,7 @@
 #include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
+#include "BKE_particle.h"
 #include "BKE_scene.h"
 #include "BKE_anim.h"
 #include "BKE_report.h"
@@ -201,7 +201,15 @@ bMotionPath *animviz_verify_motionpaths(ReportList *reports, Scene *scene, Objec
 		mpath->flag |= MOTIONPATH_FLAG_BHEAD;
 	else
 		mpath->flag &= ~MOTIONPATH_FLAG_BHEAD;
-	
+
+	/* set default custom values */
+	mpath->color[0] = 1.0;    /* Red */
+	mpath->color[1] = 0.0;
+	mpath->color[2] = 0.0;
+
+	mpath->line_thickness = 1;
+	mpath->flag |= MOTIONPATH_FLAG_LINES;  /* draw lines by default */
+
 	/* allocate a cache */
 	mpath->points = MEM_callocN(sizeof(bMotionPathVert) * mpath->length, "bMotionPathVerts");
 	
@@ -275,7 +283,7 @@ void animviz_get_object_motionpaths(Object *ob, ListBase *targets)
 /* tweak the object ordering to trick depsgraph into making MotionPath calculations run faster */
 static void motionpaths_calc_optimise_depsgraph(Scene *scene, ListBase *targets)
 {
-	Base *base, *baseNext;
+	BaseLegacy *base, *baseNext;
 	MPathTarget *mpt;
 	
 	/* make sure our temp-tag isn't already in use */
@@ -313,7 +321,7 @@ static void motionpaths_calc_update_scene(Scene *scene)
 		BKE_scene_update_for_newframe(G.main->eval_ctx, G.main, scene, scene->lay);
 	}
 	else { /* otherwise we can optimize by restricting updates */
-		Base *base, *last = NULL;
+		BaseLegacy *base, *last = NULL;
 		
 		/* only stuff that moves or needs display still */
 		DAG_scene_update_flags(G.main, scene, scene->lay, true, false);

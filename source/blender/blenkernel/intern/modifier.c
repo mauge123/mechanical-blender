@@ -49,10 +49,11 @@
 #include "DNA_object_types.h"
 
 #include "BLI_utildefines.h"
-#include "BLI_path_util.h"
 #include "BLI_listbase.h"
 #include "BLI_linklist.h"
+#include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "BLI_string_utils.h"
 
 #include "BLT_translation.h"
 
@@ -397,6 +398,13 @@ bool modifiers_isClothEnabled(Object *ob)
 bool modifiers_isModifierEnabled(Object *ob, int modifierType)
 {
 	ModifierData *md = modifiers_findByType(ob, modifierType);
+
+	return (md && md->mode & (eModifierMode_Realtime | eModifierMode_Render));
+}
+
+bool modifiers_isParticleEnabled(Object *ob)
+{
+	ModifierData *md = modifiers_findByType(ob, eModifierType_ParticleSystem);
 
 	return (md && md->mode & (eModifierMode_Realtime | eModifierMode_Render));
 }

@@ -242,6 +242,8 @@ endif()
 option(WITH_PLAYER        "Build Player" OFF)
 option(WITH_OPENCOLORIO   "Enable OpenColorIO color management" ${_init_OPENCOLORIO})
 
+option(WITH_CLAY_ENGINE    "Enable New Clay engine (Breaks Mac and Intel compatibility)" ON)
+
 # Compositor
 option(WITH_COMPOSITOR         "Enable the tile based nodal compositor" ON)
 
@@ -333,7 +335,7 @@ option(WITH_ALEMBIC             "Enable Alembic Support" OFF)
 option(WITH_ALEMBIC_HDF5        "Enable Legacy Alembic Support (not officially supported)" OFF)
 
 if(APPLE)
-	option(WITH_CODEC_QUICKTIME     "Enable Quicktime Support" ON)
+	option(WITH_CODEC_QUICKTIME     "Enable Quicktime Support" OFF)
 endif()
 
 # 3D format support
@@ -448,6 +450,7 @@ option(WITH_BOOST					"Enable features depending on boost" ON)
 
 # Unit testsing
 option(WITH_GTESTS "Enable GTest unit testing" OFF)
+option(WITH_OPENGL_TESTS "Enable OpenGL related unit testing (Experimental)" OFF)
 
 
 # Documentation
@@ -500,33 +503,40 @@ endif()
 # We default options to whatever default standard in the current compiler.
 if(CMAKE_COMPILER_IS_GNUCC AND (NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "6.0") AND (NOT WITH_CXX11))
 	set(_c11_init ON)
-	set(_cxx11_init ON)
 else()
 	set(_c11_init OFF)
-	set(_cxx11_init OFF)
 endif()
+set(_cxx11_init ON)
 
 option(WITH_C11 "Build with C11 standard enabled, for development use only!" ${_c11_init})
 mark_as_advanced(WITH_C11)
 option(WITH_CXX11 "Build with C++11 standard enabled, for development use only!" ${_cxx11_init})
 mark_as_advanced(WITH_CXX11)
 
+# Compiler toolchain
+if(CMAKE_COMPILER_IS_GNUCC)
+	option(WITH_LINKER_GOLD "Use ld.gold linker which is usually faster than ld.bfd" ON)
+	mark_as_advanced(WITH_LINKER_GOLD)
+endif()
+
 # Dependency graph
 option(WITH_LEGACY_DEPSGRAPH "Build Blender with legacy dependency graph" ON)
 mark_as_advanced(WITH_LEGACY_DEPSGRAPH)
 
-# Use hardcoded paths or find_package to find externals
-option(WITH_WINDOWS_FIND_MODULES "Use find_package to locate libraries" OFF)
-mark_as_advanced(WITH_WINDOWS_FIND_MODULES)
+if(WIN32)
+	# Use hardcoded paths or find_package to find externals
+	option(WITH_WINDOWS_FIND_MODULES "Use find_package to locate libraries" OFF)
+	mark_as_advanced(WITH_WINDOWS_FIND_MODULES)
 
-option(WITH_WINDOWS_CODESIGN "Use signtool to sign the final binary." OFF)
-mark_as_advanced(WITH_WINDOWS_CODESIGN)
+	option(WITH_WINDOWS_CODESIGN "Use signtool to sign the final binary." OFF)
+	mark_as_advanced(WITH_WINDOWS_CODESIGN)
 
-set(WINDOWS_CODESIGN_PFX CACHE FILEPATH  "Path to pfx file to use for codesigning.")
-mark_as_advanced(WINDOWS_CODESIGN_PFX)
+	set(WINDOWS_CODESIGN_PFX CACHE FILEPATH  "Path to pfx file to use for codesigning.")
+	mark_as_advanced(WINDOWS_CODESIGN_PFX)
 
-set(WINDOWS_CODESIGN_PFX_PASSWORD CACHE STRING  "password for pfx file used for codesigning.")
-mark_as_advanced(WINDOWS_CODESIGN_PFX_PASSWORD)
+	set(WINDOWS_CODESIGN_PFX_PASSWORD CACHE STRING  "password for pfx file used for codesigning.")
+	mark_as_advanced(WINDOWS_CODESIGN_PFX_PASSWORD)
+endif()
 
 # avoid using again
 option_defaults_clear()
@@ -625,6 +635,12 @@ if(APPLE)
 			# to silence sdk not found warning, just overrides CMAKE_OSX_SYSROOT
 			set(CMAKE_XCODE_ATTRIBUTE_SDKROOT macosx${OSX_SYSTEM})
 		endif()
+
+		# QuickTime framework is no longer available in SDK 10.12+
+		if(WITH_CODEC_QUICKTIME AND ${OSX_SYSTEM} VERSION_GREATER 10.11)
+			set(WITH_CODEC_QUICKTIME OFF)
+			message(STATUS "QuickTime not supported by SDK ${OSX_SYSTEM}, disabling WITH_CODEC_QUICKTIME")
+		endif()
 	endif()
 
 	if(OSX_SYSTEM MATCHES 10.9)
@@ -714,7 +730,7 @@ if(NOT WITH_BOOST)
 	macro(set_and_warn
 		_setting _val)
 		if(${${_setting}})
-			message(STATUS "'WITH_BOOST' is disabled: forceing 'set(${_setting} ${_val})'")
+			message(STATUS "'WITH_BOOST' is disabled: forcing 'set(${_setting} ${_val})'")
 		endif()
 		set(${_setting} ${_val})
 	endmacro()
@@ -734,7 +750,7 @@ elseif(WITH_CYCLES OR WITH_OPENIMAGEIO OR WITH_AUDASPACE OR WITH_INTERNATIONAL O
 	# Keep enabled
 else()
 	# New dependency graph needs either Boost or C++11 for function bindings.
-	if(NOT USE_CXX11)
+	if(NOT WITH_CXX11)
 		# Enabled but we don't need it
 		set(WITH_BOOST OFF)
 	endif()
@@ -858,7 +874,7 @@ endif()
 # linux only, not cached
 set(WITH_BINRELOC OFF)
 
-# MAXOSX only, set to avoid uninitialized
+# MACOSX only, set to avoid uninitialized
 set(EXETYPE "")
 
 # C/C++ flags
@@ -1564,7 +1580,7 @@ if(WITH_CXX11)
 	if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
 		# TODO(sergey): Do we want c++11 or gnu-c++11 here?
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-	elseif(MSVC12)
+	elseif(MSVC)
 		# Nothing special is needed, C++11 features are available by default.
 	else()
 		message(FATAL_ERROR "Compiler ${CMAKE_C_COMPILER_ID} is not supported for C++11 build yet")

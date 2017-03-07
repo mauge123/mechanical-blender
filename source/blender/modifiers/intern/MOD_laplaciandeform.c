@@ -33,12 +33,11 @@
 #include "BLI_math.h"
 #include "BLI_string.h"
 
-#include "DNA_object_types.h"
-
 #include "MEM_guardedalloc.h"
 
 #include "BKE_mesh_mapping.h"
 #include "BKE_cdderivedmesh.h"
+#include "BKE_particle.h"
 #include "BKE_deform.h"
 
 #include "MOD_util.h"
@@ -776,7 +775,6 @@ ModifierTypeInfo modifierType_LaplacianDeform = {
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
 	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    NULL,
 	/* updateDepsgraph */   NULL,
 	/* dependsOnTime */     NULL,
 	/* dependsOnNormals */	NULL,

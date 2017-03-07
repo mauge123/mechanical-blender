@@ -58,6 +58,7 @@
 #include "ED_space_api.h"
 
 #include "GPU_immediate.h"
+#include "GPU_draw.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -73,7 +74,7 @@
 
 #include "screen_intern.h"
 
-extern void ui_draw_anti_tria(float x1, float y1, float x2, float y2, float x3, float y3); /* xxx temp */
+extern void ui_draw_anti_tria(float x1, float y1, float x2, float y2, float x3, float y3, const float color[4]); /* xxx temp */
 
 /* general area and region code */
 
@@ -91,9 +92,9 @@ static void region_draw_emboss(const ARegion *ar, const rcti *scirct)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	VertexFormat* format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
 	immBegin(GL_LINE_STRIP, 5);
@@ -221,11 +222,23 @@ static void area_draw_azone_fullscreen(short x1, short y1, short x2, short y2, f
 
 		BLI_rcti_init(&click_rect, x, x + icon_size, y, y + icon_size);
 
-		glColor4ub(255, 0, 0, alpha_debug);
-		fdrawbox(click_rect.xmin, click_rect.ymin, click_rect.xmax, click_rect.ymax);
-		glColor4ub(0, 255, 255, alpha_debug);
-		fdrawline(click_rect.xmin, click_rect.ymin, click_rect.xmax, click_rect.ymax);
-		fdrawline(click_rect.xmin, click_rect.ymax, click_rect.xmax, click_rect.ymin);
+		VertexFormat *format = immVertexFormat();
+		unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+
+		immAttrib4ub(color, 255, 0, 0, alpha_debug);
+		immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
+		imm_draw_line_box(pos, click_rect.xmin, click_rect.ymin, click_rect.xmax, click_rect.ymax);
+
+		immAttrib4ub(color, 0, 255, 255, alpha_debug);
+		immBegin(GL_LINES, 4);
+		immVertex2f(pos, click_rect.xmin, click_rect.ymin);
+		immVertex2f(pos, click_rect.xmax, click_rect.ymax);
+		immVertex2f(pos, click_rect.xmin, click_rect.ymax);
+		immVertex2f(pos, click_rect.xmax, click_rect.ymin);
+		immEnd();
+
+		immUnbindProgram();
 	}
 }
 
@@ -242,9 +255,9 @@ static void area_draw_azone(short x1, short y1, short x2, short y2)
 
 	glEnable(GL_LINE_SMOOTH);
 
-	VertexFormat* format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned col = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int col = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
 	immBegin(GL_LINES, 12);
@@ -284,28 +297,31 @@ static void region_draw_azone_icon(AZone *az)
 	float midx = az->x1 + (az->x2 - az->x1) * 0.5f;
 	float midy = az->y1 + (az->y2 - az->y1) * 0.5f;
 
-	VertexFormat* format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-
-	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
 
 	/* outlined circle */
+	GPU_enable_program_point_size(); /* TODO: make a fixed-size shader to avoid this */
+	immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA);
 	immUniform4f("color", 1.0f, 1.0f, 1.0f, 0.8f);
-	imm_draw_filled_circle(pos, midx, midy, 4.25f, 12);
-	/* TODO(merwin): replace this --^ with one round point once shader is ready */
-	glEnable(GL_LINE_SMOOTH);
-	immUniform4f("color", 0.2f, 0.2f, 0.2f, 0.9f);
-	imm_draw_lined_circle(pos, midx, midy, 4.25f, 12);
-	glDisable(GL_LINE_SMOOTH);
+	immUniform4f("outlineColor", 0.2f, 0.2f, 0.2f, 0.9f);
+	immUniform1f("outlineWidth", 1.0f);
+	immUniform1f("size", 9.5f);
+	immBegin(GL_POINTS, 1);
+	immVertex2f(pos, midx, midy);
+	immEnd();
+	immUnbindProgram();
+	GPU_disable_program_point_size();
 
 	/* + */
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniform4f("color", 0.2f, 0.2f, 0.2f, 0.9f);
 	immBegin(GL_LINES, 4);
 	immVertex2f(pos, midx, midy - 2);
 	immVertex2f(pos, midx, midy + 3);
 	immVertex2f(pos, midx - 2, midy);
 	immVertex2f(pos, midx + 3, midy);
 	immEnd();
-
 	immUnbindProgram();
 }
 
@@ -313,10 +329,20 @@ static void draw_azone_plus(float x1, float y1, float x2, float y2)
 {
 	float width = 0.1f * U.widget_unit;
 	float pad = 0.2f * U.widget_unit;
-	
-	glRectf((x1 + x2 - width) * 0.5f, y1 + pad, (x1 + x2 + width) * 0.5f, y2 - pad);
-	glRectf(x1 + pad, (y1 + y2 - width) * 0.5f, (x1 + x2 - width) * 0.5f, (y1 + y2 + width) * 0.5f);
-	glRectf((x1 + x2 + width) * 0.5f, (y1 + y2 - width) * 0.5f, x2 - pad, (y1 + y2 + width) * 0.5f);
+
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+
+	glEnable(GL_BLEND);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformColor4f(0.8f, 0.8f, 0.8f, 0.4f);
+
+	immRectf(pos, (x1 + x2 - width) * 0.5f, y1 + pad, (x1 + x2 + width) * 0.5f, y2 - pad);
+	immRectf(pos, x1 + pad, (y1 + y2 - width) * 0.5f, (x1 + x2 - width) * 0.5f, (y1 + y2 + width) * 0.5f);
+	immRectf(pos, (x1 + x2 + width) * 0.5f, (y1 + y2 - width) * 0.5f, x2 - pad, (y1 + y2 + width) * 0.5f);
+
+	immUnbindProgram();
+	glDisable(GL_BLEND);
 }
 
 static void region_draw_azone_tab_plus(AZone *az)
@@ -339,54 +365,45 @@ static void region_draw_azone_tab_plus(AZone *az)
 			break;
 	}
 
-	glColor4f(0.05f, 0.05f, 0.05f, 0.4f);
-	UI_draw_roundbox((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f);
+	float color[4] = {0.05f, 0.05f, 0.05f, 0.4f};
+	UI_draw_roundbox((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, color);
 
-	glEnable(GL_BLEND);
-
-	glColor4f(0.8f, 0.8f, 0.8f, 0.4f);
 	draw_azone_plus((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2);
-
-	glDisable(GL_BLEND);
 }
 
 static void region_draw_azone_tab(AZone *az)
 {
-	float col[3];
+	float col[4], black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 	
 	glEnable(GL_BLEND);
 	UI_GetThemeColor3fv(TH_HEADER, col);
-	glColor4f(col[0], col[1], col[2], 0.5f);
-	
+	col[3] = 0.5f;
+
 	/* add code to draw region hidden as 'too small' */
 	switch (az->edge) {
 		case AE_TOP_TO_BOTTOMRIGHT:
 			UI_draw_roundbox_corner_set(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT | UI_RB_ALPHA);
 			
-			UI_draw_roundbox_shade_x(GL_POLYGON, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f);
-			glColor4ub(0, 0, 0, 255);
-			UI_draw_roundbox_unfilled((float)az->x1, 0.3f + (float)az->y1, (float)az->x2, 0.3f + (float)az->y2, 4.0f);
+			UI_draw_roundbox_shade_x(GL_TRIANGLE_FAN, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f, col);
+			UI_draw_roundbox_unfilled((float)az->x1, 0.3f + (float)az->y1, (float)az->x2, 0.3f + (float)az->y2, 4.0f, black);
 			break;
 		case AE_BOTTOM_TO_TOPLEFT:
 			UI_draw_roundbox_corner_set(UI_CNR_BOTTOM_RIGHT | UI_CNR_BOTTOM_LEFT | UI_RB_ALPHA);
 			
-			UI_draw_roundbox_shade_x(GL_POLYGON, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f);
-			glColor4ub(0, 0, 0, 255);
-			UI_draw_roundbox_unfilled((float)az->x1, 0.3f + (float)az->y1, (float)az->x2, 0.3f + (float)az->y2, 4.0f);
+			UI_draw_roundbox_shade_x(GL_TRIANGLE_FAN, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f, col);
+			UI_draw_roundbox_unfilled((float)az->x1, 0.3f + (float)az->y1, (float)az->x2, 0.3f + (float)az->y2, 4.0f, black);
 			break;
 		case AE_LEFT_TO_TOPRIGHT:
 			UI_draw_roundbox_corner_set(UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT | UI_RB_ALPHA);
 			
-			UI_draw_roundbox_shade_x(GL_POLYGON, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f);
-			glColor4ub(0, 0, 0, 255);
-			UI_draw_roundbox_unfilled((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f);
+			UI_draw_roundbox_shade_x(GL_TRIANGLE_FAN, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f, col);
+			UI_draw_roundbox_unfilled((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, black);
 			break;
 		case AE_RIGHT_TO_TOPLEFT:
 			UI_draw_roundbox_corner_set(UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT | UI_RB_ALPHA);
 			
-			UI_draw_roundbox_shade_x(GL_POLYGON, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f);
-			glColor4ub(0, 0, 0, 255);
-			UI_draw_roundbox_unfilled((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f);
+			UI_draw_roundbox_shade_x(GL_TRIANGLE_FAN, (float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, -0.3f, 0.05f, col);
+			UI_draw_roundbox_unfilled((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y2, 4.0f, black);
 			break;
 	}
 	
@@ -397,24 +414,24 @@ static void region_draw_azone_tria(AZone *az)
 {
 	glEnable(GL_BLEND);
 	//UI_GetThemeColor3fv(TH_HEADER, col);
-	glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
+	float color[4] = {0.0f, 0.0f, 0.0f, 0.35f};
 	
 	/* add code to draw region hidden as 'too small' */
 	switch (az->edge) {
 		case AE_TOP_TO_BOTTOMRIGHT:
-			ui_draw_anti_tria((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y1, (float)(az->x1 + az->x2) / 2, (float)az->y2);
+			ui_draw_anti_tria((float)az->x1, (float)az->y1, (float)az->x2, (float)az->y1, (float)(az->x1 + az->x2) / 2, (float)az->y2, color);
 			break;
 			
 		case AE_BOTTOM_TO_TOPLEFT:
-			ui_draw_anti_tria((float)az->x1, (float)az->y2, (float)az->x2, (float)az->y2, (float)(az->x1 + az->x2) / 2, (float)az->y1);
+			ui_draw_anti_tria((float)az->x1, (float)az->y2, (float)az->x2, (float)az->y2, (float)(az->x1 + az->x2) / 2, (float)az->y1, color);
 			break;
 
 		case AE_LEFT_TO_TOPRIGHT:
-			ui_draw_anti_tria((float)az->x2, (float)az->y1, (float)az->x2, (float)az->y2, (float)az->x1, (float)(az->y1 + az->y2) / 2);
+			ui_draw_anti_tria((float)az->x2, (float)az->y1, (float)az->x2, (float)az->y2, (float)az->x1, (float)(az->y1 + az->y2) / 2, color);
 			break;
 			
 		case AE_RIGHT_TO_TOPLEFT:
-			ui_draw_anti_tria((float)az->x1, (float)az->y1, (float)az->x1, (float)az->y2, (float)az->x2, (float)(az->y1 + az->y2) / 2);
+			ui_draw_anti_tria((float)az->x1, (float)az->y1, (float)az->x1, (float)az->y2, (float)az->x2, (float)(az->y1 + az->y2) / 2, color);
 			break;
 			
 	}
@@ -536,7 +553,7 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 		UI_ThemeClearColor(TH_HEADER);
 		glClear(GL_COLOR_BUFFER_BIT);
 		
-		UI_ThemeColor(TH_TEXT);
+		UI_FontThemeColor(BLF_default(), TH_TEXT);
 		BLF_draw_default(UI_UNIT_X, 0.4f * UI_UNIT_Y, 0.0f, ar->headerstr, BLF_DRAW_STR_DUMMY_MAX);
 	}
 	else if (at->draw) {
@@ -553,9 +570,13 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 	/* for debugging unneeded area redraws and partial redraw */
 #if 0
 	glEnable(GL_BLEND);
-	glColor4f(drand48(), drand48(), drand48(), 0.1f);
-	glRectf(ar->drawrct.xmin - ar->winrct.xmin, ar->drawrct.ymin - ar->winrct.ymin,
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformColor4f(drand48(), drand48(), drand48(), 0.1f);
+	immRectf(pos, ar->drawrct.xmin - ar->winrct.xmin, ar->drawrct.ymin - ar->winrct.ymin,
 	        ar->drawrct.xmax - ar->winrct.xmin, ar->drawrct.ymax - ar->winrct.ymin);
+	immUnbindProgram();
 	glDisable(GL_BLEND);
 #endif
 
@@ -1993,8 +2014,12 @@ void ED_region_panels(const bContext *C, ARegion *ar, const char *context, int c
 		/* view should be in pixelspace */
 		UI_view2d_view_restore(C);
 		glEnable(GL_BLEND);
-		UI_ThemeColor4((ar->type->regionid == RGN_TYPE_PREVIEW) ? TH_PREVIEW_BACK : TH_BACK);
-		glRecti(0, 0, BLI_rcti_size_x(&ar->winrct), BLI_rcti_size_y(&ar->winrct) + 1);
+		VertexFormat *format = immVertexFormat();
+		unsigned int pos = add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+		immUniformThemeColor((ar->type->regionid == RGN_TYPE_PREVIEW) ? TH_PREVIEW_BACK : TH_BACK);
+		immRecti(pos, 0, 0, BLI_rcti_size_x(&ar->winrct), BLI_rcti_size_y(&ar->winrct) + 1);
+		immUnbindProgram();
 		glDisable(GL_BLEND);
 	}
 	else {
@@ -2123,12 +2148,16 @@ void ED_region_info_draw(ARegion *ar, const char *text, float fill_color[4], con
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glColor4fv(fill_color);
-	glRecti(rect.xmin, rect.ymin, rect.xmax + 1, rect.ymax + 1);
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformColor4fv(fill_color);
+	immRecti(pos, rect.xmin, rect.ymin, rect.xmax + 1, rect.ymax + 1);
+	immUnbindProgram();
 	glDisable(GL_BLEND);
 
 	/* text */
-	UI_ThemeColor(TH_TEXT_HI);
+	UI_FontThemeColor(fontid, TH_TEXT_HI);
 	BLF_clipping(fontid, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
 	BLF_enable(fontid, BLF_CLIPPING);
 	BLF_position(fontid, rect.xmin + 0.6f * U.widget_unit, rect.ymin + 0.3f * U.widget_unit, 0.0f);
@@ -2323,17 +2352,20 @@ void ED_region_image_metadata_draw(int x, int y, ImBuf *ibuf, const rctf *frame,
 	box_y = metadata_box_height_get(ibuf, blf_mono_font, true);
 
 	if (box_y) {
-		UI_ThemeColor(TH_METADATA_BG);
-
 		/* set up rect */
 		BLI_rctf_init(&rect, frame->xmin, frame->xmax, frame->ymax, frame->ymax + box_y);
 		/* draw top box */
-		glRectf(rect.xmin, rect.ymin, rect.xmax, rect.ymax);
+		VertexFormat *format = immVertexFormat();
+		unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+		immUniformThemeColor(TH_METADATA_BG);
+		immRectf(pos, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
+		immUnbindProgram();
 
 		BLF_clipping(blf_mono_font, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
 		BLF_enable(blf_mono_font, BLF_CLIPPING);
 
-		UI_ThemeColor(TH_METADATA_TEXT);
+		UI_FontThemeColor(blf_mono_font, TH_METADATA_TEXT);
 		metadata_draw_imbuf(ibuf, &rect, blf_mono_font, true);
 
 		BLF_disable(blf_mono_font, BLF_CLIPPING);
@@ -2345,17 +2377,20 @@ void ED_region_image_metadata_draw(int x, int y, ImBuf *ibuf, const rctf *frame,
 	box_y = metadata_box_height_get(ibuf, blf_mono_font, false);
 
 	if (box_y) {
-		UI_ThemeColor(TH_METADATA_BG);
-
 		/* set up box rect */
 		BLI_rctf_init(&rect, frame->xmin, frame->xmax, frame->ymin - box_y, frame->ymin);
 		/* draw top box */
-		glRectf(rect.xmin, rect.ymin, rect.xmax, rect.ymax);
+		VertexFormat *format = immVertexFormat();
+		unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+		immUniformThemeColor(TH_METADATA_BG);
+		immRectf(pos, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
+		immUnbindProgram();
 
 		BLF_clipping(blf_mono_font, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
 		BLF_enable(blf_mono_font, BLF_CLIPPING);
 
-		UI_ThemeColor(TH_METADATA_TEXT);
+		UI_FontThemeColor(blf_mono_font, TH_METADATA_TEXT);
 		metadata_draw_imbuf(ibuf, &rect, blf_mono_font, false);
 
 		BLF_disable(blf_mono_font, BLF_CLIPPING);
@@ -2371,11 +2406,16 @@ void ED_region_grid_draw(ARegion *ar, float zoomx, float zoomy)
 	int x1, y1, x2, y2;
 
 	/* the image is located inside (0, 0), (1, 1) as set by view2d */
-	UI_ThemeColorShade(TH_BACK, 20);
-
 	UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x1, &y1);
 	UI_view2d_view_to_region(&ar->v2d, 1.0f, 1.0f, &x2, &y2);
-	glRectf(x1, y1, x2, y2);
+
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformThemeColorShade(TH_BACK, 20);
+	immRectf(pos, x1, y1, x2, y2);
+	immUnbindProgram();
 
 	/* gridsize adapted to zoom level */
 	gridsize = 0.5f * (zoomx + zoomy);
@@ -2395,33 +2435,52 @@ void ED_region_grid_draw(ARegion *ar, float zoomx, float zoomy)
 		}
 	}
 
-	/* the fine resolution level */
 	blendfac = 0.25f * gridsize - floorf(0.25f * gridsize);
 	CLAMP(blendfac, 0.0f, 1.0f);
-	UI_ThemeColorShade(TH_BACK, (int)(20.0f * (1.0f - blendfac)));
 
-	fac = 0.0f;
-	glBegin(GL_LINES);
-	while (fac < 1.0f) {
-		glVertex2f(x1, y1 * (1.0f - fac) + y2 * fac);
-		glVertex2f(x2, y1 * (1.0f - fac) + y2 * fac);
-		glVertex2f(x1 * (1.0f - fac) + x2 * fac, y1);
-		glVertex2f(x1 * (1.0f - fac) + x2 * fac, y2);
-		fac += gridstep;
+	int count_fine = 1.0f / gridstep;
+	int count_large = 1.0f / (4.0f * gridstep);
+
+	if (count_fine > 0) {
+		VertexFormat_clear(format);
+		pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned color = add_attrib(format, "color", GL_FLOAT, 3, KEEP_FLOAT);
+		
+		immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
+		immBegin(GL_LINES, 4 * count_fine + 4 * count_large);
+		
+		float theme_color[3];
+		UI_GetThemeColorShade3fv(TH_BACK, (int)(20.0f * (1.0f - blendfac)), theme_color);
+		immAttrib3fv(color, theme_color);
+		fac = 0.0f;
+		
+		/* the fine resolution level */
+		for (int i = 0; i < count_fine; i++) {
+			immVertex2f(pos, x1, y1 * (1.0f - fac) + y2 * fac);
+			immVertex2f(pos, x2, y1 * (1.0f - fac) + y2 * fac);
+			immVertex2f(pos, x1 * (1.0f - fac) + x2 * fac, y1);
+			immVertex2f(pos, x1 * (1.0f - fac) + x2 * fac, y2);
+			fac += gridstep;
+		}
+
+		if (count_large > 0) {
+			UI_GetThemeColor3fv(TH_BACK, theme_color);
+			immAttrib3fv(color, theme_color);
+			fac = 0.0f;
+			
+			/* the large resolution level */
+			for (int i = 0; i < count_large; i++) {
+				immVertex2f(pos, x1, y1 * (1.0f - fac) + y2 * fac);
+				immVertex2f(pos, x2, y1 * (1.0f - fac) + y2 * fac);
+				immVertex2f(pos, x1 * (1.0f - fac) + x2 * fac, y1);
+				immVertex2f(pos, x1 * (1.0f - fac) + x2 * fac, y2);
+				fac += 4.0f * gridstep;
+			}
+		}
+
+		immEnd();
+		immUnbindProgram();
 	}
-
-	/* the large resolution level */
-	UI_ThemeColor(TH_BACK);
-
-	fac = 0.0f;
-	while (fac < 1.0f) {
-		glVertex2f(x1, y1 * (1.0f - fac) + y2 * fac);
-		glVertex2f(x2, y1 * (1.0f - fac) + y2 * fac);
-		glVertex2f(x1 * (1.0f - fac) + x2 * fac, y1);
-		glVertex2f(x1 * (1.0f - fac) + x2 * fac, y2);
-		fac += 4.0f * gridstep;
-	}
-	glEnd();
 }
 
 /* If the area has overlapping regions, it returns visible rect for Region *ar */
@@ -2458,8 +2517,11 @@ void ED_region_visible_rect(ARegion *ar, rcti *rect)
 
 void ED_region_cache_draw_background(const ARegion *ar)
 {
-	glColor4ub(128, 128, 255, 64);
-	glRecti(0, 0, ar->winx, 8 * UI_DPI_FAC);
+	unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformColor4ub(128, 128, 255, 64);
+	immRecti(pos, 0, 0, ar->winx, 8 * UI_DPI_FAC);
+	immUnbindProgram();
 }
 
 void ED_region_cache_draw_curfra_label(const int framenr, const float x, const float y)
@@ -2475,9 +2537,13 @@ void ED_region_cache_draw_curfra_label(const int framenr, const float x, const f
 
 	BLF_width_and_height(fontid, numstr, sizeof(numstr), &font_dims[0], &font_dims[1]);
 
-	glRecti(x, y, x + font_dims[0] + 6.0f, y + font_dims[1] + 4.0f);
+	unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformThemeColor(TH_CFRAME);
+	immRecti(pos, x, y, x + font_dims[0] + 6.0f, y + font_dims[1] + 4.0f);
+	immUnbindProgram();
 
-	UI_ThemeColor(TH_TEXT);
+	UI_FontThemeColor(fontid, TH_TEXT);
 	BLF_position(fontid, x + 2.0f, y + 2.0f, 0.0f);
 	BLF_draw(fontid, numstr, sizeof(numstr));
 }
@@ -2485,17 +2551,18 @@ void ED_region_cache_draw_curfra_label(const int framenr, const float x, const f
 void ED_region_cache_draw_cached_segments(const ARegion *ar, const int num_segments, const int *points, const int sfra, const int efra)
 {
 	if (num_segments) {
-		int a;
+		unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+		immUniformColor4ub(128, 128, 255, 128);
 
-		glColor4ub(128, 128, 255, 128);
+		for (int a = 0; a < num_segments; a++) {
+			float x1 = (float)(points[a * 2] - sfra) / (efra - sfra + 1) * ar->winx;
+			float x2 = (float)(points[a * 2 + 1] - sfra + 1) / (efra - sfra + 1) * ar->winx;
 
-		for (a = 0; a < num_segments; a++) {
-			float x1, x2;
-
-			x1 = (float)(points[a * 2] - sfra) / (efra - sfra + 1) * ar->winx;
-			x2 = (float)(points[a * 2 + 1] - sfra + 1) / (efra - sfra + 1) * ar->winx;
-
-			glRecti(x1, 0, x2, 8 * UI_DPI_FAC);
+			immRecti(pos, x1, 0, x2, 8 * UI_DPI_FAC);
+			/* TODO(merwin): use primitive restart to draw multiple rects more efficiently */
 		}
+
+		immUnbindProgram();
 	}
 }

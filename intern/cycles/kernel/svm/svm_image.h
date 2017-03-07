@@ -144,7 +144,6 @@ ccl_device float4 svm_image_texture(KernelGlobals *kg, int id, float x, float y,
 		case 86: r = kernel_tex_image_interp(__tex_image_byte4_086, x, y); break;
 		case 87: r = kernel_tex_image_interp(__tex_image_byte4_087, x, y); break;
 		case 88: r = kernel_tex_image_interp(__tex_image_byte4_088, x, y); break;
-		case 89: r = kernel_tex_image_interp(__tex_image_byte4_089, x, y); break;
 		default:
 			kernel_assert(0);
 			return make_float4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -241,8 +240,7 @@ ccl_device void svm_node_tex_image_box(KernelGlobals *kg, ShaderData *sd, float 
 	float3 N = ccl_fetch(sd, N);
 
 	N = ccl_fetch(sd, N);
-	if(ccl_fetch(sd, object) != OBJECT_NONE)
-		object_inverse_normal_transform(kg, sd, &N);
+	object_inverse_normal_transform(kg, sd, &N);
 
 	/* project from direction vector to barycentric coordinates in triangles */
 	N.x = fabsf(N.x);

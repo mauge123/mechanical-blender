@@ -10,33 +10,42 @@
 // the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include "batch.h"
+#include "buffer_id.h"
 #include <stdlib.h>
 
 // necessary functions from matrix API
 extern void gpuBindMatrices(GLuint program);
 extern bool gpuMatricesDirty(void); // how best to use this here?
 
-Batch* Batch_create(GLenum prim_type, VertexBuffer* verts, ElementList* elem)
+Batch* Batch_create(PrimitiveType prim_type, VertexBuffer* verts, ElementList* elem)
+	{
+	Batch* batch = calloc(1, sizeof(Batch));
+
+	Batch_init(batch, prim_type, verts, elem);
+
+	return batch;
+	}
+
+void Batch_init(Batch* batch, PrimitiveType prim_type, VertexBuffer* verts, ElementList* elem)
 	{
 #if TRUST_NO_ONE
 	assert(verts != NULL);
-	assert(prim_type == GL_POINTS || prim_type == GL_LINES || prim_type == GL_TRIANGLES);
+	assert(prim_type == PRIM_POINTS || prim_type == PRIM_LINES || prim_type == PRIM_TRIANGLES);
 	// we will allow other primitive types in a future update
 #endif
-
-	Batch* batch = calloc(1, sizeof(Batch));
 
 	batch->verts = verts;
 	batch->elem = elem;
 	batch->prim_type = prim_type;
 	batch->phase = READY_TO_DRAW;
-
-	return batch;
 	}
 
 void Batch_discard(Batch* batch)
 	{
-	// TODO: clean up
+	if (batch->vao_id)
+		vao_id_free(batch->vao_id);
+
+	free(batch);
 	}
 
 void Batch_discard_all(Batch* batch)
@@ -55,6 +64,8 @@ void Batch_set_program(Batch* batch, GLuint program)
 
 	batch->program = program;
 	batch->program_dirty = true;
+
+	Batch_use_program(batch); // hack! to make Batch_Uniform* simpler
 	}
 
 static void Batch_update_program_bindings(Batch* batch)
@@ -79,9 +90,7 @@ static void Batch_update_program_bindings(Batch* batch)
 
 		const GLint loc = glGetAttribLocation(batch->program, a->name);
 
-#if TRUST_NO_ONE
-		assert(loc != -1);
-#endif
+		if (loc == -1) continue;
 
 		glEnableVertexAttribArray(loc);
 
@@ -102,8 +111,12 @@ static void Batch_update_program_bindings(Batch* batch)
 	batch->program_dirty = false;
 	}
 
-static void Batch_use_program(Batch* batch)
+void Batch_use_program(Batch* batch)
 	{
+	// NOTE: use_program & done_using_program are fragile, depend on staying in sync with
+	//       the GL context's active program. use_program doesn't mark other programs as "not used".
+	// TODO: make not fragile (somehow)
+
 	if (!batch->program_in_use)
 		{
 		glUseProgram(batch->program);
@@ -111,13 +124,24 @@ static void Batch_use_program(Batch* batch)
 		}
 	}
 
-static void Batch_done_using_program(Batch* batch)
+void Batch_done_using_program(Batch* batch)
 	{
 	if (batch->program_in_use)
 		{
 		glUseProgram(0);
 		batch->program_in_use = false;
 		}
+	}
+
+void Batch_Uniform1i(Batch* batch, const char* name, int value)
+	{
+	int loc = glGetUniformLocation(batch->program, name);
+
+#if TRUST_NO_ONE
+	assert(loc != -1);
+#endif
+
+	glUniform1i(loc, value);
 	}
 
 void Batch_Uniform1b(Batch* batch, const char* name, bool value)
@@ -128,8 +152,40 @@ void Batch_Uniform1b(Batch* batch, const char* name, bool value)
 	assert(loc != -1);
 #endif
 
-	Batch_use_program(batch);
 	glUniform1i(loc, value ? GL_TRUE : GL_FALSE);
+	}
+
+void Batch_Uniform2f(Batch* batch, const char* name, float x, float y)
+	{
+	int loc = glGetUniformLocation(batch->program, name);
+
+#if TRUST_NO_ONE
+	assert(loc != -1);
+#endif
+
+	glUniform2f(loc, x, y);
+	}
+
+void Batch_Uniform4f(Batch* batch, const char* name, float x, float y, float z, float w)
+	{
+	int loc = glGetUniformLocation(batch->program, name);
+
+#if TRUST_NO_ONE
+	assert(loc != -1);
+#endif
+
+	glUniform4f(loc, x, y, z, w);
+	}
+
+void Batch_Uniform1f(Batch* batch, const char* name, float x)
+	{
+	int loc = glGetUniformLocation(batch->program, name);
+
+#if TRUST_NO_ONE
+	assert(loc != -1);
+#endif
+
+	glUniform1f(loc, x);
 	}
 
 void Batch_Uniform3fv(Batch* batch, const char* name, const float data[3])
@@ -140,7 +196,6 @@ void Batch_Uniform3fv(Batch* batch, const char* name, const float data[3])
 	assert(loc != -1);
 #endif
 
-	Batch_use_program(batch);
 	glUniform3fv(loc, 1, data);
 	}
 
@@ -152,13 +207,12 @@ void Batch_Uniform4fv(Batch* batch, const char* name, const float data[4])
 	assert(loc != -1);
 #endif
 
-	Batch_use_program(batch);
 	glUniform4fv(loc, 1, data);
 	}
 
 static void Batch_prime(Batch* batch)
 	{
-	glGenVertexArrays(1, &batch->vao_id);
+	batch->vao_id = vao_id_alloc();
 	glBindVertexArray(batch->vao_id);
 
 	VertexBuffer_use(batch->verts);
@@ -207,3 +261,89 @@ void Batch_draw(Batch* batch)
 	Batch_done_using_program(batch);
 	glBindVertexArray(0);
 	}
+
+
+
+// clement : temp stuff
+void Batch_draw_stupid(Batch* batch)
+{
+	if (batch->vao_id)
+		glBindVertexArray(batch->vao_id);
+	else
+		Batch_prime(batch);
+
+	if (batch->program_dirty)
+		Batch_update_program_bindings(batch);
+
+	// Batch_use_program(batch);
+
+	//gpuBindMatrices(batch->program);
+
+	if (batch->elem)
+		{
+		const ElementList* el = batch->elem;
+
+#if TRACK_INDEX_RANGE
+		if (el->base_index)
+			glDrawRangeElementsBaseVertex(batch->prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0, el->base_index);
+		else
+			glDrawRangeElements(batch->prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0);
+#else
+		glDrawElements(batch->prim_type, el->index_ct, GL_UNSIGNED_INT, 0);
+#endif
+		}
+	else
+		glDrawArrays(batch->prim_type, 0, batch->verts->vertex_ct);
+
+	// Batch_done_using_program(batch);
+	glBindVertexArray(0);
+}
+
+// clement : temp stuff
+void Batch_draw_stupid_instanced(Batch* batch, unsigned int instance_vbo, int instance_count,
+                                 int attrib_nbr, int attrib_stride, int attrib_size[16], int attrib_loc[16])
+{
+	if (batch->vao_id)
+		glBindVertexArray(batch->vao_id);
+	else
+		Batch_prime(batch);
+
+	if (batch->program_dirty)
+		Batch_update_program_bindings(batch);
+
+	glBindBuffer(GL_ARRAY_BUFFER, instance_vbo);
+	int ptr_ofs = 0;
+	for (int i = 0; i < attrib_nbr; ++i) {
+		int size = attrib_size[i];
+		int loc = attrib_loc[i];
+		int atr_ofs = 0;
+
+		while (size > 0) {
+			glEnableVertexAttribArray(loc + atr_ofs);
+			glVertexAttribPointer(loc + atr_ofs, (size > 4) ? 4 : size, GL_FLOAT, GL_FALSE,
+			                      sizeof(float) * attrib_stride, (GLvoid*)(sizeof(float) * ptr_ofs));
+			glVertexAttribDivisor(loc + atr_ofs, 1);
+			atr_ofs++;
+			ptr_ofs += (size > 4) ? 4 : size;
+			size -= 4;
+		}
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	// Batch_use_program(batch);
+
+	//gpuBindMatrices(batch->program);
+
+	if (batch->elem)
+		{
+		const ElementList* el = batch->elem;
+
+		glDrawElementsInstanced(batch->prim_type, el->index_ct, GL_UNSIGNED_INT, 0, instance_count);
+		}
+	else
+		glDrawArraysInstanced(batch->prim_type, 0, batch->verts->vertex_ct, instance_count);
+
+	// Batch_done_using_program(batch);
+	glBindVertexArray(0);
+}
+

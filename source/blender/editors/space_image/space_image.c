@@ -45,6 +45,7 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_image.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -535,6 +536,7 @@ static void image_listener(bScreen *sc, ScrArea *sa, wmNotifier *wmn)
 				case ND_TRANSFORM:
 				case ND_MODIFIER:
 				{
+					TODO_LAYER_CONTEXT; /* need to use OBACT_NEW */
 					Object *ob = OBACT;
 					if (ob && (ob == wmn->reference) && (ob->mode & OB_MODE_EDIT)) {
 						if (sima->lock && (sima->flag & SI_DRAWSHADOW)) {
@@ -687,6 +689,7 @@ static void image_main_region_draw(const bContext *C, ARegion *ar)
 	Mask *mask = NULL;
 	bool curve = false;
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	View2D *v2d = &ar->v2d;
 	//View2DScrollers *scrollers;
 	float col[3];
@@ -722,7 +725,7 @@ static void image_main_region_draw(const bContext *C, ARegion *ar)
 
 	ED_region_draw_cb_draw(C, ar, REGION_DRAW_PRE_VIEW);
 
-	ED_uvedit_draw_main(sima, ar, scene, obedit, obact);
+	ED_uvedit_draw_main(sima, ar, scene, sl, obedit, obact);
 
 	/* check for mask (delay draw) */
 	if (ED_space_image_show_uvedit(sima, obedit)) {

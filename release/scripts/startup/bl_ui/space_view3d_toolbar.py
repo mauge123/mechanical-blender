@@ -22,6 +22,7 @@ from bpy.types import Menu, Panel, UIList
 from bl_ui.properties_grease_pencil_common import (
         GreasePencilDrawingToolsPanel,
         GreasePencilStrokeEditPanel,
+        GreasePencilInterpolatePanel,
         GreasePencilStrokeSculptPanel,
         GreasePencilBrushPanel,
         GreasePencilBrushCurvesPanel
@@ -431,6 +432,7 @@ class VIEW3D_PT_tools_shading(View3DPanel, Panel):
         col.label(text="Normals:")
         col.operator("mesh.normals_make_consistent", text="Recalculate")
         col.operator("mesh.flip_normals", text="Flip Direction")
+        col.operator("mesh.set_normals_from_faces", text="Set From Faces")
 
 
 class VIEW3D_PT_tools_uvs(View3DPanel, Panel):
@@ -942,12 +944,37 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
         settings = self.paint_settings(context)
         brush = settings.brush
 
-        col = layout.split().column()
-        col.template_ID_preview(settings, "brush", new="brush.add", rows=3, cols=8)
+        if not context.particle_edit_object:
+            col = layout.split().column()
+            col.template_ID_preview(settings, "brush", new="brush.add", rows=3, cols=8)
+
+        # Particle Mode #
+        if context.particle_edit_object:
+            tool = settings.tool
+
+            layout.column().prop(settings, "tool", expand=True)
+
+            if tool != 'NONE':
+                col = layout.column()
+                col.prop(brush, "size", slider=True)
+                if tool != 'ADD':
+                    col.prop(brush, "strength", slider=True)
+
+            if tool == 'ADD':
+                col.prop(brush, "count")
+                col = layout.column()
+                col.prop(settings, "use_default_interpolate")
+                col.prop(brush, "steps", slider=True)
+                col.prop(settings, "default_key_count", slider=True)
+            elif tool == 'LENGTH':
+                layout.prop(brush, "length_mode", expand=True)
+            elif tool == 'PUFF':
+                layout.prop(brush, "puff_mode", expand=True)
+                layout.prop(brush, "use_puff_volume")
 
         # Sculpt Mode #
 
-        if context.sculpt_object and brush:
+        elif context.sculpt_object and brush:
             capabilities = brush.sculpt_capabilities
 
             col = layout.column()
@@ -1534,7 +1561,7 @@ class VIEW3D_PT_sculpt_dyntopo(Panel, View3DPaintPanel):
         sub.active = (brush and brush.sculpt_tool != 'MASK')
         if (sculpt.detail_type_method == 'CONSTANT'):
             row = sub.row(align=True)
-            row.prop(sculpt, "constant_detail")
+            row.prop(sculpt, "constant_detail_resolution")
             row.operator("sculpt.sample_detail_size", text="", icon='EYEDROPPER')
         elif (sculpt.detail_type_method == 'BRUSH'):
             sub.prop(sculpt, "detail_percent")
@@ -1632,7 +1659,7 @@ class VIEW3D_PT_tools_brush_appearance(Panel, View3DPaintPanel):
     @classmethod
     def poll(cls, context):
         settings = cls.paint_settings(context)
-        return (settings is not None)
+        return (settings is not None) and (not isinstance(settings, bpy.types.ParticleEdit))
 
     def draw(self, context):
         layout = self.layout
@@ -1855,6 +1882,78 @@ class VIEW3D_MT_tools_projectpaint_stencil(Menu):
             props.value = i
 
 
+class VIEW3D_PT_tools_particlemode(View3DPanel, Panel):
+    """Default tools for particle mode"""
+    bl_context = "particlemode"
+    bl_label = "Options"
+    bl_category = "Tools"
+
+    def draw(self, context):
+        layout = self.layout
+
+        pe = context.tool_settings.particle_edit
+        ob = pe.object
+
+        layout.prop(pe, "type", text="")
+
+        ptcache = None
+
+        if pe.type == 'PARTICLES':
+            if ob.particle_systems:
+                if len(ob.particle_systems) > 1:
+                    layout.template_list("UI_UL_list", "particle_systems", ob, "particle_systems",
+                                         ob.particle_systems, "active_index", rows=2, maxrows=3)
+
+                ptcache = ob.particle_systems.active.point_cache
+        else:
+            for md in ob.modifiers:
+                if md.type == pe.type:
+                    ptcache = md.point_cache
+
+        if ptcache and len(ptcache.point_caches) > 1:
+            layout.template_list("UI_UL_list", "particles_point_caches", ptcache, "point_caches",
+                                 ptcache.point_caches, "active_index", rows=2, maxrows=3)
+
+        if not pe.is_editable:
+            layout.label(text="Point cache must be baked")
+            layout.label(text="in memory to enable editing!")
+
+        col = layout.column(align=True)
+        if pe.is_hair:
+            col.active = pe.is_editable
+            col.prop(pe, "use_emitter_deflect", text="Deflect emitter")
+            sub = col.row(align=True)
+            sub.active = pe.use_emitter_deflect
+            sub.prop(pe, "emitter_distance", text="Distance")
+
+        col = layout.column(align=True)
+        col.active = pe.is_editable
+        col.label(text="Keep:")
+        col.prop(pe, "use_preserve_length", text="Lengths")
+        col.prop(pe, "use_preserve_root", text="Root")
+        if not pe.is_hair:
+            col.label(text="Correct:")
+            col.prop(pe, "use_auto_velocity", text="Velocity")
+        col.prop(ob.data, "use_mirror_x")
+
+        col.prop(pe, "shape_object")
+        col.operator("particle.shape_cut")
+
+        col = layout.column(align=True)
+        col.active = pe.is_editable
+        col.label(text="Draw:")
+        col.prop(pe, "draw_step", text="Path Steps")
+        if pe.is_hair:
+            col.prop(pe, "show_particles", text="Children")
+        else:
+            if pe.type == 'PARTICLES':
+                col.prop(pe, "show_particles", text="Particles")
+            col.prop(pe, "use_fade_time")
+            sub = col.row(align=True)
+            sub.active = pe.use_fade_time
+            sub.prop(pe, "fade_frames", slider=True)
+
+
 # Grease Pencil drawing tools
 class VIEW3D_PT_tools_grease_pencil_draw(GreasePencilDrawingToolsPanel, Panel):
     bl_space_type = 'VIEW_3D'
@@ -1862,6 +1961,11 @@ class VIEW3D_PT_tools_grease_pencil_draw(GreasePencilDrawingToolsPanel, Panel):
 
 # Grease Pencil stroke editing tools
 class VIEW3D_PT_tools_grease_pencil_edit(GreasePencilStrokeEditPanel, Panel):
+    bl_space_type = 'VIEW_3D'
+
+
+# Grease Pencil stroke interpolation tools
+class VIEW3D_PT_tools_grease_pencil_interpolate(GreasePencilInterpolatePanel, Panel):
     bl_space_type = 'VIEW_3D'
 
 

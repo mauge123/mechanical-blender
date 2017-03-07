@@ -51,10 +51,9 @@ void BKE_rigidbody_free_constraint(struct Object *ob);
 
 struct RigidBodyOb *BKE_rigidbody_copy_object(struct Object *ob);
 struct RigidBodyCon *BKE_rigidbody_copy_constraint(struct Object *ob);
-void BKE_rigidbody_relink_constraint(struct RigidBodyCon *rbc);
 
 /* Callback format for performing operations on ID-pointers for rigidbody world. */
-typedef void (*RigidbodyWorldIDFunc)(struct RigidBodyWorld *rbw, struct ID **idpoin, void *userdata, int cd_flag);
+typedef void (*RigidbodyWorldIDFunc)(struct RigidBodyWorld *rbw, struct ID **idpoin, void *userdata, int cb_flag);
 
 void BKE_rigidbody_world_id_loop(struct RigidBodyWorld *rbw, RigidbodyWorldIDFunc func, void *userdata);
 
@@ -99,6 +98,7 @@ void BKE_rigidbody_remove_constraint(struct Scene *scene, struct Object *ob);
 void BKE_rigidbody_aftertrans_update(struct Object *ob, float loc[3], float rot[3], float quat[4], float rotAxis[3], float rotAngle);
 void BKE_rigidbody_sync_transforms(struct RigidBodyWorld *rbw, struct Object *ob, float ctime);
 bool BKE_rigidbody_check_sim_running(struct RigidBodyWorld *rbw, float ctime);
+void BKE_rigidbody_cache_reset(struct RigidBodyWorld *rbw);
 void BKE_rigidbody_rebuild_world(struct Scene *scene, float ctime);
 void BKE_rigidbody_do_simulation(struct Scene *scene, float ctime);
 

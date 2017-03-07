@@ -32,9 +32,11 @@
 
 #include "BKE_global.h"
 
+#include "GPU_batch.h"
 #include "GPU_debug.h"
 #include "GPU_glew.h"
 #include "GPU_framebuffer.h"
+#include "GPU_matrix.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
@@ -54,7 +56,7 @@ struct GPUFrameBuffer {
 
 static void GPU_print_framebuffer_error(GLenum status, char err_out[256])
 {
-	const char *format = "GPUFrameBuffer: framebuffer status %s";
+	const char *format = "GPUFrameBuffer: framebuffer status %s\n";
 	const char *err = "unknown";
 
 #define format_status(X) \
@@ -260,6 +262,43 @@ void GPU_framebuffer_slots_bind(GPUFrameBuffer *fb, int slot)
 	glPushMatrix();
 }
 
+void GPU_framebuffer_bind(GPUFrameBuffer *fb)
+{
+	int numslots = 0, i;
+	GLenum attachments[4];
+	GLenum readattachement = 0;
+	GPUTexture *tex;
+
+	for (i = 0; i < 4; i++) {
+		if (fb->colortex[i]) {
+			attachments[numslots] = GL_COLOR_ATTACHMENT0 + i;
+			tex = fb->colortex[i];
+
+			if (!readattachement)
+				readattachement = GL_COLOR_ATTACHMENT0 + i;
+
+			numslots++;
+		}
+	}
+
+	/* bind framebuffer */
+	glBindFramebuffer(GL_FRAMEBUFFER, fb->object);
+
+	if (numslots == 0) {
+		glDrawBuffer(GL_NONE);
+		glReadBuffer(GL_NONE);
+		tex = fb->depthtex;
+	}
+	else {
+		/* last bound prevails here, better allow explicit control here too */
+		glDrawBuffers(numslots, attachments);
+		glReadBuffer(readattachement);
+	}
+
+	glViewport(0, 0, GPU_texture_width(tex), GPU_texture_height(tex));
+	GG.currentfb = fb->object;
+}
+
 
 void GPU_framebuffer_texture_unbind(GPUFrameBuffer *UNUSED(fb), GPUTexture *UNUSED(tex))
 {
@@ -282,7 +321,6 @@ void GPU_framebuffer_bind_no_save(GPUFrameBuffer *fb, int slot)
 
 	/* push matrices and set default viewport and matrix */
 	glViewport(0, 0, GPU_texture_width(fb->colortex[slot]), GPU_texture_height(fb->colortex[slot]));
-	GG.currentfb = fb->object;
 	GG.currentfb = fb->object;
 }
 
@@ -343,20 +381,48 @@ void GPU_framebuffer_blur(
         GPUFrameBuffer *fb, GPUTexture *tex,
         GPUFrameBuffer *blurfb, GPUTexture *blurtex)
 {
+	const float fullscreencos[4][2] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, 1.0f}};
+	const float fullscreenuvs[4][2] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}};
+
+	static VertexFormat format = {0};
+	static VertexBuffer vbo = {{0}};
+	static Batch batch = {0};
+
 	const float scaleh[2] = {1.0f / GPU_texture_width(blurtex), 0.0f};
 	const float scalev[2] = {0.0f, 1.0f / GPU_texture_height(tex)};
 
 	GPUShader *blur_shader = GPU_shader_get_builtin_shader(GPU_SHADER_SEP_GAUSSIAN_BLUR);
-	int scale_uniform, texture_source_uniform;
 
 	if (!blur_shader)
 		return;
 
-	scale_uniform = GPU_shader_get_uniform(blur_shader, "ScaleU");
-	texture_source_uniform = GPU_shader_get_uniform(blur_shader, "textureSource");
-		
-	/* Blurring horizontally */
+	/* Preparing to draw quad */
+	if (format.attrib_ct == 0) {
+		unsigned int i = 0;
+		/* Vertex format */
+		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int uvs = add_attrib(&format, "uvs", GL_FLOAT, 2, KEEP_FLOAT);
 
+		/* Vertices */
+		VertexBuffer_init_with_format(&vbo, &format);
+		VertexBuffer_allocate_data(&vbo, 36);
+
+		for (int j = 0; j < 3; ++j) {
+			setAttrib(&vbo, uvs, i, fullscreenuvs[j]); setAttrib(&vbo, pos, i++, fullscreencos[j]);
+		}
+		for (int j = 1; j < 4; ++j) {
+			setAttrib(&vbo, uvs, i, fullscreenuvs[j]); setAttrib(&vbo, pos, i++, fullscreencos[j]);
+		}
+
+		Batch_init(&batch, GL_TRIANGLES, &vbo, NULL);
+	}
+		
+	glDisable(GL_DEPTH_TEST);
+	
+	/* Load fresh matrices */
+	gpuMatrixBegin3D(); /* TODO: finish 2D API */
+
+	/* Blurring horizontally */
 	/* We do the bind ourselves rather than using GPU_framebuffer_texture_bind() to avoid
 	 * pushing unnecessary matrices onto the OpenGL stack. */
 	glBindFramebuffer(GL_FRAMEBUFFER, blurfb->object);
@@ -365,51 +431,66 @@ void GPU_framebuffer_blur(
 	/* avoid warnings from texture binding */
 	GG.currentfb = blurfb->object;
 
-	GPU_shader_bind(blur_shader);
-	GPU_shader_uniform_vector(blur_shader, scale_uniform, 2, 1, scaleh);
-	GPU_shader_uniform_texture(blur_shader, texture_source_uniform, tex);
 	glViewport(0, 0, GPU_texture_width(blurtex), GPU_texture_height(blurtex));
-
-	/* Preparing to draw quad */
-	glMatrixMode(GL_TEXTURE);
-	glLoadIdentity();
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	glDisable(GL_DEPTH_TEST);
 
 	GPU_texture_bind(tex, 0);
 
-	/* Drawing quad */
-	glBegin(GL_QUADS);
-	glTexCoord2d(0, 0); glVertex2f(1, 1);
-	glTexCoord2d(1, 0); glVertex2f(-1, 1);
-	glTexCoord2d(1, 1); glVertex2f(-1, -1);
-	glTexCoord2d(0, 1); glVertex2f(1, -1);
-	glEnd();
+	Batch_set_builtin_program(&batch, GPU_SHADER_SEP_GAUSSIAN_BLUR);
+	Batch_Uniform2f(&batch, "ScaleU", scaleh[0], scaleh[1]);
+	Batch_Uniform1i(&batch, "textureSource", GL_TEXTURE0);
+	Batch_draw(&batch);
 
 	/* Blurring vertically */
-
 	glBindFramebuffer(GL_FRAMEBUFFER, fb->object);
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 	
 	GG.currentfb = fb->object;
 	
 	glViewport(0, 0, GPU_texture_width(tex), GPU_texture_height(tex));
-	GPU_shader_uniform_vector(blur_shader, scale_uniform, 2, 1, scalev);
-	GPU_shader_uniform_texture(blur_shader, texture_source_uniform, blurtex);
+
 	GPU_texture_bind(blurtex, 0);
 
-	glBegin(GL_QUADS);
-	glTexCoord2d(0, 0); glVertex2f(1, 1);
-	glTexCoord2d(1, 0); glVertex2f(-1, 1);
-	glTexCoord2d(1, 1); glVertex2f(-1, -1);
-	glTexCoord2d(0, 1); glVertex2f(1, -1);
-	glEnd();
+	/* Hack to make the following uniform stick */
+	Batch_set_builtin_program(&batch, GPU_SHADER_SEP_GAUSSIAN_BLUR);
+	Batch_Uniform2f(&batch, "ScaleU", scalev[0], scalev[1]);
+	Batch_Uniform1i(&batch, "textureSource", GL_TEXTURE0);
+	Batch_draw(&batch);
 
-	GPU_shader_unbind();
+	gpuMatrixEnd();
+}
+
+void GPU_framebuffer_blit(GPUFrameBuffer *fb_read, int read_slot, GPUFrameBuffer *fb_write, int write_slot, bool use_depth)
+{
+	GPUTexture *read_tex = (use_depth) ? fb_read->depthtex : fb_read->colortex[read_slot];
+	GPUTexture *write_tex = (use_depth) ? fb_write->depthtex : fb_write->colortex[write_slot];
+	int read_attach = (use_depth) ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0 + GPU_texture_framebuffer_attachment(read_tex);
+	int write_attach = (use_depth) ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0 + GPU_texture_framebuffer_attachment(write_tex);
+	int read_bind = GPU_texture_opengl_bindcode(read_tex);
+	int write_bind = GPU_texture_opengl_bindcode(write_tex);
+	const int read_w = GPU_texture_width(read_tex);
+	const int read_h = GPU_texture_height(read_tex);
+	const int write_w = GPU_texture_width(write_tex);
+	const int write_h = GPU_texture_height(write_tex);
+
+	/* read from multi-sample buffer */
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_read->object);
+	glFramebufferTexture2D(
+	        GL_READ_FRAMEBUFFER, read_attach,
+	        GL_TEXTURE_2D, read_bind, 0);
+	BLI_assert(glCheckFramebufferStatusEXT(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+	/* write into new single-sample buffer */
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_write->object);
+	glFramebufferTexture2D(
+	        GL_DRAW_FRAMEBUFFER, write_attach,
+	        GL_TEXTURE_2D, write_bind, 0);
+	BLI_assert(glCheckFramebufferStatusEXT(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+	glBlitFramebuffer(0, 0, read_w, read_h, 0, 0, write_w, write_h, (use_depth) ? GL_DEPTH_BUFFER_BIT : GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+	/* Restore previous framebuffer */
+	glBindFramebuffer(GL_FRAMEBUFFER, GG.currentfb);
+	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 }
 
 /* GPUOffScreen */
@@ -453,7 +534,7 @@ GPUOffScreen *GPU_offscreen_create(int width, int height, int samples, char err_
 		return NULL;
 	}
 
-	ofs->color = GPU_texture_create_2D_multisample(width, height, NULL, GPU_HDR_NONE, samples, err_out);
+	ofs->color = GPU_texture_create_2D_multisample(width, height, NULL, samples, err_out);
 	if (!ofs->color) {
 		GPU_offscreen_free(ofs);
 		return NULL;

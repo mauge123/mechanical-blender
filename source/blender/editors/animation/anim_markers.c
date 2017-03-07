@@ -36,7 +36,7 @@
 #include "DNA_object_types.h"
 
 #include "BLI_blenlib.h"
-#include "BLI_math_base.h"
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -58,6 +58,8 @@
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
+
+#include "GPU_immediate.h"
 
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
@@ -348,19 +350,24 @@ static void draw_marker(
 	if (flag & DRAW_MARKERS_LINES)
 #endif
 	{
+		unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		setlinestyle(3);
 		
-		if (marker->flag & SELECT)
-			glColor4ub(255, 255, 255, 96);
-		else
-			glColor4ub(0, 0, 0, 96);
-		
-		glBegin(GL_LINES);
-		glVertex2f(xpos + 0.5f, 12.0f);
-		glVertex2f(xpos + 0.5f, (v2d->cur.ymax + 12.0f) * yscale);
-		glEnd();
-		
+		if (marker->flag & SELECT) {
+			immUniformColor4ub(255, 255, 255, 96);
+		}
+		else {
+			immUniformColor4ub(0, 0, 0, 96);
+		}
+
+		immBegin(GL_LINES, 2);
+		immVertex2f(pos, xpos + 0.5f, 12.0f);
+		immVertex2f(pos, xpos + 0.5f, (v2d->cur.ymax + 12.0f) * yscale);
+		immEnd();
 		setlinestyle(0);
+
+		immUnbindProgram();
 	}
 	
 	/* 5 px to offset icon to align properly, space / pixels corrects for zoom */
@@ -380,19 +387,20 @@ static void draw_marker(
 	
 	/* and the marker name too, shifted slightly to the top-right */
 	if (marker->name[0]) {
+		unsigned char text_col[4];
 		float x, y;
 
 		/* minimal y coordinate which wouldn't be occluded by scroll */
 		int min_y = 17.0f * UI_DPI_FAC;
 		
 		if (marker->flag & SELECT) {
-			UI_ThemeColor(TH_TEXT_HI);
+			UI_GetThemeColor4ubv(TH_TEXT_HI, text_col);
 			x = xpos + 4.0f * UI_DPI_FAC;
 			y = (ypixels <= 39.0f * UI_DPI_FAC) ? (ypixels - 10.0f * UI_DPI_FAC) : 29.0f * UI_DPI_FAC;
 			y = max_ii(y, min_y);
 		}
 		else {
-			UI_ThemeColor(TH_TEXT);
+			UI_GetThemeColor4ubv(TH_TEXT, text_col);
 			if ((marker->frame <= cfra) && (marker->frame + 5 > cfra)) {
 				x = xpos + 8.0f * UI_DPI_FAC;
 				y = (ypixels <= 39.0f * UI_DPI_FAC) ? (ypixels - 10.0f * UI_DPI_FAC) : 29.0f * UI_DPI_FAC;
@@ -406,14 +414,11 @@ static void draw_marker(
 
 #ifdef DURIAN_CAMERA_SWITCH
 		if (marker->camera && (marker->camera->restrictflag & OB_RESTRICT_RENDER)) {
-			float col[4];
-			glGetFloatv(GL_CURRENT_COLOR, col);
-			col[3] = 0.4;
-			glColor4fv(col);
+			text_col[3] = 100;
 		}
 #endif
 
-		UI_fontstyle_draw_simple(fstyle, x, y, marker->name);
+		UI_fontstyle_draw_simple(fstyle, x, y, marker->name, text_col);
 	}
 }
 
@@ -440,15 +445,20 @@ void ED_markers_draw(const bContext *C, int flag)
 	v2d = UI_view2d_fromcontext(C);
 
 	if (flag & DRAW_MARKERS_MARGIN) {
+		unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+
 		const unsigned char shade[4] = {0, 0, 0, 16};
-		glColor4ubv(shade);
+		immUniformColor4ubv(shade);
 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-		glRectf(v2d->cur.xmin, 0, v2d->cur.xmax, UI_MARKER_MARGIN_Y);
+		immRectf(pos, v2d->cur.xmin, 0, v2d->cur.xmax, UI_MARKER_MARGIN_Y);
 
 		glDisable(GL_BLEND);
+
+		immUnbindProgram();
 	}
 
 	/* no time correction for framelen! space is drawn with old values */
@@ -1124,7 +1134,7 @@ static int ed_marker_select(bContext *C, const wmEvent *event, bool extend, bool
 
 	if (camera) {
 		Scene *scene = CTX_data_scene(C);
-		Base *base;
+		BaseLegacy *base;
 		TimeMarker *marker;
 		int sel = 0;
 		

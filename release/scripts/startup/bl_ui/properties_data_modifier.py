@@ -146,6 +146,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.row().prop(md, "offset_type", expand=True)
 
     def BOOLEAN(self, layout, ob, md):
+        if not bpy.app.build_options.mod_boolean:
+            layout.label("Built without Boolean modifier")
+            return
+
         split = layout.split()
 
         col = split.column()
@@ -691,6 +695,40 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
         col = split.column()
 
+    def PARTICLE_INSTANCE(self, layout, ob, md):
+        layout.prop(md, "object")
+        layout.prop(md, "particle_system_index", text="Particle System")
+
+        split = layout.split()
+        col = split.column()
+        col.label(text="Create From:")
+        col.prop(md, "use_normal")
+        col.prop(md, "use_children")
+        col.prop(md, "use_size")
+
+        col = split.column()
+        col.label(text="Show Particles When:")
+        col.prop(md, "show_alive")
+        col.prop(md, "show_unborn")
+        col.prop(md, "show_dead")
+
+        layout.separator()
+
+        layout.prop(md, "use_path", text="Create Along Paths")
+
+        split = layout.split()
+        split.active = md.use_path
+        col = split.column()
+        col.row().prop(md, "axis", expand=True)
+        col.prop(md, "use_preserve_shape")
+
+        col = split.column()
+        col.prop(md, "position", slider=True)
+        col.prop(md, "random_position", text="Random", slider=True)
+
+    def PARTICLE_SYSTEM(self, layout, ob, md):
+        layout.label(text="Settings can be found inside the Particle context")
+
     def SCREW(self, layout, ob, md):
         split = layout.split()
 
@@ -913,6 +951,23 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
     def SURFACE(self, layout, ob, md):
         layout.label(text="Settings are inside the Physics tab")
 
+    def SURFACE_DEFORM(self, layout, ob, md):
+        col = layout.column()
+        col.active = not md.is_bound
+
+        col.prop(md, "target")
+        col.prop(md, "falloff")
+
+        layout.separator()
+
+        col = layout.column()
+        col.active = md.target is not None
+
+        if md.is_bound:
+            col.operator("object.surfacedeform_bind", text="Unbind")
+        else:
+            col.operator("object.surfacedeform_bind", text="Bind")
+
     def UV_PROJECT(self, layout, ob, md):
         split = layout.split()
 
@@ -1043,6 +1098,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "narrowness", slider=True)
 
     def REMESH(self, layout, ob, md):
+        if not bpy.app.build_options.mod_remesh:
+            layout.label("Built without Remesh modifier")
+            return
+
         layout.prop(md, "mode")
 
         row = layout.row()
@@ -1278,7 +1337,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "thickness_vertex_group", text="Factor")
 
         col.prop(md, "use_crease", text="Crease Edges")
-        col.prop(md, "crease_weight", text="Crease Weight")
+        row = col.row()
+        row.active = md.use_crease
+        row.prop(md, "crease_weight", text="Crease Weight")
 
         col = split.column()
 

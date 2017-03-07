@@ -58,10 +58,6 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
-if(WITH_LEGACY_DEPSGRAPH)
-	add_definitions(-DWITH_LEGACY_DEPSGRAPH)
-endif()
-
 if(WITH_MECHANICAL)
 	list(APPEND INC
 		../../mechanical

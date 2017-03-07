@@ -22,12 +22,24 @@
 
 #include "abc_util.h"
 
+#include "abc_camera.h"
+#include "abc_curves.h"
+#include "abc_mesh.h"
+#include "abc_nurbs.h"
+#include "abc_points.h"
+#include "abc_transform.h"
+
+#include <Alembic/AbcMaterial/IMaterial.h>
+
 #include <algorithm>
 
 extern "C" {
 #include "DNA_object_types.h"
+#include "DNA_layer_types.h"
 
 #include "BLI_math.h"
+
+#include "PIL_time.h"
 }
 
 std::string get_id_name(Object *ob)
@@ -49,6 +61,16 @@ std::string get_id_name(ID *id)
 	return name;
 }
 
+
+/**
+ * @brief get_object_dag_path_name returns the name under which the object
+ *  will be exported in the Alembic file. It is of the form
+ *  "[../grandparent/]parent/object" if dupli_parent is NULL, or
+ *  "dupli_parent/[../grandparent/]parent/object" otherwise.
+ * @param ob
+ * @param dupli_parent
+ * @return
+ */
 std::string get_object_dag_path_name(Object *ob, Object *dupli_parent)
 {
 	std::string name = get_id_name(ob);
@@ -67,31 +89,9 @@ std::string get_object_dag_path_name(Object *ob, Object *dupli_parent)
 	return name;
 }
 
-bool object_selected(Object *ob)
+bool object_selected(const Base * const ob_base)
 {
-	return ob->flag & SELECT;
-}
-
-bool parent_selected(Object *ob)
-{
-	if (object_selected(ob)) {
-		return true;
-	}
-
-	bool do_export = false;
-
-	Object *parent = ob->parent;
-
-	while (parent != NULL) {
-		if (object_selected(parent)) {
-			do_export = true;
-			break;
-		}
-
-		parent = parent->parent;
-	}
-
-	return do_export;
+	return ob_base->flag & SELECT;
 }
 
 Imath::M44d convert_matrix(float mat[4][4])
@@ -188,7 +188,7 @@ void create_transform_matrix(float r_mat[4][4])
 	copy_m4_m3(transform_mat, rot_mat);
 
 	/* Add translation to transformation matrix. */
-	copy_yup_zup(transform_mat[3], loc);
+	copy_zup_from_yup(transform_mat[3], loc);
 
 	/* Create scale matrix. */
 	scale_mat[0][0] = scale[0];
@@ -206,14 +206,13 @@ void convert_matrix(const Imath::M44d &xform, Object *ob,
 {
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
-			r_mat[i][j] = xform[i][j];
+			r_mat[i][j] = static_cast<float>(xform[i][j]);
 		}
 	}
 
 	if (ob->type == OB_CAMERA) {
 		float cam_to_yup[4][4];
-		unit_m4(cam_to_yup);
-		rotate_m4(cam_to_yup, 'X', M_PI_2);
+		axis_angle_to_mat4_single(cam_to_yup, 'X', M_PI_2);
 		mul_m4_m4m4(r_mat, r_mat, cam_to_yup);
 	}
 
@@ -409,7 +408,7 @@ void create_transform_matrix(Object *obj, float transform_mat[4][4])
 	copy_m4_m3(transform_mat, rot_mat);
 
 	/* Add translation to transformation matrix. */
-	copy_zup_yup(transform_mat[3], loc);
+	copy_yup_from_zup(transform_mat[3], loc);
 
 	/* Create scale matrix. */
 	scale_mat[0][0] = scale[0];
@@ -461,4 +460,69 @@ float get_weight_and_index(float time,
 	}
 
 	return bias;
+}
+
+//#define USE_NURBS
+
+AbcObjectReader *create_reader(const Alembic::AbcGeom::IObject &object, ImportSettings &settings)
+{
+	AbcObjectReader *reader = NULL;
+
+	const Alembic::AbcGeom::MetaData &md = object.getMetaData();
+
+	if (Alembic::AbcGeom::IXform::matches(md)) {
+		reader = new AbcEmptyReader(object, settings);
+	}
+	else if (Alembic::AbcGeom::IPolyMesh::matches(md)) {
+		reader = new AbcMeshReader(object, settings);
+	}
+	else if (Alembic::AbcGeom::ISubD::matches(md)) {
+		reader = new AbcSubDReader(object, settings);
+	}
+	else if (Alembic::AbcGeom::INuPatch::matches(md)) {
+#ifdef USE_NURBS
+		/* TODO(kevin): importing cyclic NURBS from other software crashes
+		 * at the moment. This is due to the fact that NURBS in other
+		 * software have duplicated points which causes buffer overflows in
+		 * Blender. Need to figure out exactly how these points are
+		 * duplicated, in all cases (cyclic U, cyclic V, and cyclic UV).
+		 * Until this is fixed, disabling NURBS reading. */
+		reader = new AbcNurbsReader(child, settings);
+#endif
+	}
+	else if (Alembic::AbcGeom::ICamera::matches(md)) {
+		reader = new AbcCameraReader(object, settings);
+	}
+	else if (Alembic::AbcGeom::IPoints::matches(md)) {
+		reader = new AbcPointsReader(object, settings);
+	}
+	else if (Alembic::AbcMaterial::IMaterial::matches(md)) {
+		/* Pass for now. */
+	}
+	else if (Alembic::AbcGeom::ILight::matches(md)) {
+		/* Pass for now. */
+	}
+	else if (Alembic::AbcGeom::IFaceSet::matches(md)) {
+		/* Pass, those are handled in the mesh reader. */
+	}
+	else if (Alembic::AbcGeom::ICurves::matches(md)) {
+		reader = new AbcCurveReader(object, settings);
+	}
+	else {
+		assert(false);
+	}
+
+	return reader;
+}
+
+/* ********************** */
+
+ScopeTimer::ScopeTimer(const char *message)
+	: m_message(message)
+	, m_start(PIL_check_seconds_timer())
+{}
+
+ScopeTimer::~ScopeTimer()
+{
+	fprintf(stderr, "%s: %fs\n", m_message, PIL_check_seconds_timer() - m_start);
 }

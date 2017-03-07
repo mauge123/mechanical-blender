@@ -70,9 +70,11 @@
 #include "BKE_main.h"
 #include "BKE_modifier.h"
 #include "BKE_node.h"
+#include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_sequencer.h"
+#include "BKE_sound.h"
 #include "BKE_writeavi.h"  /* <------ should be replaced once with generic movie module */
 #include "BKE_object.h"
 
@@ -2010,14 +2012,14 @@ bool RE_allow_render_generic_object(Object *ob)
 #define DEPSGRAPH_WORKAROUND_HACK
 
 #ifdef DEPSGRAPH_WORKAROUND_HACK
-static void tag_dependend_objects_for_render(Scene *scene, int renderlay)
+static void tag_dependend_objects_for_render(Scene *scene, int UNUSED(renderlay))
 {
 	Scene *sce_iter;
 	Base *base;
 	for (SETLOOPER(scene, sce_iter, base)) {
 		Object *object = base->object;
 
-		if ((base->lay & renderlay) == 0) {
+		if ((base->flag & BASE_VISIBLED) == 0) {
 			continue;
 		}
 
@@ -3089,6 +3091,21 @@ static void validate_render_settings(Render *re)
 	}
 }
 
+static void update_physics_cache(Render *re, Scene *scene, int UNUSED(anim_init))
+{
+	PTCacheBaker baker;
+
+	memset(&baker, 0, sizeof(baker));
+	baker.main = re->main;
+	baker.scene = scene;
+	baker.bake = 0;
+	baker.render = 1;
+	baker.anim_init = 1;
+	baker.quick_step = 1;
+
+	BKE_ptcache_bake(&baker);
+}
+
 void RE_SetActiveRenderView(Render *re, const char *viewname)
 {
 	BLI_strncpy(re->viewname, viewname, sizeof(re->viewname));
@@ -3101,7 +3118,7 @@ const char *RE_GetActiveRenderView(Render *re)
 
 /* evaluating scene options for general Blender render */
 static int render_initialize_from_main(Render *re, RenderData *rd, Main *bmain, Scene *scene, SceneRenderLayer *srl,
-                                       Object *camera_override, unsigned int lay_override, int anim, int UNUSED(anim_init))
+                                       Object *camera_override, unsigned int lay_override, int anim, int anim_init)
 {
 	int winx, winy;
 	rcti disprect;
@@ -3145,6 +3162,16 @@ static int render_initialize_from_main(Render *re, RenderData *rd, Main *bmain, 
 	
 	/* check all scenes involved */
 	tag_scenes_for_render(re);
+
+	/*
+	 * Disabled completely for now,
+	 * can be later set as render profile option
+	 * and default for background render.
+	 */
+	if (0) {
+		/* make sure dynamics are up to date */
+		update_physics_cache(re, scene, anim_init);
+	}
 	
 	if (srl || scene->r.scemode & R_SINGLE_LAYER) {
 		BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
@@ -3413,7 +3440,7 @@ bool RE_WriteRenderViewsMovie(
 		ok = mh->append_movie(movie_ctx_arr[0], rd, preview ? scene->r.psfra : scene->r.sfra, scene->r.cfra, (int *) ibuf_arr[2]->rect,
 		                      ibuf_arr[2]->x, ibuf_arr[2]->y, "", reports);
 
-		for (i = 0; i < 2; i++) {
+		for (i = 0; i < 3; i++) {
 			/* imbuf knows which rects are not part of ibuf */
 			IMB_freeImBuf(ibuf_arr[i]);
 		}
@@ -3765,6 +3792,7 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 	re->flag &= ~R_ANIMATION;
 
 	BLI_callback_exec(re->main, (ID *)scene, G.is_break ? BLI_CB_EVT_RENDER_CANCEL : BLI_CB_EVT_RENDER_COMPLETE);
+	BKE_sound_reset_scene_specs(scene);
 
 	/* UGLY WARNING */
 	G.is_rendering = false;

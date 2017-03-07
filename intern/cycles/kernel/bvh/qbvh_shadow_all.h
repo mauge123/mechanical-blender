@@ -92,10 +92,9 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 	/* Offsets to select the side that becomes the lower or upper bound. */
 	int near_x, near_y, near_z;
 	int far_x, far_y, far_z;
-
-	if(idir.x >= 0.0f) { near_x = 0; far_x = 1; } else { near_x = 1; far_x = 0; }
-	if(idir.y >= 0.0f) { near_y = 2; far_y = 3; } else { near_y = 3; far_y = 2; }
-	if(idir.z >= 0.0f) { near_z = 4; far_z = 5; } else { near_z = 5; far_z = 4; }
+	qbvh_near_far_idx_calc(idir,
+	                       &near_x, &near_y, &near_z,
+	                       &far_x, &far_y, &far_z);
 
 	IsectPrecalc isect_precalc;
 	triangle_intersect_precalc(dir, &isect_precalc);
@@ -107,14 +106,20 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 			while(node_addr >= 0 && node_addr != ENTRYPOINT_SENTINEL) {
 				float4 inodes = kernel_tex_fetch(__bvh_nodes, node_addr+0);
 
+				if(false
 #ifdef __VISIBILITY_FLAG__
-				if((__float_as_uint(inodes.x) & PATH_RAY_SHADOW) == 0) {
+				   || ((__float_as_uint(inodes.x) & PATH_RAY_SHADOW) == 0)
+#endif
+#if BVH_FEATURE(BVH_MOTION)
+				   || UNLIKELY(ray->time < inodes.y)
+				   || UNLIKELY(ray->time > inodes.z)
+#endif
+				) {
 					/* Pop. */
 					node_addr = traversal_stack[stack_ptr].addr;
 					--stack_ptr;
 					continue;
 				}
-#endif
 
 				ssef dist;
 				int child_mask = NODE_INTERSECT(kg,
@@ -263,7 +268,7 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 
 					/* Primitive intersection. */
 					while(prim_addr < prim_addr2) {
-						kernel_assert(kernel_tex_fetch(__prim_type, prim_addr) == type);
+						kernel_assert((kernel_tex_fetch(__prim_type, prim_addr) & PRIMITIVE_ALL) == p_type);
 
 						bool hit;
 
@@ -298,6 +303,7 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 #if BVH_FEATURE(BVH_HAIR)
 							case PRIMITIVE_CURVE:
 							case PRIMITIVE_MOTION_CURVE: {
+								const uint curve_type = kernel_tex_fetch(__prim_type, prim_addr);
 								if(kernel_data.curve.curveflags & CURVE_KN_INTERPOLATE) {
 									hit = bvh_cardinal_curve_intersect(kg,
 									                                   isect_array,
@@ -307,7 +313,7 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 									                                   object,
 									                                   prim_addr,
 									                                   ray->time,
-									                                   type,
+									                                   curve_type,
 									                                   NULL,
 									                                   0, 0);
 								}
@@ -320,7 +326,7 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 									                          object,
 									                          prim_addr,
 									                          ray->time,
-									                          type,
+									                          curve_type,
 									                          NULL,
 									                          0, 0);
 								}
@@ -392,9 +398,9 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 					num_hits_in_instance = 0;
 					isect_array->t = isect_t;
 
-					if(idir.x >= 0.0f) { near_x = 0; far_x = 1; } else { near_x = 1; far_x = 0; }
-					if(idir.y >= 0.0f) { near_y = 2; far_y = 3; } else { near_y = 3; far_y = 2; }
-					if(idir.z >= 0.0f) { near_z = 4; far_z = 5; } else { near_z = 5; far_z = 4; }
+					qbvh_near_far_idx_calc(idir,
+					                       &near_x, &near_y, &near_z,
+					                       &far_x, &far_y, &far_z);
 					tfar = ssef(isect_t);
 #  if BVH_FEATURE(BVH_HAIR)
 					dir4 = sse3f(ssef(dir.x), ssef(dir.y), ssef(dir.z));
@@ -450,9 +456,9 @@ ccl_device bool BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 			isect_t = tmax;
 			isect_array->t = isect_t;
 
-			if(idir.x >= 0.0f) { near_x = 0; far_x = 1; } else { near_x = 1; far_x = 0; }
-			if(idir.y >= 0.0f) { near_y = 2; far_y = 3; } else { near_y = 3; far_y = 2; }
-			if(idir.z >= 0.0f) { near_z = 4; far_z = 5; } else { near_z = 5; far_z = 4; }
+			qbvh_near_far_idx_calc(idir,
+			                       &near_x, &near_y, &near_z,
+			                       &far_x, &far_y, &far_z);
 			tfar = ssef(isect_t);
 #  if BVH_FEATURE(BVH_HAIR)
 			dir4 = sse3f(ssef(dir.x), ssef(dir.y), ssef(dir.z));

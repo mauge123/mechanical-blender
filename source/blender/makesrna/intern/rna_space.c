@@ -224,7 +224,9 @@ static EnumPropertyItem buttons_context_items[] = {
 	{BCONTEXT_BONE_CONSTRAINT, "BONE_CONSTRAINT", ICON_CONSTRAINT_BONE, "Bone Constraints", "Bone constraints"},
 	{BCONTEXT_MATERIAL, "MATERIAL", ICON_MATERIAL, "Material", "Material"},
 	{BCONTEXT_TEXTURE, "TEXTURE", ICON_TEXTURE, "Texture", "Texture"},
+	{BCONTEXT_PARTICLE, "PARTICLES", ICON_PARTICLES, "Particles", "Particle"},
 	{BCONTEXT_PHYSICS, "PHYSICS", ICON_PHYSICS, "Physics", "Physics"},
+	{BCONTEXT_COLLECTION, "COLLECTION", ICON_COLLAPSEMENU, "Collection", "Collection"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -233,6 +235,7 @@ static EnumPropertyItem buttons_texture_context_items[] = {
 	{SB_TEXC_MATERIAL, "MATERIAL", ICON_MATERIAL, "", "Show material textures"},
 	{SB_TEXC_WORLD, "WORLD", ICON_WORLD, "", "Show world textures"},
 	{SB_TEXC_LAMP, "LAMP", ICON_LAMP, "", "Show lamp textures"},
+	{SB_TEXC_PARTICLES, "PARTICLES", ICON_PARTICLES, "", "Show particles textures"},
 	{SB_TEXC_LINESTYLE, "LINESTYLE", ICON_LINE_DATA, "", "Show linestyle textures"},
 	{SB_TEXC_OTHER, "OTHER", ICON_TEXTURE, "", "Show other data textures"},
 	{0, NULL, 0, NULL, NULL}
@@ -270,6 +273,7 @@ EnumPropertyItem rna_enum_file_sort_items[] = {
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
+#include "BKE_layer.h"
 #include "BKE_nla.h"
 #include "BKE_paint.h"
 #include "BKE_scene.h"
@@ -951,7 +955,11 @@ static int rna_SpaceImageEditor_show_maskedit_get(PointerRNA *ptr)
 {
 	SpaceImage *sima = (SpaceImage *)(ptr->data);
 	bScreen *sc = (bScreen *)ptr->id.data;
-	return ED_space_image_check_show_maskedit(sc->scene, sima);
+
+	TODO_LAYER_CONTEXT; /* get SceneLayer from context/window/workspace instead */
+	SceneLayer *sl = BKE_scene_layer_context_active(sc->scene);
+
+	return ED_space_image_check_show_maskedit(sl, sima);
 }
 
 static void rna_SpaceImageEditor_image_set(PointerRNA *ptr, PointerRNA value)
@@ -1211,6 +1219,10 @@ static EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSED(C), 
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_SCENE);
 	}
 
+	if (sbuts->pathflag & (1 << BCONTEXT_COLLECTION)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_COLLECTION);
+	}
+
 	if (sbuts->pathflag & (1 << BCONTEXT_WORLD)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_WORLD);
 	}
@@ -1246,6 +1258,10 @@ static EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSED(C), 
 
 	if (sbuts->pathflag & (1 << BCONTEXT_TEXTURE)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_TEXTURE);
+	}
+
+	if (sbuts->pathflag & (1 << BCONTEXT_PARTICLE)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_PARTICLE);
 	}
 
 	if (sbuts->pathflag & (1 << BCONTEXT_PHYSICS)) {
@@ -1289,6 +1305,10 @@ static EnumPropertyItem *rna_SpaceProperties_texture_context_itemf(bContext *C, 
 	}
 	else if (ED_texture_context_check_material(C)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_texture_context_items, SB_TEXC_MATERIAL);
+	}
+
+	if (ED_texture_context_check_particles(C)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_texture_context_items, SB_TEXC_PARTICLES);
 	}
 
 	if (ED_texture_context_check_linestyle(C)) {
@@ -2107,7 +2127,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
 	static EnumPropertyItem other_uv_filter_items[] = {
 		{SI_FILTER_ALL, "ALL", 0, "All", "No filter, show all islands from other objects"},
 		{SI_FILTER_SAME_IMAGE, "SAME_IMAGE", ICON_IMAGE_DATA, "Same Image",
-		 "Only show others' UV islads who's active image matches image of the active face"},
+		 "Only show others' UV islands whose active image matches image of the active face"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -2226,7 +2246,10 @@ static void rna_def_space_outliner(BlenderRNA *brna)
 		{SO_DATABLOCKS, "DATABLOCKS", 0, "Data-Blocks", "Display all raw data-blocks"},
 		{SO_USERDEF, "USER_PREFERENCES", 0, "User Preferences", "Display user preference data"},
 		{SO_ID_ORPHANS, "ORPHAN_DATA", 0, "Orphan Data",
-						"Display data-blocks which are unused and/or will be lost when the file is reloaded"},
+		                "Display data-blocks which are unused and/or will be lost when the file is reloaded"},
+		{SO_ACT_LAYER, "ACT_LAYER", 0, "Active Render Layer", "Display the collections of the active render layer"},
+		{SO_COLLECTIONS, "COLLECTIONS", 0, "All Collections", "Display all collections based on the master "
+		                 "collection hierarchy"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -2447,8 +2470,8 @@ static void rna_def_backgroundImages(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Remove background image");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm = RNA_def_pointer(func, "image", "BackgroundImage", "", "Image displayed as viewport background");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL | PROP_RNAPTR);
-	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 
 	func = RNA_def_function(srna, "clear", "rna_BackgroundImage_clear");
 	RNA_def_function_ui_description(func, "Remove all background images");
@@ -2774,7 +2797,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "use_pivot_point_align", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_ALIGN);
-	RNA_def_property_ui_text(prop, "Align", "Manipulate center points (object and pose mode only)");
+	RNA_def_property_ui_text(prop, "Align", "Manipulate center points (object, pose and weight paint mode only)");
 	RNA_def_property_ui_icon(prop, ICON_ALIGN, 0);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_pivot_update");
 
@@ -3912,6 +3935,11 @@ static void rna_def_space_time(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Softbody", "Show the active object's softbody point cache");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TIME, NULL);
 	
+	prop = RNA_def_property(srna, "cache_particles", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "cache_display", TIME_CACHE_PARTICLES);
+	RNA_def_property_ui_text(prop, "Particles", "Show the active object's particle point cache");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TIME, NULL);
+	
 	prop = RNA_def_property(srna, "cache_cloth", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "cache_display", TIME_CACHE_CLOTH);
 	RNA_def_property_ui_text(prop, "Cloth", "Show the active object's cloth point cache");
@@ -4050,6 +4078,8 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
 		{FILTER_ID_MSK, "MASK", ICON_MOD_MASK, "Masks", "Show/hide Mask data-blocks"},
 		{FILTER_ID_NT, "NODE_TREE", ICON_NODETREE, "Node Trees", "Show/hide Node Tree data-blocks"},
 		{FILTER_ID_OB, "OBJECT", ICON_OBJECT_DATA, "Objects", "Show/hide Object data-blocks"},
+		{FILTER_ID_PA, "PARTICLE_SETTINGS", ICON_PARTICLE_DATA,
+		               "Particles Settings", "Show/hide Particle Settings data-blocks"},
 		{FILTER_ID_PAL, "PALETTE", ICON_COLOR, "Palettes", "Show/hide Palette data-blocks"},
 		{FILTER_ID_PC, "PAINT_CURVE", ICON_CURVE_BEZCURVE, "Paint Curves", "Show/hide Paint Curve data-blocks"},
 		{FILTER_ID_SCE, "SCENE", ICON_SCENE_DATA, "Scenes", "Show/hide Scene data-blocks"},
@@ -4078,7 +4108,7 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
 		 "IMAGE", ICON_IMAGE_DATA, "Images & Sounds", "Show/hide images, movie clips, sounds and masks"},
 		{FILTER_ID_CA | FILTER_ID_LA | FILTER_ID_SPK | FILTER_ID_WO,
 	     "ENVIRONMENT", ICON_WORLD_DATA, "Environment", "Show/hide worlds, lamps, cameras and speakers"},
-		{FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT | FILTER_ID_VF | FILTER_ID_CF,
+		{FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT | FILTER_ID_VF | FILTER_ID_CF,
 	     "MISC", ICON_GREASEPENCIL, "Miscellaneous", "Show/hide other data types"},
 	    {0, NULL, 0, NULL, NULL}
 	};
@@ -4450,15 +4480,15 @@ static void rna_def_space_node_path_api(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Set the root node tree");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	parm = RNA_def_pointer(func, "node_tree", "NodeTree", "Node Tree", "");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_RNAPTR);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED | PARM_RNAPTR);
 
 	func = RNA_def_function(srna, "append", "rna_SpaceNodeEditor_path_append");
 	RNA_def_function_ui_description(func, "Append a node group tree to the path");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	parm = RNA_def_pointer(func, "node_tree", "NodeTree", "Node Tree", "Node tree to append to the node editor path");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_RNAPTR);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED | PARM_RNAPTR);
 	parm = RNA_def_pointer(func, "node", "Node", "Node", "Group node linking to this node tree");
-	RNA_def_property_flag(parm, PROP_RNAPTR);
+	RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
 
 	func = RNA_def_function(srna, "pop", "rna_SpaceNodeEditor_path_pop");
 	RNA_def_function_ui_description(func, "Remove the last node tree from the path");

@@ -37,7 +37,6 @@
 #include "DNA_cloth_types.h"
 #include "DNA_key_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_object_force.h"
 #include "DNA_object_types.h"
 
 #include "MEM_guardedalloc.h"
@@ -52,6 +51,7 @@
 #include "BKE_key.h"
 #include "BKE_library_query.h"
 #include "BKE_modifier.h"
+#include "BKE_pointcache.h"
 
 #include "depsgraph_private.h"
 
@@ -63,9 +63,10 @@ static void initData(ModifierData *md)
 	
 	clmd->sim_parms = MEM_callocN(sizeof(ClothSimSettings), "cloth sim parms");
 	clmd->coll_parms = MEM_callocN(sizeof(ClothCollSettings), "cloth coll parms");
+	clmd->point_cache = BKE_ptcache_add(&clmd->ptcaches);
 	
 	/* check for alloc failing */
-	if (!clmd->sim_parms || !clmd->coll_parms)
+	if (!clmd->sim_parms || !clmd->coll_parms || !clmd->point_cache)
 		return;
 	
 	cloth_init(clmd);
@@ -116,20 +117,6 @@ static void deformVerts(ModifierData *md, Object *ob, DerivedMesh *derivedData, 
 	dm->release(dm);
 }
 
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Main *UNUSED(bmain),
-                           Scene *scene, Object *ob, DagNode *obNode)
-{
-	ClothModifierData *clmd = (ClothModifierData *) md;
-	
-	if (clmd) {
-		/* Actual code uses get_collisionobjects */
-		dag_add_collision_relations(forest, scene, ob, obNode, clmd->coll_parms->group, ob->lay|scene->lay, eModifierType_Collision, NULL, true, "Cloth Collision");
-
-		dag_add_forcefield_relations(forest, scene, ob, obNode, clmd->sim_parms->effector_weights, true, 0, "Cloth Field");
-	}
-}
-
 static void updateDepsgraph(ModifierData *md,
                             struct Main *UNUSED(bmain),
                             struct Scene *scene,
@@ -173,10 +160,15 @@ static void copyData(ModifierData *md, ModifierData *target)
 	if (tclmd->coll_parms)
 		MEM_freeN(tclmd->coll_parms);
 	
+	BKE_ptcache_free_list(&tclmd->ptcaches);
+	tclmd->point_cache = NULL;
+
 	tclmd->sim_parms = MEM_dupallocN(clmd->sim_parms);
 	if (clmd->sim_parms->effector_weights)
 		tclmd->sim_parms->effector_weights = MEM_dupallocN(clmd->sim_parms->effector_weights);
 	tclmd->coll_parms = MEM_dupallocN(clmd->coll_parms);
+	tclmd->point_cache = BKE_ptcache_add(&tclmd->ptcaches);
+	tclmd->point_cache->step = 1;
 	tclmd->clothObject = NULL;
 	tclmd->hairdata = NULL;
 	tclmd->solver_result = NULL;
@@ -205,6 +197,9 @@ static void freeData(ModifierData *md)
 		if (clmd->coll_parms)
 			MEM_freeN(clmd->coll_parms);
 		
+		BKE_ptcache_free_list(&clmd->ptcaches);
+		clmd->point_cache = NULL;
+		
 		if (clmd->hairdata)
 			MEM_freeN(clmd->hairdata);
 		
@@ -219,11 +214,11 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 	ClothModifierData *clmd = (ClothModifierData *) md;
 
 	if (clmd->coll_parms) {
-		walk(userData, ob, (ID **)&clmd->coll_parms->group, IDWALK_NOP);
+		walk(userData, ob, (ID **)&clmd->coll_parms->group, IDWALK_CB_NOP);
 	}
 
 	if (clmd->sim_parms && clmd->sim_parms->effector_weights) {
-		walk(userData, ob, (ID **)&clmd->sim_parms->effector_weights->group, IDWALK_NOP);
+		walk(userData, ob, (ID **)&clmd->sim_parms->effector_weights->group, IDWALK_CB_NOP);
 	}
 }
 
@@ -247,7 +242,6 @@ ModifierTypeInfo modifierType_Cloth = {
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
 	/* isDisabled */        NULL,
-	/* updateDepgraph */    updateDepgraph,
 	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     dependsOnTime,
 	/* dependsOnNormals */	NULL,

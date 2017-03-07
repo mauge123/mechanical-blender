@@ -81,12 +81,6 @@
 /* use accelerated overlap check */
 #define USE_BVH
 
-// #define USE_BOOLEAN_RAYCAST_DRAW
-
-#ifdef USE_BOOLEAN_RAYCAST_DRAW
-/* insert bl_debug_draw_quad_clear... here */
-#endif
-
 // #define USE_DUMP
 
 static void tri_v3_scale(
@@ -986,7 +980,7 @@ bool BM_mesh_intersect(
         struct BMLoop *(*looptris)[3], const int looptris_tot,
         int (*test_fn)(BMFace *f, void *user_data), void *user_data,
         const bool use_self, const bool use_separate, const bool use_dissolve, const bool use_island_connect,
-        const int boolean_mode,
+        const bool use_edge_tag, const int boolean_mode,
         const float eps)
 {
 	struct ISectState s;
@@ -1004,10 +998,6 @@ bool BM_mesh_intersect(
 	BVHTreeOverlap *overlap;
 #else
 	int i_a, i_b;
-#endif
-
-#ifdef USE_BOOLEAN_RAYCAST_DRAW
-	bl_debug_draw_quad_clear();
 #endif
 
 	s.bm = bm;
@@ -1526,7 +1516,7 @@ bool BM_mesh_intersect(
 
 		BM_mesh_edgesplit(bm, false, true, false);
 	}
-	else if (boolean_mode != BMESH_ISECT_BOOLEAN_NONE) {
+	else if (boolean_mode != BMESH_ISECT_BOOLEAN_NONE || use_edge_tag) {
 		GSetIterator gs_iter;
 
 		/* no need to clear for boolean */
@@ -1607,17 +1597,6 @@ bool BM_mesh_intersect(
 						do_flip = (side == 0);
 						break;
 				}
-
-#ifdef USE_BOOLEAN_RAYCAST_DRAW
-				{
-					unsigned int colors[4] = {0x00000000, 0xffffffff, 0xff000000, 0x0000ff};
-					float co_other[3] = {UNPACK3(co)};
-					co_other[0] += 1000.0f;
-					bl_debug_color_set(colors[(hits & 1) == 1]);
-					bl_debug_draw_edge_add(co, co_other);
-				}
-#endif
-
 			}
 
 			if (do_remove) {

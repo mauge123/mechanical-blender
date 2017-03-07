@@ -42,7 +42,6 @@
 #include "DNA_constraint_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_movieclip_types.h"
-#include "DNA_object_types.h"
 #include "DNA_scene_types.h"  /* PET modes */
 
 #include "BLI_alloca.h"
@@ -60,14 +59,17 @@
 #include "BKE_editmesh_bvh.h"
 #include "BKE_context.h"
 #include "BKE_constraint.h"
+#include "BKE_particle.h"
 #include "BKE_unit.h"
 #include "BKE_mask.h"
 #include "BKE_report.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_cdderivedmesh.h"
 
-#include "BIF_gl.h"
 #include "BIF_glutil.h"
+
+#include "GPU_immediate.h"
+#include "GPU_matrix.h"
 
 #include "ED_image.h"
 #include "ED_keyframing.h"
@@ -108,7 +110,7 @@ static void drawEdgeSlide(TransInfo *t);
 static void drawVertSlide(TransInfo *t);
 static void postInputRotation(TransInfo *t, float values[3]);
 
-static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short around);
+static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], const short around);
 static void initSnapSpatial(TransInfo *t, float r_snap[3]);
 
 
@@ -1936,8 +1938,16 @@ typedef enum {
 	LEFT,
 	RIGHT
 } ArrowDirection;
+
+#define POS_INDEX 0
+/* NOTE: this --^ is a bit hackish, but simplifies VertexFormat usage among functions
+ * private to this file  - merwin
+ */
+
 static void drawArrow(ArrowDirection d, short offset, short length, short size)
 {
+	immBegin(PRIM_LINES, 6);
+
 	switch (d) {
 		case LEFT:
 			offset = -offset;
@@ -1945,14 +1955,12 @@ static void drawArrow(ArrowDirection d, short offset, short length, short size)
 			size = -size;
 			/* fall-through */
 		case RIGHT:
-			glBegin(GL_LINES);
-			glVertex2s(offset, 0);
-			glVertex2s(offset + length, 0);
-			glVertex2s(offset + length, 0);
-			glVertex2s(offset + length - size, -size);
-			glVertex2s(offset + length, 0);
-			glVertex2s(offset + length - size,  size);
-			glEnd();
+			immVertex2f(POS_INDEX, offset, 0);
+			immVertex2f(POS_INDEX, offset + length, 0);
+			immVertex2f(POS_INDEX, offset + length, 0);
+			immVertex2f(POS_INDEX, offset + length - size, -size);
+			immVertex2f(POS_INDEX, offset + length, 0);
+			immVertex2f(POS_INDEX, offset + length - size,  size);
 			break;
 
 		case DOWN:
@@ -1961,45 +1969,45 @@ static void drawArrow(ArrowDirection d, short offset, short length, short size)
 			size = -size;
 			/* fall-through */
 		case UP:
-			glBegin(GL_LINES);
-			glVertex2s(0, offset);
-			glVertex2s(0, offset + length);
-			glVertex2s(0, offset + length);
-			glVertex2s(-size, offset + length - size);
-			glVertex2s(0, offset + length);
-			glVertex2s(size, offset + length - size);
-			glEnd();
+			immVertex2f(POS_INDEX, 0, offset);
+			immVertex2f(POS_INDEX, 0, offset + length);
+			immVertex2f(POS_INDEX, 0, offset + length);
+			immVertex2f(POS_INDEX, -size, offset + length - size);
+			immVertex2f(POS_INDEX, 0, offset + length);
+			immVertex2f(POS_INDEX, size, offset + length - size);
 			break;
 	}
+
+	immEnd();
 }
 
 static void drawArrowHead(ArrowDirection d, short size)
 {
+	immBegin(PRIM_LINES, 4);
+
 	switch (d) {
 		case LEFT:
 			size = -size;
 			/* fall-through */
 		case RIGHT:
-			glBegin(GL_LINES);
-			glVertex2s(0, 0);
-			glVertex2s(-size, -size);
-			glVertex2s(0, 0);
-			glVertex2s(-size,  size);
-			glEnd();
+			immVertex2f(POS_INDEX, 0, 0);
+			immVertex2f(POS_INDEX, -size, -size);
+			immVertex2f(POS_INDEX, 0, 0);
+			immVertex2f(POS_INDEX, -size,  size);
 			break;
 
 		case DOWN:
 			size = -size;
 			/* fall-through */
 		case UP:
-			glBegin(GL_LINES);
-			glVertex2s(0, 0);
-			glVertex2s(-size, -size);
-			glVertex2s(0, 0);
-			glVertex2s(size, -size);
-			glEnd();
+			immVertex2f(POS_INDEX, 0, 0);
+			immVertex2f(POS_INDEX, -size, -size);
+			immVertex2f(POS_INDEX, 0, 0);
+			immVertex2f(POS_INDEX, size, -size);
 			break;
 	}
+
+	immEnd();
 }
 
 static void drawArc(float size, float angle_start, float angle_end, int segments)
@@ -2008,14 +2016,14 @@ static void drawArc(float size, float angle_start, float angle_end, int segments
 	float angle;
 	int a;
 
-	glBegin(GL_LINE_STRIP);
+	immBegin(PRIM_LINE_STRIP, segments + 1);
 
 	for (angle = angle_start, a = 0; a < segments; angle += delta, a++) {
-		glVertex2f(cosf(angle) * size, sinf(angle) * size);
+		immVertex2f(POS_INDEX, cosf(angle) * size, sinf(angle) * size);
 	}
-	glVertex2f(cosf(angle_end) * size, sinf(angle_end) * size);
+	immVertex2f(POS_INDEX, cosf(angle_end) * size, sinf(angle_end) * size);
 
-	glEnd();
+	immEnd();
 }
 
 static int helpline_poll(bContext *C)
@@ -2033,10 +2041,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 	if (t->helpline != HLP_NONE && !(t->flag & T_USES_MANIPULATOR)) {
 		float vecrot[3], cent[2];
-		int mval[2];
-
-		mval[0] = x;
-		mval[1] = y;
+		float mval[3] = { x, y, 0.0f };
 
 		copy_v3_v3(vecrot, t->center);
 		if (t->flag & T_EDIT) {
@@ -2050,42 +2055,45 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 		projectFloatViewEx(t, vecrot, cent, V3D_PROJ_TEST_CLIP_ZERO);
 
-		glPushMatrix();
+		gpuMatrixBegin3D_legacy(); /* TODO(merwin): finish the 2D matrix API & use here */
+
+		unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		BLI_assert(pos == POS_INDEX);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		switch (t->helpline) {
 			case HLP_SPRING:
-				UI_ThemeColor(TH_VIEW_OVERLAY);
-
+				immUniformThemeColor(TH_VIEW_OVERLAY);
 				setlinestyle(3);
-				glLineWidth(1);
-				glBegin(GL_LINES);
-				glVertex2iv(t->mval);
-				glVertex2fv(cent);
-				glEnd();
+				glLineWidth(1.0f);
 
-				glTranslate2iv(mval);
-				glRotatef(-RAD2DEGF(atan2f(cent[0] - t->mval[0], cent[1] - t->mval[1])), 0, 0, 1);
+				immBegin(PRIM_LINES, 2);
+				immVertex2f(POS_INDEX, (float)t->mval[0], (float)t->mval[1]);
+				immVertex2fv(POS_INDEX, cent);
+				immEnd();
+
+				gpuTranslate3fv(mval);
+				gpuRotateAxis(-RAD2DEGF(atan2f(cent[0] - t->mval[0], cent[1] - t->mval[1])), 'Z');
 
 				setlinestyle(0);
-				glLineWidth(3.0);
+				glLineWidth(3.0f);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
 				break;
 			case HLP_HARROW:
-				UI_ThemeColor(TH_VIEW_OVERLAY);
+				immUniformThemeColor(TH_VIEW_OVERLAY);
+				gpuTranslate3fv(mval);
 
-				glTranslate2iv(mval);
-
-				glLineWidth(3.0);
+				glLineWidth(3.0f);
 				drawArrow(RIGHT, 5, 10, 5);
 				drawArrow(LEFT, 5, 10, 5);
 				break;
 			case HLP_VARROW:
-				UI_ThemeColor(TH_VIEW_OVERLAY);
+				immUniformThemeColor(TH_VIEW_OVERLAY);
 
-				glTranslate2iv(mval);
+				gpuTranslate3fv(mval);
 
-				glLineWidth(3.0);
+				glLineWidth(3.0f);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
 				break;
@@ -2096,33 +2104,35 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				float dist = hypotf(dx, dy);
 				float delta_angle = min_ff(15.0f / dist, (float)M_PI / 4.0f);
 				float spacing_angle = min_ff(5.0f / dist, (float)M_PI / 12.0f);
-				UI_ThemeColor(TH_VIEW_OVERLAY);
+
+				immUniformThemeColor(TH_VIEW_OVERLAY);
 
 				setlinestyle(3);
-				glLineWidth(1);
-				glBegin(GL_LINES);
-				glVertex2iv(t->mval);
-				glVertex2fv(cent);
-				glEnd();
+				glLineWidth(1.0f);
 
-				glTranslatef(cent[0] - t->mval[0] + mval[0], cent[1] - t->mval[1] + mval[1], 0);
+				immBegin(PRIM_LINES, 2);
+				immVertex2f(POS_INDEX, (float)t->mval[0], (float)t->mval[1]);
+				immVertex2fv(POS_INDEX, cent);
+				immEnd();
+
+				gpuTranslate3f(cent[0] - t->mval[0] + mval[0], cent[1] - t->mval[1] + mval[1], 0);
 
 				setlinestyle(0);
-				glLineWidth(3.0);
+				glLineWidth(3.0f);
 				drawArc(dist, angle - delta_angle, angle - spacing_angle, 10);
 				drawArc(dist, angle + spacing_angle, angle + delta_angle, 10);
 
-				glPushMatrix();
+				gpuPushMatrix();
 
-				glTranslatef(cosf(angle - delta_angle) * dist, sinf(angle - delta_angle) * dist, 0);
-				glRotatef(RAD2DEGF(angle - delta_angle), 0, 0, 1);
+				gpuTranslate3f(cosf(angle - delta_angle) * dist, sinf(angle - delta_angle) * dist, 0);
+				gpuRotateAxis(RAD2DEGF(angle - delta_angle), 'Z');
 
 				drawArrowHead(DOWN, 5);
 
-				glPopMatrix();
+				gpuPopMatrix();
 
-				glTranslatef(cosf(angle + delta_angle) * dist, sinf(angle + delta_angle) * dist, 0);
-				glRotatef(RAD2DEGF(angle + delta_angle), 0, 0, 1);
+				gpuTranslate3f(cosf(angle + delta_angle) * dist, sinf(angle + delta_angle) * dist, 0);
+				gpuRotateAxis(RAD2DEGF(angle + delta_angle), 'Z');
 
 				drawArrowHead(UP, 5);
 				break;
@@ -2132,18 +2142,18 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				unsigned char col[3], col2[3];
 				UI_GetThemeColor3ubv(TH_GRID, col);
 
-				glTranslate2iv(mval);
+				gpuTranslate3fv(mval);
 
-				glLineWidth(3.0);
+				glLineWidth(3.0f);
 
 				UI_make_axis_color(col, col2, 'X');
-				glColor3ubv((GLubyte *)col2);
+				immUniformColor3ubv((GLubyte *)col2);
 
 				drawArrow(RIGHT, 5, 10, 5);
 				drawArrow(LEFT, 5, 10, 5);
 
 				UI_make_axis_color(col, col2, 'Y');
-				glColor3ubv((GLubyte *)col2);
+				immUniformColor3ubv((GLubyte *)col2);
 
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
@@ -2182,15 +2192,15 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 #endif
 		}
 
-		glPopMatrix();
+		immUnbindProgram();
+		gpuMatrixEnd();
 	}
 }
 
 static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), void *arg)
 {
 	TransInfo *t = arg;
-
-	glLineWidth(1.0);
+	glLineWidth(1.0f);
 
 	drawConstraint(t);
 	drawPropCircle(C, t);
@@ -2216,7 +2226,8 @@ static void drawAutoKeyWarning(TransInfo *UNUSED(t), ARegion *ar)
 
 	ED_region_visible_rect(ar, &rect);
 
-	BLF_width_and_height_default(printable, BLF_DRAW_STR_DUMMY_MAX, &printable_size[0], &printable_size[1]);
+	const int font_id = BLF_default();
+	BLF_width_and_height(font_id, printable, BLF_DRAW_STR_DUMMY_MAX, &printable_size[0], &printable_size[1]);
 
 	xco = (rect.xmax - U.widget_unit) - (int)printable_size[0];
 	yco = (rect.ymax - U.widget_unit);
@@ -2224,7 +2235,9 @@ static void drawAutoKeyWarning(TransInfo *UNUSED(t), ARegion *ar)
 	/* warning text (to clarify meaning of overlays)
 	 * - original color was red to match the icon, but that clashes badly with a less nasty border
 	 */
-	UI_ThemeColorShade(TH_TEXT_HI, -50);
+	unsigned char color[3];
+	UI_GetThemeColorShade3ubv(TH_TEXT_HI, -50, color);
+	BLF_color3ubv(font_id, color);
 #ifdef WITH_INTERNATIONAL
 	BLF_draw_default(xco, yco, 0.0f, printable, BLF_DRAW_STR_DUMMY_MAX);
 #else
@@ -2247,10 +2260,11 @@ static void drawTransformPixel(const struct bContext *UNUSED(C), ARegion *ar, vo
 {
 	TransInfo *t = arg;
 	Scene *scene = t->scene;
-	Object *ob = OBACT;
-
-	/* draw autokeyframing hint in the corner
-	 * - only draw if enabled (advanced users may be distracted/annoyed),
+	SceneLayer *sl = t->sl;
+	Object *ob = OBACT_NEW;
+	
+	/* draw autokeyframing hint in the corner 
+	 * - only draw if enabled (advanced users may be distracted/annoyed), 
 	 *   for objects that will be autokeyframed (no point ohterwise),
 	 *   AND only for the active region (as showing all is too overwhelming)
 	 */
@@ -2593,7 +2607,14 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	calculateCenter(t);
 
 	if (event) {
-		initMouseInput(t, &t->mouse, t->center2d, event->mval);
+		/* Initialize accurate transform to settings requested by keymap. */
+		bool use_accurate = false;
+		if ((prop = RNA_struct_find_property(op->ptr, "use_accurate")) && RNA_property_is_set(op->ptr, prop)) {
+			if (RNA_property_boolean_get(op->ptr, prop)) {
+				use_accurate = true;
+			}
+		}
+		initMouseInput(t, &t->mouse, t->center2d, event->mval, use_accurate);
 
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 		if (t->spacetype == SPACE_VIEW3D) {
@@ -2611,17 +2632,16 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 					if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, event->mval, t->iloc)) {
 						// Ok
 					} else {
-						ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+						ED_view3d_win_to_3d_int(t->view, t->ar, p, event->mval, t->iloc);
 					}
 				}else{
-					ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+					ED_view3d_win_to_3d_int(t->view, t->ar, p, event->mval, t->iloc);
 				}
 			} else {
-				ED_view3d_win_to_3d_int(t->ar, p, event->mval, t->iloc);
+				ED_view3d_win_to_3d_int(t->view, t->ar, p, event->mval, t->iloc);
 			}
 		}
 #endif
-
 	}
 
 	initTransformMode (t, op, event, mode);
@@ -3391,7 +3411,7 @@ static void initBend(TransInfo *t)
 
 	curs = ED_view3d_cursor3d_get(t->scene, t->view);
 	copy_v3_v3(data->warp_sta, curs);
-	ED_view3d_win_to_3d(t->ar, curs, mval_fl, data->warp_end);
+	ED_view3d_win_to_3d(t->sa->spacedata.first, t->ar, curs, mval_fl, data->warp_end);
 
 	copy_v3_v3(data->warp_nor, t->viewinv[2]);
 	if (t->flag & T_EDIT) {
@@ -3903,8 +3923,9 @@ static void ElementResize(TransInfo *t, TransData *td, float mat[3][3])
 	}
 
 	protectedTransBits(td->protectflag, vec);
-	add_v3_v3v3(td->loc, td->iloc, vec);
-
+	if (td->loc) {
+		add_v3_v3v3(td->loc, td->iloc, vec);
+	}
 	constraintTransLim(t, td);
 }
 
@@ -4231,6 +4252,12 @@ static void initRotation(TransInfo *t)
 	copy_v3_v3(t->axis_orig, t->axis);
 }
 
+/**
+ * Applies values of rotation to `td->loc` and `td->ext->quat`
+ * based on a rotation matrix (mat) and a pivot (center).
+ *
+ * Protected axis and other transform settings are taken into account.
+ */
 static void ElementRotation_ex(TransInfo *t, TransData *td, float mat[3][3], const float *center)
 {
 	float vec[3], totmat[3][3], smat[3][3];
@@ -4848,9 +4875,22 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 {
 	TransData *td = t->data;
 	float tvec[3];
-	int i;
 
-	for (i = 0; i < t->total; i++, td++) {
+	/* The ideal would be "apply_snap_align_rotation" only when a snap point is found
+	 * so, maybe inside this function is not the best place to apply this rotation.
+	 * but you need "handle snapping rotation before doing the translation" (really?) */
+	const bool apply_snap_align_rotation = usingSnappingNormal(t);// && (t->tsnap.status & POINT_INIT);
+	float pivot[3];
+	if (apply_snap_align_rotation) {
+		copy_v3_v3(pivot, t->tsnap.snapTarget);
+		/* The pivot has to be in local-space (see T49494) */
+		if (t->flag & (T_EDIT | T_POSE)) {
+			Object *ob = t->obedit ? t->obedit : t->poseobj;
+			mul_m4_v3(ob->imat, pivot);
+		}
+	}
+
+	for (int i = 0; i < t->total; i++, td++) {
 		if (td->flag & TD_NOACTION)
 			break;
 
@@ -4861,7 +4901,7 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 		bool use_rotate_offset = false;
 
 		/* handle snapping rotation before doing the translation */
-		if (usingSnappingNormal(t)) {
+		if (apply_snap_align_rotation) {
 			float mat[3][3];
 
 			if (validSnappingNormal(t)) {
@@ -4879,7 +4919,7 @@ static void applyTranslationValue(TransInfo *t, const float vec[3])
 				unit_m3(mat);
 			}
 
-			ElementRotation_ex(t, td, mat, t->tsnap.snapTarget);
+			ElementRotation_ex(t, td, mat, pivot);
 
 			if (td->loc) {
 				use_rotate_offset = true;
@@ -7340,10 +7380,13 @@ static void drawEdgeSlide(TransInfo *t)
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			glPushAttrib(GL_CURRENT_BIT | GL_LINE_BIT | GL_POINT_BIT);
-			glPushMatrix();
+			gpuMatrixBegin3D_legacy();
 
-			glMultMatrixf(t->obedit->obmat);
+			gpuMultMatrix3D(t->obedit->obmat);
+
+			unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+
+			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
 			if (sld->use_even == true) {
 				float co_a[3], co_b[3], co_mark[3];
@@ -7357,39 +7400,35 @@ static void drawEdgeSlide(TransInfo *t)
 				add_v3_v3v3(co_b, curr_sv->v_co_orig, curr_sv->dir_side[1]);
 
 				glLineWidth(line_size);
-				UI_ThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
-				glBegin(GL_LINES);
+				immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
+				immBeginAtMost(PRIM_LINES, 4);
 				if (curr_sv->v_side[0]) {
-					glVertex3fv(curr_sv->v_side[0]->co);
-					glVertex3fv(curr_sv->v_co_orig);
+					immVertex3fv(pos, curr_sv->v_side[0]->co);
+					immVertex3fv(pos, curr_sv->v_co_orig);
 				}
 				if (curr_sv->v_side[1]) {
-					glVertex3fv(curr_sv->v_side[1]->co);
-					glVertex3fv(curr_sv->v_co_orig);
+					immVertex3fv(pos, curr_sv->v_side[1]->co);
+					immVertex3fv(pos, curr_sv->v_co_orig);
 				}
-				glEnd();
+				immEnd();
 
-				UI_ThemeColorShadeAlpha(TH_SELECT, -30, alpha_shade);
+				immUniformThemeColorShadeAlpha(TH_SELECT, -30, alpha_shade);
 				glPointSize(ctrl_size);
-				glBegin(GL_POINTS);
+				immBegin(PRIM_POINTS, 1);
 				if (sld->flipped) {
-					if (curr_sv->v_side[1]) glVertex3fv(curr_sv->v_side[1]->co);
+					if (curr_sv->v_side[1]) immVertex3fv(pos, curr_sv->v_side[1]->co);
 				}
 				else {
-					if (curr_sv->v_side[0]) glVertex3fv(curr_sv->v_side[0]->co);
+					if (curr_sv->v_side[0]) immVertex3fv(pos, curr_sv->v_side[0]->co);
 				}
-				glEnd();
+				immEnd();
 
-				UI_ThemeColorShadeAlpha(TH_SELECT, 255, alpha_shade);
+				immUniformThemeColorShadeAlpha(TH_SELECT, 255, alpha_shade);
 				glPointSize(guide_size);
-				glBegin(GL_POINTS);
-#if 0
-				interp_v3_v3v3(co_mark, co_b, co_a, fac);
-				glVertex3fv(co_mark);
-#endif
+				immBegin(PRIM_POINTS, 1);
 				interp_line_v3_v3v3v3(co_mark, co_b, curr_sv->v_co_orig, co_a, fac);
-				glVertex3fv(co_mark);
-				glEnd();
+				immVertex3fv(pos, co_mark);
+				immEnd();
 			}
 			else {
 				if (is_clamp == false) {
@@ -7399,8 +7438,8 @@ static void drawEdgeSlide(TransInfo *t)
 					const int alpha_shade = -160;
 
 					glLineWidth(line_size);
-					UI_ThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
-					glBegin(GL_LINES);
+					immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
+					immBegin(PRIM_LINES, sld->totsv * 2);
 
 					sv = sld->sv;
 					for (i = 0; i < sld->totsv; i++, sv++) {
@@ -7418,18 +7457,19 @@ static void drawEdgeSlide(TransInfo *t)
 						add_v3_v3(a, sv->v_co_orig);
 						add_v3_v3(b, sv->v_co_orig);
 
-						glVertex3fv(a);
-						glVertex3fv(b);
+						immVertex3fv(pos, a);
+						immVertex3fv(pos, b);
 					}
-					glEnd();
+					immEnd();
 				}
 				else {
 					BLI_assert(0);
 				}
 			}
 
-			glPopMatrix();
-			glPopAttrib();
+			immUnbindProgram();
+
+			gpuMatrixEnd();
 
 			glDisable(GL_BLEND);
 
@@ -7953,19 +7993,23 @@ static void drawVertSlide(TransInfo *t)
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			glPushAttrib(GL_CURRENT_BIT | GL_LINE_BIT | GL_POINT_BIT);
-			glPushMatrix();
+			gpuMatrixBegin3D_legacy();
 
-			glMultMatrixf(t->obedit->obmat);
+			gpuMultMatrix3D(t->obedit->obmat);
 
 			glLineWidth(line_size);
-			UI_ThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
-			glBegin(GL_LINES);
+
+			unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+			 
+			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+			immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
+
+			immBegin(PRIM_LINES, sld->totsv * 2);
 			if (is_clamp) {
 				sv = sld->sv;
 				for (i = 0; i < sld->totsv; i++, sv++) {
-					glVertex3fv(sv->co_orig_3d);
-					glVertex3fv(sv->co_link_orig_3d[sv->co_link_curr]);
+					immVertex3fv(pos, sv->co_orig_3d);
+					immVertex3fv(pos, sv->co_link_orig_3d[sv->co_link_curr]);
 				}
 			}
 			else {
@@ -7978,19 +8022,19 @@ static void drawVertSlide(TransInfo *t)
 					add_v3_v3(a, sv->co_orig_3d);
 					add_v3_v3(b, sv->co_orig_3d);
 
-					glVertex3fv(a);
-					glVertex3fv(b);
+					immVertex3fv(pos, a);
+					immVertex3fv(pos, b);
 				}
 			}
-			glEnd();
+			immEnd();
 
 			glPointSize(ctrl_size);
 
-			glBegin(GL_POINTS);
-			glVertex3fv((sld->flipped && sld->use_even) ?
-						curr_sv->co_link_orig_3d[curr_sv->co_link_curr] :
-						curr_sv->co_orig_3d);
-			glEnd();
+			immBegin(PRIM_POINTS, 1);
+			immVertex3fv(pos, (sld->flipped && sld->use_even) ?
+			            curr_sv->co_link_orig_3d[curr_sv->co_link_curr] :
+			            curr_sv->co_orig_3d);
+			immEnd();
 
 			glDisable(GL_BLEND);
 
@@ -8016,19 +8060,20 @@ static void drawVertSlide(TransInfo *t)
 
 				add_v3_v3(co_dest_3d, curr_sv->co_orig_3d);
 
-				glLineWidth(1);
+				glLineWidth(1.0f);
 				setlinestyle(1);
 
-				cpack(0xffffff);
-				glBegin(GL_LINES);
-				glVertex3fv(curr_sv->co_orig_3d);
-				glVertex3fv(co_dest_3d);
+				imm_cpack(0xffffff);
 
-				glEnd();
+				immBegin(PRIM_LINES, 2);
+				immVertex3fv(pos, curr_sv->co_orig_3d);
+				immVertex3fv(pos, co_dest_3d);
+				immEnd();
 			}
 
-			glPopMatrix();
-			glPopAttrib();
+			immUnbindProgram();
+
+			gpuMatrixEnd();
 
 			if (v3d && v3d->zbuf)
 				glEnable(GL_DEPTH_TEST);
@@ -9004,7 +9049,7 @@ static void initTimeScale(TransInfo *t)
 	center[1] = t->mouse.imval[1];
 
 	/* force a reinit with the center2d used here */
-	initMouseInput(t, &t->mouse, center, t->mouse.imval);
+	initMouseInput(t, &t->mouse, center, t->mouse.imval, false);
 
 	initMouseInputMode(t, &t->mouse, INPUT_SPRING_FLIP);
 

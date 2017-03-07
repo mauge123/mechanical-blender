@@ -43,6 +43,7 @@
 #include "BLI_alloca.h"
 #include "BLI_dynstr.h"
 #include "BLI_listbase.h"
+#include "BLI_string_utils.h"
 
 #include "BLT_translation.h"
 
@@ -88,6 +89,7 @@ bool id_type_can_have_animdata(const short id_type)
 		case ID_OB:
 		case ID_ME: case ID_MB: case ID_CU: case ID_AR: case ID_LT:
 		case ID_KE:
+		case ID_PA:
 		case ID_MA: case ID_TE: case ID_NT:
 		case ID_LA: case ID_CA: case ID_WO:
 		case ID_LS:
@@ -310,17 +312,19 @@ bool BKE_animdata_copy_id(ID *id_to, ID *id_from, const bool do_action)
 	return true;
 }
 
-void BKE_animdata_copy_id_action(ID *id)
+void BKE_animdata_copy_id_action(ID *id, const bool set_newid)
 {
 	AnimData *adt = BKE_animdata_from_id(id);
 	if (adt) {
 		if (adt->action) {
 			id_us_min((ID *)adt->action);
-			adt->action = BKE_action_copy(G.main, adt->action);
+			adt->action = set_newid ? ID_NEW_SET(adt->action, BKE_action_copy(G.main, adt->action)) :
+			                          BKE_action_copy(G.main, adt->action);
 		}
 		if (adt->tmpact) {
 			id_us_min((ID *)adt->tmpact);
-			adt->tmpact = BKE_action_copy(G.main, adt->tmpact);
+			adt->tmpact = set_newid ? ID_NEW_SET(adt->tmpact, BKE_action_copy(G.main, adt->tmpact)) :
+			                          BKE_action_copy(G.main, adt->tmpact);
 		}
 	}
 }
@@ -1137,6 +1141,9 @@ void BKE_animdata_main_cb(Main *mainptr, ID_AnimData_Edit_Callback func, void *u
 	/* meshes */
 	ANIMDATA_IDS_CB(mainptr->mesh.first);
 	
+	/* particles */
+	ANIMDATA_IDS_CB(mainptr->particle.first);
+
 	/* speakers */
 	ANIMDATA_IDS_CB(mainptr->speaker.first);
 
@@ -1230,6 +1237,9 @@ void BKE_animdata_fix_paths_rename_all(ID *ref_id, const char *prefix, const cha
 	/* meshes */
 	RENAMEFIX_ANIM_IDS(mainptr->mesh.first);
 	
+	/* particles */
+	RENAMEFIX_ANIM_IDS(mainptr->particle.first);
+
 	/* speakers */
 	RENAMEFIX_ANIM_IDS(mainptr->speaker.first);
 
@@ -1653,7 +1663,7 @@ static bool animsys_write_rna_setting(PathResolvedRNA *anim_rna, const float val
 		/* for cases like duplifarmes it's only a temporary so don't
 		 * notify anyone of updates */
 		if (!(id->tag & LIB_TAG_ANIM_NO_RECALC)) {
-			id->tag |= LIB_TAG_ID_RECALC;
+			BKE_id_tag_set_atomic(id, LIB_TAG_ID_RECALC);
 			DAG_id_type_tag(G.main, GS(id->name));
 		}
 	}
@@ -2861,6 +2871,9 @@ void BKE_animsys_evaluate_all_animation(Main *main, Scene *scene, float ctime)
 	
 	/* meshes */
 	EVAL_ANIM_IDS(main->mesh.first, ADT_RECALC_ANIM);
+	
+	/* particles */
+	EVAL_ANIM_IDS(main->particle.first, ADT_RECALC_ANIM);
 	
 	/* speakers */
 	EVAL_ANIM_IDS(main->speaker.first, ADT_RECALC_ANIM);

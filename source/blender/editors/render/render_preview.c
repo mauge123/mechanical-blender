@@ -69,6 +69,7 @@
 #include "BKE_image.h"
 #include "BKE_icons.h"
 #include "BKE_lamp.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_library_remap.h"
 #include "BKE_main.h"
@@ -85,6 +86,7 @@
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
 
+#include "GPU_shader.h"
 
 #include "RE_pipeline.h"
 #include "RE_engine.h"
@@ -94,6 +96,7 @@
 
 #include "ED_datafiles.h"
 #include "ED_render.h"
+#include "ED_screen.h"
 
 #ifndef NDEBUG
 /* Used for database init assert(). */
@@ -275,7 +278,7 @@ static Scene *preview_get_scene(Main *pr_main)
 static Scene *preview_prepare_scene(Main *bmain, Scene *scene, ID *id, int id_type, ShaderPreview *sp)
 {
 	Scene *sce;
-	Base *base;
+	BaseLegacy *base;
 	Main *pr_main = sp->pr_main;
 
 	memcpy(pr_main->name, bmain->name, sizeof(pr_main->name));
@@ -357,29 +360,33 @@ static Scene *preview_prepare_scene(Main *bmain, Scene *scene, ID *id, int id_ty
 					/* this only works in a specific case where the preview.blend contains
 					 * an object starting with 'c' which has a material linked to it (not the obdata)
 					 * and that material has a fake shadow texture in the active texture slot */
-					for (base = sce->base.first; base; base = base->next) {
-						if (base->object->id.name[2] == 'c') {
-							Material *shadmat = give_current_material(base->object, base->object->actcol);
+					FOREACH_SCENE_OBJECT(sce, ob)
+					{
+						if (ob->id.name[2] == 'c') {
+							Material *shadmat = give_current_material(ob, ob->actcol);
 							if (shadmat) {
 								if (mat->mode2 & MA_CASTSHADOW) shadmat->septex = 0;
 								else shadmat->septex |= 1;
 							}
 						}
 					}
+					FOREACH_SCENE_OBJECT_END
 					
 					/* turn off bounce lights for volume, 
 					 * doesn't make much visual difference and slows it down too */
-					for (base = sce->base.first; base; base = base->next) {
-						if (base->object->type == OB_LAMP) {
+					FOREACH_SCENE_OBJECT(sce, ob)
+					{
+						if (ob->type == OB_LAMP) {
 							/* if doesn't match 'Lamp.002' --> main key light */
-							if (!STREQ(base->object->id.name + 2, "Lamp.002")) {
+							if (!STREQ(ob->id.name + 2, "Lamp.002")) {
 								if (mat->material_type == MA_TYPE_VOLUME)
-									base->object->restrictflag |= OB_RESTRICT_RENDER;
+									ob->restrictflag |= OB_RESTRICT_RENDER;
 								else
-									base->object->restrictflag &= ~OB_RESTRICT_RENDER;
+									ob->restrictflag &= ~OB_RESTRICT_RENDER;
 							}
 						}
 					}
+					FOREACH_SCENE_OBJECT_END
 				}
 				else {
 					/* use current scene world to light sphere */
@@ -593,7 +600,9 @@ static bool ed_preview_draw_rect(ScrArea *sa, int split, int first, rcti *rect, 
 				if (re)
 					RE_AcquiredResultGet32(re, &rres, (unsigned int *)rect_byte, 0);
 
-				glaDrawPixelsSafe(fx, fy, rres.rectx, rres.recty, rres.rectx, GL_RGBA, GL_UNSIGNED_BYTE, rect_byte);
+				immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+				immDrawPixelsTex(fx, fy, rres.rectx, rres.recty, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, rect_byte,
+				                 1.0f, 1.0f, NULL);
 				
 				MEM_freeN(rect_byte);
 				
@@ -1022,6 +1031,12 @@ static void icon_preview_startjob(void *customdata, short *stop, short *do_updat
 
 			*do_update = true;
 		}
+		else if (idtype == ID_SCR) {
+			bScreen *screen = (bScreen *)id;
+
+			ED_screen_preview_render(screen, sp->sizex, sp->sizey, sp->pr_rect);
+			*do_update = true;
+		}
 		else {
 			/* re-use shader job */
 			shader_preview_startjob(customdata, stop, do_update);
@@ -1080,13 +1095,19 @@ static void icon_preview_add_size(IconPreview *ip, unsigned int *rect, int sizex
 static void icon_preview_startjob_all_sizes(void *customdata, short *stop, short *do_update, float *progress)
 {
 	IconPreview *ip = (IconPreview *)customdata;
-	IconPreviewSize *cur_size = ip->sizes.first;
+	IconPreviewSize *cur_size;
 	const bool use_new_shading = BKE_scene_use_new_shading_nodes(ip->scene);
 
-	while (cur_size) {
+	for (cur_size = ip->sizes.first; cur_size; cur_size = cur_size->next) {
 		PreviewImage *prv = ip->owner;
+
+		if (prv->tag & PRV_TAG_DEFFERED_DELETE) {
+			/* Non-thread-protected reading is not an issue here. */
+			continue;
+		}
+
 		ShaderPreview *sp = MEM_callocN(sizeof(ShaderPreview), "Icon ShaderPreview");
-		const bool is_render = !prv->use_deferred;
+		const bool is_render = !(prv->tag & PRV_TAG_DEFFERED);
 
 		/* construct shader preview from image size and previewcustomdata */
 		sp->scene = ip->scene;
@@ -1117,8 +1138,6 @@ static void icon_preview_startjob_all_sizes(void *customdata, short *stop, short
 
 		common_preview_startjob(sp, stop, do_update, progress);
 		shader_preview_free(sp);
-
-		cur_size = cur_size->next;
 	}
 }
 
@@ -1146,6 +1165,15 @@ static void icon_preview_endjob(void *customdata)
 			}
 		}
 #endif
+	}
+
+	if (ip->owner) {
+		PreviewImage *prv_img = ip->owner;
+		prv_img->tag &= ~PRV_TAG_DEFFERED_RENDERING;
+		if (prv_img->tag & PRV_TAG_DEFFERED_DELETE) {
+			BLI_assert(prv_img->tag & PRV_TAG_DEFFERED);
+			BKE_previewimg_cached_release_pointer(prv_img);
+		}
 	}
 }
 
@@ -1204,6 +1232,14 @@ void ED_preview_icon_job(const bContext *C, void *owner, ID *id, unsigned int *r
 	ip->id = id;
 
 	icon_preview_add_size(ip, rect, sizex, sizey);
+
+	/* Special threading hack: warn main code that this preview is being rendered and cannot be freed... */
+	{
+		PreviewImage *prv_img = owner;
+		if (prv_img->tag & PRV_TAG_DEFFERED) {
+			prv_img->tag |= PRV_TAG_DEFFERED_RENDERING;
+		}
+	}
 
 	/* setup job */
 	WM_jobs_customdata_set(wm_job, ip, icon_preview_free);

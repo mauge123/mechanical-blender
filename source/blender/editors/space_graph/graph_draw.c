@@ -181,7 +181,7 @@ static void draw_fcurve_selected_keyframe_vertices(FCurve *fcu, View2D *v2d, boo
 /* helper func - draw keyframe vertices only for an F-Curve */
 static void draw_fcurve_keyframe_vertices(FCurve *fcu, View2D *v2d, bool edit, unsigned pos)
 {
-	immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH);
+	immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
 
 	immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * U.pixelsize);
 
@@ -236,7 +236,7 @@ static void draw_fcurve_selected_handle_vertices(FCurve *fcu, View2D *v2d, bool 
 static void draw_fcurve_handle_vertices(FCurve *fcu, View2D *v2d, bool sel_handle_only, unsigned pos)
 {
 	/* smooth outlines for more consistent appearance */
-	immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_SMOOTH);
+	immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA);
 
 	/* set handle size */
 	immUniform1f("size", (UI_GetThemeValuef(TH_HANDLE_VERTEX_SIZE) + 1.0f) * U.pixelsize);
@@ -388,31 +388,20 @@ static void draw_fcurve_handles(SpaceIpo *sipo, FCurve *fcu)
  */
 static void draw_fcurve_sample_control(float x, float y, float xscale, float yscale, float hsize)
 {
-	static GLuint displist = 0;
-	
-	/* initialize X shape */
-	if (displist == 0) {
-		displist = glGenLists(1);
-		glNewList(displist, GL_COMPILE);
-		
-		glBegin(GL_LINES);
-		glVertex2f(-0.7f, -0.7f);
-		glVertex2f(+0.7f, +0.7f);
-			
-		glVertex2f(-0.7f, +0.7f);
-		glVertex2f(+0.7f, -0.7f);
-		glEnd();  /* GL_LINES */
-		
-		glEndList();
-	}
 	
 	/* adjust view transform before starting */
 	glTranslatef(x, y, 0.0f);
 	glScalef(1.0f / xscale * hsize, 1.0f / yscale * hsize, 1.0f);
-	
-	/* draw! */
-	glCallList(displist);
-	
+
+	/* draw X shape */
+	glBegin(GL_LINES);
+	glVertex2f(-0.7f, -0.7f);
+	glVertex2f(+0.7f, +0.7f);
+
+	glVertex2f(-0.7f, +0.7f);
+	glVertex2f(+0.7f, -0.7f);
+	glEnd();  /* GL_LINES */
+
 	/* restore view transform */
 	glScalef(xscale / hsize, yscale / hsize, 1.0);
 	glTranslatef(-x, -y, 0.0f);

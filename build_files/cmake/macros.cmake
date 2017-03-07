@@ -416,14 +416,7 @@ function(setup_liblinks
 		target_link_libraries(${target} ${OPENCOLORIO_LIBRARIES})
 	endif()
 	if(WITH_OPENSUBDIV OR WITH_CYCLES_OPENSUBDIV)
-		if(WIN32 AND NOT UNIX)
-			file_list_suffix(OPENSUBDIV_LIBRARIES_DEBUG "${OPENSUBDIV_LIBRARIES}" "_d")
-			target_link_libraries_debug(${target} "${OPENSUBDIV_LIBRARIES_DEBUG}")
-			target_link_libraries_optimized(${target} "${OPENSUBDIV_LIBRARIES}")
-			unset(OPENSUBDIV_LIBRARIES_DEBUG)
-		else()
 			target_link_libraries(${target} ${OPENSUBDIV_LIBRARIES})
-		endif()
 	endif()
 	if(WITH_OPENVDB)
 		target_link_libraries(${target} ${OPENVDB_LIBRARIES} ${TBB_LIBRARIES})
@@ -604,6 +597,7 @@ function(SETUP_BLENDER_SORTED_LIBS)
 		bf_modifiers
 		bf_bmesh
 		bf_gpu
+		bf_draw
 		bf_blenloader
 		bf_blenkernel
 		bf_physics

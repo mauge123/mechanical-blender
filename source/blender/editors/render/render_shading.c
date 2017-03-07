@@ -36,6 +36,7 @@
 #include "DNA_material_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_space_types.h"
 #include "DNA_world_types.h"
@@ -53,6 +54,7 @@
 #include "BKE_font.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_linestyle.h"
 #include "BKE_main.h"
@@ -625,11 +627,11 @@ static int render_layer_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene = CTX_data_scene(C);
 
-	BKE_scene_add_render_layer(scene, NULL);
-	scene->r.actlay = BLI_listbase_count(&scene->r.layers) - 1;
+	BKE_scene_layer_add(scene, NULL);
+	scene->active_layer = BLI_listbase_count(&scene->render_layers) - 1;
 
 	DAG_id_tag_update(&scene->id, 0);
-	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
+	WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
 	
 	return OPERATOR_FINISHED;
 }
@@ -651,10 +653,11 @@ void SCENE_OT_render_layer_add(wmOperatorType *ot)
 static int render_layer_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene = CTX_data_scene(C);
-	SceneRenderLayer *rl = BLI_findlink(&scene->r.layers, scene->r.actlay);
+	SceneLayer *sl = BKE_scene_layer_context_active(scene);
 
-	if (!BKE_scene_remove_render_layer(CTX_data_main(C), scene, rl))
+	if (!BKE_scene_layer_remove(CTX_data_main(C), scene, sl)) {
 		return OPERATOR_CANCELLED;
+	}
 
 	DAG_id_tag_update(&scene->id, 0);
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
@@ -1774,6 +1777,9 @@ static void copy_mtex_copybuf(ID *id)
 			mtex = &(((World *)id)->mtex[(int)((World *)id)->texact]);
 			// mtex= wrld->mtex[(int)wrld->texact]; // TODO
 			break;
+		case ID_PA:
+			mtex = &(((ParticleSettings *)id)->mtex[(int)((ParticleSettings *)id)->texact]);
+			break;
 		case ID_LS:
 			mtex = &(((FreestyleLineStyle *)id)->mtex[(int)((FreestyleLineStyle *)id)->texact]);
 			break;
@@ -1806,6 +1812,9 @@ static void paste_mtex_copybuf(ID *id)
 		case ID_WO:
 			mtex = &(((World *)id)->mtex[(int)((World *)id)->texact]);
 			// mtex= wrld->mtex[(int)wrld->texact]; // TODO
+			break;
+		case ID_PA:
+			mtex = &(((ParticleSettings *)id)->mtex[(int)((ParticleSettings *)id)->texact]);
 			break;
 		case ID_LS:
 			mtex = &(((FreestyleLineStyle *)id)->mtex[(int)((FreestyleLineStyle *)id)->texact]);
@@ -1875,6 +1884,7 @@ static int paste_mtex_exec(bContext *C, wmOperator *UNUSED(op))
 		Material *ma = CTX_data_pointer_get_type(C, "material", &RNA_Material).data;
 		Lamp *la = CTX_data_pointer_get_type(C, "lamp", &RNA_Lamp).data;
 		World *wo = CTX_data_pointer_get_type(C, "world", &RNA_World).data;
+		ParticleSystem *psys = CTX_data_pointer_get_type(C, "particle_system", &RNA_ParticleSystem).data;
 		FreestyleLineStyle *linestyle = CTX_data_pointer_get_type(C, "line_style", &RNA_FreestyleLineStyle).data;
 
 		if (ma)
@@ -1883,6 +1893,8 @@ static int paste_mtex_exec(bContext *C, wmOperator *UNUSED(op))
 			id = &la->id;
 		else if (wo)
 			id = &wo->id;
+		else if (psys)
+			id = &psys->part->id;
 		else if (linestyle)
 			id = &linestyle->id;
 		

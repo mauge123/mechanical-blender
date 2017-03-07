@@ -38,6 +38,7 @@ extern "C" {
 
 typedef struct GPUShader GPUShader;
 struct GPUTexture;
+struct GPUUniformBuffer;
 
 /* GPU Shader
  * - only for fragment shaders now
@@ -69,14 +70,21 @@ void GPU_shader_free(GPUShader *shader);
 void GPU_shader_bind(GPUShader *shader);
 void GPU_shader_unbind(void);
 
+int GPU_shader_get_program(GPUShader *shader);
+
 void *GPU_shader_get_interface(GPUShader *shader);
-void GPU_shader_set_interface(GPUShader *shader, void *interface);
+
+void *GPU_fx_shader_get_interface(GPUShader *shader);
+void GPU_fx_shader_set_interface(GPUShader *shader, void *interface);
+
 int GPU_shader_get_uniform(GPUShader *shader, const char *name);
+int GPU_shader_get_uniform_block(GPUShader *shader, const char *name);
 void GPU_shader_uniform_vector(GPUShader *shader, int location, int length,
 	int arraysize, const float *value);
 void GPU_shader_uniform_vector_int(GPUShader *shader, int location, int length,
 	int arraysize, const int *value);
 
+void GPU_shader_uniform_buffer(GPUShader *shader, int location, struct GPUUniformBuffer *ubo);
 void GPU_shader_uniform_texture(GPUShader *shader, int location, struct GPUTexture *tex);
 void GPU_shader_uniform_int(GPUShader *shader, int location, int value);
 void GPU_shader_geometry_stage_primitive_io(GPUShader *shader, int input, int output, int number);
@@ -85,42 +93,85 @@ int GPU_shader_get_attribute(GPUShader *shader, const char *name);
 
 /* Builtin/Non-generated shaders */
 typedef enum GPUBuiltinShader {
-	GPU_SHADER_VSM_STORE         = 0,
-	GPU_SHADER_SEP_GAUSSIAN_BLUR = 1,
-	GPU_SHADER_SMOKE             = 2,
-	GPU_SHADER_SMOKE_FIRE        = 3,
+	GPU_SHADER_VSM_STORE,
+	GPU_SHADER_SEP_GAUSSIAN_BLUR,
+	GPU_SHADER_SMOKE,
+	GPU_SHADER_SMOKE_FIRE,
+	GPU_SHADER_SMOKE_COBA,
 
 	/* specialized drawing */
 	GPU_SHADER_TEXT,
 	GPU_SHADER_EDGES_FRONT_BACK_PERSP,
 	GPU_SHADER_EDGES_FRONT_BACK_ORTHO,
-
+	GPU_SHADER_EDGES_OVERLAY_SIMPLE,
+	GPU_SHADER_EDGES_OVERLAY,
+	GPU_SHADER_KEYFRAME_DIAMOND,
+	GPU_SHADER_SIMPLE_LIGHTING,
 	/* for simple 2D drawing */
 	GPU_SHADER_2D_UNIFORM_COLOR,
 	GPU_SHADER_2D_FLAT_COLOR,
 	GPU_SHADER_2D_SMOOTH_COLOR,
+	GPU_SHADER_2D_IMAGE_COLOR,
+	GPU_SHADER_2D_CHECKER,
+	GPU_SHADER_2D_DIAG_STRIPES,
 	/* for simple 3D drawing */
 	GPU_SHADER_3D_UNIFORM_COLOR,
+	GPU_SHADER_3D_UNIFORM_COLOR_INSTANCE,
 	GPU_SHADER_3D_FLAT_COLOR,
 	GPU_SHADER_3D_SMOOTH_COLOR,
 	GPU_SHADER_3D_DEPTH_ONLY,
 	/* basic image drawing */
+	GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR,
+	GPU_SHADER_2D_IMAGE_MASK_UNIFORM_COLOR,
 	GPU_SHADER_3D_IMAGE_MODULATE_ALPHA,
 	GPU_SHADER_3D_IMAGE_RECT_MODULATE_ALPHA,
 	GPU_SHADER_3D_IMAGE_DEPTH,
+	/* stereo 3d */
+	GPU_SHADER_2D_IMAGE_INTERLACE,
 	/* points */
 	GPU_SHADER_2D_POINT_FIXED_SIZE_UNIFORM_COLOR,
-	GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH,
-	GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_SMOOTH,
-	GPU_SHADER_2D_POINT_UNIFORM_SIZE_VARYING_COLOR_OUTLINE_SMOOTH,
+	GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA,
+	GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA,
+	GPU_SHADER_2D_POINT_UNIFORM_SIZE_VARYING_COLOR_OUTLINE_AA,
 	GPU_SHADER_2D_POINT_VARYING_SIZE_VARYING_COLOR,
 	GPU_SHADER_3D_POINT_FIXED_SIZE_UNIFORM_COLOR,
 	GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR,
-	GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_SMOOTH,
-	GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_SMOOTH,
+	GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA,
+	GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA,
 	GPU_SHADER_3D_POINT_VARYING_SIZE_UNIFORM_COLOR,
 	GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR,
+	/* lines */
+	GPU_SHADER_2D_LINE_DASHED_COLOR,
+	/* lamp drawing */
+	GPU_SHADER_3D_GROUNDPOINT,
+	GPU_SHADER_3D_GROUNDLINE,
+	GPU_SHADER_3D_SCREENSPACE_VARIYING_COLOR,
+	/* bone drawing */
+	GPU_SHADER_3D_OBJECTSPACE_VARIYING_COLOR,
+	GPU_SHADER_3D_OBJECTSPACE_SIMPLE_LIGHTING_VARIYING_COLOR,
+	/* camera drawing */
+	GPU_SHADER_CAMERA,
+	/* distance in front of objects */
+	GPU_SHADER_DISTANCE_LINES,
+	/* axis name */
+	GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED_AXIS,
+	/* instance */
+	GPU_SHADER_INSTANCE_UNIFORM_COLOR,
+	GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE,
+	GPU_SHADER_INSTANCE_EDGES_VARIYING_COLOR,
+
+	GPU_NUM_BUILTIN_SHADERS /* (not an actual shader) */
 } GPUBuiltinShader;
+
+/* Keep these in sync with:
+ *  gpu_shader_image_interlace_frag.glsl
+ *  gpu_shader_image_rect_interlace_frag.glsl
+ **/
+typedef enum GPUInterlaceShader {
+	GPU_SHADER_INTERLACE_ROW               = 0,
+	GPU_SHADER_INTERLACE_COLUMN            = 1,
+	GPU_SHADER_INTERLACE_CHECKER           = 2,
+} GPUInterlaceShader;
 
 GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader);
 GPUShader *GPU_shader_get_builtin_fx_shader(int effects, bool persp);

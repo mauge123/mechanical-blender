@@ -86,8 +86,10 @@
 
 #include "BKE_idcode.h"
 
-#include "BIF_glutil.h" /* for paint cursor */
 #include "BLF_api.h"
+
+#include "BIF_glutil.h" /* for paint cursor */
+#include "GPU_immediate.h"
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -96,8 +98,6 @@
 #include "ED_screen.h"
 #include "ED_util.h"
 #include "ED_view3d.h"
-
-#include "GPU_basic_shader.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -1849,7 +1849,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	             BLENDER_VERSION / 100, BLENDER_VERSION % 100);
 	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", url);
 	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url",
-	              "http://www.blender.org/manual");
+	              "https://docs.blender.org/manual/en/dev/");
 	uiItemStringO(col, IFACE_("Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
 #ifdef WITH_MECHANICAL
 	uiItemStringO(col, IFACE_("Mechanical Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.mechanicalblender.org");
@@ -2991,8 +2991,8 @@ static void radial_control_set_tex(RadialControl *rc)
 			if ((ibuf = BKE_brush_gen_radial_control_imbuf(rc->image_id_ptr.data, rc->use_secondary_tex))) {
 				glGenTextures(1, &rc->gltex);
 				glBindTexture(GL_TEXTURE_2D, rc->gltex);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA8, ibuf->x, ibuf->y, 0,
-				             GL_ALPHA, GL_FLOAT, ibuf->rect_float);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, ibuf->x, ibuf->y, 0,
+				             GL_RED, GL_FLOAT, ibuf->rect_float);
 				MEM_freeN(ibuf->rect_float);
 				MEM_freeN(ibuf);
 			}
@@ -3025,13 +3025,26 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 
 		RNA_property_float_get_array(fill_ptr, fill_prop, col);
 	}
-	glColor4f(col[0], col[1], col[2], alpha);
+		
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
 
 	if (rc->gltex) {
+
+		unsigned texCoord = add_attrib(format, "texCoord", GL_FLOAT, 2, KEEP_FLOAT);
+
 		glBindTexture(GL_TEXTURE_2D, rc->gltex);
 
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		GLint swizzleMask[] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
+		glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
+
+		immBindBuiltinProgram(GPU_SHADER_2D_IMAGE_MASK_UNIFORM_COLOR);
+
+		immUniform4f("color", col[0], col[1], col[2], alpha);
+		immUniform1i("image", GL_TEXTURE0);
 
 		/* set up rotation if available */
 		if (rc->rot_prop) {
@@ -3041,18 +3054,21 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 		}
 
 		/* draw textured quad */
-		GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
-		glBegin(GL_QUADS);
-		glTexCoord2f(0, 0);
-		glVertex2f(-radius, -radius);
-		glTexCoord2f(1, 0);
-		glVertex2f(radius, -radius);
-		glTexCoord2f(1, 1);
-		glVertex2f(radius, radius);
-		glTexCoord2f(0, 1);
-		glVertex2f(-radius, radius);
-		glEnd();
-		GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+		immBegin(GL_QUADS, 4);
+
+		immAttrib2f(texCoord, 0, 0);
+		immVertex2f(pos, -radius, -radius);
+
+		immAttrib2f(texCoord, 1, 0);
+		immVertex2f(pos, radius, -radius);
+		
+		immAttrib2f(texCoord, 1, 1);
+		immVertex2f(pos, radius, radius);
+		
+		immAttrib2f(texCoord, 0, 1);
+		immVertex2f(pos, -radius, radius);
+
+		immEnd();
 
 		/* undo rotation */
 		if (rc->rot_prop)
@@ -3060,8 +3076,12 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 	}
 	else {
 		/* flat color if no texture available */
-		glutil_draw_filled_arc(0, M_PI * 2, radius, 40);
+		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+		immUniformColor3fvAlpha(col, alpha);
+		imm_draw_filled_circle(pos, 0.0f, 0.0f, radius, 40);
 	}
+	
+	immUnbindProgram();
 }
 
 static void radial_control_paint_cursor(bContext *C, int x, int y, void *customdata)
@@ -3137,24 +3157,38 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 	/* set line color */
 	if (rc->col_prop)
 		RNA_property_float_get_array(&rc->col_ptr, rc->col_prop, col);
-	glColor4f(col[0], col[1], col[2], 0.5);
+
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformColor3fvAlpha(col, 0.5); 
 
 	if (rc->subtype == PROP_ANGLE) {
 		glPushMatrix();
+
 		/* draw original angle line */
 		glRotatef(RAD2DEGF(rc->initial_value), 0, 0, 1);
-		fdrawline((float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
+		immBegin(GL_LINES, 2);
+		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f);
+		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
+		immEnd();
+
 		/* draw new angle line */
 		glRotatef(RAD2DEGF(rc->current_value - rc->initial_value), 0, 0, 1);
-		fdrawline((float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
+		immBegin(GL_LINES, 2);
+		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f);
+		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
+		immEnd();
+
 		glPopMatrix();
 	}
 
 	/* draw circles on top */
-	glutil_draw_lined_arc(0.0, (float)(M_PI * 2.0), r1, 40);
-	glutil_draw_lined_arc(0.0, (float)(M_PI * 2.0), r2, 40);
+	imm_draw_lined_circle(pos, 0.0f, 0.0f, r1, 40);
+	imm_draw_lined_circle(pos, 0.0f, 0.0f, r2, 40);
 	if (rmin > 0.0f)
-		glutil_draw_lined_arc(0.0, (float)(M_PI * 2.0), rmin, 40);
+		imm_draw_lined_circle(pos, 0.0, 0.0f, rmin, 40);
 
 	BLF_size(fontid, 1.5 * fstyle_points * U.pixelsize, U.dpi);
 	BLF_enable(fontid, BLF_SHADOW);
@@ -3170,6 +3204,8 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 
 	glDisable(GL_BLEND);
 	glDisable(GL_LINE_SMOOTH);
+
+	immUnbindProgram();
 }
 
 typedef enum {
@@ -3916,8 +3952,12 @@ static void previews_id_ensure(bContext *C, Scene *scene, ID *id)
 	}
 }
 
-static int previews_id_ensure_callback(void *userdata, ID *UNUSED(self_id), ID **idptr, int UNUSED(cd_flag))
+static int previews_id_ensure_callback(void *userdata, ID *UNUSED(self_id), ID **idptr, int cb_flag)
 {
+	if (cb_flag & IDWALK_CB_PRIVATE) {
+		return IDWALK_RET_NOP;
+	}
+
 	PreviewsIDEnsureData *data = userdata;
 	ID *id = *idptr;
 
@@ -3950,7 +3990,7 @@ static int previews_ensure_exec(bContext *C, wmOperator *UNUSED(op))
 		preview_id_data.scene = scene;
 		id = (ID *)scene;
 
-		BKE_library_foreach_ID_link(id, previews_id_ensure_callback, &preview_id_data, IDWALK_RECURSE);
+		BKE_library_foreach_ID_link(NULL, id, previews_id_ensure_callback, &preview_id_data, IDWALK_RECURSE);
 	}
 
 	/* Check a last time for ID not used (fake users only, in theory), and
@@ -4569,4 +4609,3 @@ EnumPropertyItem *RNA_mask_local_itemf(bContext *C, PointerRNA *ptr, PropertyRNA
 {
 	return rna_id_itemf(C, ptr, r_free, C ? (ID *)CTX_data_main(C)->mask.first : NULL, true);
 }
-

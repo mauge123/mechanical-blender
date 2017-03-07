@@ -70,12 +70,12 @@ static MatrixState state; /* TODO(merwin): make part of GPUContext, alongside im
 #define Projection3D state.ProjectionMatrix3D
 #define Projection2D state.ProjectionMatrix2D
 
-void gpuMatrixInit()
+void gpuMatrixInit(void)
 {
 	memset(&state, 0, sizeof(MatrixState));
 }
 
-void gpuMatrixBegin2D()
+void gpuMatrixBegin2D(void)
 {
 	state.mode = MATRIX_MODE_2D;
 	state.top = 0;
@@ -83,7 +83,7 @@ void gpuMatrixBegin2D()
 	gpuOrtho2D(-1.0f, +1.0f, -1.0f, +1.0f); // or identity?
 }
 
-void gpuMatrixBegin3D()
+void gpuMatrixBegin3D(void)
 {
 	state.mode = MATRIX_MODE_3D;
 	state.top = 0;
@@ -92,7 +92,7 @@ void gpuMatrixBegin3D()
 }
 
 #if SUPPORT_LEGACY_MATRIX
-void gpuMatrixBegin3D_legacy()
+void gpuMatrixBegin3D_legacy(void)
 {
 	/* copy top matrix from each legacy stack into new fresh stack */
 	state.mode = MATRIX_MODE_3D;
@@ -103,7 +103,7 @@ void gpuMatrixBegin3D_legacy()
 }
 #endif
 
-void gpuMatrixEnd()
+void gpuMatrixEnd(void)
 {
 	state.mode = MATRIX_MODE_INACTIVE;
 }
@@ -133,7 +133,7 @@ static void checkmat(cosnt float *m)
 #endif
 
 
-void gpuPushMatrix()
+void gpuPushMatrix(void)
 {
 	BLI_assert(state.mode != MATRIX_MODE_INACTIVE);
 	BLI_assert(state.top < MATRIX_STACK_DEPTH);
@@ -144,7 +144,7 @@ void gpuPushMatrix()
 		copy_m3_m3(ModelView2D, state.ModelViewStack2D[state.top - 1]);
 }
 
-void gpuPopMatrix()
+void gpuPopMatrix(void)
 {
 	BLI_assert(state.mode != MATRIX_MODE_INACTIVE);
 	BLI_assert(state.top > 0);
@@ -168,7 +168,7 @@ void gpuLoadMatrix2D(const float m[3][3])
 	state.dirty = true;
 }
 
-void gpuLoadIdentity()
+void gpuLoadIdentity(void)
 {
 	switch (state.mode) {
 		case MATRIX_MODE_3D:
@@ -281,7 +281,7 @@ void gpuScale3fv(const float vec[3])
 void gpuMultMatrix3D(const float m[4][4])
 {
 	BLI_assert(state.mode == MATRIX_MODE_3D);
-	mul_m4_m4_pre(ModelView3D, m);
+	mul_m4_m4_post(ModelView3D, m);
 	CHECKMAT(ModelView3D);
 	state.dirty = true;
 }
@@ -289,9 +289,15 @@ void gpuMultMatrix3D(const float m[4][4])
 void gpuMultMatrix2D(const float m[3][3])
 {
 	BLI_assert(state.mode == MATRIX_MODE_2D);
-	mul_m3_m3_pre(ModelView2D, m);
+	mul_m3_m3_post(ModelView2D, m);
 	CHECKMAT(ModelView2D);
 	state.dirty = true;
+}
+
+void gpuRotate3f(float deg, float x, float y, float z)
+{
+	const float axis[3] = {x, y, z};
+	gpuRotate3fv(deg, axis);
 }
 
 void gpuRotate3fv(float deg, const float axis[3])
@@ -481,19 +487,23 @@ void gpuLookAt(float eyeX, float eyeY, float eyeZ, float centerX, float centerY,
 	gpuTranslate3f(-eyeX, -eyeY, -eyeZ);
 }
 
-void gpuProject(const float obj[3], const float model[4][4], const float proj[4][4], const GLint view[4], float win[3])
+void gpuProject(const float world[3], const float model[4][4], const float proj[4][4], const int view[4], float win[3])
 {
 	float v[4];
 
-	mul_v4_m4v3(v, model, obj);
+	mul_v4_m4v3(v, model, world);
 	mul_m4_v4(proj, v);
+
+	if (v[3] != 0.0f) {
+		mul_v3_fl(v, 1.0f / v[3]);
+	}
 
 	win[0] = view[0] + (view[2] * (v[0] + 1)) * 0.5f;
 	win[1] = view[1] + (view[3] * (v[1] + 1)) * 0.5f;
 	win[2] = (v[2] + 1) * 0.5f;
 }
 
-bool gpuUnProject(const float win[3], const float model[4][4], const float proj[4][4], const GLint view[4], float obj[3])
+bool gpuUnProject(const float win[3], const float model[4][4], const float proj[4][4], const int view[4], float world[3])
 {
 	float pm[4][4];
 	float in[4];
@@ -502,6 +512,7 @@ bool gpuUnProject(const float win[3], const float model[4][4], const float proj[
 	mul_m4_m4m4(pm, proj, model);
 
 	if (!invert_m4(pm)) {
+		zero_v3(world);
 		return false;
 	}
 
@@ -522,19 +533,12 @@ bool gpuUnProject(const float win[3], const float model[4][4], const float proj[
 	mul_v4_m4v3(out, pm, in);
 
 	if (out[3] == 0.0f) {
+		copy_v3_v3(world, out);
 		return false;
 	}
-	else {
-		out[0] /= out[3];
-		out[1] /= out[3];
-		out[2] /= out[3];
 
-		obj[0] = out[0];
-		obj[1] = out[1];
-		obj[2] = out[2];
-
-		return true;
-	}
+	mul_v3_v3fl(world, out, 1.0f / out[3]);
+	return true;
 }
 
 const float *gpuGetModelViewMatrix3D(float m[4][4])
@@ -589,27 +593,22 @@ const float *gpuGetProjectionMatrix3D(float m[4][4])
 
 const float *gpuGetModelViewProjectionMatrix3D(float m[4][4])
 {
+	if (m == NULL) {
+		static Mat4 temp;
+		m = temp;
+	}
+
 #if SUPPORT_LEGACY_MATRIX
 	if (state.mode == MATRIX_MODE_INACTIVE) {
-		if (m == NULL) {
-			static Mat4 temp;
-			m = temp;
-		}
-
 		Mat4 proj;
-		glGetFloatv(GL_MODELVIEW_MATRIX, (float*)proj);
-		glGetFloatv(GL_PROJECTION_MATRIX, (float*)m);
-		mul_m4_m4_post(m, proj);
+		glGetFloatv(GL_MODELVIEW_MATRIX, (float*)m);
+		glGetFloatv(GL_PROJECTION_MATRIX, (float*)proj);
+		mul_m4_m4_pre(m, proj);
 		return (const float*)m;
 	}
 #endif
 
 	BLI_assert(state.mode == MATRIX_MODE_3D);
-
-	if (m == NULL) {
-		static Mat4 temp;
-		m = temp;
-	}
 
 	mul_m4_m4m4(m, Projection3D, ModelView3D);
 	return (const float*)m;
@@ -622,7 +621,7 @@ const float *gpuGetNormalMatrix(float m[3][3])
 		m = temp3;
 	}
 
-	copy_m3_m4(m, gpuGetModelViewMatrix3D(NULL));
+	copy_m3_m4(m, (const float (*)[4])gpuGetModelViewMatrix3D(NULL));
 
 	invert_m3(m);
 	transpose_m3(m);
@@ -695,7 +694,15 @@ void gpuBindMatrices(GLuint program)
 	state.dirty = false;
 }
 
-bool gpuMatricesDirty()
+bool gpuMatricesDirty(void)
 {
 	return state.dirty;
 }
+
+#if SUPPORT_LEGACY_MATRIX
+void gpuMatrixUpdate_legacy(void)
+{
+	BLI_assert(state.mode == MATRIX_MODE_INACTIVE);
+	state.dirty = true;
+}
+#endif

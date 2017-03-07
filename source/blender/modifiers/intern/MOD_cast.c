@@ -102,34 +102,19 @@ static void foreachObjectLink(
 {
 	CastModifierData *cmd = (CastModifierData *) md;
 
-	walk(userData, ob, &cmd->object, IDWALK_NOP);
-}
-
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Main *UNUSED(bmain),
-                           struct Scene *UNUSED(scene),
-                           Object *UNUSED(ob),
-                           DagNode *obNode)
-{
-	CastModifierData *cmd = (CastModifierData *) md;
-
-	if (cmd->object) {
-		DagNode *curNode = dag_get_node(forest, cmd->object);
-
-		dag_add_relation(forest, curNode, obNode, DAG_RL_OB_DATA,
-		                 "Cast Modifier");
-	}
+	walk(userData, ob, &cmd->object, IDWALK_CB_NOP);
 }
 
 static void updateDepsgraph(ModifierData *md,
                             struct Main *UNUSED(bmain),
                             struct Scene *UNUSED(scene),
-                            Object *UNUSED(ob),
+                            Object *object,
                             struct DepsNodeHandle *node)
 {
 	CastModifierData *cmd = (CastModifierData *)md;
 	if (cmd->object != NULL) {
 		DEG_add_object_relation(node, cmd->object, DEG_OB_COMP_TRANSFORM, "Cast Modifier");
+		DEG_add_object_relation(node, object, DEG_OB_COMP_TRANSFORM, "Cast Modifier");
 	}
 }
 
@@ -512,7 +497,6 @@ ModifierTypeInfo modifierType_Cast = {
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    updateDepgraph,
 	/* updateDepsgraph */   updateDepsgraph,
 	/* dependsOnTime */     NULL,
 	/* dependsOnNormals */	NULL,

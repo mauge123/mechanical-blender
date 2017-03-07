@@ -181,7 +181,7 @@ enum {
 	UI_BUT_HAS_SEP_CHAR    = (1 << 27),  /* but->str contains UI_SEP_CHAR, used for key shortcuts */
 	UI_BUT_UPDATE_DELAY    = (1 << 28),  /* don't run updates while dragging (needed in rare cases). */
 	UI_BUT_TEXTEDIT_UPDATE = (1 << 29),  /* when widget is in textedit mode, update value on each char stroke */
-	UI_BUT_SEARCH_UNLINK   = (1 << 30),  /* show unlink for search button */
+	UI_BUT_VALUE_CLEAR     = (1 << 30),  /* show 'x' icon to clear/unlink value of text or search button */
 };
 
 #define UI_PANEL_WIDTH          340
@@ -308,17 +308,17 @@ typedef enum {
  * Functions to draw various shapes, taking theme settings into account.
  * Used for code that draws its own UI style elements. */
 
-void UI_draw_roundbox(float minx, float miny, float maxx, float maxy, float rad);
+void UI_draw_roundbox(float minx, float miny, float maxx, float maxy, float rad, const float color[4]);
 void UI_draw_roundbox_corner_set(int type);
 int  UI_draw_roundbox_corner_get(void);
-void UI_draw_roundbox_unfilled(float minx, float miny, float maxx, float maxy, float rad);
+void UI_draw_roundbox_unfilled(float minx, float miny, float maxx, float maxy, float rad, const float color[4]);
 void UI_draw_box_shadow(unsigned char alpha, float minx, float miny, float maxx, float maxy);
 void UI_draw_roundbox_gl_mode_3ubAlpha(int mode, float minx, float miny, float maxx, float maxy, float rad, unsigned char col[3], unsigned char alpha);
 void UI_draw_roundbox_gl_mode_3fvAlpha(int mode, float minx, float miny, float maxx, float maxy, float rad, float col[3], float alpha);
 void UI_draw_roundbox_gl_mode(int mode, float minx, float miny, float maxx, float maxy, float rad, float col[4]);
-void UI_draw_roundbox_shade_x(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadetop, float shadedown);
-void UI_draw_roundbox_shade_y(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadeLeft, float shadeRight);
-void UI_draw_text_underline(int pos_x, int pos_y, int len, int height);
+void UI_draw_roundbox_shade_x(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadetop, float shadedown, const float col[4]);
+void UI_draw_roundbox_shade_y(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadeleft, float shaderight, const float col[4]);
+void UI_draw_text_underline(int pos_x, int pos_y, int len, int height, const float color[4]);
 
 void UI_draw_safe_areas(
         unsigned pos, float x1, float x2, float y1, float y2,
@@ -1044,20 +1044,22 @@ void UI_context_active_but_prop_get_templateID(
 
 /* Styled text draw */
 void UI_fontstyle_set(const struct uiFontStyle *fs);
-void UI_fontstyle_draw_ex(
-        const struct uiFontStyle *fs, const struct rcti *rect, const char *str,
-        size_t len, float *r_xofs, float *r_yofs);
-void UI_fontstyle_draw(const struct uiFontStyle *fs, const struct rcti *rect, const char *str);
-void UI_fontstyle_draw_rotated(const struct uiFontStyle *fs, const struct rcti *rect, const char *str);
-void UI_fontstyle_draw_simple(const struct uiFontStyle *fs, float x, float y, const char *str);
+void UI_fontstyle_draw_ex(const struct uiFontStyle *fs, const struct rcti *rect, const char *str,
+                          const unsigned char col[4], size_t len, float *r_xofs, float *r_yofs);
+void UI_fontstyle_draw(const struct uiFontStyle *fs, const struct rcti *rect, const char *str,
+                       const unsigned char col[4]);
+void UI_fontstyle_draw_rotated(const struct uiFontStyle *fs, const struct rcti *rect, const char *str,
+                               const unsigned char col[4]);
+void UI_fontstyle_draw_simple(const struct uiFontStyle *fs, float x, float y, const char *str,
+                              const unsigned char col[4]);
 void UI_fontstyle_draw_simple_backdrop(
         const struct uiFontStyle *fs, float x, float y, const char *str,
-        const unsigned char fg[4], const unsigned char bg[4]);
+        const float col_fg[4], const float col_bg[4]);
 
 int UI_fontstyle_string_width(const struct uiFontStyle *fs, const char *str);
 int UI_fontstyle_height_max(const struct uiFontStyle *fs);
 
-void UI_draw_icon_tri(float x, float y, char dir);
+void UI_draw_icon_tri(float x, float y, char dir, const float[4]);
 
 struct uiStyle *UI_style_get(void);		/* use for fonts etc */
 struct uiStyle *UI_style_get_dpi(void);	/* DPI scaled settings for drawing */

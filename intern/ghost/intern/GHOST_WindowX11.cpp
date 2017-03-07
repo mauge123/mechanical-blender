@@ -861,24 +861,32 @@ void GHOST_WindowX11::icccmSetState(int state)
 
 int GHOST_WindowX11::icccmGetState(void) const
 {
-	Atom *prop_ret;
+	struct {
+		CARD32 state;
+		XID    icon;
+	} *prop_ret;
 	unsigned long bytes_after, num_ret;
 	Atom type_ret;
-	int format_ret, st;
+	int ret, format_ret;
+	CARD32 st;
 
 	prop_ret = NULL;
-	st = XGetWindowProperty(
+	ret = XGetWindowProperty(
 	        m_display, m_window, m_system->m_atom.WM_STATE, 0, 2,
 	        False, m_system->m_atom.WM_STATE, &type_ret,
 	        &format_ret, &num_ret, &bytes_after, ((unsigned char **)&prop_ret));
-	if ((st == Success) && (prop_ret) && (num_ret == 2))
-		st = prop_ret[0];
-	else
+	if ((ret == Success) && (prop_ret != NULL) && (num_ret == 2)) {
+		st = prop_ret->state;
+	}
+	else {
 		st = NormalState;
+	}
 
-	if (prop_ret)
+	if (prop_ret) {
 		XFree(prop_ret);
-	return (st);
+	}
+
+	return st;
 }
 
 void GHOST_WindowX11::netwmMaximized(bool set)
@@ -1308,10 +1316,12 @@ GHOST_Context *GHOST_WindowX11::newDrawingContext(GHOST_TDrawingContextType type
 	if (type == GHOST_kDrawingContextTypeOpenGL) {
 
 		// During development:
+		//   try 4.x compatibility profile
 		//   try 3.3 compatibility profile
 		//   fall back to 3.0 if needed
 		//
 		// Final Blender 2.8:
+		//   try 4.x core profile
 		//   try 3.3 core profile
 		//   no fallbacks
 
@@ -1324,7 +1334,28 @@ GHOST_Context *GHOST_WindowX11::newDrawingContext(GHOST_TDrawingContextType type
 #  error // must specify either core or compat at build time
 #endif
 
-		GHOST_Context *context = new GHOST_ContextGLX(
+		GHOST_Context *context;
+
+		for (int minor = 5; minor >= 0; --minor) {
+			context = new GHOST_ContextGLX(
+			        m_wantStereoVisual,
+			        m_wantNumOfAASamples,
+			        m_window,
+			        m_display,
+			        m_visualInfo,
+			        (GLXFBConfig)m_fbconfig,
+			        profile_mask,
+			        4, minor,
+			        GHOST_OPENGL_GLX_CONTEXT_FLAGS | (m_is_debug_context ? GLX_CONTEXT_DEBUG_BIT_ARB : 0),
+			        GHOST_OPENGL_GLX_RESET_NOTIFICATION_STRATEGY);
+
+			if (context->initializeDrawingContext())
+				return context;
+			else
+				delete context;
+		}
+
+		context = new GHOST_ContextGLX(
 		        m_wantStereoVisual,
 		        m_wantNumOfAASamples,
 		        m_window,
@@ -1338,27 +1369,26 @@ GHOST_Context *GHOST_WindowX11::newDrawingContext(GHOST_TDrawingContextType type
 
 		if (context->initializeDrawingContext())
 			return context;
-		else {
+		else
 			delete context;
 
-			// since that failed try 3.0 (mostly for Mesa, which doesn't implement compatibility profile)
-			context = new GHOST_ContextGLX(
-			        m_wantStereoVisual,
-			        m_wantNumOfAASamples,
-			        m_window,
-			        m_display,
-			        m_visualInfo,
-			        (GLXFBConfig)m_fbconfig,
-			        0, // no profile bit
-			        3, 0,
-			        GHOST_OPENGL_GLX_CONTEXT_FLAGS | (m_is_debug_context ? GLX_CONTEXT_DEBUG_BIT_ARB : 0),
-			        GHOST_OPENGL_GLX_RESET_NOTIFICATION_STRATEGY);
+		// since that failed try 3.0 (mostly for Mesa, which doesn't implement compatibility profile)
+		context = new GHOST_ContextGLX(
+		        m_wantStereoVisual,
+		        m_wantNumOfAASamples,
+		        m_window,
+		        m_display,
+		        m_visualInfo,
+		        (GLXFBConfig)m_fbconfig,
+		        0, // no profile bit
+		        3, 0,
+		        GHOST_OPENGL_GLX_CONTEXT_FLAGS | (m_is_debug_context ? GLX_CONTEXT_DEBUG_BIT_ARB : 0),
+		        GHOST_OPENGL_GLX_RESET_NOTIFICATION_STRATEGY);
 
-			if (context->initializeDrawingContext())
-				return context;
-			else
-				delete context;
-		}
+		if (context->initializeDrawingContext())
+			return context;
+		else
+			delete context;
 	}
 
 	return NULL;

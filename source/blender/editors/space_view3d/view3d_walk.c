@@ -340,8 +340,8 @@ static void drawWalkPixel(const struct bContext *UNUSED(C), ARegion *ar, void *a
 		yoff = walk->ar->winy / 2;
 	}
 
-	VertexFormat* format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+	VertexFormat *format = immVertexFormat();
+	unsigned int pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -599,7 +599,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 	walk->rv3d->rflag |= RV3D_NAVIGATING;
 
 	walk->snap_context = ED_transform_snap_object_context_create_view3d(
-	        CTX_data_main(C), walk->scene, SNAP_OBJECT_USE_CACHE,
+	        CTX_data_main(C), walk->scene, 0,
 	        walk->ar, walk->v3d);
 
 	walk->v3d_camera_control = ED_view3d_cameracontrol_acquire(

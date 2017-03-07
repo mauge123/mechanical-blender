@@ -50,7 +50,6 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
-#include "DNA_object_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -73,6 +72,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
+#include "BKE_layer.h"
 #include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
@@ -82,7 +82,9 @@
 #include "BKE_nla.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
+#include "BKE_particle.h"
 #include "BKE_paint.h"
+#include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_rigidbody.h"
 #include "BKE_scene.h"
@@ -95,6 +97,7 @@
 
 #include "ED_anim_api.h"
 #include "ED_armature.h"
+#include "ED_particle.h"
 #include "ED_image.h"
 #include "ED_keyframing.h"
 #include "ED_keyframes_edit.h"
@@ -285,13 +288,13 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
 
 static void createTransTexspace(TransInfo *t)
 {
-	Scene *scene = t->scene;
+	SceneLayer *sl = t->sl;
 	TransData *td;
 	Object *ob;
 	ID *id;
 	short *texflag;
 
-	ob = OBACT;
+	ob = OBACT_NEW;
 
 	if (ob == NULL) { // Shouldn't logically happen, but still...
 		t->total = 0;
@@ -828,7 +831,6 @@ static void pose_grab_with_ik_clear(Object *ob)
 	bKinematicConstraint *data;
 	bPoseChannel *pchan;
 	bConstraint *con, *next;
-	bool need_dependency_update = false;
 
 	for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
 		/* clear all temporary lock flags */
@@ -843,7 +845,6 @@ static void pose_grab_with_ik_clear(Object *ob)
 				data = con->data;
 				if (data->flag & CONSTRAINT_IK_TEMP) {
 					/* iTaSC needs clear for removed constraints */
-					need_dependency_update = true;
 					BIK_clear_data(ob->pose);
 
 					BLI_remlink(&pchan->constraints, con);
@@ -858,13 +859,8 @@ static void pose_grab_with_ik_clear(Object *ob)
 		}
 	}
 
-#ifdef WITH_LEGACY_DEPSGRAPH
-	if (!DEG_depsgraph_use_legacy() && need_dependency_update)
-#endif
-	{
-		/* TODO(sergey): Consider doing partial update only. */
-		DAG_relations_tag_update(G.main);
-	}
+	/* TODO(sergey): Consider doing partial update only. */
+	DAG_relations_tag_update(G.main);
 }
 
 /* adds the IK to pchan - returns if added */
@@ -1017,13 +1013,8 @@ static short pose_grab_with_ik(Object *ob)
 	/* iTaSC needs clear for new IK constraints */
 	if (tot_ik) {
 		BIK_clear_data(ob->pose);
-#ifdef WITH_LEGACY_DEPSGRAPH
-		if (!DEG_depsgraph_use_legacy())
-#endif
-		{
-			/* TODO(sergey): Consuder doing partial update only. */
-			DAG_relations_tag_update(G.main);
-		}
+		/* TODO(sergey): Consuder doing partial update only. */
+		DAG_relations_tag_update(G.main);
 	}
 
 	return (tot_ik) ? 1 : 0;
@@ -1803,6 +1794,175 @@ static void createTransLatticeVerts(TransInfo *t)
 	}
 }
 
+/* ******************* particle edit **************** */
+static void createTransParticleVerts(bContext *C, TransInfo *t)
+{
+	TransData *td = NULL;
+	TransDataExtension *tx;
+	Base *base = CTX_data_active_base(C);
+	Object *ob = CTX_data_active_object(C);
+	ParticleEditSettings *pset = PE_settings(t->scene);
+	PTCacheEdit *edit = PE_get_current(t->scene, t->sl, ob);
+	ParticleSystem *psys = NULL;
+	ParticleSystemModifierData *psmd = NULL;
+	PTCacheEditPoint *point;
+	PTCacheEditKey *key;
+	float mat[4][4];
+	int i, k, transformparticle;
+	int count = 0, hasselected = 0;
+	const bool is_prop_edit = (t->flag & T_PROP_EDIT) != 0;
+
+	if (edit == NULL || t->settings->particle.selectmode == SCE_SELECT_PATH) return;
+
+	psys = edit->psys;
+
+	if (psys)
+		psmd = psys_get_modifier(ob, psys);
+
+	base->flag |= BA_HAS_RECALC_DATA;
+
+	for (i = 0, point = edit->points; i < edit->totpoint; i++, point++) {
+		point->flag &= ~PEP_TRANSFORM;
+		transformparticle = 0;
+
+		if ((point->flag & PEP_HIDE) == 0) {
+			for (k = 0, key = point->keys; k < point->totkey; k++, key++) {
+				if ((key->flag & PEK_HIDE) == 0) {
+					if (key->flag & PEK_SELECT) {
+						hasselected = 1;
+						transformparticle = 1;
+					}
+					else if (is_prop_edit)
+						transformparticle = 1;
+				}
+			}
+		}
+
+		if (transformparticle) {
+			count += point->totkey;
+			point->flag |= PEP_TRANSFORM;
+		}
+	}
+
+	/* note: in prop mode we need at least 1 selected */
+	if (hasselected == 0) return;
+
+	t->total = count;
+	td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransObData(Particle Mode)");
+
+	if (t->mode == TFM_BAKE_TIME)
+		tx = t->ext = MEM_callocN(t->total * sizeof(TransDataExtension), "Particle_TransExtension");
+	else
+		tx = t->ext = NULL;
+
+	unit_m4(mat);
+
+	invert_m4_m4(ob->imat, ob->obmat);
+
+	for (i = 0, point = edit->points; i < edit->totpoint; i++, point++) {
+		TransData *head, *tail;
+		head = tail = td;
+
+		if (!(point->flag & PEP_TRANSFORM)) continue;
+
+		if (psys && !(psys->flag & PSYS_GLOBAL_HAIR))
+			psys_mat_hair_to_global(ob, psmd->dm_final, psys->part->from, psys->particles + i, mat);
+
+		for (k = 0, key = point->keys; k < point->totkey; k++, key++) {
+			if (key->flag & PEK_USE_WCO) {
+				copy_v3_v3(key->world_co, key->co);
+				mul_m4_v3(mat, key->world_co);
+				td->loc = key->world_co;
+			}
+			else
+				td->loc = key->co;
+
+			copy_v3_v3(td->iloc, td->loc);
+			copy_v3_v3(td->center, td->loc);
+
+			if (key->flag & PEK_SELECT)
+				td->flag |= TD_SELECTED;
+			else if (!is_prop_edit)
+				td->flag |= TD_SKIP;
+
+			unit_m3(td->mtx);
+			unit_m3(td->smtx);
+
+			/* don't allow moving roots */
+			if (k == 0 && pset->flag & PE_LOCK_FIRST && (!psys || !(psys->flag & PSYS_GLOBAL_HAIR)))
+				td->protectflag |= OB_LOCK_LOC;
+
+			td->ob = ob;
+			td->ext = tx;
+			if (t->mode == TFM_BAKE_TIME) {
+				td->val = key->time;
+				td->ival = *(key->time);
+				/* abuse size and quat for min/max values */
+				td->flag |= TD_NO_EXT;
+				if (k == 0) tx->size = NULL;
+				else tx->size = (key - 1)->time;
+
+				if (k == point->totkey - 1) tx->quat = NULL;
+				else tx->quat = (key + 1)->time;
+			}
+
+			td++;
+			if (tx)
+				tx++;
+			tail++;
+		}
+		if (is_prop_edit && head != tail)
+			calc_distanceCurveVerts(head, tail - 1);
+	}
+}
+
+void flushTransParticles(TransInfo *t)
+{
+	Scene *scene = t->scene;
+	SceneLayer *sl = t->sl;
+	Object *ob = OBACT_NEW;
+	PTCacheEdit *edit = PE_get_current(scene, sl, ob);
+	ParticleSystem *psys = edit->psys;
+	ParticleSystemModifierData *psmd = NULL;
+	PTCacheEditPoint *point;
+	PTCacheEditKey *key;
+	TransData *td;
+	float mat[4][4], imat[4][4], co[3];
+	int i, k;
+	const bool is_prop_edit = (t->flag & T_PROP_EDIT) != 0;
+
+	if (psys)
+		psmd = psys_get_modifier(ob, psys);
+
+	/* we do transform in world space, so flush world space position
+	 * back to particle local space (only for hair particles) */
+	td = t->data;
+	for (i = 0, point = edit->points; i < edit->totpoint; i++, point++, td++) {
+		if (!(point->flag & PEP_TRANSFORM)) continue;
+
+		if (psys && !(psys->flag & PSYS_GLOBAL_HAIR)) {
+			psys_mat_hair_to_global(ob, psmd->dm_final, psys->part->from, psys->particles + i, mat);
+			invert_m4_m4(imat, mat);
+
+			for (k = 0, key = point->keys; k < point->totkey; k++, key++) {
+				copy_v3_v3(co, key->world_co);
+				mul_m4_v3(imat, co);
+
+
+				/* optimization for proportional edit */
+				if (!is_prop_edit || !compare_v3v3(key->co, co, 0.0001f)) {
+					copy_v3_v3(key->co, co);
+					point->flag |= PEP_EDIT_RECALC;
+				}
+			}
+		}
+		else
+			point->flag |= PEP_EDIT_RECALC;
+	}
+
+	PE_update_object(scene, sl, OBACT_NEW, 1);
+}
+
 /* ********************* mesh ****************** */
 
 static bool bmesh_test_dist_add(BMVert *v, BMVert *v_other,
@@ -2324,7 +2484,12 @@ static void createTransEditVerts(TransInfo *t)
 		editmesh_set_connectivity_distance(em->bm, mtx, dists);
 	}
 
-	if (t->around == V3D_AROUND_LOCAL_ORIGINS) {
+	/* Only in case of rotation and resize, we want the elements of the edited
+	 * object to behave as groups whose pivot are the individual origins
+	 *
+	 * TODO: use island_info to detect the closest point when the "Snap Target"
+	 * in Blender UI is "Closest" */
+	if ((t->around == V3D_AROUND_LOCAL_ORIGINS) && (t->mode != TFM_TRANSLATION)) {
 		island_info = editmesh_islands_info_calc(em, &island_info_tot, &island_vert_map);
 	}
 
@@ -5293,12 +5458,11 @@ void set_trans_object_base_flags(TransInfo *t)
 static void set_trans_object_base_flags(TransInfo *t)
 #endif
 {
-	Scene *scene = t->scene;
-	View3D *v3d = t->view;
+	SceneLayer *sl = t->sl;
 
 	/*
 	 * if Base selected and has parent selected:
-	 * base->flag = BA_WAS_SEL
+	 * base->flag_legacy = BA_WAS_SEL
 	 */
 	Base *base;
 
@@ -5307,32 +5471,32 @@ static void set_trans_object_base_flags(TransInfo *t)
 		return;
 
 	/* makes sure base flags and object flags are identical */
-	BKE_scene_base_flag_to_objects(t->scene);
+	BKE_scene_base_flag_to_objects(t->sl);
 
 	/* Make sure depsgraph is here. */
 	DAG_scene_relations_update(G.main, t->scene);
 
 	/* handle pending update events, otherwise they got copied below */
-	for (base = scene->base.first; base; base = base->next) {
+	for (base = sl->object_bases.first; base; base = base->next) {
 		if (base->object->recalc & OB_RECALC_ALL) {
 			/* TODO(sergey): Ideally, it's not needed. */
 			BKE_object_handle_update(G.main->eval_ctx, t->scene, base->object);
 		}
 	}
 
-	for (base = scene->base.first; base; base = base->next) {
-		base->flag &= ~BA_WAS_SEL;
+	for (base = sl->object_bases.first; base; base = base->next) {
+		base->flag_legacy &= ~BA_WAS_SEL;
 
-		if (TESTBASELIB_BGMODE(v3d, scene, base)) {
+		if (TESTBASELIB_BGMODE_NEW(base)) {
 			Object *ob = base->object;
 			Object *parsel = ob->parent;
 
 			/* if parent selected, deselect */
 			while (parsel) {
-				if (parsel->flag & SELECT) {
-					Base *parbase = BKE_scene_base_find(scene, parsel);
+				Base *parbase = BKE_scene_layer_base_find(sl, parsel);
+				if (parbase->flag & BASE_SELECTED) {
 					if (parbase) { /* in rare cases this can fail */
-						if (TESTBASELIB_BGMODE(v3d, scene, parbase)) {
+						if (TESTBASELIB_BGMODE_NEW(parbase)) {
 							break;
 						}
 					}
@@ -5345,29 +5509,24 @@ static void set_trans_object_base_flags(TransInfo *t)
 				if ((t->around == V3D_AROUND_LOCAL_ORIGINS) &&
 				    (t->mode == TFM_ROTATION || t->mode == TFM_TRACKBALL))
 				{
-					base->flag |= BA_TRANSFORM_CHILD;
+					base->flag_legacy |= BA_TRANSFORM_CHILD;
 				}
 				else {
-					base->flag &= ~SELECT;
-					base->flag |= BA_WAS_SEL;
+					base->flag &= ~BASE_SELECTED;
+					base->flag_legacy |= BA_WAS_SEL;
 				}
 			}
 			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 		}
 	}
 
-	/* all recalc flags get flushed to all layers, so a layer flip later on works fine */
-#ifdef WITH_LEGACY_DEPSGRAPH
-	DAG_scene_flush_update(G.main, t->scene, -1, 0);
-#endif
-
 	/* and we store them temporal in base (only used for transform code) */
 	/* this because after doing updates, the object->recalc is cleared */
-	for (base = scene->base.first; base; base = base->next) {
+	for (base = sl->object_bases.first; base; base = base->next) {
 		if (base->object->recalc & OB_RECALC_OB)
-			base->flag |= BA_HAS_RECALC_OB;
+			base->flag_legacy |= BA_HAS_RECALC_OB;
 		if (base->object->recalc & OB_RECALC_DATA)
-			base->flag |= BA_HAS_RECALC_DATA;
+			base->flag_legacy |= BA_HAS_RECALC_DATA;
 	}
 }
 
@@ -5389,8 +5548,7 @@ static bool mark_children(Object *ob)
 static int count_proportional_objects(TransInfo *t)
 {
 	int total = 0;
-	Scene *scene = t->scene;
-	View3D *v3d = t->view;
+	SceneLayer *sl = t->sl;
 	Base *base;
 
 	/* rotations around local centers are allowed to propagate, so we take all objects */
@@ -5398,8 +5556,8 @@ static int count_proportional_objects(TransInfo *t)
 	      (t->mode == TFM_ROTATION || t->mode == TFM_TRACKBALL)))
 	{
 		/* mark all parents */
-		for (base = scene->base.first; base; base = base->next) {
-			if (TESTBASELIB_BGMODE(v3d, scene, base)) {
+		for (base = sl->object_bases.first; base; base = base->next) {
+			if (TESTBASELIB_BGMODE_NEW(base)) {
 				Object *parent = base->object->parent;
 	
 				/* flag all parents */
@@ -5411,22 +5569,24 @@ static int count_proportional_objects(TransInfo *t)
 		}
 
 		/* mark all children */
-		for (base = scene->base.first; base; base = base->next) {
+		for (base = sl->object_bases.first; base; base = base->next) {
 			/* all base not already selected or marked that is editable */
-			if ((base->object->flag & (SELECT | BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT)) == 0 &&
-			    (BASE_EDITABLE_BGMODE(v3d, scene, base)))
+			if ((base->object->flag & (BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT)) == 0 &&
+			    (base->flag & BASE_SELECTED) == 0 &&
+			    (BASE_EDITABLE_BGMODE_NEW(base)))
 			{
 				mark_children(base->object);
 			}
 		}
 	}
 	
-	for (base = scene->base.first; base; base = base->next) {
+	for (base = sl->object_bases.first; base; base = base->next) {
 		Object *ob = base->object;
 
 		/* if base is not selected, not a parent of selection or not a child of selection and it is editable */
-		if ((ob->flag & (SELECT | BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT)) == 0 &&
-		    (BASE_EDITABLE_BGMODE(v3d, scene, base)))
+		if ((ob->flag & (BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT)) == 0 &&
+		    (base->flag & BASE_SELECTED) == 0 &&
+		    (BASE_EDITABLE_BGMODE_NEW(base)))
 		{
 
 			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
@@ -5438,17 +5598,14 @@ static int count_proportional_objects(TransInfo *t)
 
 	/* all recalc flags get flushed to all layers, so a layer flip later on works fine */
 	DAG_scene_relations_update(G.main, t->scene);
-#ifdef WITH_LEGACY_DEPSGRAPH
-	DAG_scene_flush_update(G.main, t->scene, -1, 0);
-#endif
 
 	/* and we store them temporal in base (only used for transform code) */
 	/* this because after doing updates, the object->recalc is cleared */
-	for (base = scene->base.first; base; base = base->next) {
+	for (base = sl->object_bases.first; base; base = base->next) {
 		if (base->object->recalc & OB_RECALC_OB)
-			base->flag |= BA_HAS_RECALC_OB;
+			base->flag_legacy |= BA_HAS_RECALC_OB;
 		if (base->object->recalc & OB_RECALC_DATA)
-			base->flag |= BA_HAS_RECALC_DATA;
+			base->flag_legacy |= BA_HAS_RECALC_DATA;
 	}
 
 	return total;
@@ -5460,14 +5617,15 @@ void clear_trans_object_base_flags(TransInfo *t)
 static void clear_trans_object_base_flags(TransInfo *t)
 #endif
 {
-	Scene *sce = t->scene;
+	SceneLayer *sl = t->sl;
 	Base *base;
 
-	for (base = sce->base.first; base; base = base->next) {
-		if (base->flag & BA_WAS_SEL)
-			base->flag |= SELECT;
+	for (base = sl->object_bases.first; base; base = base->next) {
+		if (base->flag_legacy & BA_WAS_SEL) {
+			base->flag |= BASE_SELECTED;
+		}
 
-		base->flag &= ~(BA_WAS_SEL | BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA | BA_TEMP_TAG | BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT);
+		base->flag_legacy &= ~(BA_WAS_SEL | BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA | BA_TEMP_TAG | BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT);
 	}
 }
 
@@ -5475,7 +5633,7 @@ static void clear_trans_object_base_flags(TransInfo *t)
  *  tmode: should be a transform mode
  */
 // NOTE: context may not always be available, so must check before using it as it's a luxury for a few cases
-void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob, int tmode)
+void autokeyframe_ob_cb_func(bContext *C, Scene *scene, SceneLayer *sl, View3D *v3d, Object *ob, int tmode)
 {
 	ID *id = &ob->id;
 	FCurve *fcu;
@@ -5522,9 +5680,9 @@ void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob,
 			if (tmode == TFM_TRANSLATION) {
 				do_loc = true;
 			}
-			else if (tmode == TFM_ROTATION) {
+			else if (ELEM(tmode, TFM_ROTATION, TFM_TRACKBALL)) {
 				if (v3d->around == V3D_AROUND_ACTIVE) {
-					if (ob != OBACT)
+					if (ob != OBACT_NEW)
 						do_loc = true;
 				}
 				else if (v3d->around == V3D_AROUND_CURSOR)
@@ -5535,7 +5693,7 @@ void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob,
 			}
 			else if (tmode == TFM_RESIZE) {
 				if (v3d->around == V3D_AROUND_ACTIVE) {
-					if (ob != OBACT)
+					if (ob != OBACT_NEW)
 						do_loc = true;
 				}
 				else if (v3d->around == V3D_AROUND_CURSOR)
@@ -5667,7 +5825,7 @@ void autokeyframe_pose_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *o
 						else
 							do_loc = true;
 					}
-					else if (tmode == TFM_ROTATION) {
+					else if (ELEM(tmode, TFM_ROTATION, TFM_TRACKBALL)) {
 						if (ELEM(v3d->around, V3D_AROUND_CURSOR, V3D_AROUND_ACTIVE))
 							do_loc = true;
 							
@@ -6254,6 +6412,13 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 	else if (t->options & CTX_PAINT_CURVE) {
 		/* pass */
 	}
+	else if ((t->scene->basact) &&
+	         (ob = t->scene->basact->object) &&
+	         (ob->mode & OB_MODE_PARTICLE_EDIT) &&
+	         PE_get_current(t->scene, t->sl, ob))
+	{
+		/* do nothing */
+	}
 	else { /* Objects */
 		int i;
 
@@ -6261,6 +6426,8 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 		for (i = 0; i < t->total; i++) {
 			TransData *td = t->data + i;
+			ListBase pidlist;
+			PTCacheID *pid;
 			ob = td->ob;
 
 			if (td->flag & TD_NOACTION)
@@ -6268,6 +6435,18 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 			
 			if (td->flag & TD_SKIP)
 				continue;
+
+			/* flag object caches as outdated */
+			BKE_ptcache_ids_from_object(&pidlist, ob, t->scene, MAX_DUPLI_RECUR);
+			for (pid = pidlist.first; pid; pid = pid->next) {
+				if (pid->type != PTCACHE_TYPE_PARTICLES) /* particles don't need reset on geometry change */
+					pid->cache->flag |= PTCACHE_OUTDATED;
+			}
+			BLI_freelistN(&pidlist);
+
+			/* pointcache refresh */
+			if (BKE_ptcache_object_reset(t->scene, ob, PTCACHE_RESET_OUTDATED))
+				DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 			/* Needed for proper updating of "quick cached" dynamics. */
 			/* Creates troubles for moving animated objects without */
@@ -6277,7 +6456,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 			/* Set autokey if necessary */
 			if (!canceled) {
-				autokeyframe_ob_cb_func(C, t->scene, (View3D *)t->view, ob, t->mode);
+				autokeyframe_ob_cb_func(C, t->scene, t->sl, (View3D *)t->view, ob, t->mode);
 			}
 			
 			/* restore rigid body transform */
@@ -6370,7 +6549,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 	
 	if (is_prop_edit) {
 		View3D *v3d = t->view;
-		Base *base;
+		BaseLegacy *base;
 
 		for (base = scene->base.first; base; base = base->next) {
 			Object *ob = base->object;
@@ -7824,7 +8003,8 @@ static void createTransGPencil(bContext *C, TransInfo *t)
 void createTransData(bContext *C, TransInfo *t)
 {
 	Scene *scene = t->scene;
-	Object *ob = OBACT;
+	SceneLayer *sl = t->sl;
+	Object *ob = OBACT_NEW;
 
 	/* if tests must match recalcData for correct updates */
 	if (t->options & CTX_TEXTURE) {
@@ -7994,14 +8174,23 @@ void createTransData(bContext *C, TransInfo *t)
 		 * lines below just check is also visible */
 		Object *ob_armature = modifiers_isDeformedByArmature(ob);
 		if (ob_armature && ob_armature->mode & OB_MODE_POSE) {
-			Base *base_arm = BKE_scene_base_find(t->scene, ob_armature);
+			Base *base_arm = BKE_scene_layer_base_find(t->sl, ob_armature);
 			if (base_arm) {
-				View3D *v3d = t->view;
-				if (BASE_VISIBLE(v3d, base_arm)) {
+				if (BASE_VISIBLE_NEW(base_arm)) {
 					createTransPose(t, ob_armature);
 				}
 			}
 			
+		}
+	}
+	else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT) && PE_start_edit(PE_get_current(scene, sl, ob))) {
+		createTransParticleVerts(C, t);
+		t->flag |= T_POINTS;
+
+		if (t->data && t->flag & T_PROP_EDIT) {
+			sort_trans_data(t); // makes selected become first in array
+			set_prop_dist(t, 1);
+			sort_trans_data_dist(t);
 		}
 	}
 	else if (ob && (ob->mode & OB_MODE_ALL_PAINT)) {

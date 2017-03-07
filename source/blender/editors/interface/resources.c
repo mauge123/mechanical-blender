@@ -53,6 +53,8 @@
 
 #include "BIF_gl.h"
 
+#include "BLF_api.h"
+
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
 
@@ -1305,18 +1307,11 @@ void UI_ThemeColor4(int colorid)
 /* set the color with offset for shades */
 void UI_ThemeColorShade(int colorid, int offset)
 {
-	int r, g, b;
-	const unsigned char *cp;
-
-	cp = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
-	r = offset + (int) cp[0];
-	CLAMP(r, 0, 255);
-	g = offset + (int) cp[1];
-	CLAMP(g, 0, 255);
-	b = offset + (int) cp[2];
-	CLAMP(b, 0, 255);
-	glColor4ub(r, g, b, cp[3]);
+	unsigned char col[4];
+	UI_GetThemeColorShade4ubv(colorid, offset, col);
+	glColor4ubv(col);
 }
+
 void UI_ThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset)
 {
 	int r, g, b, a;
@@ -1333,6 +1328,27 @@ void UI_ThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset)
 	CLAMP(a, 0, 255);
 
 	glColor4ub(r, g, b, a);
+}
+
+void UI_GetThemeColorShadeAlpha4ubv(int colorid, int coloffset, int alphaoffset, unsigned char col[4])
+{
+	int r, g, b, a;
+	const unsigned char *cp;
+	
+	cp = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
+	r = coloffset + (int) cp[0];
+	CLAMP(r, 0, 255);
+	g = coloffset + (int) cp[1];
+	CLAMP(g, 0, 255);
+	b = coloffset + (int) cp[2];
+	CLAMP(b, 0, 255);
+	a = alphaoffset + (int) cp[3];
+	CLAMP(a, 0, 255);
+
+	col[0] = r;
+	col[1] = g;
+	col[2] = b;
+	col[3] = a;
 }
 
 void UI_GetThemeColorBlend3ubv(int colorid1, int colorid2, float fac, unsigned char col[3])
@@ -1400,6 +1416,12 @@ void UI_ThemeColorBlendShadeAlpha(int colorid1, int colorid2, float fac, int off
 	glColor4ub(r, g, b, a);
 }
 
+void UI_FontThemeColor(int fontid, int colorid)
+{
+	unsigned char color[4];
+	UI_GetThemeColor4ubv(colorid, color);
+	BLF_color4ubv(fontid, color);
+}
 
 /* get individual values, not scaled */
 float UI_GetThemeValuef(int colorid)
@@ -1496,6 +1518,42 @@ void UI_GetThemeColorShade3ubv(int colorid, int offset, unsigned char col[3])
 	col[0] = r;
 	col[1] = g;
 	col[2] = b;
+}
+
+void UI_GetThemeColorBlendShade3ubv(int colorid1, int colorid2, float fac, int offset, unsigned char col[3])
+{
+	const unsigned char *cp1, *cp2;
+
+	cp1 = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid1);
+	cp2 = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid2);
+
+	CLAMP(fac, 0.0f, 1.0f);
+	col[0] = offset + floorf((1.0f - fac) * cp1[0] + fac * cp2[0]);
+	col[1] = offset + floorf((1.0f - fac) * cp1[1] + fac * cp2[1]);
+	col[2] = offset + floorf((1.0f - fac) * cp1[2] + fac * cp2[2]);
+
+	CLAMP(col[0], 0, 255);
+	CLAMP(col[1], 0, 255);
+	CLAMP(col[2], 0, 255);
+}
+
+void UI_GetThemeColorShade4ubv(int colorid, int offset, unsigned char col[4])
+{
+	int r, g, b;
+	const unsigned char *cp;
+
+	cp = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
+	r = offset + (int) cp[0];
+	CLAMP(r, 0, 255);
+	g = offset + (int) cp[1];
+	CLAMP(g, 0, 255);
+	b = offset + (int) cp[2];
+	CLAMP(b, 0, 255);
+
+	col[0] = r;
+	col[1] = g;
+	col[2] = b;
+	col[3] = cp[3];
 }
 
 void UI_GetThemeColorShadeAlpha4fv(int colorid, int coloffset, int alphaoffset, float col[4])
@@ -2827,17 +2885,21 @@ void init_userdef_do_versions(void)
 		}
 	}
 
+	if (!USER_VERSION_ATLEAST(278, 3)) {
+		for (bTheme *btheme = U.themes.first; btheme; btheme = btheme->next) {
+			/* Keyframe Indicators (were using wrong alpha) */
+			btheme->tv3d.time_keyframe[3] = btheme->tv3d.time_gp_keyframe[3] = 255;
+			btheme->ttime.time_keyframe[3] = btheme->ttime.time_gp_keyframe[3] = 255;
+		}
+	}
+
 	/**
 	 * Include next version bump.
 	 *
 	 * (keep this block even if it becomes empty).
 	 */
 	{
-		for (bTheme *btheme = U.themes.first; btheme; btheme = btheme->next) {
-			/* Keyframe Indicators (were using wrong alpha) */
-			btheme->tv3d.time_keyframe[3] = btheme->tv3d.time_gp_keyframe[3] = 255;
-			btheme->ttime.time_keyframe[3] = btheme->ttime.time_gp_keyframe[3] = 255;
-		}
+		
 	}
 
 	if (U.pixelsize == 0.0f)

@@ -21,6 +21,7 @@ import bpy
 from bpy.types import Panel
 
 from bl_ui.properties_physics_common import (
+        point_cache_ui,
         effector_weights_ui,
         )
 
@@ -44,6 +45,10 @@ class PHYSICS_PT_smoke(PhysicButtonsPanel, Panel):
     def draw(self, context):
         layout = self.layout
 
+        if not bpy.app.build_options.mod_smoke:
+            layout.label("Built without Smoke modifier")
+            return
+
         md = context.smoke
         ob = context.object
 
@@ -53,6 +58,8 @@ class PHYSICS_PT_smoke(PhysicButtonsPanel, Panel):
             domain = md.domain_settings
 
             split = layout.split()
+
+            split.enabled = not domain.point_cache.is_baked
 
             col = split.column()
             col.label(text="Resolution:")
@@ -84,7 +91,14 @@ class PHYSICS_PT_smoke(PhysicButtonsPanel, Panel):
                 col = split.column()
                 col.label(text="Flow Source:")
                 col.prop(flow, "smoke_flow_source", expand=False, text="")
-                if flow.smoke_flow_source == 'MESH':
+                if flow.smoke_flow_source == 'PARTICLES':
+                    col.label(text="Particle System:")
+                    col.prop_search(flow, "particle_system", ob, "particle_systems", text="")
+                    col.prop(flow, "use_particle_size", text="Set Size")
+                    sub = col.column()
+                    sub.active = flow.use_particle_size
+                    sub.prop(flow, "particle_size")
+                else:
                     col.prop(flow, "surface_distance")
                     col.prop(flow, "volume_density")
 
@@ -169,6 +183,7 @@ class PHYSICS_PT_smoke_fire(PhysicButtonsPanel, Panel):
         domain = context.smoke.domain_settings
 
         split = layout.split()
+        split.enabled = not domain.point_cache.is_baked
 
         col = split.column(align=True)
         col.label(text="Reaction:")
@@ -205,6 +220,7 @@ class PHYSICS_PT_smoke_adaptive_domain(PhysicButtonsPanel, Panel):
         layout.active = domain.use_adaptive_domain
 
         split = layout.split()
+        split.enabled = (not domain.point_cache.is_baked)
 
         col = split.column(align=True)
         col.label(text="Resolution:")
@@ -240,6 +256,7 @@ class PHYSICS_PT_smoke_highres(PhysicButtonsPanel, Panel):
         layout.active = md.use_high_resolution
 
         split = layout.split()
+        split.enabled = not md.point_cache.is_baked
 
         col = split.column()
         col.label(text="Resolution:")
@@ -303,7 +320,10 @@ class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):
 
         layout.prop(domain, "cache_file_format")
 
-        if cache_file_format == 'OPENVDB':
+        if cache_file_format == 'POINTCACHE':
+            layout.label(text="Compression:")
+            layout.prop(domain, "point_cache_compress_type", expand=True)
+        elif cache_file_format == 'OPENVDB':
             if not bpy.app.build_options.openvdb:
                 layout.label("Built without OpenVDB support")
                 return
@@ -313,6 +333,9 @@ class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):
             row = layout.row()
             row.label("Data Depth:")
             row.prop(domain, "data_depth", expand=True, text="Data Depth")
+
+        cache = domain.point_cache
+        point_cache_ui(self, context, cache, (cache.is_baked is False), 'SMOKE')
 
 
 class PHYSICS_PT_smoke_field_weights(PhysicButtonsPanel, Panel):
@@ -377,6 +400,14 @@ class PHYSICS_PT_smoke_display_settings(PhysicButtonsPanel, Panel):
         col.enabled = domain.draw_velocity
         col.prop(domain, "vector_draw_type")
         col.prop(domain, "vector_scale")
+
+        layout.separator()
+        layout.label(text="Color Mapping:")
+        layout.prop(domain, "use_color_ramp")
+        col = layout.column();
+        col.enabled = domain.use_color_ramp
+        col.prop(domain, "coba_field")
+        col.template_color_ramp(domain, "color_ramp", expand=True)
 
 
 if __name__ == "__main__":  # only for live edit.

@@ -159,6 +159,8 @@ static void buttons_main_region_draw(const bContext *C, ARegion *ar)
 		ED_region_panels(C, ar, "material", sbuts->mainb, vertical);
 	else if (sbuts->mainb == BCONTEXT_TEXTURE)
 		ED_region_panels(C, ar, "texture", sbuts->mainb, vertical);
+	else if (sbuts->mainb == BCONTEXT_PARTICLE)
+		ED_region_panels(C, ar, "particle", sbuts->mainb, vertical);
 	else if (sbuts->mainb == BCONTEXT_PHYSICS)
 		ED_region_panels(C, ar, "physics", sbuts->mainb, vertical);
 	else if (sbuts->mainb == BCONTEXT_BONE)
@@ -169,6 +171,8 @@ static void buttons_main_region_draw(const bContext *C, ARegion *ar)
 		ED_region_panels(C, ar, "constraint", sbuts->mainb, vertical);
 	else if (sbuts->mainb == BCONTEXT_BONE_CONSTRAINT)
 		ED_region_panels(C, ar, "bone_constraint", sbuts->mainb, vertical);
+	else if (sbuts->mainb == BCONTEXT_COLLECTION)
+		ED_region_panels(C, ar, "collection", sbuts->mainb, vertical);
 
 	sbuts->re_align = 0;
 	sbuts->mainbo = sbuts->mainb;
@@ -278,6 +282,11 @@ static void buttons_area_listener(bScreen *UNUSED(sc), ScrArea *sa, wmNotifier *
 				case ND_CONSTRAINT:
 					buttons_area_redraw(sa, BCONTEXT_CONSTRAINT);
 					buttons_area_redraw(sa, BCONTEXT_BONE_CONSTRAINT);
+					break;
+				case ND_PARTICLE:
+					if (wmn->action == NA_EDITED)
+						buttons_area_redraw(sa, BCONTEXT_PARTICLE);
+					sbuts->preview = 1;
 					break;
 				case ND_DRAW:
 					buttons_area_redraw(sa, BCONTEXT_OBJECT);

@@ -41,8 +41,8 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_listbase.h"
-#include "BLI_path_util.h"
 #include "BLI_math.h"
+#include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 #include "BLI_memarena.h"
 
@@ -1080,7 +1080,7 @@ static void polygonize(PROCESS *process)
 static void init_meta(EvaluationContext *eval_ctx, PROCESS *process, Scene *scene, Object *ob)
 {
 	Scene *sce_iter = scene;
-	Base *base;
+	BaseLegacy *base;
 	Object *bob;
 	MetaBall *mb;
 	const MetaElem *ml;
@@ -1102,7 +1102,7 @@ static void init_meta(EvaluationContext *eval_ctx, PROCESS *process, Scene *scen
 			zero_size = 0;
 			ml = NULL;
 
-			if (bob == ob && (base->flag & OB_FROMDUPLI) == 0) {
+			if (bob == ob && (base->flag_legacy & OB_FROMDUPLI) == 0) {
 				mb = ob->data;
 
 				if (mb->editelems) ml = mb->editelems->first;

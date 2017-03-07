@@ -136,6 +136,7 @@ bool nla_panel_context(const bContext *C, PointerRNA *adt_ptr, PointerRNA *nlt_p
 			case ANIMTYPE_DSSKEY:
 			case ANIMTYPE_DSWOR:
 			case ANIMTYPE_DSNTREE:
+			case ANIMTYPE_DSPART:
 			case ANIMTYPE_DSMBALL:
 			case ANIMTYPE_DSARM:
 			case ANIMTYPE_DSMESH:
@@ -501,51 +502,57 @@ static void nla_panel_modifiers(const bContext *C, Panel *pa)
 void nla_buttons_register(ARegionType *art)
 {
 	PanelType *pt;
-	
+
 	pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel animdata");
 	strcpy(pt->idname, "NLA_PT_animdata");
 	strcpy(pt->label, N_("Animation Data"));
+	strcpy(pt->category, "Animations");
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = nla_panel_animdata;
 	pt->poll = nla_animdata_panel_poll;
 	pt->flag = PNL_DEFAULT_CLOSED;
 	BLI_addtail(&art->paneltypes, pt);
-	
+
 	pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel track");
 	strcpy(pt->idname, "NLA_PT_track");
 	strcpy(pt->label, N_("Active Track"));
+	strcpy(pt->category, "Animations");
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = nla_panel_track;
 	pt->poll = nla_track_panel_poll;
 	BLI_addtail(&art->paneltypes, pt);
-	
+
 	pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel properties");
 	strcpy(pt->idname, "NLA_PT_properties");
 	strcpy(pt->label, N_("Active Strip"));
+	strcpy(pt->category, "Animations");
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = nla_panel_properties;
 	pt->poll = nla_strip_panel_poll;
 	BLI_addtail(&art->paneltypes, pt);
-	
+
 	pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel properties");
 	strcpy(pt->idname, "NLA_PT_actionclip");
 	strcpy(pt->label, N_("Action Clip"));
+	strcpy(pt->category, "Animations");
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = nla_panel_actclip;
 	pt->poll = nla_strip_actclip_panel_poll;
 	BLI_addtail(&art->paneltypes, pt);
-	
+
 	pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel evaluation");
 	strcpy(pt->idname, "NLA_PT_evaluation");
 	strcpy(pt->label, N_("Evaluation"));
+	strcpy(pt->category, "Animations");
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = nla_panel_evaluation;
 	pt->poll = nla_strip_eval_panel_poll;
 	BLI_addtail(&art->paneltypes, pt);
-	
+
 	pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel modifiers");
 	strcpy(pt->idname, "NLA_PT_modifiers");
 	strcpy(pt->label, N_("Modifiers"));
+  strcpy(pt->category, "Modifiers");
 	strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
 	pt->draw = nla_panel_modifiers;
 	pt->poll = nla_strip_eval_panel_poll;

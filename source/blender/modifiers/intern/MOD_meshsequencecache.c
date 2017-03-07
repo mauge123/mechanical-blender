@@ -65,6 +65,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 
 	if (tmcmd->cache_file) {
 		id_us_plus(&tmcmd->cache_file->id);
+		tmcmd->reader = NULL;
 	}
 }
 
@@ -74,6 +75,13 @@ static void freeData(ModifierData *md)
 
 	if (mcmd->cache_file) {
 		id_us_min(&mcmd->cache_file->id);
+	}
+
+	if (mcmd->reader) {
+#ifdef WITH_ALEMBIC
+		CacheReader_free(mcmd->reader);
+#endif
+		mcmd->reader = NULL;
 	}
 }
 
@@ -102,10 +110,20 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	BKE_cachefile_ensure_handle(G.main, cache_file);
 
-	DerivedMesh *result = ABC_read_mesh(cache_file->handle,
+	if (!mcmd->reader) {
+		mcmd->reader = CacheReader_open_alembic_object(cache_file->handle,
+		                                               mcmd->reader,
+		                                               ob,
+		                                               mcmd->object_path);
+		if (!mcmd->reader) {
+			modifier_setError(md, "Could not create Alembic reader for file %s", cache_file->filepath);
+			return dm;
+		}
+	}
+
+	DerivedMesh *result = ABC_read_mesh(mcmd->reader,
 	                                    ob,
 	                                    dm,
-	                                    mcmd->object_path,
 	                                    time,
 	                                    &err_str,
 	                                    mcmd->read_flag);
@@ -133,26 +151,9 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 {
 	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
 
-	walk(userData, ob, (ID **)&mcmd->cache_file, IDWALK_USER);
+	walk(userData, ob, (ID **)&mcmd->cache_file, IDWALK_CB_USER);
 }
 
-
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Main *bmain,
-                           struct Scene *scene,
-                           Object *ob, DagNode *obNode)
-{
-	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
-
-	if (mcmd->cache_file != NULL) {
-		DagNode *curNode = dag_get_node(forest, mcmd->cache_file);
-
-		dag_add_relation(forest, curNode, obNode,
-		                 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Cache File Modifier");
-	}
-
-	UNUSED_VARS(bmain, scene, ob);
-}
 
 static void updateDepsgraph(ModifierData *md,
                             struct Main *bmain,
@@ -187,7 +188,6 @@ ModifierTypeInfo modifierType_MeshSequenceCache = {
     /* requiredDataMask */  NULL,
     /* freeData */          freeData,
     /* isDisabled */        isDisabled,
-    /* updateDepgraph */    updateDepgraph,
     /* updateDepsgraph */   updateDepsgraph,
     /* dependsOnTime */     dependsOnTime,
     /* dependsOnNormals */  NULL,

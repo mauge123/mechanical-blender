@@ -19,7 +19,7 @@ This is a typical Python environment so tutorials on how to write Python scripts
 will work running the scripts in Blender too.
 Blender provides the :mod:`bpy` module to the Python interpreter.
 This module can be imported in a script and gives access to Blender data, classes, and functions.
-Scripts that deal with Blender data will need to import this module. 
+Scripts that deal with Blender data will need to import this module.
 
 Here is a simple example of moving a vertex of the object named **Cube**:
 
@@ -43,8 +43,7 @@ scene manipulation, automation, defining your own toolset and customization.
 
 On startup Blender scans the ``scripts/startup/`` directory for Python modules and imports them.
 The exact location of this directory depends on your installation.
-`See the directory layout docs
-<https://www.blender.org/manual/getting_started/installing_blender/directorylayout.html>`__
+See the :ref:`directory layout docs <blender_manual:getting-started_installing-config-directories>`.
 
 
 Script Loading
@@ -81,7 +80,7 @@ To run as modules:
 
 
 Add-ons
-------
+-------
 
 Some of Blenders functionality is best kept optional,
 alongside scripts loaded at startup we have add-ons which are kept in their own directory ``scripts/addons``,
@@ -92,7 +91,7 @@ variable which Blender uses to read metadata such as name, author, category and 
 
 The User Preferences add-on listing uses **bl_info** to display information about each add-on.
 
-`See Add-ons <http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Guidelines/Addons>`__
+`See Add-ons <https://wiki.blender.org/index.php/Dev:Py/Scripts/Guidelines/Addons>`__
 for details on the ``bl_info`` dictionary.
 
 
@@ -214,7 +213,7 @@ A simple Blender/Python module can look like this:
        bpy.utils.register_class(SimpleOperator)
 
    def unregister():
-       bpy.utils.unregister_class(SimpleOperator)    
+       bpy.utils.unregister_class(SimpleOperator)
 
    if __name__ == "__main__":
        register()
@@ -328,7 +327,7 @@ Say you want to store material settings for a custom engine.
 .. note::
 
    *The class must be registered before being used in a property, failing to do so will raise an error:*
-   
+
    ``ValueError: bpy_struct "Material" registration error: my_custom_props could not register``
 
 
@@ -430,4 +429,3 @@ Calling these operators:
    >>> bpy.ops.object.operator_2()
    Hello World OBJECT_OT_operator_2
    {'FINISHED'}
-

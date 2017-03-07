@@ -47,6 +47,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
 #include "BKE_sound.h"
@@ -836,8 +837,9 @@ void CTX_wm_window_set(bContext *C, wmWindow *win)
 void CTX_wm_screen_set(bContext *C, bScreen *screen)
 {
 	C->wm.screen = screen;
-	if (C->wm.screen)
-		C->data.scene = C->wm.screen->scene;
+	if (C->wm.screen) {
+		CTX_data_scene_set(C, C->wm.screen->scene);
+	}
 	C->wm.area = NULL;
 	C->wm.region = NULL;
 }
@@ -896,6 +898,59 @@ Scene *CTX_data_scene(const bContext *C)
 		return C->data.scene;
 }
 
+SceneLayer *CTX_data_scene_layer(const bContext *C)
+{
+	SceneLayer *sl;
+
+	if (ctx_data_pointer_verify(C, "render_layer", (void *)&sl)) {
+		return sl;
+	}
+	else {
+		return BKE_scene_layer_context_active(CTX_data_scene(C));
+	}
+}
+
+/**
+ * This is tricky. Sometimes the user overrides the render_layer
+ * but not the scene_collection. In this case what to do?
+ *
+ * If the scene_collection is linked to the SceneLayer we use it.
+ * Otherwise we fallback to the active one of the SceneLayer.
+ */
+LayerCollection *CTX_data_layer_collection(const bContext *C)
+{
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	LayerCollection *lc;
+
+	if (ctx_data_pointer_verify(C, "layer_collection", (void *)&lc)) {
+		if (BKE_scene_layer_has_collection(sl, lc->scene_collection)) {
+			return lc;
+		}
+	}
+
+	/* fallback */
+	return BKE_layer_collection_active(sl);
+}
+
+SceneCollection *CTX_data_scene_collection(const bContext *C)
+{
+	SceneCollection *sc;
+	if (ctx_data_pointer_verify(C, "scene_collection", (void *)&sc)) {
+		if (BKE_scene_layer_has_collection(CTX_data_scene_layer(C), sc)) {
+			return sc;
+		}
+	}
+
+	LayerCollection *lc = CTX_data_layer_collection(C);
+	if (lc) {
+		return lc->scene_collection;
+	}
+
+	/* fallback */
+	Scene *scene = CTX_data_scene(C);
+	return BKE_collection_master(scene);
+}
+
 int CTX_data_mode_enum(const bContext *C)
 {
 	Object *obedit = CTX_data_edit_object(C);
@@ -927,6 +982,7 @@ int CTX_data_mode_enum(const bContext *C)
 			else if (ob->mode & OB_MODE_WEIGHT_PAINT) return CTX_MODE_PAINT_WEIGHT;
 			else if (ob->mode & OB_MODE_VERTEX_PAINT) return CTX_MODE_PAINT_VERTEX;
 			else if (ob->mode & OB_MODE_TEXTURE_PAINT) return CTX_MODE_PAINT_TEXTURE;
+			else if (ob->mode & OB_MODE_PARTICLE_EDIT) return CTX_MODE_PARTICLE;
 		}
 	}
 
@@ -949,6 +1005,7 @@ static const char *data_mode_strings[] = {
 	"weightpaint",
 	"vertexpaint",
 	"imagepaint",
+	"particlemode",
 	"objectmode",
 	NULL
 };

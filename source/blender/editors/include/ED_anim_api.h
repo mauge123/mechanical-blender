@@ -82,6 +82,7 @@ typedef struct bAnimContext {
 	struct bDopeSheet *ads; /* dopesheet data for editor (or which is being used) */
 	
 	struct Scene *scene;    /* active scene */
+	struct SceneLayer *scene_layer; /* active scene layer */
 	struct Object *obact;   /* active object */
 	ListBase *markers;      /* active set of markers */
 	
@@ -161,6 +162,7 @@ typedef enum eAnim_ChannelType {
 	ANIMTYPE_DSSKEY,
 	ANIMTYPE_DSWOR,
 	ANIMTYPE_DSNTREE,
+	ANIMTYPE_DSPART,
 	ANIMTYPE_DSMBALL,
 	ANIMTYPE_DSARM,
 	ANIMTYPE_DSMESH,
@@ -278,6 +280,7 @@ typedef enum eAnimFilter_Flags {
 #define FILTER_CAM_OBJD(ca)     (CHECK_TYPE_INLINE(ca, Camera *), ((ca->flag & CAM_DS_EXPAND)))
 #define FILTER_CACHEFILE_OBJD(cf)     (CHECK_TYPE_INLINE(cf, CacheFile *), ((cf->flag & CACHEFILE_DS_EXPAND)))
 #define FILTER_CUR_OBJD(cu)     (CHECK_TYPE_INLINE(cu, Curve *), ((cu->flag & CU_DS_EXPAND)))
+#define FILTER_PART_OBJD(part)  (CHECK_TYPE_INLINE(part, ParticleSettings *), ((part->flag & PART_DS_EXPAND)))
 #define FILTER_MBALL_OBJD(mb)   (CHECK_TYPE_INLINE(mb, MetaBall *), ((mb->flag2 & MB_DS_EXPAND)))
 #define FILTER_ARM_OBJD(arm)    (CHECK_TYPE_INLINE(arm, bArmature *), ((arm->flag & ARM_DS_EXPAND)))
 #define FILTER_MESH_OBJD(me)    (CHECK_TYPE_INLINE(me, Mesh *), ((me->flag & ME_DS_EXPAND)))

@@ -61,7 +61,7 @@ ccl_device void BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 	ss_isect->num_hits = 0;
 
 	const int object_flag = kernel_tex_fetch(__object_flag, subsurface_object);
-	if(!(object_flag & SD_TRANSFORM_APPLIED)) {
+	if(!(object_flag & SD_OBJECT_TRANSFORM_APPLIED)) {
 #if BVH_FEATURE(BVH_MOTION)
 		Transform ob_itfm;
 		bvh_instance_motion_push(kg,
@@ -101,10 +101,9 @@ ccl_device void BVH_FUNCTION_FULL_NAME(QBVH)(KernelGlobals *kg,
 	/* Offsets to select the side that becomes the lower or upper bound. */
 	int near_x, near_y, near_z;
 	int far_x, far_y, far_z;
-
-	if(idir.x >= 0.0f) { near_x = 0; far_x = 1; } else { near_x = 1; far_x = 0; }
-	if(idir.y >= 0.0f) { near_y = 2; far_y = 3; } else { near_y = 3; far_y = 2; }
-	if(idir.z >= 0.0f) { near_z = 4; far_z = 5; } else { near_z = 5; far_z = 4; }
+	qbvh_near_far_idx_calc(idir,
+	                       &near_x, &near_y, &near_z,
+	                       &far_x, &far_y, &far_z);
 
 	IsectPrecalc isect_precalc;
 	triangle_intersect_precalc(dir, &isect_precalc);

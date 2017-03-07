@@ -1,6 +1,3 @@
-#ifndef _GPU_MATRIX_H_
-#define _GPU_MATRIX_H_
-
 /*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -32,8 +29,11 @@
  *  \ingroup gpu
  */
 
+#ifndef _GPU_MATRIX_H_
+#define _GPU_MATRIX_H_
+
+#include "BLI_sys_types.h"
 #include "GPU_glew.h"
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,6 +84,7 @@ void gpuTranslate3f(float x, float y, float z);
 void gpuTranslate3fv(const float vec[3]);
 void gpuScale3f(float x, float y, float z);
 void gpuScale3fv(const float vec[3]);
+void gpuRotate3f(float deg, float x, float y, float z); /* axis of rotation should be a unit vector */
 void gpuRotate3fv(float deg, const float axis[3]); /* axis of rotation should be a unit vector */
 void gpuRotateAxis(float deg, char axis); /* TODO: enum for axis? */
 
@@ -109,12 +110,10 @@ void gpuOrtho(float left, float right, float bottom, float top, float near, floa
 void gpuFrustum(float left, float right, float bottom, float top, float near, float far);
 void gpuPerspective(float fovy, float aspect, float near, float far);
 
-/* pass vector through current transform (world --> screen) */
-void gpuProject(const float obj[3], const float model[4][4], const float proj[4][4], const GLint view[4], float win[3]);
+/* 3D Projection between Window and World Space */
 
-/* pass vector through inverse transform (world <-- screen) */
-bool gpuUnProject(const float win[3], const float model[4][4], const float proj[4][4], const GLint view[4], float obj[3]);
-
+void gpuProject(const float world[3], const float model[4][4], const float proj[4][4], const int view[4], float win[3]);
+bool gpuUnProject(const float win[3], const float model[4][4], const float proj[4][4], const int view[4], float world[3]);
 
 /* 2D Projection Matrix */
 
@@ -133,6 +132,9 @@ const float *gpuGetNormalMatrixInverse(float m[3][3]);
 #if SUPPORT_LEGACY_MATRIX
 /* copy top matrix from each legacy stack into new fresh stack */
 void gpuMatrixBegin3D_legacy(void);
+
+/* call after using glScale, glTranslate, etc. between draw calls */
+void gpuMatrixUpdate_legacy(void);
 #endif
 
 

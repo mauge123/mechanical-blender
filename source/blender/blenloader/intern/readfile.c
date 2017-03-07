@@ -72,6 +72,7 @@
 #include "DNA_ipo_types.h"
 #include "DNA_key_types.h"
 #include "DNA_lattice_types.h"
+#include "DNA_layer_types.h"
 #include "DNA_lamp_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_meta_types.h"
@@ -81,9 +82,9 @@
 #include "DNA_nla_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_fluidsim.h" // NT
-#include "DNA_object_force.h"
 #include "DNA_object_types.h"
 #include "DNA_packedFile_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_property_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_text_types.h"
@@ -125,6 +126,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_global.h" // for G
 #include "BKE_group.h"
+#include "BKE_layer.h"
 #include "BKE_library.h" // for which_libbase
 #include "BKE_library_idmap.h"
 #include "BKE_library_query.h"
@@ -137,6 +139,8 @@
 #include "BKE_node.h" // for tree type defines
 #include "BKE_object.h"
 #include "BKE_paint.h"
+#include "BKE_particle.h"
+#include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_sca.h" // for init_actuator
 #include "BKE_scene.h"
@@ -529,6 +533,8 @@ void blo_split_main(ListBase *mainlist, Main *main)
 	for (Library *lib = main->library.first; lib; lib = lib->id.next, i++) {
 		Main *libmain = BKE_main_new();
 		libmain->curlib = lib;
+		libmain->versionfile = lib->versionfile;
+		libmain->subversionfile = lib->subversionfile;
 		BLI_addtail(mainlist, libmain);
 		lib->temp_index = i;
 		lib_main_array[i] = libmain;
@@ -559,6 +565,10 @@ static void read_file_version(FileData *fd, Main *main)
 			else if (bhead->code == ENDB)
 				break;
 		}
+	}
+	if (main->curlib) {
+		main->curlib->versionfile = main->versionfile;
+		main->curlib->subversionfile = main->subversionfile;
 	}
 }
 
@@ -2145,6 +2155,7 @@ static PreviewImage *direct_link_preview_image(FileData *fd, PreviewImage *old_p
 			prv->gputexture[i] = NULL;
 		}
 		prv->icon_id = 0;
+		prv->tag = 0;
 	}
 	
 	return prv;
@@ -3235,6 +3246,11 @@ static void direct_link_constraints(FileData *fd, ListBase *lb)
 					con->flag |= CONSTRAINT_SPACEONCE;
 				break;
 			}
+			case CONSTRAINT_TYPE_TRANSFORM_CACHE:
+			{
+				bTransformCacheConstraint *data = con->data;
+				data->reader = NULL;
+			}
 		}
 	}
 }
@@ -3953,6 +3969,7 @@ static void lib_link_material(FileData *fd, Main *main)
 static void direct_link_material(FileData *fd, Material *ma)
 {
 	int a;
+	MaterialEngineSettings *mes;
 	
 	ma->adt = newdataadr(fd, ma->adt);
 	direct_link_animdata(fd, ma->adt);
@@ -3973,9 +3990,91 @@ static void direct_link_material(FileData *fd, Material *ma)
 	
 	ma->preview = direct_link_preview_image(fd, ma->preview);
 	BLI_listbase_clear(&ma->gpumaterial);
+
+	link_list(fd, &ma->engines_settings);
+	for (mes = ma->engines_settings.first; mes; mes = mes->next) {
+		mes->data = newdataadr(fd, mes->data);
+	}
 }
 
 /* ************ READ PARTICLE SETTINGS ***************** */
+/* update this also to writefile.c */
+static const char *ptcache_data_struct[] = {
+	"", // BPHYS_DATA_INDEX
+	"", // BPHYS_DATA_LOCATION
+	"", // BPHYS_DATA_VELOCITY
+	"", // BPHYS_DATA_ROTATION
+	"", // BPHYS_DATA_AVELOCITY / BPHYS_DATA_XCONST */
+	"", // BPHYS_DATA_SIZE:
+	"", // BPHYS_DATA_TIMES:
+	"BoidData" // case BPHYS_DATA_BOIDS:
+};
+
+static void direct_link_pointcache_cb(FileData *fd, void *data)
+{
+	PTCacheMem *pm = data;
+	PTCacheExtra *extra;
+	int i;
+	for (i = 0; i < BPHYS_TOT_DATA; i++) {
+		pm->data[i] = newdataadr(fd, pm->data[i]);
+
+		/* the cache saves non-struct data without DNA */
+		if (pm->data[i] && ptcache_data_struct[i][0]=='\0' && (fd->flags & FD_FLAGS_SWITCH_ENDIAN)) {
+			int tot = (BKE_ptcache_data_size(i) * pm->totpoint) / sizeof(int);  /* data_size returns bytes */
+			int *poin = pm->data[i];
+
+			BLI_endian_switch_int32_array(poin, tot);
+		}
+	}
+
+	link_list(fd, &pm->extradata);
+
+	for (extra=pm->extradata.first; extra; extra=extra->next)
+		extra->data = newdataadr(fd, extra->data);
+}
+
+static void direct_link_pointcache(FileData *fd, PointCache *cache)
+{
+	if ((cache->flag & PTCACHE_DISK_CACHE)==0) {
+		link_list_ex(fd, &cache->mem_cache, direct_link_pointcache_cb);
+	}
+	else
+		BLI_listbase_clear(&cache->mem_cache);
+	
+	cache->flag &= ~PTCACHE_SIMULATION_VALID;
+	cache->simframe = 0;
+	cache->edit = NULL;
+	cache->free_edit = NULL;
+	cache->cached_frames = NULL;
+}
+
+static void direct_link_pointcache_list(FileData *fd, ListBase *ptcaches, PointCache **ocache, int force_disk)
+{
+	if (ptcaches->first) {
+		PointCache *cache= NULL;
+		link_list(fd, ptcaches);
+		for (cache=ptcaches->first; cache; cache=cache->next) {
+			direct_link_pointcache(fd, cache);
+			if (force_disk) {
+				cache->flag |= PTCACHE_DISK_CACHE;
+				cache->step = 1;
+			}
+		}
+		
+		*ocache = newdataadr(fd, *ocache);
+	}
+	else if (*ocache) {
+		/* old "single" caches need to be linked too */
+		*ocache = newdataadr(fd, *ocache);
+		direct_link_pointcache(fd, *ocache);
+		if (force_disk) {
+			(*ocache)->flag |= PTCACHE_DISK_CACHE;
+			(*ocache)->step = 1;
+		}
+		
+		ptcaches->first = ptcaches->last = *ocache;
+	}
+}
 
 static void lib_link_partdeflect(FileData *fd, ID *id, PartDeflect *pd)
 {
@@ -3985,9 +4084,277 @@ static void lib_link_partdeflect(FileData *fd, ID *id, PartDeflect *pd)
 		pd->f_source = newlibadr(fd, id->lib, pd->f_source);
 }
 
+static void lib_link_particlesettings(FileData *fd, Main *main)
+{
+	ParticleSettings *part;
+	ParticleDupliWeight *dw;
+	MTex *mtex;
+	int a;
+	
+	for (part = main->particle.first; part; part = part->id.next) {
+		if (part->id.tag & LIB_TAG_NEED_LINK) {
+			lib_link_animdata(fd, &part->id, part->adt);
+			part->ipo = newlibadr_us(fd, part->id.lib, part->ipo); // XXX deprecated - old animation system
+			
+			part->dup_ob = newlibadr(fd, part->id.lib, part->dup_ob);
+			part->dup_group = newlibadr(fd, part->id.lib, part->dup_group);
+			part->eff_group = newlibadr(fd, part->id.lib, part->eff_group);
+			part->bb_ob = newlibadr(fd, part->id.lib, part->bb_ob);
+			part->collision_group = newlibadr(fd, part->id.lib, part->collision_group);
+			
+			lib_link_partdeflect(fd, &part->id, part->pd);
+			lib_link_partdeflect(fd, &part->id, part->pd2);
+			
+			if (part->effector_weights) {
+				part->effector_weights->group = newlibadr(fd, part->id.lib, part->effector_weights->group);
+			}
+			else {
+				part->effector_weights = BKE_add_effector_weights(part->eff_group);
+			}
+
+			if (part->dupliweights.first && part->dup_group) {
+				int index_ok = 0;
+				/* check for old files without indices (all indexes 0) */
+				if (BLI_listbase_is_single(&part->dupliweights)) {
+					/* special case for only one object in the group */
+					index_ok = 1;
+				}
+				else {
+					for (dw = part->dupliweights.first; dw; dw = dw->next) {
+						if (dw->index > 0) {
+							index_ok = 1;
+							break;
+						}
+					}
+				}
+
+				if (index_ok) {
+					/* if we have indexes, let's use them */
+					for (dw = part->dupliweights.first; dw; dw = dw->next) {
+						/* Do not try to restore pointer here, we have to search for group objects in another
+						 * separated step.
+						 * Reason is, the used group may be linked from another library, which has not yet
+						 * been 'lib_linked'.
+						 * Since dw->ob is not considered as an object user (it does not make objet directly linked),
+						 * we may have no valid way to retrieve it yet.
+						 * See T49273. */
+						dw->ob = NULL;
+					}
+				}
+				else {
+					/* otherwise try to get objects from own library (won't work on library linked groups) */
+					for (dw = part->dupliweights.first; dw; dw = dw->next) {
+						dw->ob = newlibadr(fd, part->id.lib, dw->ob);
+					}
+				}
+			}
+			else {
+				BLI_listbase_clear(&part->dupliweights);
+			}
+			
+			if (part->boids) {
+				BoidState *state = part->boids->states.first;
+				BoidRule *rule;
+				for (; state; state=state->next) {
+					rule = state->rules.first;
+					for (; rule; rule=rule->next) {
+						switch (rule->type) {
+							case eBoidRuleType_Goal:
+							case eBoidRuleType_Avoid:
+							{
+								BoidRuleGoalAvoid *brga = (BoidRuleGoalAvoid*)rule;
+								brga->ob = newlibadr(fd, part->id.lib, brga->ob);
+								break;
+							}
+							case eBoidRuleType_FollowLeader:
+							{
+								BoidRuleFollowLeader *brfl = (BoidRuleFollowLeader*)rule;
+								brfl->ob = newlibadr(fd, part->id.lib, brfl->ob);
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			for (a = 0; a < MAX_MTEX; a++) {
+				mtex= part->mtex[a];
+				if (mtex) {
+					mtex->tex = newlibadr_us(fd, part->id.lib, mtex->tex);
+					mtex->object = newlibadr(fd, part->id.lib, mtex->object);
+				}
+			}
+			
+			part->id.tag &= ~LIB_TAG_NEED_LINK;
+		}
+	}
+}
+
 static void direct_link_partdeflect(PartDeflect *pd)
 {
 	if (pd) pd->rng = NULL;
+}
+
+static void direct_link_particlesettings(FileData *fd, ParticleSettings *part)
+{
+	int a;
+	
+	part->adt = newdataadr(fd, part->adt);
+	part->pd = newdataadr(fd, part->pd);
+	part->pd2 = newdataadr(fd, part->pd2);
+
+	direct_link_animdata(fd, part->adt);
+	direct_link_partdeflect(part->pd);
+	direct_link_partdeflect(part->pd2);
+
+	part->clumpcurve = newdataadr(fd, part->clumpcurve);
+	if (part->clumpcurve)
+		direct_link_curvemapping(fd, part->clumpcurve);
+	part->roughcurve = newdataadr(fd, part->roughcurve);
+	if (part->roughcurve)
+		direct_link_curvemapping(fd, part->roughcurve);
+
+	part->effector_weights = newdataadr(fd, part->effector_weights);
+	if (!part->effector_weights)
+		part->effector_weights = BKE_add_effector_weights(part->eff_group);
+
+	link_list(fd, &part->dupliweights);
+
+	part->boids = newdataadr(fd, part->boids);
+	part->fluid = newdataadr(fd, part->fluid);
+
+	if (part->boids) {
+		BoidState *state;
+		link_list(fd, &part->boids->states);
+		
+		for (state=part->boids->states.first; state; state=state->next) {
+			link_list(fd, &state->rules);
+			link_list(fd, &state->conditions);
+			link_list(fd, &state->actions);
+		}
+	}
+	for (a = 0; a < MAX_MTEX; a++) {
+		part->mtex[a] = newdataadr(fd, part->mtex[a]);
+	}
+}
+
+static void lib_link_particlesystems(FileData *fd, Object *ob, ID *id, ListBase *particles)
+{
+	ParticleSystem *psys, *psysnext;
+
+	for (psys=particles->first; psys; psys=psysnext) {
+		psysnext = psys->next;
+		
+		psys->part = newlibadr_us(fd, id->lib, psys->part);
+		if (psys->part) {
+			ParticleTarget *pt = psys->targets.first;
+			
+			for (; pt; pt=pt->next)
+				pt->ob=newlibadr(fd, id->lib, pt->ob);
+			
+			psys->parent = newlibadr(fd, id->lib, psys->parent);
+			psys->target_ob = newlibadr(fd, id->lib, psys->target_ob);
+			
+			if (psys->clmd) {
+				/* XXX - from reading existing code this seems correct but intended usage of
+				 * pointcache /w cloth should be added in 'ParticleSystem' - campbell */
+				psys->clmd->point_cache = psys->pointcache;
+				psys->clmd->ptcaches.first = psys->clmd->ptcaches.last= NULL;
+				psys->clmd->coll_parms->group = newlibadr(fd, id->lib, psys->clmd->coll_parms->group);
+				psys->clmd->modifier.error = NULL;
+			}
+		}
+		else {
+			/* particle modifier must be removed before particle system */
+			ParticleSystemModifierData *psmd = psys_get_modifier(ob, psys);
+			BLI_remlink(&ob->modifiers, psmd);
+			modifier_free((ModifierData *)psmd);
+			
+			BLI_remlink(particles, psys);
+			MEM_freeN(psys);
+		}
+	}
+}
+static void direct_link_particlesystems(FileData *fd, ListBase *particles)
+{
+	ParticleSystem *psys;
+	ParticleData *pa;
+	int a;
+	
+	for (psys=particles->first; psys; psys=psys->next) {
+		psys->particles=newdataadr(fd, psys->particles);
+		
+		if (psys->particles && psys->particles->hair) {
+			for (a=0, pa=psys->particles; a<psys->totpart; a++, pa++)
+				pa->hair=newdataadr(fd, pa->hair);
+		}
+		
+		if (psys->particles && psys->particles->keys) {
+			for (a=0, pa=psys->particles; a<psys->totpart; a++, pa++) {
+				pa->keys= NULL;
+				pa->totkey= 0;
+			}
+			
+			psys->flag &= ~PSYS_KEYED;
+		}
+
+		if (psys->particles && psys->particles->boid) {
+			pa = psys->particles;
+			pa->boid = newdataadr(fd, pa->boid);
+			pa->boid->ground = NULL;  /* This is purely runtime data, but still can be an issue if left dangling. */
+			for (a = 1, pa++; a < psys->totpart; a++, pa++) {
+				pa->boid = (pa - 1)->boid + 1;
+				pa->boid->ground = NULL;
+			}
+		}
+		else if (psys->particles) {
+			for (a=0, pa=psys->particles; a<psys->totpart; a++, pa++)
+				pa->boid = NULL;
+		}
+		
+		psys->fluid_springs = newdataadr(fd, psys->fluid_springs);
+		
+		psys->child = newdataadr(fd, psys->child);
+		psys->effectors = NULL;
+		
+		link_list(fd, &psys->targets);
+		
+		psys->edit = NULL;
+		psys->free_edit = NULL;
+		psys->pathcache = NULL;
+		psys->childcache = NULL;
+		BLI_listbase_clear(&psys->pathcachebufs);
+		BLI_listbase_clear(&psys->childcachebufs);
+		psys->pdd = NULL;
+		psys->renderdata = NULL;
+		
+		if (psys->clmd) {
+			psys->clmd = newdataadr(fd, psys->clmd);
+			psys->clmd->clothObject = NULL;
+			psys->clmd->hairdata = NULL;
+			
+			psys->clmd->sim_parms= newdataadr(fd, psys->clmd->sim_parms);
+			psys->clmd->coll_parms= newdataadr(fd, psys->clmd->coll_parms);
+			
+			if (psys->clmd->sim_parms) {
+				psys->clmd->sim_parms->effector_weights = NULL;
+				if (psys->clmd->sim_parms->presets > 10)
+					psys->clmd->sim_parms->presets = 0;
+			}
+			
+			psys->hair_in_dm = psys->hair_out_dm = NULL;
+			psys->clmd->solver_result = NULL;
+		}
+
+		direct_link_pointcache_list(fd, &psys->ptcaches, &psys->pointcache, 0);
+		if (psys->clmd) {
+			psys->clmd->point_cache = psys->pointcache;
+		}
+
+		psys->tree = NULL;
+		psys->bvhtree = NULL;
+	}
+	return;
 }
 
 /* ************ READ MESH ***************** */
@@ -4261,6 +4628,7 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 
 	mesh->bb = NULL;
 	mesh->edit_btmesh = NULL;
+	mesh->batch_cache = NULL;
 	
 	/* happens with old files */
 	if (mesh->mselect == NULL) {
@@ -4362,12 +4730,12 @@ static void direct_link_latt(FileData *fd, Lattice *lt)
 /* ************ READ OBJECT ***************** */
 
 static void lib_link_modifiers__linkModifiers(
-        void *userData, Object *ob, ID **idpoin, int cd_flag)
+        void *userData, Object *ob, ID **idpoin, int cb_flag)
 {
 	FileData *fd = userData;
 
 	*idpoin = newlibadr(fd, ob->id.lib, *idpoin);
-	if (*idpoin != NULL && (cd_flag & IDWALK_USER) != 0) {
+	if (*idpoin != NULL && (cb_flag & IDWALK_CB_USER) != 0) {
 		id_us_plus_no_lib(*idpoin);
 	}
 }
@@ -4613,6 +4981,7 @@ static void lib_link_object(FileData *fd, Main *main)
 				ob->soft->effector_weights->group = newlibadr(fd, ob->id.lib, ob->soft->effector_weights->group);
 			}
 			
+			lib_link_particlesystems(fd, ob, &ob->id, &ob->particlesystem);
 			lib_link_modifiers(fd, ob);
 
 			if (ob->rigidbody_constraint) {
@@ -4713,6 +5082,8 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			clmd->sim_parms= newdataadr(fd, clmd->sim_parms);
 			clmd->coll_parms= newdataadr(fd, clmd->coll_parms);
 			
+			direct_link_pointcache_list(fd, &clmd->ptcaches, &clmd->point_cache, 0);
+			
 			if (clmd->sim_parms) {
 				if (clmd->sim_parms->presets > 10)
 					clmd->sim_parms->presets = 0;
@@ -4753,10 +5124,29 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				smd->domain->tex = NULL;
 				smd->domain->tex_shadow = NULL;
 				smd->domain->tex_wt = NULL;
+				smd->domain->coba = newdataadr(fd, smd->domain->coba);
 				
 				smd->domain->effector_weights = newdataadr(fd, smd->domain->effector_weights);
 				if (!smd->domain->effector_weights)
 					smd->domain->effector_weights = BKE_add_effector_weights(NULL);
+				
+				direct_link_pointcache_list(fd, &(smd->domain->ptcaches[0]), &(smd->domain->point_cache[0]), 1);
+				
+				/* Smoke uses only one cache from now on, so store pointer convert */
+				if (smd->domain->ptcaches[1].first || smd->domain->point_cache[1]) {
+					if (smd->domain->point_cache[1]) {
+						PointCache *cache = newdataadr(fd, smd->domain->point_cache[1]);
+						if (cache->flag & PTCACHE_FAKE_SMOKE) {
+							/* Smoke was already saved in "new format" and this cache is a fake one. */
+						}
+						else {
+							printf("High resolution smoke cache not available due to pointcache update. Please reset the simulation.\n");
+						}
+						BKE_ptcache_free(cache);
+					}
+					BLI_listbase_clear(&smd->domain->ptcaches[1]);
+					smd->domain->point_cache[1] = NULL;
+				}
 			}
 			else if (smd->type == MOD_SMOKE_TYPE_FLOW) {
 				smd->domain = NULL;
@@ -4766,6 +5156,7 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				smd->flow->dm = NULL;
 				smd->flow->verts_old = NULL;
 				smd->flow->numverts = 0;
+				smd->flow->psys = newdataadr(fd, smd->flow->psys);
 			}
 			else if (smd->type == MOD_SMOKE_TYPE_COLL) {
 				smd->flow = NULL;
@@ -4801,6 +5192,7 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 					for (surface=pmd->canvas->surfaces.first; surface; surface=surface->next) {
 						surface->canvas = pmd->canvas;
 						surface->data = NULL;
+						direct_link_pointcache_list(fd, &(surface->ptcaches), &(surface->pointcache), 1);
 						
 						if (!(surface->effector_weights = newdataadr(fd, surface->effector_weights)))
 							surface->effector_weights = BKE_add_effector_weights(NULL);
@@ -4810,6 +5202,7 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			if (pmd->brush) {
 				pmd->brush = newdataadr(fd, pmd->brush);
 				pmd->brush->pmd = pmd;
+				pmd->brush->psys = newdataadr(fd, pmd->brush->psys);
 				pmd->brush->paint_ramp = newdataadr(fd, pmd->brush->paint_ramp);
 				pmd->brush->vel_ramp = newdataadr(fd, pmd->brush->vel_ramp);
 				pmd->brush->dm = NULL;
@@ -4863,6 +5256,15 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			if (hmd->curfalloff) {
 				direct_link_curvemapping(fd, hmd->curfalloff);
 			}
+		}
+		else if (md->type == eModifierType_ParticleSystem) {
+			ParticleSystemModifierData *psmd = (ParticleSystemModifierData *)md;
+			
+			psmd->dm_final = NULL;
+			psmd->dm_deformed = NULL;
+			psmd->psys= newdataadr(fd, psmd->psys);
+			psmd->flag &= ~eParticleSystemFlag_psys_updated;
+			psmd->flag |= eParticleSystemFlag_file_loaded;
 		}
 		else if (md->type == eModifierType_Explode) {
 			ExplodeModifierData *psmd = (ExplodeModifierData *)md;
@@ -4933,6 +5335,41 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			csmd->delta_cache = NULL;
 			csmd->delta_cache_num = 0;
 		}
+		else if (md->type == eModifierType_MeshSequenceCache) {
+			MeshSeqCacheModifierData *msmcd = (MeshSeqCacheModifierData *)md;
+			msmcd->reader = NULL;
+		}
+		else if (md->type == eModifierType_SurfaceDeform) {
+			SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
+
+			smd->verts = newdataadr(fd, smd->verts);
+
+			if (smd->verts) {
+				for (int i = 0; i < smd->numverts; i++) {
+					smd->verts[i].binds = newdataadr(fd, smd->verts[i].binds);
+
+					if (smd->verts[i].binds) {
+						for (int j = 0; j < smd->verts[i].numbinds; j++) {
+							smd->verts[i].binds[j].vert_inds = newdataadr(fd, smd->verts[i].binds[j].vert_inds);
+							smd->verts[i].binds[j].vert_weights = newdataadr(fd, smd->verts[i].binds[j].vert_weights);
+
+							if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+								if (smd->verts[i].binds[j].vert_inds)
+									BLI_endian_switch_uint32_array(smd->verts[i].binds[j].vert_inds, smd->verts[i].binds[j].numverts);
+
+								if (smd->verts[i].binds[j].vert_weights) {
+									if (smd->verts[i].binds[j].mode == MOD_SDEF_MODE_CENTROID ||
+									    smd->verts[i].binds[j].mode == MOD_SDEF_MODE_LOOPTRI)
+										BLI_endian_switch_float_array(smd->verts[i].binds[j].vert_weights, 3);
+									else
+										BLI_endian_switch_float_array(smd->verts[i].binds[j].vert_weights, smd->verts[i].binds[j].numverts);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -4962,7 +5399,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 	 * See [#34776, #42780] for more information.
 	 */
 	if (fd->memfile || (ob->id.tag & (LIB_TAG_EXTERN | LIB_TAG_INDIRECT))) {
-		ob->mode &= ~OB_MODE_EDIT;
+		ob->mode &= ~(OB_MODE_EDIT | OB_MODE_PARTICLE_EDIT);
 		if (!fd->memfile) {
 			ob->mode &= ~OB_MODE_POSE;
 		}
@@ -5065,6 +5502,8 @@ static void direct_link_object(FileData *fd, Object *ob)
 		sb->effector_weights = newdataadr(fd, sb->effector_weights);
 		if (!sb->effector_weights)
 			sb->effector_weights = BKE_add_effector_weights(NULL);
+		
+		direct_link_pointcache_list(fd, &sb->ptcaches, &sb->pointcache, 0);
 	}
 	ob->bsoft = newdataadr(fd, ob->bsoft);
 	ob->fluidsimSettings= newdataadr(fd, ob->fluidsimSettings); /* NT */
@@ -5082,6 +5521,9 @@ static void direct_link_object(FileData *fd, Object *ob)
 	ob->rigidbody_constraint = newdataadr(fd, ob->rigidbody_constraint);
 	if (ob->rigidbody_constraint)
 		ob->rigidbody_constraint->physics_constraint = NULL;
+
+	link_list(fd, &ob->particlesystem);
+	direct_link_particlesystems(fd, &ob->particlesystem);
 	
 	link_list(fd, &ob->prop);
 	for (prop = ob->prop.first; prop; prop = prop->next) {
@@ -5159,6 +5601,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 	ob->bb = NULL;
 	ob->derivedDeform = NULL;
 	ob->derivedFinal = NULL;
+	BLI_listbase_clear(&ob->collection_settings);
 	BLI_listbase_clear(&ob->gpulamp);
 	link_list(fd, &ob->pc_ids);
 
@@ -5246,11 +5689,29 @@ static bool scene_validate_setscene__liblink(Scene *sce, const int totscene)
 }
 #endif
 
+static void lib_link_scene_collection(FileData *fd, Library *lib, SceneCollection *sc)
+{
+	for (LinkData *link = sc->objects.first; link; link = link->next) {
+		link->data = newlibadr_us(fd, lib, link->data);
+		BLI_assert(link->data);
+	}
+
+	for (LinkData *link = sc->filter_objects.first; link; link = link->next) {
+		link->data = newlibadr_us(fd, lib, link->data);
+		BLI_assert(link->data);
+	}
+
+	for (SceneCollection *nsc = sc->scene_collections.first; nsc; nsc = nsc->next) {
+		lib_link_scene_collection(fd, lib, nsc);
+	}
+}
+
 static void lib_link_scene(FileData *fd, Main *main)
 {
 	Scene *sce;
-	Base *base, *next;
+	BaseLegacy *base_legacy, *base_legacy_next;
 	Sequence *seq;
+	SceneLayer *sl;
 	SceneRenderLayer *srl;
 	FreestyleModuleConfig *fmc;
 	FreestyleLineSet *fls;
@@ -5298,17 +5759,19 @@ static void lib_link_scene(FileData *fd, Main *main)
 			
 			sce->toolsettings->skgen_template = newlibadr(fd, sce->id.lib, sce->toolsettings->skgen_template);
 			
-			for (base = sce->base.first; base; base = next) {
-				next = base->next;
+			sce->toolsettings->particle.shape_object = newlibadr(fd, sce->id.lib, sce->toolsettings->particle.shape_object);
+			
+			for (base_legacy = sce->base.first; base_legacy; base_legacy = base_legacy_next) {
+				base_legacy_next = base_legacy->next;
 				
-				base->object = newlibadr_us(fd, sce->id.lib, base->object);
+				base_legacy->object = newlibadr_us(fd, sce->id.lib, base_legacy->object);
 				
-				if (base->object == NULL) {
+				if (base_legacy->object == NULL) {
 					blo_reportf_wrap(fd->reports, RPT_WARNING, TIP_("LIB: object lost from scene: '%s'"),
 					                 sce->id.name + 2);
-					BLI_remlink(&sce->base, base);
-					if (base == sce->basact) sce->basact = NULL;
-					MEM_freeN(base);
+					BLI_remlink(&sce->base, base_legacy);
+					if (base_legacy == sce->basact) sce->basact = NULL;
+					MEM_freeN(base_legacy);
 				}
 			}
 			
@@ -5393,6 +5856,18 @@ static void lib_link_scene(FileData *fd, Main *main)
 			
 			/* Motion Tracking */
 			sce->clip = newlibadr_us(fd, sce->id.lib, sce->clip);
+
+			lib_link_scene_collection(fd, sce->id.lib, sce->collection);
+
+			for (sl = sce->render_layers.first; sl; sl = sl->next) {
+				/* tag scene layer to update for collection tree evaluation */
+				sl->flag |= SCENE_LAYER_ENGINE_DIRTY;
+				for (Base *base = sl->object_bases.first; base; base = base->next) {
+					/* we only bump the use count for the collection objects */
+					base->object = newlibadr(fd, sce->id.lib, base->object);
+					base->flag |= BASE_DIRTY_ENGINE_SETTINGS;
+				}
+			}
 
 #ifdef USE_SETSCENE_CHECK
 			if (sce->set != NULL) {
@@ -5497,13 +5972,56 @@ static void direct_link_view_settings(FileData *fd, ColorManagedViewSettings *vi
 		direct_link_curvemapping(fd, view_settings->curve_mapping);
 }
 
+static void direct_link_scene_collection(FileData *fd, SceneCollection *sc)
+{
+	link_list(fd, &sc->objects);
+	link_list(fd, &sc->filter_objects);
+	link_list(fd, &sc->scene_collections);
+
+	for (SceneCollection *nsc = sc->scene_collections.first; nsc; nsc = nsc->next) {
+		direct_link_scene_collection(fd, nsc);
+	}
+}
+
+static void direct_link_engine_settings(FileData *fd, ListBase *lb)
+{
+	link_list(fd, lb);
+	for (CollectionEngineSettings *ces = lb->first; ces; ces = ces->next) {
+		link_list(fd, &ces->properties);
+	}
+}
+
+static void direct_link_layer_collections(FileData *fd, ListBase *lb)
+{
+	link_list(fd, lb);
+	for (LayerCollection *lc = lb->first; lc; lc = lc->next) {
+		lc->scene_collection = newdataadr(fd, lc->scene_collection);
+
+		link_list(fd, &lc->object_bases);
+
+		for (LinkData *link = lc->object_bases.first; link; link = link->next) {
+			link->data = newdataadr(fd, link->data);
+		}
+
+		link_list(fd, &lc->overrides);
+
+		direct_link_engine_settings(fd, &lc->engine_settings);
+
+		direct_link_engine_settings(fd, &lc->mode_settings);
+
+		direct_link_layer_collections(fd, &lc->layer_collections);
+	}
+}
+
 static void direct_link_scene(FileData *fd, Scene *sce)
 {
 	Editing *ed;
 	Sequence *seq;
 	MetaStack *ms;
 	RigidBodyWorld *rbw;
+	SceneLayer *sl;
 	SceneRenderLayer *srl;
+	RenderEngineSettings *res;
 	
 	sce->theDag = NULL;
 	sce->depsgraph = NULL;
@@ -5538,6 +6056,10 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 		direct_link_paint(fd, &sce->toolsettings->imapaint.paint);
 
 		sce->toolsettings->imapaint.paintcursor = NULL;
+		sce->toolsettings->particle.paintcursor = NULL;
+		sce->toolsettings->particle.scene = NULL;
+		sce->toolsettings->particle.scene_layer = NULL;
+		sce->toolsettings->particle.object = NULL;
 		sce->toolsettings->gp_sculpt.paintcursor = NULL;
 
 		/* in rare cases this is needed, see [#33806] */
@@ -5549,6 +6071,7 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 			sce->toolsettings->wpaint->wpaint_prev = NULL;
 			sce->toolsettings->wpaint->tot = 0;
 		}
+		
 		/* relink grease pencil drawing brushes */
 		link_list(fd, &sce->toolsettings->gp_brushes);
 		for (bGPDbrush *brush = sce->toolsettings->gp_brushes.first; brush; brush = brush->next) {
@@ -5564,6 +6087,12 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 			if (brush->cur_jitter) {
 				direct_link_curvemapping(fd, brush->cur_jitter);
 			}
+		}
+		
+		/* relink grease pencil interpolation curves */
+		sce->toolsettings->gp_interpolate.custom_ipo = newdataadr(fd, sce->toolsettings->gp_interpolate.custom_ipo);
+		if (sce->toolsettings->gp_interpolate.custom_ipo) {
+			direct_link_curvemapping(fd, sce->toolsettings->gp_interpolate.custom_ipo);
 		}
 	}
 
@@ -5731,11 +6260,38 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 		rbw->effector_weights = newdataadr(fd, rbw->effector_weights);
 		if (!rbw->effector_weights)
 			rbw->effector_weights = BKE_add_effector_weights(NULL);
+
+		/* link cache */
+		direct_link_pointcache_list(fd, &rbw->ptcaches, &rbw->pointcache, false);
+		/* make sure simulation starts from the beginning after loading file */
+		if (rbw->pointcache) {
+			rbw->ltime = (float)rbw->pointcache->startframe;
+		}
 	}
 
 	sce->preview = direct_link_preview_image(fd, sce->preview);
 
 	direct_link_curvemapping(fd, &sce->r.mblur_shutter_curve);
+
+	/* this runs before the very first doversion */
+	if (sce->collection) {
+		sce->collection = newdataadr(fd, sce->collection);
+		direct_link_scene_collection(fd, sce->collection);
+	}
+
+	link_list(fd, &sce->render_layers);
+	for (sl = sce->render_layers.first; sl; sl = sl->next) {
+		link_list(fd, &sl->object_bases);
+		sl->basact = newdataadr(fd, sl->basact);
+		direct_link_layer_collections(fd, &sl->layer_collections);
+		/* tag scene layer to update for collection tree evaluation */
+		BKE_scene_layer_base_flag_recalculate(sl);
+	}
+
+	link_list(fd, &sce->engines_settings);
+	for (res = sce->engines_settings.first; res; res = res->next) {
+		res->data = newdataadr(fd, res->data);
+	}
 }
 
 /* ************ READ WM ***************** */
@@ -6584,6 +7140,8 @@ static bool direct_link_screen(FileData *fd, bScreen *sc)
 	sc->mainwin = sc->subwinactive= 0;	/* indices */
 	sc->swap = 0;
 
+	sc->preview = direct_link_preview_image(fd, sc->preview);
+
 	/* edges */
 	for (se = sc->edgebase.first; se; se = se->next) {
 		se->v1 = newdataadr(fd, se->v1);
@@ -7052,7 +7610,7 @@ static void lib_link_group(FileData *fd, Main *main)
 			if (add_us) {
 				id_us_ensure_real(&group->id);
 			}
-			BKE_group_object_unlink(group, NULL, NULL, NULL);	/* removes NULL entries */
+			BKE_group_object_unlink(group, NULL);	/* removes NULL entries */
 		}
 	}
 }
@@ -7579,6 +8137,7 @@ static const char *dataname(short id_code)
 		case ID_SO: return "Data from SO";
 		case ID_NT: return "Data from NT";
 		case ID_BR: return "Data from BR";
+		case ID_PA: return "Data from PA";
 		case ID_PAL: return "Data from PAL";
 		case ID_PC: return "Data from PCRV";
 		case ID_GD: return "Data from GD";
@@ -7726,12 +8285,16 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, const short 
 	id->lib = main->curlib;
 	id->us = ID_FAKE_USERS(id);
 	id->icon_id = 0;
+	id->newid = NULL;  /* Needed because .blend may have been saved with crap value here... */
 	
 	/* this case cannot be direct_linked: it's just the ID part */
 	if (bhead->code == ID_ID) {
 		return blo_nextbhead(fd, bhead);
 	}
-	
+
+	/* That way, we know which datablock needs do_versions (required currently for linking). */
+	id->tag |= LIB_TAG_NEW;
+
 	/* need a name for the mallocN, just for debugging and sane prints on leaks */
 	allocname = dataname(GS(id->name));
 	
@@ -7818,6 +8381,9 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, const short 
 			break;
 		case ID_BR:
 			direct_link_brush(fd, (Brush*)id);
+			break;
+		case ID_PA:
+			direct_link_particlesettings(fd, (ParticleSettings*)id);
 			break;
 		case ID_GD:
 			direct_link_gpencil(fd, (bGPdata *)id);
@@ -7981,6 +8547,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	blo_do_versions_250(fd, lib, main);
 	blo_do_versions_260(fd, lib, main);
 	blo_do_versions_270(fd, lib, main);
+	blo_do_versions_280(fd, lib, main);
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init see do_versions_userdef() above! */
@@ -7988,14 +8555,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	/* don't forget to set version number in BKE_blender_version.h! */
 }
 
-#if 0 // XXX: disabled for now... we still don't have this in the right place in the loading code for it to work
-static void do_versions_after_linking(FileData *fd, Library *lib, Main *main)
+static void do_versions_after_linking(Main *main)
 {
-	/* old Animation System (using IPO's) needs to be converted to the new Animato system */
-	if (main->versionfile < 250)
-		do_versions_ipos_to_animato(main);
+//	printf("%s for %s (%s), %d.%d\n", __func__, main->curlib ? main->curlib->name : main->name,
+//	       main->curlib ? "LIB" : "MAIN", main->versionfile, main->subversionfile);
+	do_versions_after_linking_270(main);
+	do_versions_after_linking_280(main);
 }
-#endif
 
 static void lib_link_all(FileData *fd, Main *main)
 {
@@ -8031,6 +8597,7 @@ static void lib_link_all(FileData *fd, Main *main)
 	lib_link_brush(fd, main);
 	lib_link_palette(fd, main);
 	lib_link_paint_curve(fd, main);
+	lib_link_particlesettings(fd, main);
 	lib_link_movieclip(fd, main);
 	lib_link_mask(fd, main);
 	lib_link_linestyle(fd, main);
@@ -8195,7 +8762,20 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 	blo_join_main(&mainlist);
 	
 	lib_link_all(fd, bfd->main);
-	//do_versions_after_linking(fd, NULL, bfd->main); // XXX: not here (or even in this function at all)! this causes crashes on many files - Aligorith (July 04, 2010)
+
+	/* Skip in undo case. */
+	if (fd->memfile == NULL) {
+		/* Yep, second splitting... but this is a very cheap operation, so no big deal. */
+		blo_split_main(&mainlist, bfd->main);
+		for (Main *mainvar = mainlist.first; mainvar; mainvar = mainvar->next) {
+			BLI_assert(mainvar->versionfile != 0);
+			do_versions_after_linking(mainvar);
+		}
+		blo_join_main(&mainlist);
+	}
+
+	BKE_main_id_tag_all(bfd->main, LIB_TAG_NEW, false);
+
 	lib_verify_nodetree(bfd->main, true);
 	fix_relpaths_library(fd->relabase, bfd->main); /* make all relative paths, relative to the open blend file */
 	
@@ -8545,6 +9125,58 @@ static void expand_animdata(FileData *fd, Main *mainvar, AnimData *adt)
 		expand_animdata_nlastrips(fd, mainvar, &nlt->strips);
 }	
 
+static void expand_particlesettings(FileData *fd, Main *mainvar, ParticleSettings *part)
+{
+	int a;
+	
+	expand_doit(fd, mainvar, part->dup_ob);
+	expand_doit(fd, mainvar, part->dup_group);
+	expand_doit(fd, mainvar, part->eff_group);
+	expand_doit(fd, mainvar, part->bb_ob);
+	expand_doit(fd, mainvar, part->collision_group);
+	
+	if (part->adt)
+		expand_animdata(fd, mainvar, part->adt);
+	
+	for (a = 0; a < MAX_MTEX; a++) {
+		if (part->mtex[a]) {
+			expand_doit(fd, mainvar, part->mtex[a]->tex);
+			expand_doit(fd, mainvar, part->mtex[a]->object);
+		}
+	}
+
+	if (part->effector_weights) {
+		expand_doit(fd, mainvar, part->effector_weights->group);
+	}
+
+	if (part->pd) {
+		expand_doit(fd, mainvar, part->pd->tex);
+		expand_doit(fd, mainvar, part->pd->f_source);
+	}
+	if (part->pd2) {
+		expand_doit(fd, mainvar, part->pd2->tex);
+		expand_doit(fd, mainvar, part->pd2->f_source);
+	}
+
+	if (part->boids) {
+		BoidState *state;
+		BoidRule *rule;
+
+		for (state = part->boids->states.first; state; state = state->next) {
+			for (rule = state->rules.first; rule; rule = rule->next) {
+				if (rule->type == eBoidRuleType_Avoid) {
+					BoidRuleGoalAvoid *gabr = (BoidRuleGoalAvoid *)rule;
+					expand_doit(fd, mainvar, gabr->ob);
+				}
+				else if (rule->type == eBoidRuleType_FollowLeader) {
+					BoidRuleFollowLeader *flbr = (BoidRuleFollowLeader *)rule;
+					expand_doit(fd, mainvar, flbr->ob);
+				}
+			}
+		}
+	}
+}
+
 static void expand_group(FileData *fd, Main *mainvar, Group *group)
 {
 	GroupObject *go;
@@ -8835,7 +9467,7 @@ static void expand_armature(FileData *fd, Main *mainvar, bArmature *arm)
 }
 
 static void expand_object_expandModifiers(
-        void *userData, Object *UNUSED(ob), ID **idpoin, int UNUSED(cd_flag))
+        void *userData, Object *UNUSED(ob), ID **idpoin, int UNUSED(cb_flag))
 {
 	struct { FileData *fd; Main *mainvar; } *data= userData;
 	
@@ -8847,6 +9479,7 @@ static void expand_object_expandModifiers(
 
 static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 {
+	ParticleSystem *psys;
 	bSensor *sens;
 	bController *cont;
 	bActuator *act;
@@ -8902,6 +9535,9 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 		expand_doit(fd, mainvar, ob->proxy);
 	if (ob->proxy_group)
 		expand_doit(fd, mainvar, ob->proxy_group);
+
+	for (psys = ob->particlesystem.first; psys; psys = psys->next)
+		expand_doit(fd, mainvar, psys->part);
 
 	for (sens = ob->sensors.first; sens; sens = sens->next) {
 		if (sens->type == SENS_MESSAGE) {
@@ -9007,9 +9643,24 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 	}
 }
 
+static void expand_scene_collection(FileData *fd, Main *mainvar, SceneCollection *sc)
+{
+	for (LinkData *link = sc->objects.first; link; link = link->next) {
+		expand_doit(fd, mainvar, link->data);
+	}
+
+	for (LinkData *link = sc->filter_objects.first; link; link = link->next) {
+		expand_doit(fd, mainvar, link->data);
+	}
+
+	for (SceneCollection *nsc= sc->scene_collections.first; nsc; nsc = nsc->next) {
+		expand_scene_collection(fd, mainvar, nsc);
+	}
+}
+
 static void expand_scene(FileData *fd, Main *mainvar, Scene *sce)
 {
-	Base *base;
+	BaseLegacy *base;
 	SceneRenderLayer *srl;
 	FreestyleModuleConfig *module;
 	FreestyleLineSet *lineset;
@@ -9076,6 +9727,8 @@ static void expand_scene(FileData *fd, Main *mainvar, Scene *sce)
 	}
 
 	expand_doit(fd, mainvar, sce->clip);
+
+	expand_scene_collection(fd, mainvar, sce->collection);
 }
 
 static void expand_camera(FileData *fd, Main *mainvar, Camera *ca)
@@ -9273,6 +9926,9 @@ void BLO_expand_main(void *fdhandle, Main *mainvar)
 					case ID_IP:
 						expand_ipo(fd, mainvar, (Ipo *)id); // XXX deprecated - old animation system
 						break;
+					case ID_PA:
+						expand_particlesettings(fd, mainvar, (ParticleSettings *)id);
+						break;
 					case ID_MC:
 						expand_movieclip(fd, mainvar, (MovieClip *)id);
 						break;
@@ -9319,7 +9975,7 @@ static bool object_in_any_scene(Main *mainvar, Object *ob)
 static void give_base_to_objects(Main *mainvar, Scene *scene, View3D *v3d, Library *lib, const short flag)
 {
 	Object *ob;
-	Base *base;
+	BaseLegacy *base;
 	const unsigned int active_lay = (flag & FILE_ACTIVELAY) ? BKE_screen_view3d_layer_active(v3d, scene) : 0;
 	const bool is_link = (flag & FILE_LINK) != 0;
 
@@ -9340,16 +9996,22 @@ static void give_base_to_objects(Main *mainvar, Scene *scene, View3D *v3d, Libra
 			}
 
 			if (do_it) {
-				base = MEM_callocN(sizeof(Base), __func__);
+				base = MEM_callocN(sizeof(BaseLegacy), __func__);
 				BLI_addtail(&scene->base, base);
 
 				if (active_lay) {
 					ob->lay = active_lay;
 				}
+				if (flag & FILE_AUTOSELECT) {
+					/* Note that link_object_postprocess() already checks for FILE_AUTOSELECT flag,
+					 * but it will miss objects from non-instanciated groups... */
+					ob->flag |= SELECT;
+					/* do NOT make base active here! screws up GUI stuff, if you want it do it on src/ level */
+				}
 
-				base->lay = ob->lay;
 				base->object = ob;
-				base->flag = ob->flag;
+				base->lay = ob->lay;
+				BKE_scene_base_flag_sync_from_object(base);
 
 				CLAMP_MIN(ob->id.us, 0);
 				id_us_plus_no_lib((ID *)ob);
@@ -9365,7 +10027,7 @@ static void give_base_to_groups(
         Main *mainvar, Scene *scene, View3D *v3d, Library *UNUSED(lib), const short UNUSED(flag))
 {
 	Group *group;
-	Base *base;
+	BaseLegacy *base;
 	Object *ob;
 	const unsigned int active_lay = BKE_screen_view3d_layer_active(v3d, scene);
 
@@ -9382,8 +10044,8 @@ static void give_base_to_groups(
 
 			/* assign the base */
 			base = BKE_scene_base_add(scene, ob);
-			base->flag |= SELECT;
-			base->object->flag = base->flag;
+			base->flag_legacy |= SELECT;
+			BKE_scene_base_flag_sync_from_base(base);
 			DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
 			scene->basact = base;
 
@@ -9465,10 +10127,10 @@ static ID *link_named_part(
 static void link_object_postprocess(ID *id, Scene *scene, View3D *v3d, const short flag)
 {
 	if (scene) {
-		Base *base;
+		BaseLegacy *base;
 		Object *ob;
 
-		base = MEM_callocN(sizeof(Base), "app_nam_part");
+		base = MEM_callocN(sizeof(BaseLegacy), "app_nam_part");
 		BLI_addtail(&scene->base, base);
 
 		ob = (Object *)id;
@@ -9481,12 +10143,12 @@ static void link_object_postprocess(ID *id, Scene *scene, View3D *v3d, const sho
 		ob->mode = OB_MODE_OBJECT;
 		base->lay = ob->lay;
 		base->object = ob;
-		base->flag = ob->flag;
+		base->flag_legacy = ob->flag;
 		id_us_plus_no_lib((ID *)ob);
 
 		if (flag & FILE_AUTOSELECT) {
-			base->flag |= SELECT;
-			base->object->flag = base->flag;
+			base->flag_legacy |= SELECT;
+			BKE_scene_base_flag_sync_from_base(base);
 			/* do NOT make base active here! screws up GUI stuff, if you want it do it on src/ level */
 		}
 	}
@@ -9668,6 +10330,32 @@ Main *BLO_library_link_begin(Main *mainvar, BlendHandle **bh, const char *filepa
 	return library_link_begin(mainvar, &fd, filepath);
 }
 
+static void split_main_newid(Main *mainptr, Main *main_newid)
+{
+	/* We only copy the necessary subset of data in this temp main. */
+	main_newid->versionfile = mainptr->versionfile;
+	main_newid->subversionfile = mainptr->subversionfile;
+	BLI_strncpy(main_newid->name, mainptr->name, sizeof(main_newid->name));
+	main_newid->curlib = mainptr->curlib;
+
+	ListBase *lbarray[MAX_LIBARRAY];
+	ListBase *lbarray_newid[MAX_LIBARRAY];
+	int i = set_listbasepointers(mainptr, lbarray);
+	set_listbasepointers(main_newid, lbarray_newid);
+	while (i--) {
+		BLI_listbase_clear(lbarray_newid[i]);
+
+		for (ID *id = lbarray[i]->first, *idnext; id; id = idnext) {
+			idnext = id->next;
+
+			if (id->tag & LIB_TAG_NEW) {
+				BLI_remlink(lbarray[i], id);
+				BLI_addtail(lbarray_newid[i], id);
+			}
+		}
+	}
+}
+
 /* scene and v3d may be NULL. */
 static void library_link_end(Main *mainl, FileData **fd, const short flag, Scene *scene, View3D *v3d)
 {
@@ -9696,10 +10384,28 @@ static void library_link_end(Main *mainl, FileData **fd, const short flag, Scene
 
 	blo_join_main((*fd)->mainlist);
 	mainvar = (*fd)->mainlist->first;
-	MEM_freeN((*fd)->mainlist);
 	mainl = NULL; /* blo_join_main free's mainl, cant use anymore */
 
 	lib_link_all(*fd, mainvar);
+
+	/* Yep, second splitting... but this is a very cheap operation, so no big deal. */
+	blo_split_main((*fd)->mainlist, mainvar);
+	Main main_newid = {0};
+	for (mainvar = ((Main *)(*fd)->mainlist->first)->next; mainvar; mainvar = mainvar->next) {
+		BLI_assert(mainvar->versionfile != 0);
+		/* We need to split out IDs already existing, or they will go again through do_versions - bad, very bad! */
+		split_main_newid(mainvar, &main_newid);
+
+		do_versions_after_linking(&main_newid);
+
+		add_main_to_main(mainvar, &main_newid);
+	}
+	blo_join_main((*fd)->mainlist);
+	mainvar = (*fd)->mainlist->first;
+	MEM_freeN((*fd)->mainlist);
+
+	BKE_main_id_tag_all(mainvar, LIB_TAG_NEW, false);
+
 	lib_verify_nodetree(mainvar, false);
 	fix_relpaths_library(G.main->name, mainvar); /* make all relative paths, relative to the open blend file */
 
@@ -9870,6 +10576,9 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					else {
 						mainptr->curlib->filedata = NULL;
 						mainptr->curlib->id.tag |= LIB_TAG_MISSING;
+						/* Set lib version to current main one... Makes assert later happy. */
+						mainptr->versionfile = mainptr->curlib->versionfile = mainl->versionfile;
+						mainptr->subversionfile = mainptr->curlib->subversionfile = mainl->subversionfile;
 					}
 					
 					if (fd == NULL) {
@@ -9939,14 +10648,19 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 	}
 	
 	/* do versions, link, and free */
+	Main main_newid = {0};
 	for (mainptr = mainl->next; mainptr; mainptr = mainptr->next) {
-		/* some mains still have to be read, then
-		 * versionfile is still zero! */
+		/* some mains still have to be read, then versionfile is still zero! */
 		if (mainptr->versionfile) {
+			/* We need to split out IDs already existing, or they will go again through do_versions - bad, very bad! */
+			split_main_newid(mainptr, &main_newid);
+
 			if (mainptr->curlib->filedata) // can be zero... with shift+f1 append
-				do_versions(mainptr->curlib->filedata, mainptr->curlib, mainptr);
+				do_versions(mainptr->curlib->filedata, mainptr->curlib, &main_newid);
 			else
-				do_versions(basefd, NULL, mainptr);
+				do_versions(basefd, NULL, &main_newid);
+
+			add_main_to_main(mainptr, &main_newid);
 		}
 		
 		if (mainptr->curlib->filedata)

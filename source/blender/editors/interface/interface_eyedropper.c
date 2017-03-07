@@ -139,8 +139,8 @@ static void eyedropper_draw_cursor_text(const struct bContext *C, ARegion *ar, c
 	wmWindow *win = CTX_wm_window(C);
 	int x = win->eventstate->x;
 	int y = win->eventstate->y;
-	const unsigned char fg[4] = {255, 255, 255, 255};
-	const unsigned char bg[4] = {0, 0, 0, 50};
+	const float col_fg[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	const float col_bg[4] = {0.0f, 0.0f, 0.0f, 0.2f};
 
 
 	if ((name[0] == '\0') ||
@@ -154,7 +154,7 @@ static void eyedropper_draw_cursor_text(const struct bContext *C, ARegion *ar, c
 
 	y += U.widget_unit;
 
-	UI_fontstyle_draw_simple_backdrop(fstyle, x, y, name, fg, bg);
+	UI_fontstyle_draw_simple_backdrop(fstyle, x, y, name, col_fg, col_bg);
 }
 
 
@@ -597,7 +597,7 @@ static void datadropper_id_sample_pt(bContext *C, DataDropper *ddr, int mx, int 
 				const int mval[2] = {
 				    mx - ar->winrct.xmin,
 				    my - ar->winrct.ymin};
-				Base *base;
+				BaseLegacy *base;
 
 				CTX_wm_area_set(C, sa);
 				CTX_wm_region_set(C, ar);
@@ -748,7 +748,7 @@ static int datadropper_poll(bContext *C)
 	if ((CTX_wm_window(C) != NULL) &&
 	    (but = UI_context_active_but_prop_get(C, &ptr, &prop, &index_dummy)) &&
 	    (but->type == UI_BTYPE_SEARCH_MENU) &&
-	    (but->flag & UI_BUT_SEARCH_UNLINK))
+	    (but->flag & UI_BUT_VALUE_CLEAR))
 	{
 		if (prop && RNA_property_type(prop) == PROP_POINTER) {
 			StructRNA *type = RNA_property_pointer_type(&ptr, prop);
@@ -882,7 +882,6 @@ static void depthdropper_exit(bContext *C, wmOperator *op)
  */
 static void depthdropper_depth_sample_pt(bContext *C, DepthDropper *ddr, int mx, int my, float *r_depth)
 {
-
 	/* we could use some clever */
 	wmWindow *win = CTX_wm_window(C);
 	ScrArea *sa = BKE_screen_find_area_xy(win->screen, SPACE_TYPE_ANY, mx, my);
@@ -923,7 +922,7 @@ static void depthdropper_depth_sample_pt(bContext *C, DepthDropper *ddr, int mx,
 					float co_align[3];
 
 					/* quick way to get view-center aligned point */
-					ED_view3d_win_to_3d(ar, co, mval_center_fl, co_align);
+					ED_view3d_win_to_3d(v3d, ar, co, mval_center_fl, co_align);
 
 					*r_depth = len_v3v3(view_co, co_align);
 
@@ -1081,6 +1080,15 @@ static int depthdropper_poll(bContext *C)
 		    (RNA_property_array_check(prop) == false))
 		{
 			return 1;
+		}
+	}
+	else  {
+		RegionView3D *rv3d = CTX_wm_region_view3d(C);
+		if (rv3d && rv3d->persp == RV3D_CAMOB) {
+			View3D *v3d = CTX_wm_view3d(C);
+			if (v3d->camera && v3d->camera->data && !ID_IS_LINKED_DATABLOCK(v3d->camera->data)) {
+				return 1;
+			}
 		}
 	}
 

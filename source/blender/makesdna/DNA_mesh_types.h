@@ -138,9 +138,7 @@ typedef struct Mesh {
 
 /**/
 
-
-
-
+	void *batch_cache;
 } Mesh;
 
 /* deprecated by MTFace, only here for file reading */

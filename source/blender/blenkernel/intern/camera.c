@@ -252,7 +252,7 @@ void BKE_camera_params_from_view3d(CameraParams *params, const View3D *v3d, cons
 	}
 	else if (rv3d->persp == RV3D_ORTHO) {
 		/* orthographic view */
-		int sensor_size = BKE_camera_sensor_size(params->sensor_fit, params->sensor_x, params->sensor_y);
+		float sensor_size = BKE_camera_sensor_size(params->sensor_fit, params->sensor_x, params->sensor_y);
 		params->clipend *= 0.5f;    // otherwise too extreme low zbuffer quality
 		params->clipsta = -params->clipend;
 
@@ -337,6 +337,8 @@ void BKE_camera_params_compute_viewplane(CameraParams *params, int winx, int win
 	viewplane.ymin *= pixsize;
 	viewplane.ymax *= pixsize;
 
+	/* Used for rendering (offset by near-clip with perspective views), passed to RE_SetPixelSize.
+	 * For viewport drawing 'RegionView3D.pixsize'. */
 	params->viewdx = pixsize;
 	params->viewdy = params->ycor * pixsize;
 	params->viewplane = viewplane;
@@ -851,7 +853,7 @@ static Object *camera_multiview_advanced(Scene *scene, Object *camera, const cha
 	}
 
 	if (name[0] != '\0') {
-		Base *base = BKE_scene_base_find_by_name(scene, name);
+		BaseLegacy *base = BKE_scene_base_find_by_name(scene, name);
 		if (base) {
 			return base->object;
 		}

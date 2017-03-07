@@ -57,8 +57,6 @@
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
-#include "GPU_glew.h"
-#include "GPU_basic_shader.h"
 #include "GPU_immediate.h"
 
 #include "RE_engine.h"
@@ -79,8 +77,6 @@
 #define WIN_BACK_OK     1
 #define WIN_FRONT_OK    2
 #define WIN_BOTH_OK     3
-
-#define USE_TEXTURE_RECTANGLE 1
 
 /* ******************* drawing, overlays *************** */
 

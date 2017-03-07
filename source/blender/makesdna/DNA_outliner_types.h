@@ -90,7 +90,7 @@ enum {
 #define TSE_SEQUENCE        26  /* NO ID */
 #define TSE_SEQ_STRIP       27  /* NO ID */
 #define TSE_SEQUENCE_DUP    28  /* NO ID */
-/* #define TSE_LINKED_PSYS     29 */ /* DEPRECATED */
+#define TSE_LINKED_PSYS     29
 #define TSE_RNA_STRUCT      30  /* NO ID */
 #define TSE_RNA_PROPERTY    31  /* NO ID */
 #define TSE_RNA_ARRAY_ELEM  32  /* NO ID */
@@ -99,6 +99,8 @@ enum {
 #define TSE_KEYMAP_ITEM     35  /* NO ID */
 #define TSE_ID_BASE         36  /* NO ID */
 #define TSE_GP_LAYER        37  /* NO ID */
+#define TSE_LAYER_COLLECTION 38 /* NO ID */
+#define TSE_SCENE_COLLECTION 39 /* NO ID */
 
 
 /* Check whether given TreeStoreElem should have a real ID in its ->id member. */

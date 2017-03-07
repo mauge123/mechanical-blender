@@ -40,12 +40,16 @@ extern "C" {
 struct ARegion;
 struct bScreen;
 struct CacheFile;
+struct LayerCollection;
 struct ListBase;
 struct Main;
 struct Object;
+struct Base;
 struct PointerRNA;
 struct ReportList;
 struct Scene;
+struct SceneCollection;
+struct SceneLayer;
 struct ScrArea;
 struct SpaceLink;
 struct View3D;
@@ -109,6 +113,7 @@ enum {
 	CTX_MODE_PAINT_WEIGHT,
 	CTX_MODE_PAINT_VERTEX,
 	CTX_MODE_PAINT_TEXTURE,
+	CTX_MODE_PARTICLE,
 	CTX_MODE_OBJECT
 };
 
@@ -238,6 +243,9 @@ int ctx_data_list_count(const bContext *C, int (*func)(const bContext *, ListBas
 
 struct Main *CTX_data_main(const bContext *C);
 struct Scene *CTX_data_scene(const bContext *C);
+struct LayerCollection *CTX_data_layer_collection(const bContext *C);
+struct SceneCollection *CTX_data_scene_collection(const bContext *C);
+struct SceneLayer *CTX_data_scene_layer(const bContext *C);
 struct ToolSettings *CTX_data_tool_settings(const bContext *C);
 
 const char *CTX_data_mode_string(const bContext *C);

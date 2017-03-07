@@ -35,7 +35,6 @@
 #include "DNA_group_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_meta_types.h"
-#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
 #include "BLI_math.h"
@@ -51,6 +50,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_key.h"
 #include "BKE_paint.h"
+#include "BKE_particle.h"
 #include "BKE_editmesh.h"
 
 #include "ED_info.h"
@@ -279,11 +279,41 @@ static void stats_object_sculpt_dynamic_topology(Object *ob, SceneStats *stats)
 	stats->tottri = ob->sculpt->bm->totface;
 }
 
-static void stats_dupli_object(Base *base, Object *ob, SceneStats *stats)
+static void stats_dupli_object(BaseLegacy *base, Object *ob, SceneStats *stats)
 {
-	if (base->flag & SELECT) stats->totobjsel++;
+	if (base->flag_legacy & SELECT) stats->totobjsel++;
 
-	if (ob->parent && (ob->parent->transflag & (OB_DUPLIVERTS | OB_DUPLIFACES))) {
+	if (ob->transflag & OB_DUPLIPARTS) {
+		/* Dupli Particles */
+		ParticleSystem *psys;
+		ParticleSettings *part;
+
+		for (psys = ob->particlesystem.first; psys; psys = psys->next) {
+			part = psys->part;
+
+			if (part->draw_as == PART_DRAW_OB && part->dup_ob) {
+				int tot = count_particles(psys);
+				stats_object(part->dup_ob, 0, tot, stats);
+			}
+			else if (part->draw_as == PART_DRAW_GR && part->dup_group) {
+				GroupObject *go;
+				int tot, totgroup = 0, cur = 0;
+				
+				for (go = part->dup_group->gobject.first; go; go = go->next)
+					totgroup++;
+
+				for (go = part->dup_group->gobject.first; go; go = go->next) {
+					tot = count_particles_mod(psys, totgroup, cur);
+					stats_object(go->ob, 0, tot, stats);
+					cur++;
+				}
+			}
+		}
+		
+		stats_object(ob, base->flag_legacy & SELECT, 1, stats);
+		stats->totobj++;
+	}
+	else if (ob->parent && (ob->parent->transflag & (OB_DUPLIVERTS | OB_DUPLIFACES))) {
 		/* Dupli Verts/Faces */
 		int tot;
 
@@ -296,23 +326,23 @@ static void stats_dupli_object(Base *base, Object *ob, SceneStats *stats)
 		}
 
 		stats->totobj += tot;
-		stats_object(ob, base->flag & SELECT, tot, stats);
+		stats_object(ob, base->flag_legacy & SELECT, tot, stats);
 	}
 	else if (ob->transflag & OB_DUPLIFRAMES) {
 		/* Dupli Frames */
 		int tot = count_duplilist(ob);
 		stats->totobj += tot;
-		stats_object(ob, base->flag & SELECT, tot, stats);
+		stats_object(ob, base->flag_legacy & SELECT, tot, stats);
 	}
 	else if ((ob->transflag & OB_DUPLIGROUP) && ob->dup_group) {
 		/* Dupli Group */
 		int tot = count_duplilist(ob);
 		stats->totobj += tot;
-		stats_object(ob, base->flag & SELECT, tot, stats);
+		stats_object(ob, base->flag_legacy & SELECT, tot, stats);
 	}
 	else {
 		/* No Dupli */
-		stats_object(ob, base->flag & SELECT, 1, stats);
+		stats_object(ob, base->flag_legacy & SELECT, 1, stats);
 		stats->totobj++;
 	}
 }
@@ -328,7 +358,7 @@ static void stats_update(Scene *scene)
 {
 	SceneStats stats = {0};
 	Object *ob = (scene->basact) ? scene->basact->object : NULL;
-	Base *base;
+	BaseLegacy *base;
 	
 	if (scene->obedit) {
 		/* Edit Mode */

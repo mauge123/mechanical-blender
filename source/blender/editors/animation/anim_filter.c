@@ -64,6 +64,7 @@
 #include "DNA_meta_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_node_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_space_types.h"
 #include "DNA_sequence_types.h"
 #include "DNA_scene_types.h"
@@ -74,6 +75,7 @@
 #include "DNA_object_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_layer_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -90,6 +92,7 @@
 #include "BKE_global.h"
 #include "BKE_group.h"
 #include "BKE_key.h"
+#include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_modifier.h"
@@ -130,11 +133,11 @@ static void animedit_get_yscale_factor(bAnimContext *ac)
 /* Note: there's a similar function in key.c (BKE_key_from_object) */
 static Key *actedit_get_shapekeys(bAnimContext *ac)
 {
-	Scene *scene = ac->scene;
+	SceneLayer *sl = ac->scene_layer;
 	Object *ob;
 	Key *key;
 	
-	ob = OBACT;
+	ob = OBACT_NEW;
 	if (ob == NULL) 
 		return NULL;
 	
@@ -378,8 +381,9 @@ bool ANIM_animdata_get_context(const bContext *C, bAnimContext *ac)
 	ac->scene = scene;
 	if (scene) {
 		ac->markers = ED_context_get_markers(C);
-		ac->obact = (scene->basact) ?  scene->basact->object : NULL;
 	}
+	ac->scene_layer = CTX_data_scene_layer(C);
+	ac->obact = (ac->scene_layer->basact) ? ac->scene_layer->basact->object : NULL;
 	ac->sa = sa;
 	ac->ar = ar;
 	ac->sl = sl;
@@ -795,6 +799,19 @@ static bAnimListElem *make_new_animlistelem(void *data, short datatype, ID *owne
 				AnimData *adt = linestyle->adt;
 				
 				ale->flag = FILTER_LS_SCED(linestyle); 
+				
+				ale->key_data = (adt) ? adt->action : NULL;
+				ale->datatype = ALE_ACT;
+				
+				ale->adt = BKE_animdata_from_id(data);
+				break;
+			}
+			case ANIMTYPE_DSPART:
+			{
+				ParticleSettings *part = (ParticleSettings *)ale->data;
+				AnimData *adt = part->adt;
+				
+				ale->flag = FILTER_PART_OBJD(part);
 				
 				ale->key_data = (adt) ? adt->action : NULL;
 				ale->datatype = ALE_ACT;
@@ -1670,15 +1687,16 @@ static size_t animdata_filter_gpencil(bAnimContext *ac, ListBase *anim_data, voi
 	
 	if (ads->filterflag & ADS_FILTER_GP_3DONLY) {
 		Scene *scene = (Scene *)ads->source;
+		SceneLayer *sl = (SceneLayer *)ac->scene_layer;
 		Base *base;
-		
+
 		/* Active scene's GPencil block first - No parent item needed... */
 		if (scene->gpd) {
 			items += animdata_filter_gpencil_data(anim_data, ads, scene->gpd, filter_mode);
 		}
 		
 		/* Objects in the scene */
-		for (base = scene->base.first; base; base = base->next) {
+		for (base = sl->object_bases.first; base; base = base->next) {
 			/* Only consider this object if it has got some GP data (saving on all the other tests) */
 			if (base->object && base->object->gpd) {
 				Object *ob = base->object;
@@ -1694,14 +1712,14 @@ static size_t animdata_filter_gpencil(bAnimContext *ac, ListBase *anim_data, voi
 				 */
 				if ((filter_mode & ANIMFILTER_DATA_VISIBLE) && !(ads->filterflag & ADS_FILTER_INCL_HIDDEN)) {
 					/* layer visibility - we check both object and base, since these may not be in sync yet */
-					if ((scene->lay & (ob->lay | base->lay)) == 0) continue;
+					if ((base->flag & BASE_VISIBLED) == 0) continue;
 					
 					/* outliner restrict-flag */
 					if (ob->restrictflag & OB_RESTRICT_VIEW) continue;
 				}
 				
 				/* check selection and object type filters */
-				if ( (ads->filterflag & ADS_FILTER_ONLYSEL) && !((base->flag & SELECT) /*|| (base == scene->basact)*/) ) {
+				if ( (ads->filterflag & ADS_FILTER_ONLYSEL) && !((base->flag & BASE_SELECTED) /*|| (base == scene->basact)*/) ) {
 					/* only selected should be shown */
 					continue;
 				}
@@ -2074,6 +2092,12 @@ static size_t animdata_filter_ds_textures(bAnimContext *ac, ListBase *anim_data,
 			mtex = (MTex **)(&wo->mtex);
 			break;
 		}
+		case ID_PA:
+		{
+			ParticleSettings *part = (ParticleSettings *)owner_id;
+			mtex = (MTex **)(&part->mtex);
+			break;
+		}
 		default: 
 		{
 			/* invalid/unsupported option */
@@ -2204,7 +2228,7 @@ typedef struct tAnimFilterModifiersContext {
 
 
 /* dependency walker callback for modifier dependencies */
-static void animfilter_modifier_idpoin_cb(void *afm_ptr, Object *ob, ID **idpoin, int UNUSED(cd_flag))
+static void animfilter_modifier_idpoin_cb(void *afm_ptr, Object *ob, ID **idpoin, int UNUSED(cb_flag))
 {
 	tAnimFilterModifiersContext *afm = (tAnimFilterModifiersContext *)afm_ptr;
 	ID *owner_id = &ob->id;
@@ -2267,6 +2291,53 @@ static size_t animdata_filter_ds_modifiers(bAnimContext *ac, ListBase *anim_data
 }
 
 /* ............ */
+
+
+static size_t animdata_filter_ds_particles(bAnimContext *ac, ListBase *anim_data, bDopeSheet *ads, Object *ob, int filter_mode)
+{
+	ParticleSystem *psys;
+	size_t items = 0;
+
+	for (psys = ob->particlesystem.first; psys; psys = psys->next) {
+		ListBase tmp_data = {NULL, NULL};
+		size_t tmp_items = 0;
+		
+		/* if no material returned, skip - so that we don't get weird blank entries... */
+		if (ELEM(NULL, psys->part, psys->part->adt))
+			continue;
+		
+		/* add particle-system's animation data to temp collection */
+		BEGIN_ANIMFILTER_SUBCHANNELS(FILTER_PART_OBJD(psys->part))
+		{
+			/* particle system's animation data */
+			tmp_items += animfilter_block_data(ac, &tmp_data, ads, (ID *)psys->part, filter_mode);
+			
+			/* textures */
+			if (!(ads->filterflag & ADS_FILTER_NOTEX))
+				tmp_items += animdata_filter_ds_textures(ac, &tmp_data, ads, (ID *)psys->part, filter_mode);
+		}
+		END_ANIMFILTER_SUBCHANNELS;
+		
+		/* did we find anything? */
+		if (tmp_items) {
+			/* include particle-expand widget first */
+			if (filter_mode & ANIMFILTER_LIST_CHANNELS) {
+				/* check if filtering by active status */
+				if (ANIMCHANNEL_ACTIVEOK(psys->part)) {
+					ANIMCHANNEL_NEW_CHANNEL(psys->part, ANIMTYPE_DSPART, psys->part);
+				}
+			}
+			
+			/* now add the list of collected channels */
+			BLI_movelisttolist(anim_data, &tmp_data);
+			BLI_assert(BLI_listbase_is_empty(&tmp_data));
+			items += tmp_items;
+		}
+	}
+	
+	/* return the number of items added to the list */
+	return items;
+}
 
 
 static size_t animdata_filter_ds_obdata(bAnimContext *ac, ListBase *anim_data, bDopeSheet *ads, Object *ob, int filter_mode)
@@ -2600,6 +2671,11 @@ static size_t animdata_filter_dopesheet_ob(bAnimContext *ac, ListBase *anim_data
 			tmp_items += animdata_filter_ds_obdata(ac, &tmp_data, ads, ob, filter_mode);
 		}
 		
+		/* particles */
+		if ((ob->particlesystem.first) && !(ads->filterflag & ADS_FILTER_NOPART)) {
+			tmp_items += animdata_filter_ds_particles(ac, &tmp_data, ads, ob, filter_mode);
+		}
+		
 		/* grease pencil */
 		if ((ob->gpd) && !(ads->filterflag & ADS_FILTER_NOGPENCIL)) {
 			tmp_items += animdata_filter_ds_gpencil(ac, &tmp_data, ads, ob->gpd, filter_mode);
@@ -2626,7 +2702,7 @@ static size_t animdata_filter_dopesheet_ob(bAnimContext *ac, ListBase *anim_data
 		if (filter_mode & ANIMFILTER_LIST_CHANNELS) {
 			/* check if filtering by selection */
 			// XXX: double-check on this - most of the time, a lot of tools need to filter out these channels!
-			if (ANIMCHANNEL_SELOK((base->flag & SELECT))) {
+			if (ANIMCHANNEL_SELOK((base->flag & BASE_SELECTED))) {
 				/* check if filtering by active status */
 				if (ANIMCHANNEL_ACTIVEOK(ob)) {
 					ANIMCHANNEL_NEW_CHANNEL(base, ANIMTYPE_OBJECT, ob);
@@ -2850,7 +2926,7 @@ static size_t animdata_filter_dopesheet_movieclips(bAnimContext *ac, ListBase *a
 }
 
 /* Helper for animdata_filter_dopesheet() - For checking if an object should be included or not */
-static bool animdata_filter_base_is_ok(bDopeSheet *ads, Scene *scene, Base *base, int filter_mode)
+static bool animdata_filter_base_is_ok(bDopeSheet *ads, Base *base, int filter_mode)
 {
 	Object *ob = base->object;
 	
@@ -2868,7 +2944,7 @@ static bool animdata_filter_base_is_ok(bDopeSheet *ads, Scene *scene, Base *base
 	 */
 	if ((filter_mode & ANIMFILTER_DATA_VISIBLE) && !(ads->filterflag & ADS_FILTER_INCL_HIDDEN)) {
 		/* layer visibility - we check both object and base, since these may not be in sync yet */
-		if ((scene->lay & (ob->lay | base->lay)) == 0)
+		if ((base->flag & BASE_VISIBLED) == 0)
 			return false;
 		
 		/* outliner restrict-flag */
@@ -2903,7 +2979,7 @@ static bool animdata_filter_base_is_ok(bDopeSheet *ads, Scene *scene, Base *base
 	}
 
 	/* check selection and object type filters */
-	if ((ads->filterflag & ADS_FILTER_ONLYSEL) && !((base->flag & SELECT) /*|| (base == sce->basact)*/)) {
+	if ((ads->filterflag & ADS_FILTER_ONLYSEL) && !((base->flag & BASE_SELECTED) /*|| (base == sce->basact)*/)) {
 		/* only selected should be shown */
 		return false;
 	}
@@ -2931,15 +3007,15 @@ static int ds_base_sorting_cmp(const void *base1_ptr, const void *base2_ptr)
 }
 
 /* Get a sorted list of all the bases - for inclusion in dopesheet (when drawing channels) */
-static Base **animdata_filter_ds_sorted_bases(bDopeSheet *ads, Scene *scene, int filter_mode, size_t *r_usable_bases)
+static Base **animdata_filter_ds_sorted_bases(bDopeSheet *ads, SceneLayer *sl, int filter_mode, size_t *r_usable_bases)
 {
 	/* Create an array with space for all the bases, but only containing the usable ones */
-	size_t tot_bases = BLI_listbase_count(&scene->base);
+	size_t tot_bases = BLI_listbase_count(&sl->object_bases);
 	size_t num_bases = 0;
 	
 	Base **sorted_bases = MEM_mallocN(sizeof(Base *) * tot_bases, "Dopesheet Usable Sorted Bases");
-	for (Base *base = scene->base.first; base; base = base->next) {
-		if (animdata_filter_base_is_ok(ads, scene, base, filter_mode)) {
+	for (Base *base = sl->object_bases.first; base; base = base->next) {
+		if (animdata_filter_base_is_ok(ads, base, filter_mode)) {
 			sorted_bases[num_bases++] = base;
 		}
 	}
@@ -2957,8 +3033,9 @@ static Base **animdata_filter_ds_sorted_bases(bDopeSheet *ads, Scene *scene, int
 static size_t animdata_filter_dopesheet(bAnimContext *ac, ListBase *anim_data, bDopeSheet *ads, int filter_mode)
 {
 	Scene *scene = (Scene *)ads->source;
+	SceneLayer *sl = (SceneLayer *)ac->scene_layer;
 	size_t items = 0;
-	
+
 	/* check that we do indeed have a scene */
 	if ((ads->source == NULL) || (GS(ads->source->name) != ID_SCE)) {
 		printf("Dope Sheet Error: No scene!\n");
@@ -2995,14 +3072,14 @@ static size_t animdata_filter_dopesheet(bAnimContext *ac, ListBase *anim_data, b
 	 *  - Don't do this if there's just a single object
 	 */
 	if ((filter_mode & ANIMFILTER_LIST_CHANNELS) && !(ads->flag & ADS_FLAG_NO_DB_SORT) &&
-	    (scene->base.first != scene->base.last))
+	    (sl->object_bases.first != sl->object_bases.last))
 	{
 		/* Filter list of bases (i.e. objects), sort them, then add their contents normally... */
 		// TODO: Cache the old sorted order - if the set of bases hasn't changed, don't re-sort...
 		Base **sorted_bases;
 		size_t num_bases;
 		
-		sorted_bases = animdata_filter_ds_sorted_bases(ads, scene, filter_mode, &num_bases);
+		sorted_bases = animdata_filter_ds_sorted_bases(ads, sl, filter_mode, &num_bases);
 		if (sorted_bases) {
 			/* Add the necessary channels for these bases... */
 			for (size_t i = 0; i < num_bases; i++) {
@@ -3019,8 +3096,8 @@ static size_t animdata_filter_dopesheet(bAnimContext *ac, ListBase *anim_data, b
 		/* Filter and add contents of each base (i.e. object) without them sorting first
 		 * NOTE: This saves performance in cases where order doesn't matter
 		 */
-		for (Base *base = scene->base.first; base; base = base->next) {
-			if (animdata_filter_base_is_ok(ads, scene, base, filter_mode)) {
+		for (Base *base = sl->object_bases.first; base; base = base->next) {
+			if (animdata_filter_base_is_ok(ads, base, filter_mode)) {
 				/* since we're still here, this object should be usable */
 				items += animdata_filter_dopesheet_ob(ac, anim_data, ads, base, filter_mode);
 			}

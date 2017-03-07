@@ -70,10 +70,10 @@ static void InputVector(TransInfo *t, MouseInput *mi, const double mval[2], floa
 			if (erf && reference_plane_project_input (t->obedit, erf, t->ar, t->view, imval, vec)) {
 				// Ok
 			} else {
-				ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+				ED_view3d_win_to_3d(t->view, t->ar, p, fmval, vec);
 			}
 		} else {
-			ED_view3d_win_to_3d(t->ar, p, fmval, vec);
+			ED_view3d_win_to_3d(t->view, t->ar, p, fmval, vec);
 		}
 		sub_v3_v3v3(output, vec, t->iloc);
 	} else {
@@ -284,10 +284,10 @@ static void InputAngleSpring(TransInfo *t, MouseInput *mi, const double mval[2],
 	output[1] = toutput[0];
 }
 
-void initMouseInput(TransInfo *UNUSED(t), MouseInput *mi, const float center[2], const int mval[2])
+void initMouseInput(TransInfo *UNUSED(t), MouseInput *mi, const float center[2], const int mval[2], const bool precision)
 {
 	mi->factor = 0;
-	mi->precision = 0;
+	mi->precision = precision;
 
 	mi->center[0] = center[0];
 	mi->center[1] = center[1];

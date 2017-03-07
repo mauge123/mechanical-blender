@@ -52,8 +52,8 @@ typedef enum ModifierType {
 	eModifierType_Smooth            = 16,
 	eModifierType_Cast              = 17,
 	eModifierType_MeshDeform        = 18,
-	/*eModifierType_ParticleSystem    = 19,*/ /* DEPRECATED */
-	/*eModifierType_ParticleInstance  = 20,*/ /* DEPRECATED */
+	eModifierType_ParticleSystem    = 19,
+	eModifierType_ParticleInstance  = 20,
 	eModifierType_Explode           = 21,
 	eModifierType_Cloth             = 22,
 	eModifierType_Collision         = 23,
@@ -86,6 +86,7 @@ typedef enum ModifierType {
 	eModifierType_NormalEdit        = 50,
 	eModifierType_CorrectiveSmooth  = 51,
 	eModifierType_MeshSequenceCache = 52,
+	eModifierType_SurfaceDeform     = 53,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -599,6 +600,8 @@ typedef struct ClothModifierData {
 	struct Cloth *clothObject;            /* The internal data structure for cloth. */
 	struct ClothSimSettings *sim_parms;   /* definition is in DNA_cloth_types.h */
 	struct ClothCollSettings *coll_parms; /* definition is in DNA_cloth_types.h */
+	struct PointCache *point_cache;       /* definition is in DNA_object_force.h */
+	struct ListBase ptcaches;
 	/* XXX nasty hack, remove once hair can be separated from cloth modifier data */
 	struct ClothHairData *hairdata;
 	/* grid geometry values of hair continuum */
@@ -718,6 +721,41 @@ enum {
 	MOD_MDEF_SURFACE  = 1,
 };
 
+typedef struct ParticleSystemModifierData {
+	ModifierData modifier;
+
+	struct ParticleSystem *psys;
+	struct DerivedMesh *dm_final;  /* Final DM - its topology may differ from orig mesh. */
+	struct DerivedMesh *dm_deformed;  /* Deformed-onle DM - its topology is same as orig mesh one. */
+	int totdmvert, totdmedge, totdmface;
+	short flag, pad;
+} ParticleSystemModifierData;
+
+typedef enum {
+	eParticleSystemFlag_Pars         = (1 << 0),
+	eParticleSystemFlag_psys_updated = (1 << 1),
+	eParticleSystemFlag_file_loaded  = (1 << 2),
+} ParticleSystemModifierFlag;
+
+typedef enum {
+	eParticleInstanceFlag_Parents   = (1 << 0),
+	eParticleInstanceFlag_Children  = (1 << 1),
+	eParticleInstanceFlag_Path      = (1 << 2),
+	eParticleInstanceFlag_Unborn    = (1 << 3),
+	eParticleInstanceFlag_Alive     = (1 << 4),
+	eParticleInstanceFlag_Dead      = (1 << 5),
+	eParticleInstanceFlag_KeepShape = (1 << 6),
+	eParticleInstanceFlag_UseSize   = (1 << 7),
+} ParticleInstanceModifierFlag;
+
+typedef struct ParticleInstanceModifierData {
+	ModifierData modifier;
+
+	struct Object *ob;
+	short psys, flag, axis, pad;
+	float position, random_position;
+} ParticleInstanceModifierData;
+
 typedef enum {
 	eExplodeFlag_CalcFaces = (1 << 0),
 	eExplodeFlag_PaSize    = (1 << 1),
@@ -752,6 +790,7 @@ typedef struct FluidsimModifierData {
 	ModifierData modifier;
 
 	struct FluidsimSettings *fss;   /* definition is in DNA_object_fluidsim.h */
+	struct PointCache *point_cache; /* definition is in DNA_object_force.h */
 } FluidsimModifierData;
 
 typedef struct ShrinkwrapModifierData {
@@ -1517,6 +1556,7 @@ typedef struct MeshSeqCacheModifierData {
 	ModifierData modifier;
 
 	struct CacheFile *cache_file;
+	struct CacheReader *reader;
 	char object_path[1024];  /* 1024 = FILE_MAX */
 
 	char read_flag;
@@ -1529,6 +1569,46 @@ enum {
 	MOD_MESHSEQ_READ_POLY  = (1 << 1),
 	MOD_MESHSEQ_READ_UV    = (1 << 2),
 	MOD_MESHSEQ_READ_COLOR = (1 << 3),
+};
+
+typedef struct SDefBind {
+	unsigned int *vert_inds;
+	unsigned int numverts;
+	int mode;
+	float *vert_weights;
+	float normal_dist;
+	float influence;
+} SDefBind;
+
+typedef struct SDefVert {
+	SDefBind *binds;
+	unsigned int numbinds;
+	char pad[4];
+} SDefVert;
+
+typedef struct SurfaceDeformModifierData {
+	ModifierData modifier;
+
+	struct Object *target;	/* bind target object */
+	SDefVert *verts;		/* vertex bind data */
+	float falloff;
+	unsigned int numverts, numpoly;
+	int flags;
+	float mat[4][4];
+} SurfaceDeformModifierData;
+
+/* Surface Deform modifier flags */
+enum {
+	MOD_SDEF_BIND = (1 << 0),
+	MOD_SDEF_USES_LOOPTRI = (1 << 1),
+	MOD_SDEF_HAS_CONCAVE = (1 << 2),
+};
+
+/* Surface Deform vertex bind modes */
+enum {
+	MOD_SDEF_MODE_LOOPTRI = 0,
+	MOD_SDEF_MODE_NGON = 1,
+	MOD_SDEF_MODE_CENTROID = 2,
 };
 
 #define MOD_MESHSEQ_READ_ALL \

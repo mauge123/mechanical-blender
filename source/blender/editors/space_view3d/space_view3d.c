@@ -47,6 +47,7 @@
 #include "BKE_icons.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_mesh_render.h"
 #include "BKE_object.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -181,8 +182,8 @@ bool ED_view3d_context_user_region(bContext *C, View3D **r_v3d, ARegion **r_ar)
 		View3D *v3d = (View3D *)sa->spacedata.first;
 
 		if (ar) {
-			RegionView3D *rv3d = ar->regiondata;
-			if (rv3d && (rv3d->viewlock & RV3D_LOCKED) == 0) {
+			RegionView3D *rv3d;
+			if ((ar->regiontype == RGN_TYPE_WINDOW) && (rv3d = ar->regiondata) && (rv3d->viewlock & RV3D_LOCKED) == 0) {
 				*r_v3d = v3d;
 				*r_ar = ar;
 				return true;
@@ -586,6 +587,7 @@ static void view3d_main_region_exit(wmWindowManager *wm, ARegion *ar)
 
 	if (rv3d->viewport) {
 		GPU_viewport_free(rv3d->viewport);
+		MEM_freeN(rv3d->viewport);
 		rv3d->viewport = NULL;
 	}
 }
@@ -647,7 +649,7 @@ static int view3d_ima_bg_drop_poll(bContext *C, wmDrag *drag, const wmEvent *eve
 
 static int view3d_ima_empty_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
-	Base *base = ED_view3d_give_base_under_cursor(C, event->mval);
+	BaseLegacy *base = ED_view3d_give_base_under_cursor(C, event->mval);
 
 	/* either holding and ctrl and no object, or dropping to empty */
 	if (((base == NULL) && event->ctrl) ||
@@ -661,7 +663,7 @@ static int view3d_ima_empty_drop_poll(bContext *C, wmDrag *drag, const wmEvent *
 
 static int view3d_ima_mesh_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
-	Base *base = ED_view3d_give_base_under_cursor(C, event->mval);
+	BaseLegacy *base = ED_view3d_give_base_under_cursor(C, event->mval);
 
 	if (base && base->object->type == OB_MESH)
 		return view3d_ima_drop_poll(C, drag, event);
@@ -747,6 +749,7 @@ static void view3d_main_region_free(ARegion *ar)
 		}
 		if (rv3d->viewport) {
 			GPU_viewport_free(rv3d->viewport);
+			MEM_freeN(rv3d->viewport);
 		}
 
 		MEM_freeN(rv3d);
@@ -784,7 +787,7 @@ static void view3d_recalc_used_layers(ARegion *ar, wmNotifier *wmn, Scene *scene
 	wmWindow *win = wmn->wm->winactive;
 	ScrArea *sa;
 	unsigned int lay_used = 0;
-	Base *base;
+	BaseLegacy *base;
 
 	if (!win) return;
 
@@ -878,6 +881,7 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 				case ND_MODIFIER:
 				case ND_CONSTRAINT:
 				case ND_KEYS:
+				case ND_PARTICLE:
 				case ND_LOD:
 					ED_region_tag_redraw(ar);
 					break;
@@ -890,9 +894,18 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 			break;
 		case NC_GEOM:
 			switch (wmn->data) {
+				case ND_SELECT:
+				{
+					if (scene->obedit) {
+						Object *ob = scene->obedit;
+						if (ob->type == OB_MESH) {
+							struct Mesh *me = ob->data;
+							BKE_mesh_batch_selection_dirty(me);
+						}
+					}
+				}
 				case ND_DATA:
 				case ND_VERTEX_GROUP:
-				case ND_SELECT:
 					ED_region_tag_redraw(ar);
 					break;
 			}
@@ -936,21 +949,13 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 			switch (wmn->data) {
 				case ND_SHADING:
 				case ND_NODES:
-				{
-#ifdef WITH_LEGACY_DEPSGRAPH
-					Object *ob = OBACT;
-					if ((v3d->drawtype == OB_MATERIAL) ||
-					    (ob && (ob->mode == OB_MODE_TEXTURE_PAINT)) ||
-					    (v3d->drawtype == OB_TEXTURE &&
-					     (scene->gm.matmode == GAME_MAT_GLSL ||
-					      BKE_scene_use_new_shading_nodes(scene))) ||
-					    !DEG_depsgraph_use_legacy())
-#endif
-					{
-						ED_region_tag_redraw(ar);
-					}
+					/* TODO(sergey) This is a bit too much updates, but needed to
+					 * have proper material drivers update in the viewport.
+					 *
+					 * How to solve?
+					 */
+					ED_region_tag_redraw(ar);
 					break;
-				}
 				case ND_SHADING_DRAW:
 				case ND_SHADING_LINKS:
 					ED_region_tag_redraw(ar);
@@ -967,12 +972,10 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 		case NC_LAMP:
 			switch (wmn->data) {
 				case ND_LIGHTING:
-					if ((v3d->drawtype == OB_MATERIAL) ||
-					    (v3d->drawtype == OB_TEXTURE && (scene->gm.matmode == GAME_MAT_GLSL)) ||
-					    !DEG_depsgraph_use_legacy())
-					{
-						ED_region_tag_redraw(ar);
-					}
+					/* TODO(sergey): This is a bit too much, but needed to
+					 * handle updates from new depsgraph.
+					 */
+					ED_region_tag_redraw(ar);
 					break;
 				case ND_LIGHTING_DRAW:
 					ED_region_tag_redraw(ar);
@@ -1265,26 +1268,9 @@ static void space_view3d_listener(bScreen *UNUSED(sc), ScrArea *sa, struct wmNot
 			}
 			break;
 	}
-
-	/* removed since BKE_image_user_frame_calc is now called in view3d_draw_bgpic because screen_ops doesnt call the notifier. */
-#if 0
-	if (wmn->category == NC_SCENE && wmn->data == ND_FRAME) {
-		View3D *v3d = area->spacedata.first;
-		BGpic *bgpic = v3d->bgpicbase.first;
-
-		for (; bgpic; bgpic = bgpic->next) {
-			if (bgpic->ima) {
-				Scene *scene = wmn->reference;
-				BKE_image_user_frame_calc(&bgpic->iuser, scene->r.cfra, 0);
-			}
-		}
-	}
-#endif
 }
 
 const char *view3d_context_dir[] = {
-	"selected_objects", "selected_bases", "selected_editable_objects",
-	"selected_editable_bases", "visible_objects", "visible_bases", "selectable_objects", "selectable_bases",
 	"active_base", "active_object", NULL
 };
 
@@ -1295,109 +1281,27 @@ static int view3d_context(const bContext *C, const char *member, bContextDataRes
 	if (CTX_data_dir(member)) {
 		CTX_data_dir_set(result, view3d_context_dir);
 	}
-	else if (CTX_data_equals(member, "selected_objects") || CTX_data_equals(member, "selected_bases")) {
-		View3D *v3d = CTX_wm_view3d(C);
-		Scene *scene = CTX_data_scene(C);
-		const unsigned int lay = v3d ? v3d->lay : scene->lay;
-		Base *base;
-		const bool selected_objects = CTX_data_equals(member, "selected_objects");
-
-		for (base = scene->base.first; base; base = base->next) {
-			if ((base->flag & SELECT) && (base->lay & lay)) {
-				if ((base->object->restrictflag & OB_RESTRICT_VIEW) == 0) {
-					if (selected_objects)
-						CTX_data_id_list_add(result, &base->object->id);
-					else
-						CTX_data_list_add(result, &scene->id, &RNA_ObjectBase, base);
-				}
-			}
-		}
-		CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
-		return 1;
-	}
-	else if (CTX_data_equals(member, "selected_editable_objects") || CTX_data_equals(member, "selected_editable_bases")) {
-		View3D *v3d = CTX_wm_view3d(C);
-		Scene *scene = CTX_data_scene(C);
-		const unsigned int lay = v3d ? v3d->lay : scene->lay;
-		Base *base;
-		const bool selected_editable_objects = CTX_data_equals(member, "selected_editable_objects");
-
-		for (base = scene->base.first; base; base = base->next) {
-			if ((base->flag & SELECT) && (base->lay & lay)) {
-				if ((base->object->restrictflag & OB_RESTRICT_VIEW) == 0) {
-					if (0 == BKE_object_is_libdata(base->object)) {
-						if (selected_editable_objects)
-							CTX_data_id_list_add(result, &base->object->id);
-						else
-							CTX_data_list_add(result, &scene->id, &RNA_ObjectBase, base);
-					}
-				}
-			}
-		}
-		CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
-		return 1;
-	}
-	else if (CTX_data_equals(member, "visible_objects") || CTX_data_equals(member, "visible_bases")) {
-		View3D *v3d = CTX_wm_view3d(C);
-		Scene *scene = CTX_data_scene(C);
-		const unsigned int lay = v3d ? v3d->lay : scene->lay;
-		Base *base;
-		const bool visible_objects = CTX_data_equals(member, "visible_objects");
-
-		for (base = scene->base.first; base; base = base->next) {
-			if (base->lay & lay) {
-				if ((base->object->restrictflag & OB_RESTRICT_VIEW) == 0) {
-					if (visible_objects)
-						CTX_data_id_list_add(result, &base->object->id);
-					else
-						CTX_data_list_add(result, &scene->id, &RNA_ObjectBase, base);
-				}
-			}
-		}
-		CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
-		return 1;
-	}
-	else if (CTX_data_equals(member, "selectable_objects") || CTX_data_equals(member, "selectable_bases")) {
-		View3D *v3d = CTX_wm_view3d(C);
-		Scene *scene = CTX_data_scene(C);
-		const unsigned int lay = v3d ? v3d->lay : scene->lay;
-		Base *base;
-		const bool selectable_objects = CTX_data_equals(member, "selectable_objects");
-
-		for (base = scene->base.first; base; base = base->next) {
-			if (base->lay & lay) {
-				if ((base->object->restrictflag & OB_RESTRICT_VIEW) == 0 && (base->object->restrictflag & OB_RESTRICT_SELECT) == 0) {
-					if (selectable_objects)
-						CTX_data_id_list_add(result, &base->object->id);
-					else
-						CTX_data_list_add(result, &scene->id, &RNA_ObjectBase, base);
-				}
-			}
-		}
-		CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
-		return 1;
-	}
 	else if (CTX_data_equals(member, "active_base")) {
-		View3D *v3d = CTX_wm_view3d(C);
 		Scene *scene = CTX_data_scene(C);
-		const unsigned int lay = v3d ? v3d->lay : scene->lay;
-		if (scene->basact && (scene->basact->lay & lay)) {
-			Object *ob = scene->basact->object;
+		SceneLayer *sl = CTX_data_scene_layer(C);
+		if (sl->basact) {
+			Object *ob = sl->basact->object;
 			/* if hidden but in edit mode, we still display, can happen with animation */
-			if ((ob->restrictflag & OB_RESTRICT_VIEW) == 0 || (ob->mode & OB_MODE_EDIT))
-				CTX_data_pointer_set(result, &scene->id, &RNA_ObjectBase, scene->basact);
+			if ((sl->basact->flag & BASE_VISIBLED) != 0 || (ob->mode & OB_MODE_EDIT)) {
+				CTX_data_pointer_set(result, &scene->id, &RNA_ObjectBase, sl->basact);
+			}
 		}
 		
 		return 1;
 	}
 	else if (CTX_data_equals(member, "active_object")) {
-		View3D *v3d = CTX_wm_view3d(C);
-		Scene *scene = CTX_data_scene(C);
-		const unsigned int lay = v3d ? v3d->lay : scene->lay;
-		if (scene->basact && (scene->basact->lay & lay)) {
-			Object *ob = scene->basact->object;
-			if ((ob->restrictflag & OB_RESTRICT_VIEW) == 0 || (ob->mode & OB_MODE_EDIT))
-				CTX_data_id_pointer_set(result, &scene->basact->object->id);
+		SceneLayer *sl = CTX_data_scene_layer(C);
+		if (sl->basact) {
+			Object *ob = sl->basact->object;
+			/* if hidden but in edit mode, we still display, can happen with animation */
+			if ((sl->basact->flag & BASE_VISIBLED) != 0 || (ob->mode & OB_MODE_EDIT) != 0) {
+				CTX_data_id_pointer_set(result, &ob->id);
+			}
 		}
 		
 		return 1;

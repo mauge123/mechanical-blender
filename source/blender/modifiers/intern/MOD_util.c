@@ -257,6 +257,8 @@ void modifier_type_init(ModifierTypeInfo *types[])
 	INIT_TYPE(Boolean);
 	INIT_TYPE(MeshDeform);
 	INIT_TYPE(Ocean);
+	INIT_TYPE(ParticleSystem);
+	INIT_TYPE(ParticleInstance);
 	INIT_TYPE(Explode);
 	INIT_TYPE(Shrinkwrap);
 	INIT_TYPE(Fluidsim);
@@ -285,5 +287,6 @@ void modifier_type_init(ModifierTypeInfo *types[])
 	INIT_TYPE(NormalEdit);
 	INIT_TYPE(CorrectiveSmooth);
 	INIT_TYPE(MeshSequenceCache);
+	INIT_TYPE(SurfaceDeform);
 #undef INIT_TYPE
 }

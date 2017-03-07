@@ -105,6 +105,7 @@ EnumPropertyItem rna_enum_object_modifier_type_items[] = {
 	{eModifierType_Shrinkwrap, "SHRINKWRAP", ICON_MOD_SHRINKWRAP, "Shrinkwrap", ""},
 	{eModifierType_SimpleDeform, "SIMPLE_DEFORM", ICON_MOD_SIMPLEDEFORM, "Simple Deform", ""},
 	{eModifierType_Smooth, "SMOOTH", ICON_MOD_SMOOTH, "Smooth", ""},
+	{eModifierType_SurfaceDeform, "SURFACE_DEFORM", ICON_MOD_MESHDEFORM, "Surface Deform", ""},
 	{eModifierType_Warp, "WARP", ICON_MOD_WARP, "Warp", ""},
 	{eModifierType_Wave, "WAVE", ICON_MOD_WAVE, "Wave", ""},
 	{0, "", 0, N_("Simulate"), ""},
@@ -114,6 +115,8 @@ EnumPropertyItem rna_enum_object_modifier_type_items[] = {
 	{eModifierType_Explode, "EXPLODE", ICON_MOD_EXPLODE, "Explode", ""},
 	{eModifierType_Fluidsim, "FLUID_SIMULATION", ICON_MOD_FLUIDSIM, "Fluid Simulation", ""},
 	{eModifierType_Ocean, "OCEAN", ICON_MOD_OCEAN, "Ocean", ""},
+	{eModifierType_ParticleInstance, "PARTICLE_INSTANCE", ICON_MOD_PARTICLES, "Particle Instance", ""},
+	{eModifierType_ParticleSystem, "PARTICLE_SYSTEM", ICON_MOD_PARTICLES, "Particle System", ""},
 	{eModifierType_Smoke, "SMOKE", ICON_MOD_SMOKE, "Smoke", ""},
 	{eModifierType_Softbody, "SOFT_BODY", ICON_MOD_SOFT, "Soft Body", ""},
 	{eModifierType_Surface, "SURFACE", ICON_MOD_PHYSICS, "Surface", ""},
@@ -277,6 +280,7 @@ EnumPropertyItem rna_enum_axis_flag_xyz_items[] = {
 
 #ifdef RNA_RUNTIME
 
+#include "DNA_particle_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_smoke_types.h"
 
@@ -286,6 +290,7 @@ EnumPropertyItem rna_enum_axis_flag_xyz_items[] = {
 #include "BKE_library.h"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
+#include "BKE_particle.h"
 
 #ifdef WITH_ALEMBIC
 #  include "ABC_alembic.h"
@@ -338,6 +343,10 @@ static StructRNA *rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_CastModifier;
 		case eModifierType_MeshDeform:
 			return &RNA_MeshDeformModifier;
+		case eModifierType_ParticleSystem:
+			return &RNA_ParticleSystemModifier;
+		case eModifierType_ParticleInstance:
+			return &RNA_ParticleInstanceModifier;
 		case eModifierType_Explode:
 			return &RNA_ExplodeModifier;
 		case eModifierType_Cloth:
@@ -400,6 +409,8 @@ static StructRNA *rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_CorrectiveSmoothModifier;
 		case eModifierType_MeshSequenceCache:
 			return &RNA_MeshSequenceCacheModifier;
+		case eModifierType_SurfaceDeform:
+			return &RNA_SurfaceDeformModifier;
 		/* Default */
 		case eModifierType_None:
 		case eModifierType_ShapeKey:
@@ -565,6 +576,7 @@ RNA_MOD_OBJECT_SET(MeshDeform, object, OB_MESH);
 RNA_MOD_OBJECT_SET(NormalEdit, target, OB_EMPTY);
 RNA_MOD_OBJECT_SET(Shrinkwrap, target, OB_MESH);
 RNA_MOD_OBJECT_SET(Shrinkwrap, auxTarget, OB_MESH);
+RNA_MOD_OBJECT_SET(SurfaceDeform, target, OB_MESH);
 
 static void rna_HookModifier_object_set(PointerRNA *ptr, PointerRNA value)
 {
@@ -697,6 +709,12 @@ static PointerRNA rna_SoftBodyModifier_settings_get(PointerRNA *ptr)
 {
 	Object *ob = (Object *)ptr->id.data;
 	return rna_pointer_inherit_refine(ptr, &RNA_SoftBodySettings, ob->soft);
+}
+
+static PointerRNA rna_SoftBodyModifier_point_cache_get(PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	return rna_pointer_inherit_refine(ptr, &RNA_PointCache, ob->soft->pointcache);
 }
 
 static PointerRNA rna_CollisionModifier_settings_get(PointerRNA *ptr)
@@ -1115,6 +1133,26 @@ static int rna_CorrectiveSmoothModifier_is_bind_get(PointerRNA *ptr)
 {
 	CorrectiveSmoothModifierData *csmd = (CorrectiveSmoothModifierData *)ptr->data;
 	return (csmd->bind_coords != NULL);
+}
+
+static int rna_SurfaceDeformModifier_is_bound_get(PointerRNA *ptr)
+{
+	return (((SurfaceDeformModifierData *)ptr->data)->verts != NULL);
+}
+
+static void rna_MeshSequenceCache_object_path_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+#ifdef WITH_ALEMBIC
+	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)ptr->data;
+	Object *ob = (Object *)ptr->id.data;
+
+	mcmd->reader = CacheReader_open_alembic_object(mcmd->cache_file->handle,
+	                                               mcmd->reader,
+	                                               ob,
+	                                               mcmd->object_path);
+#endif
+
+	rna_Modifier_update(bmain, scene, ptr);
 }
 
 #else
@@ -1871,6 +1909,12 @@ static void rna_def_modifier_softbody(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "SoftBodySettings");
 	RNA_def_property_pointer_funcs(prop, "rna_SoftBodyModifier_settings_get", NULL, NULL, NULL);
 	RNA_def_property_ui_text(prop, "Soft Body Settings", "");
+
+	prop = RNA_def_property(srna, "point_cache", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_struct_type(prop, "PointCache");
+	RNA_def_property_pointer_funcs(prop, "rna_SoftBodyModifier_point_cache_get", NULL, NULL, NULL);
+	RNA_def_property_ui_text(prop, "Soft Body Point Cache", "");
 }
 
 static void rna_def_modifier_boolean(BlenderRNA *brna)
@@ -2542,6 +2586,104 @@ static void rna_def_modifier_meshdeform(BlenderRNA *brna)
 #endif
 }
 
+static void rna_def_modifier_particlesystem(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "ParticleSystemModifier", "Modifier");
+	RNA_def_struct_ui_text(srna, "ParticleSystem Modifier", "Particle system simulation modifier");
+	RNA_def_struct_sdna(srna, "ParticleSystemModifierData");
+	RNA_def_struct_ui_icon(srna, ICON_MOD_PARTICLES);
+	
+	prop = RNA_def_property(srna, "particle_system", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "psys");
+	RNA_def_property_ui_text(prop, "Particle System", "Particle System that this modifier controls");
+}
+
+static void rna_def_modifier_particleinstance(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "ParticleInstanceModifier", "Modifier");
+	RNA_def_struct_ui_text(srna, "ParticleInstance Modifier", "Particle system instancing modifier");
+	RNA_def_struct_sdna(srna, "ParticleInstanceModifierData");
+	RNA_def_struct_ui_icon(srna, ICON_MOD_PARTICLES);
+
+	prop = RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "ob");
+	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Mesh_object_poll");
+	RNA_def_property_ui_text(prop, "Object", "Object that has the particle system");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
+
+	prop = RNA_def_property(srna, "particle_system_index", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "psys");
+	RNA_def_property_range(prop, 1, 10);
+	RNA_def_property_ui_text(prop, "Particle System Number", "");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "axis");
+	RNA_def_property_enum_items(prop, rna_enum_axis_xyz_items);
+	RNA_def_property_ui_text(prop, "Axis", "Pole axis for rotation");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+	
+	prop = RNA_def_property(srna, "use_normal", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Parents);
+	RNA_def_property_ui_text(prop, "Normal", "Create instances from normal particles");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "use_children", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Children);
+	RNA_def_property_ui_text(prop, "Children", "Create instances from child particles");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "use_path", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Path);
+	RNA_def_property_ui_text(prop, "Path", "Create instances along particle paths");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "show_unborn", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Unborn);
+	RNA_def_property_ui_text(prop, "Unborn", "Show instances when particles are unborn");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "show_alive", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Alive);
+	RNA_def_property_ui_text(prop, "Alive", "Show instances when particles are alive");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "show_dead", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_Dead);
+	RNA_def_property_ui_text(prop, "Dead", "Show instances when particles are dead");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "use_preserve_shape", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_KeepShape);
+	RNA_def_property_ui_text(prop, "Keep Shape", "Don't stretch the object");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "use_size", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", eParticleInstanceFlag_UseSize);
+	RNA_def_property_ui_text(prop, "Size", "Use particle size to scale the instances");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "position", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "position");
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_text(prop, "Position", "Position along path");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "random_position", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "random_position");
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_text(prop, "Random Position", "Randomize position along path");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+}
+
 static void rna_def_modifier_explode(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2618,6 +2760,10 @@ static void rna_def_modifier_cloth(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "ClothSolverResult");
 	RNA_def_property_pointer_sdna(prop, NULL, "solver_result");
 	RNA_def_property_ui_text(prop, "Solver Result", "");
+	
+	prop = RNA_def_property(srna, "point_cache", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_ui_text(prop, "Point Cache", "");
 
 	prop = RNA_def_property(srna, "hair_grid_min", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "hair_grid_min");
@@ -4135,7 +4281,7 @@ static void rna_def_modifier_meshseqcache(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "object_path", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Object Path", "Path to the object in the Alembic archive used to lookup geometric data");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+	RNA_def_property_update(prop, 0, "rna_MeshSequenceCache_object_path_update");
 
 	static EnumPropertyItem read_flag_items[] = {
 		{MOD_MESHSEQ_READ_VERT,  "VERT", 0, "Vertex", ""},
@@ -4565,6 +4711,33 @@ static void rna_def_modifier_normaledit(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
+static void rna_def_modifier_surfacedeform(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "SurfaceDeformModifier", "Modifier");
+	RNA_def_struct_ui_text(srna, "SurfaceDeform Modifier", "blablabla");
+	RNA_def_struct_sdna(srna, "SurfaceDeformModifierData");
+	RNA_def_struct_ui_icon(srna, ICON_MOD_MESHDEFORM);
+
+	prop = RNA_def_property(srna, "target", PROP_POINTER, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Target", "Mesh object to deform with");
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_SurfaceDeformModifier_target_set", NULL, "rna_Mesh_object_poll");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
+
+	prop = RNA_def_property(srna, "falloff", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 2.0f, 16.0f);
+	RNA_def_property_ui_text(prop, "Interpolation falloff", "Controls how much nearby polygons influence deformation");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "is_bound", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_funcs(prop, "rna_SurfaceDeformModifier_is_bound_get", NULL);
+	RNA_def_property_ui_text(prop, "Bound", "Whether geometry has been bound to target mesh");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+}
+
 void RNA_def_modifier(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -4650,6 +4823,8 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_correctivesmooth(brna);
 	rna_def_modifier_cast(brna);
 	rna_def_modifier_meshdeform(brna);
+	rna_def_modifier_particlesystem(brna);
+	rna_def_modifier_particleinstance(brna);
 	rna_def_modifier_explode(brna);
 	rna_def_modifier_cloth(brna);
 	rna_def_modifier_collision(brna);
@@ -4680,6 +4855,7 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_datatransfer(brna);
 	rna_def_modifier_normaledit(brna);
 	rna_def_modifier_meshseqcache(brna);
+	rna_def_modifier_surfacedeform(brna);
 }
 
 #endif

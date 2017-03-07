@@ -357,12 +357,20 @@ void    UI_GetThemeColorBlend3ubv(int colorid1, int colorid2, float fac, unsigne
 // get the color, range 0.0-1.0, complete with shading offset
 void    UI_GetThemeColorShade3fv(int colorid, int offset, float col[3]);
 void    UI_GetThemeColorShade3ubv(int colorid, int offset, unsigned char col[3]);
+void    UI_GetThemeColorShade4ubv(int colorid, int offset, unsigned char col[4]);
+
+// get three color values, range 0-255, complete with shading offset for the RGB components and blending
+void	UI_GetThemeColorBlendShade3ubv(int colorid1, int colorid2, float fac, int offset, unsigned char col[3]);
 
 // get four color values, scaled to 0.0-1.0 range
 void    UI_GetThemeColor4fv(int colorid, float col[4]);
 // get four color values, range 0.0-1.0, complete with shading offset for the RGB components
 void    UI_GetThemeColorShade4fv(int colorid, int offset, float col[4]);
 void	UI_GetThemeColorShadeAlpha4fv(int colorid, int coloffset, int alphaoffset, float col[4]);
+
+// get four colour values ranged between 0 and 255; includes the alpha channel
+void    UI_GetThemeColorShadeAlpha4ubv(int colorid, int coloffset, int alphaoffset, unsigned char col[4]);
+
 // get four color values, range 0.0-1.0, complete with shading offset for the RGB components and blending
 void    UI_GetThemeColorBlendShade4fv(int colorid1, int colorid2, float fac, int offset, float col[4]);
 
@@ -381,6 +389,10 @@ void    UI_GetColorPtrShade3ubv(const unsigned char cp1[3], unsigned char col[3]
 
 // get a 3 byte color, blended and shaded between two other char color pointers
 void    UI_GetColorPtrBlendShade3ubv(const unsigned char cp1[3], const unsigned char cp2[3], unsigned char col[3], float fac, int offset);
+
+// sets the font color
+// (for anything fancy use UI_GetThemeColor[Fancy] then BLF_color)
+void UI_FontThemeColor(int fontid, int colorid);
 
 // clear the openGL ClearColor using the input colorid
 void    UI_ThemeClearColor(int colorid);

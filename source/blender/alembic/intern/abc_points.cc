@@ -32,9 +32,11 @@ extern "C" {
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 
+#include "BKE_cdderivedmesh.h"
 #include "BKE_lattice.h"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
+#include "BKE_particle.h"
 #include "BKE_scene.h"
 
 #include "BLI_math.h"
@@ -61,15 +63,13 @@ AbcPointsWriter::AbcPointsWriter(Scene *scene,
 	                             AbcTransformWriter *parent,
 	                             uint32_t time_sampling,
 	                             ExportSettings &settings,
-	                             void *UNUSED(psys))
+	                             ParticleSystem *psys)
     : AbcObjectWriter(scene, ob, time_sampling, settings, parent)
 {
-	m_psys = NULL; // = psys;
+	m_psys = psys;
 
-#if 0
 	OPoints points(parent->alembicXform(), psys->name, m_time_sampling);
 	m_schema = points.getSchema();
-#endif
 }
 
 void AbcPointsWriter::do_write()
@@ -77,7 +77,7 @@ void AbcPointsWriter::do_write()
 	if (!m_psys) {
 		return;
 	}
-#if 0
+
 	std::vector<Imath::V3f> points;
 	std::vector<Imath::V3f> velocities;
 	std::vector<float> widths;
@@ -134,7 +134,6 @@ void AbcPointsWriter::do_write()
 	m_sample.setSelfBounds(bounds());
 
 	m_schema.set(m_sample);
-#endif
 }
 
 /* ************************************************************************** */
@@ -156,14 +155,14 @@ void AbcPointsReader::readObjectData(Main *bmain, float time)
 {
 	Mesh *mesh = BKE_mesh_add(bmain, m_data_name.c_str());
 
-	const ISampleSelector sample_sel(time);
-	m_sample = m_schema.getValue(sample_sel);
+	DerivedMesh *dm = CDDM_from_mesh(mesh);
+	DerivedMesh *ndm = this->read_derivedmesh(dm, time, 0, NULL);
 
-	const P3fArraySamplePtr &positions = m_sample.getPositions();
-	utils::mesh_add_verts(mesh, positions->size());
+	if (ndm != dm) {
+		dm->release(dm);
+	}
 
-	CDStreamConfig config = create_config(mesh);
-	read_points_sample(m_schema, sample_sel, config, time);
+	DM_to_mesh(ndm, mesh, m_object, CD_MASK_MESH, true);
 
 	if (m_settings->validate_meshes) {
 		BKE_mesh_validate(mesh, false, false);
@@ -190,7 +189,8 @@ void read_points_sample(const IPointsSchema &schema,
 	N3fArraySamplePtr vnormals;
 
 	if (has_property(prop, "N")) {
-		const IN3fArrayProperty &normals_prop = IN3fArrayProperty(prop, "N", time);
+		const Alembic::Util::uint32_t itime = static_cast<Alembic::Util::uint32_t>(time);
+		const IN3fArrayProperty &normals_prop = IN3fArrayProperty(prop, "N", itime);
 
 		if (normals_prop) {
 			vnormals = normals_prop.getValue(selector);
@@ -198,4 +198,23 @@ void read_points_sample(const IPointsSchema &schema,
 	}
 
 	read_mverts(config.mvert, positions, vnormals);
+}
+
+DerivedMesh *AbcPointsReader::read_derivedmesh(DerivedMesh *dm, const float time, int /*read_flag*/, const char ** /*err_str*/)
+{
+	ISampleSelector sample_sel(time);
+	const IPointsSchema::Sample sample = m_schema.getValue(sample_sel);
+
+	const P3fArraySamplePtr &positions = sample.getPositions();
+
+	DerivedMesh *new_dm = NULL;
+
+	if (dm->getNumVerts(dm) != positions->size()) {
+		new_dm = CDDM_new(positions->size(), 0, 0, 0, 0);
+	}
+
+	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
+	read_points_sample(m_schema, sample_sel, config, time);
+
+	return new_dm ? new_dm : dm;
 }

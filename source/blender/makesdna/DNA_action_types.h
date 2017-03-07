@@ -76,6 +76,8 @@ typedef struct bMotionPath {
 	int start_frame;            /* for drawing paths, the start frame number */
 	int end_frame;              /* for drawing paths, the end frame number */
 	
+	float color[3];	            /* optional custom color */
+	int line_thickness;         /* line thickness */
 	int flag;                   /* baking settings - eMotionPath_Flag */
 } bMotionPath;
 
@@ -84,7 +86,11 @@ typedef enum eMotionPath_Flag {
 	/* (for bones) path represents the head of the bone */
 	MOTIONPATH_FLAG_BHEAD       = (1 << 0),
 	/* motion path is being edited */
-	MOTIONPATH_FLAG_EDIT        = (1 << 1)
+	MOTIONPATH_FLAG_EDIT        = (1 << 1),
+	/* Custom colors */
+	MOTIONPATH_FLAG_CUSTOM      = (1 << 2),
+	/* Draw lines or only points */
+	MOTIONPATH_FLAG_LINES       = (1 << 3)   
 } eMotionPath_Flag;
 
 /* Visualization General --------------------------- */
@@ -232,6 +238,8 @@ typedef struct bPoseChannel {
 	float chan_mat[4][4];           /* matrix result of loc/quat/size, and where we put deform in, see next line */
 	float pose_mat[4][4];           /* constraints accumulate here. in the end, pose_mat = bone->arm_mat * chan_mat
 	                                 * this matrix is object space */
+	float disp_mat[4][4];           /* for display, pose_mat with bone length applied */
+	float disp_tail_mat[4][4];      /* for display, pose_mat with bone length applied and translated to tail*/
 	float constinv[4][4];           /* inverse result of constraints.
 	                                 * doesn't include effect of restposition, parent, and local transform*/
 	

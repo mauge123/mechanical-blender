@@ -725,10 +725,13 @@ static void wm_operator_finished(bContext *C, wmOperator *op, const bool repeat)
 	/* we don't want to do undo pushes for operators that are being
 	 * called from operators that already do an undo push. usually
 	 * this will happen for python operators that call C operators */
-	if (wm->op_undo_depth == 0)
+	if (wm->op_undo_depth == 0) {
 		if (op->type->flag & OPTYPE_UNDO)
 			ED_undo_push_op(C, op);
-	
+		else if (op->type->flag & OPTYPE_UNDO_GROUPED)
+			ED_undo_grouped_push_op(C, op);
+	}
+
 	if (repeat == 0) {
 		if (G.debug & G_DEBUG_WM) {
 			char *buf = WM_operator_pystring(C, op, false, true);
@@ -1930,9 +1933,12 @@ static int wm_handler_fileselect_do(bContext *C, ListBase *handlers, wmEventHand
 					wm->op_undo_depth--;
 
 				/* XXX check this carefully, CTX_wm_manager(C) == wm is a bit hackish */
-				if (CTX_wm_manager(C) == wm && wm->op_undo_depth == 0)
+				if (CTX_wm_manager(C) == wm && wm->op_undo_depth == 0) {
 					if (handler->op->type->flag & OPTYPE_UNDO)
 						ED_undo_push_op(C, handler->op);
+					else if (handler->op->type->flag & OPTYPE_UNDO_GROUPED)
+						ED_undo_grouped_push_op(C, handler->op);
+				}
 
 				if (handler->op->reports->list.first) {
 
@@ -2711,7 +2717,7 @@ void WM_event_add_fileselect(bContext *C, wmOperator *op)
 	wmWindow *win = CTX_wm_window(C);
 
 	/* only allow 1 file selector open per window */
-	for (handler = win->modalhandlers.first; handler; handler = handlernext) {
+	for (handler = win->handlers.first; handler; handler = handlernext) {
 		handlernext = handler->next;
 		
 		if (handler->type == WM_HANDLER_FILESELECT) {
@@ -2725,7 +2731,7 @@ void WM_event_add_fileselect(bContext *C, wmOperator *op)
 
 					if (sfile->op == handler->op) {
 						CTX_wm_area_set(C, sa);
-						wm_handler_fileselect_do(C, &win->modalhandlers, handler, EVT_FILESELECT_CANCEL);
+						wm_handler_fileselect_do(C, &win->handlers, handler, EVT_FILESELECT_CANCEL);
 						break;
 					}
 				}
@@ -2733,7 +2739,7 @@ void WM_event_add_fileselect(bContext *C, wmOperator *op)
 
 			/* if not found we stop the handler without changing the screen */
 			if (!sa)
-				wm_handler_fileselect_do(C, &win->modalhandlers, handler, EVT_FILESELECT_EXTERNAL_CANCEL);
+				wm_handler_fileselect_do(C, &win->handlers, handler, EVT_FILESELECT_EXTERNAL_CANCEL);
 		}
 	}
 	
@@ -2744,7 +2750,7 @@ void WM_event_add_fileselect(bContext *C, wmOperator *op)
 	handler->op_area = CTX_wm_area(C);
 	handler->op_region = CTX_wm_region(C);
 	
-	BLI_addhead(&win->modalhandlers, handler);
+	BLI_addhead(&win->handlers, handler);
 	
 	/* check props once before invoking if check is available
 	 * ensures initial properties are valid */
@@ -3339,6 +3345,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 			GHOST_TEventCursorData *cd = customdata;
 
 			copy_v2_v2_int(&event.x, &cd->x);
+			wm_stereo3d_mouse_offset_apply(win, &event.x);
+
 			event.type = MOUSEMOVE;
 			wm_event_add_mousemove(win, &event);
 			copy_v2_v2_int(&evt->x, &event.x);

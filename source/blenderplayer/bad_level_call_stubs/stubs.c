@@ -45,6 +45,7 @@ struct ARegion;
 struct ARegionType;
 struct BMEditMesh;
 struct Base;
+struct BaseLegacy;
 struct bContext;
 struct BoundBox;
 struct Brush;
@@ -142,7 +143,6 @@ struct wmWindowManager;
 #  pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
-#include "../../intern/cycles/blender/CCL_api.h"
 #include "../../intern/dualcon/dualcon.h"
 #include "../../intern/elbeem/extern/elbeem.h"
 #include "../blender/blenkernel/BKE_modifier.h"
@@ -165,6 +165,7 @@ struct wmWindowManager;
 #include "../blender/editors/include/ED_mesh.h"
 #include "../blender/editors/include/ED_node.h"
 #include "../blender/editors/include/ED_object.h"
+#include "../blender/editors/include/ED_particle.h"
 #include "../blender/editors/include/ED_render.h"
 #include "../blender/editors/include/ED_screen.h"
 #include "../blender/editors/include/ED_space_api.h"
@@ -185,6 +186,7 @@ struct wmWindowManager;
 #include "../blender/render/extern/include/RE_pipeline.h"
 #include "../blender/render/extern/include/RE_render_ext.h"
 #include "../blender/render/extern/include/RE_shader_ext.h"
+#include "../blender/draw/DRW_engine.h"
 #include "../blender/windowmanager/WM_api.h"
 
 
@@ -237,13 +239,13 @@ struct RenderLayer *RE_GetRenderLayer(struct RenderResult *rr, const char *name)
 void RE_texture_rng_init() RET_NONE
 void RE_texture_rng_exit() RET_NONE
 
-bool RE_layers_have_name(struct RenderResult *result) {STUB_ASSERT(0); return 0;}
+bool RE_layers_have_name(struct RenderResult *result) RET_ZERO
 const char *RE_engine_active_view_get(struct RenderEngine *engine) RET_NULL
-void RE_engine_active_view_set(struct RenderEngine *engine, const char *viewname) {STUB_ASSERT(0);}
-void RE_engine_get_camera_model_matrix(struct RenderEngine *engine, struct Object *camera, int use_spherical_stereo, float *r_modelmat) {STUB_ASSERT(0);}
+void RE_engine_active_view_set(struct RenderEngine *engine, const char *viewname) RET_NONE
+void RE_engine_get_camera_model_matrix(struct RenderEngine *engine, struct Object *camera, int use_spherical_stereo, float *r_modelmat) RET_NONE
 float RE_engine_get_camera_shift_x(struct RenderEngine *engine, struct Object *camera, int use_spherical_stereo) RET_ZERO
 int RE_engine_get_spherical_stereo(struct RenderEngine *engine, struct Object *camera) RET_ZERO
-void RE_SetActiveRenderView(struct Render *re, const char *viewname) {STUB_ASSERT(0);}
+void RE_SetActiveRenderView(struct Render *re, const char *viewname) RET_NONE
 
 struct RenderPass *RE_pass_find_by_type(volatile struct RenderLayer *rl, int passtype, const char *viewname) RET_NULL
 bool RE_HasFakeLayer(RenderResult *res) RET_ZERO
@@ -411,6 +413,9 @@ void ED_fsmenu_entry_set_path(struct FSMenuEntry *fsentry, const char *name) RET
 char *ED_fsmenu_entry_get_name(struct FSMenuEntry *fsentry) RET_NULL
 void ED_fsmenu_entry_set_name(struct FSMenuEntry *fsentry, const char *name) RET_NONE
 
+struct PTCacheEdit *PE_get_current(struct Scene *scene, struct SceneLayer *sl, struct Object *ob) RET_NULL
+void PE_current_changed(struct Scene *scene, struct Object *ob) RET_NONE
+
 /* rna keymap */
 struct wmKeyMap *WM_keymap_active(struct wmWindowManager *wm, struct wmKeyMap *keymap) RET_NULL
 struct wmKeyMap *WM_keymap_find(struct wmKeyConfig *keyconf, const char *idname, int spaceid, int regionid) RET_NULL
@@ -459,17 +464,17 @@ void ED_node_texture_default(const struct bContext *C, struct Tex *tex) RET_NONE
 void ED_node_tag_update_id(struct ID *id) RET_NONE
 void ED_node_tag_update_nodetree(struct Main *bmain, struct bNodeTree *ntree, struct bNode *node) RET_NONE
 void ED_node_tree_update(const struct bContext *C) RET_NONE
-void ED_node_set_tree_type(struct SpaceNode *snode, struct bNodeTreeType *typeinfo){}
-void ED_init_custom_node_type(struct bNodeType *ntype){}
-void ED_init_custom_node_socket_type(struct bNodeSocketType *stype){}
+void ED_node_set_tree_type(struct SpaceNode *snode, struct bNodeTreeType *typeinfo) RET_NONE
+void ED_init_custom_node_type(struct bNodeType *ntype) RET_NONE
+void ED_init_custom_node_socket_type(struct bNodeSocketType *stype) RET_NONE
 void ED_init_standard_node_socket_type(struct bNodeSocketType *stype) RET_NONE
 void ED_init_node_socket_type_virtual(struct bNodeSocketType *stype) RET_NONE
-int ED_node_tree_path_length(struct SpaceNode *snode){return 0;}
-void ED_node_tree_path_get(struct SpaceNode *snode, char *value){}
-void ED_node_tree_path_get_fixedbuf(struct SpaceNode *snode, char *value, int max_length){}
-void ED_node_tree_start(struct SpaceNode *snode, struct bNodeTree *ntree, struct ID *id, struct ID *from){}
-void ED_node_tree_push(struct SpaceNode *snode, struct bNodeTree *ntree, struct bNode *gnode){}
-void ED_node_tree_pop(struct SpaceNode *snode){}
+int ED_node_tree_path_length(struct SpaceNode *snode) RET_ZERO
+void ED_node_tree_path_get(struct SpaceNode *snode, char *value) RET_NONE
+void ED_node_tree_path_get_fixedbuf(struct SpaceNode *snode, char *value, int max_length) RET_NONE
+void ED_node_tree_start(struct SpaceNode *snode, struct bNodeTree *ntree, struct ID *id, struct ID *from) RET_NONE
+void ED_node_tree_push(struct SpaceNode *snode, struct bNodeTree *ntree, struct bNode *gnode) RET_NONE
+void ED_node_tree_pop(struct SpaceNode *snode) RET_NONE
 int ED_view3d_scene_layer_set(int lay, const int *values, int *active) RET_ZERO
 void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar, bool do_clip) RET_NONE
 void ED_view3d_from_m4(float mat[4][4], float ofs[3], float quat[4], float *dist) RET_NONE
@@ -482,7 +487,8 @@ void ED_view3d_shade_update(struct Main *bmain, struct Scene *scene, struct View
 void ED_node_shader_default(const struct bContext *C, struct ID *id) RET_NONE
 void ED_screen_animation_timer_update(struct bScreen *screen, int redraws, int refresh) RET_NONE
 struct bScreen *ED_screen_animation_playing(const struct wmWindowManager *wm) RET_NULL
-void ED_base_object_select(struct Base *base, short mode) RET_NONE
+void ED_base_object_select(struct BaseLegacy *base, short mode) RET_NONE
+void ED_object_base_select(struct Base *base, short mode) RET_NONE
 bool ED_object_modifier_remove(struct ReportList *reports, struct Main *bmain, struct Object *ob, struct ModifierData *md) RET_ZERO
 struct ModifierData *ED_object_modifier_add(struct ReportList *reports, struct Main *bmain, struct Scene *scene, struct Object *ob, const char *name, int type) RET_ZERO
 void ED_object_modifier_clear(struct Main *bmain, struct Object *ob) RET_NONE
@@ -503,7 +509,7 @@ void uiLayoutSetAlignment(uiLayout *layout, char alignment) RET_NONE
 void uiLayoutSetScaleX(struct uiLayout *layout, float scale) RET_NONE
 void uiLayoutSetScaleY(struct uiLayout *layout, float scale) RET_NONE
 void uiTemplateIconView(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, int show_labels, float icon_scale) RET_NONE
-void ED_base_object_free_and_unlink(struct Main *bmain, struct Scene *scene, struct Base *base) RET_NONE
+void ED_base_object_free_and_unlink(struct Main *bmain, struct Scene *scene, struct Object *base) RET_NONE
 void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges, int calc_tessface) RET_NONE
 void ED_mesh_vertices_add(struct Mesh *mesh, struct ReportList *reports, int count) RET_NONE
 void ED_mesh_edges_add(struct Mesh *mesh, struct ReportList *reports, int count) RET_NONE
@@ -529,11 +535,12 @@ int ED_mesh_mirror_spatial_table(struct Object *ob, struct BMEditMesh *em, struc
 
 float ED_rollBoneToVector(EditBone *bone, const float new_up_axis[3], const bool axis_only) RET_ZERO
 void ED_space_image_get_size(struct SpaceImage *sima, int *width, int *height) RET_NONE
-bool ED_space_image_check_show_maskedit(struct Scene *scene, struct SpaceImage *sima) RET_ZERO
+bool ED_space_image_check_show_maskedit(struct SceneLayer *sl, struct SpaceImage *sima) RET_ZERO
 
 bool ED_texture_context_check_world(const struct bContext *C) RET_ZERO
 bool ED_texture_context_check_material(const struct bContext *C) RET_ZERO
 bool ED_texture_context_check_lamp(const struct bContext *C) RET_ZERO
+bool ED_texture_context_check_particles(const struct bContext *C) RET_ZERO
 bool ED_texture_context_check_others(const struct bContext *C) RET_ZERO
 
 bool ED_text_region_location_from_cursor(SpaceText *st, ARegion *ar, const int cursor_co[2], int r_pixel_co[2]) RET_ZERO
@@ -592,6 +599,12 @@ const char *uiLayoutIntrospect(uiLayout *layout) RET_NULL
 void UI_reinit_font(void) RET_NONE
 int UI_rnaptr_icon_get(struct bContext *C, struct PointerRNA *ptr, int rnaicon, const bool big) RET_ZERO
 struct bTheme *UI_GetTheme(void) RET_NULL
+void UI_GetThemeColor4fv(int colorid, float col[4]) RET_NONE
+void UI_GetThemeColorShade4fv(int colorid, int offset, float col[4]) RET_NONE
+void UI_GetThemeColorShadeAlpha4fv(int colorid, int coloffset, int alphaoffset, float col[4]) RET_NONE
+void UI_GetThemeColorBlendShade4fv(int colorid1, int colorid2, float fac, int offset, float col[4]) RET_NONE
+void UI_GetThemeColorBlend3ubv(int colorid1, int colorid2, float fac, unsigned char col[3]) RET_NONE
+void UI_GetThemeColorShadeAlpha4ubv(int colorid, int coloffset, int alphaoffset, unsigned char col[4]) RET_NONE
 
 /* rna template */
 void uiTemplateAnyID(uiLayout *layout, struct PointerRNA *ptr, const char *propname, const char *proptypename, const char *text) RET_NONE
@@ -657,6 +670,7 @@ void RE_ReleaseResultImage(struct Render *re) RET_NONE
 int RE_engine_test_break(struct RenderEngine *engine) RET_ZERO
 void RE_engines_init() RET_NONE
 void RE_engines_exit() RET_NONE
+void RE_engines_register(struct Main *bmain, RenderEngineType *render_type) RET_NONE
 void RE_engine_report(struct RenderEngine *engine, int type, const char *msg) RET_NONE
 ListBase R_engines = {NULL, NULL};
 void RE_engine_free(struct RenderEngine *engine) RET_NONE
@@ -666,11 +680,19 @@ struct RenderEngine *RE_engine_create(struct RenderEngineType *type) RET_NULL
 void RE_engine_frame_set(struct RenderEngine *engine, int frame, float subframe) RET_NONE
 void RE_FreePersistentData(void) RET_NONE
 void RE_point_density_cache(struct Scene *scene, struct PointDensity *pd, const bool use_render_params) RET_NONE
-void RE_point_density_minmax(struct Scene *scene, struct PointDensity *pd, const bool use_render_params, float r_min[3], float r_max[3]) RET_NONE;
-void RE_point_density_sample(struct Scene *scene, struct PointDensity *pd, int resolution, const bool use_render_params, float *values) RET_NONE;
-void RE_point_density_free(struct PointDensity *pd) RET_NONE;
+void RE_point_density_minmax(struct Scene *scene, struct PointDensity *pd, const bool use_render_params, float r_min[3], float r_max[3]) RET_NONE
+void RE_point_density_sample(struct Scene *scene, struct PointDensity *pd, int resolution, const bool use_render_params, float *values) RET_NONE
+void RE_point_density_free(struct PointDensity *pd) RET_NONE
 void RE_instance_get_particle_info(struct ObjectInstanceRen *obi, float *index, float *age, float *lifetime, float co[3], float *size, float vel[3], float angvel[3]) RET_NONE
 void RE_FreeAllPersistentData(void) RET_NONE
+float RE_fresnel_dielectric(float incoming[3], float normal[3], float eta) RET_ZERO
+
+/* Draw */
+void *DRW_render_settings_get(struct Scene *scene, const char *engine_name) RET_NULL
+
+void OBJECT_collection_settings_create(struct CollectionEngineSettings *ces) RET_NONE
+void EDIT_MESH_collection_settings_create(struct CollectionEngineSettings *ces) RET_NONE
+void EDIT_ARMATURE_collection_settings_create(struct CollectionEngineSettings *ces) RET_NONE
 
 /* python */
 struct wmOperatorType *WM_operatortype_find(const char *idname, bool quiet) RET_NULL
@@ -749,7 +771,7 @@ void BPY_pyconstraint_exec(struct bPythonConstraint *con, struct bConstraintOb *
 void macro_wrapper(struct wmOperatorType *ot, void *userdata) RET_NONE
 bool pyrna_id_FromPyObject(struct PyObject *obj, struct ID **id) RET_ZERO
 struct PyObject *pyrna_id_CreatePyObject(struct ID *id) RET_NULL
-void BPY_context_update(struct bContext *C) RET_NONE;
+void BPY_context_update(struct bContext *C) RET_NONE
 const char *BPY_app_translations_py_pgettext(const char *msgctxt, const char *msgid) RET_ARG(msgid)
 
 /* intern/dualcon */
@@ -767,10 +789,6 @@ void *dualcon(const DualConInput *input_mesh,
               float scale,
               int depth) RET_ZERO
 
-/* intern/cycles */
-struct CCLDeviceInfo;
-struct CCLDeviceInfo *CCL_compute_device_list(int opencl) RET_NULL
-
 /* compositor */
 void COM_execute(RenderData *rd, Scene *scene, bNodeTree *editingtree, int rendering,
                  const ColorManagedViewSettings *viewSettings, const ColorManagedDisplaySettings *displaySettings,
@@ -779,8 +797,5 @@ void COM_execute(RenderData *rd, Scene *scene, bNodeTree *editingtree, int rende
 /*multiview*/
 bool RE_RenderResult_is_stereo(RenderResult *res) RET_ZERO
 void uiTemplateImageViews(uiLayout *layout, struct PointerRNA *imfptr) RET_NONE
-
-/* GPU */
-void immBindBuiltinProgram(GPUBuiltinShader shader_id) RET_NONE
 
 #endif // WITH_GAMEENGINE

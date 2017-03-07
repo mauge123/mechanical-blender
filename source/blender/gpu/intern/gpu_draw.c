@@ -38,8 +38,6 @@
 
 #include <string.h>
 
-#include "GPU_glew.h"
-
 #include "BLI_blenlib.h"
 #include "BLI_linklist.h"
 #include "BLI_math.h"
@@ -56,6 +54,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_particle_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -220,11 +219,12 @@ void GPU_render_text(
 }
 
 /* Checking powers of two for images since OpenGL ES requires it */
-
+#ifdef WITH_DDS
 static bool is_power_of_2_resolution(int w, int h)
 {
 	return is_power_of_2_i(w) && is_power_of_2_i(h);
 }
+#endif
 
 static bool is_over_resolution_limit(GLenum textarget, int w, int h)
 {
@@ -852,32 +852,6 @@ void GPU_create_gl_tex(
 	int tpx = rectw;
 	int tpy = recth;
 
-#if 0 /* NPOT support should be a compile-time check */
-	/* scale if not a power of two. this is not strictly necessary for newer
-	 * GPUs (OpenGL version >= 2.0) since they support non-power-of-two-textures 
-	 * Then don't bother scaling for hardware that supports NPOT textures! */
-	if (textarget == GL_TEXTURE_2D &&
-	    ((!GPU_full_non_power_of_two_support() && !is_power_of_2_resolution(rectw, recth)) ||
-	     is_over_resolution_limit(textarget, rectw, recth)))
-	{
-		rectw = smaller_power_of_2_limit(rectw);
-		recth = smaller_power_of_2_limit(recth);
-
-		if (use_high_bit_depth) {
-			ibuf = IMB_allocFromBuffer(NULL, frect, tpx, tpy);
-			IMB_scaleImBuf(ibuf, rectw, recth);
-
-			frect = ibuf->rect_float;
-		}
-		else {
-			ibuf = IMB_allocFromBuffer(rect, NULL, tpx, tpy);
-			IMB_scaleImBuf(ibuf, rectw, recth);
-
-			rect = ibuf->rect;
-		}
-	}
-#endif
-
 	/* create image */
 	glGenTextures(1, (GLuint *)bind);
 	glBindTexture(textarget, *bind);
@@ -1202,13 +1176,7 @@ void GPU_paint_set_mipmap(bool mipmap)
 /* check if image has been downscaled and do scaled partial update */
 static bool GPU_check_scaled_image(ImBuf *ibuf, Image *ima, float *frect, int x, int y, int w, int h)
 {
-#if 0 /* NPOT suport should be a compile-time check */
-	if ((!GPU_full_non_power_of_two_support() && !is_power_of_2_resolution(ibuf->x, ibuf->y)) ||
-	    is_over_resolution_limit(GL_TEXTURE_2D, ibuf->x, ibuf->y))
-#else
-	if (is_over_resolution_limit(GL_TEXTURE_2D, ibuf->x, ibuf->y))
-#endif
-	{
+	if (is_over_resolution_limit(GL_TEXTURE_2D, ibuf->x, ibuf->y)) {
 		int x_limit = smaller_power_of_2_limit(ibuf->x);
 		int y_limit = smaller_power_of_2_limit(ibuf->y);
 
@@ -1437,31 +1405,40 @@ void GPU_create_smoke(SmokeModifierData *smd, int highres)
 			if (smoke_has_colors(sds->fluid)) {
 				float *data = MEM_callocN(sizeof(float) * sds->total_cells * 4, "smokeColorTexture");
 				smoke_get_rgba(sds->fluid, data, 0);
-				sds->tex = GPU_texture_create_3D(sds->res[0], sds->res[1], sds->res[2], 4, data);
+				sds->tex = GPU_texture_create_3D(sds->res[0], sds->res[1], sds->res[2], data, NULL);
 				MEM_freeN(data);
 			}
 			/* density only */
 			else {
-				sds->tex = GPU_texture_create_3D(sds->res[0], sds->res[1], sds->res[2], 1, smoke_get_density(sds->fluid));
+				sds->tex = GPU_texture_create_3D_custom(sds->res[0], sds->res[1], sds->res[2], 1,
+				                                 GPU_R8, smoke_get_density(sds->fluid), NULL);
 			}
-			sds->tex_flame = (smoke_has_fuel(sds->fluid)) ? GPU_texture_create_3D(sds->res[0], sds->res[1], sds->res[2], 1, smoke_get_flame(sds->fluid)) : NULL;
+			sds->tex_flame = (smoke_has_fuel(sds->fluid)) ?
+			                  GPU_texture_create_3D_custom(sds->res[0], sds->res[1], sds->res[2], 1,
+			                  GPU_R8, smoke_get_flame(sds->fluid), NULL) :
+			                  NULL;
 		}
 		else if (!sds->tex && highres) {
 			/* rgba texture for color + density */
 			if (smoke_turbulence_has_colors(sds->wt)) {
 				float *data = MEM_callocN(sizeof(float) * smoke_turbulence_get_cells(sds->wt) * 4, "smokeColorTexture");
 				smoke_turbulence_get_rgba(sds->wt, data, 0);
-				sds->tex = GPU_texture_create_3D(sds->res_wt[0], sds->res_wt[1], sds->res_wt[2], 4, data);
+				sds->tex = GPU_texture_create_3D(sds->res_wt[0], sds->res_wt[1], sds->res_wt[2], data, NULL);
 				MEM_freeN(data);
 			}
 			/* density only */
 			else {
-				sds->tex = GPU_texture_create_3D(sds->res_wt[0], sds->res_wt[1], sds->res_wt[2], 1, smoke_turbulence_get_density(sds->wt));
+				sds->tex = GPU_texture_create_3D_custom(sds->res_wt[0], sds->res_wt[1], sds->res_wt[2], 1,
+				                                        GPU_R8, smoke_turbulence_get_density(sds->wt), NULL);
 			}
-			sds->tex_flame = (smoke_turbulence_has_fuel(sds->wt)) ? GPU_texture_create_3D(sds->res_wt[0], sds->res_wt[1], sds->res_wt[2], 1, smoke_turbulence_get_flame(sds->wt)) : NULL;
+			sds->tex_flame = (smoke_turbulence_has_fuel(sds->wt)) ?
+			                  GPU_texture_create_3D_custom(sds->res_wt[0], sds->res_wt[1], sds->res_wt[2], 1,
+			                                               GPU_R8, smoke_turbulence_get_flame(sds->wt), NULL):
+			                  NULL;
 		}
 
-		sds->tex_shadow = GPU_texture_create_3D(sds->res[0], sds->res[1], sds->res[2], 1, sds->shadow);
+		sds->tex_shadow = GPU_texture_create_3D_custom(sds->res[0], sds->res[1], sds->res[2], 1,
+		                                        GPU_R8, sds->shadow, NULL);
 	}
 #else // WITH_SMOKE
 	(void)highres;
@@ -1710,7 +1687,7 @@ void GPU_end_dupli_object(void)
 }
 
 void GPU_begin_object_materials(
-        View3D *v3d, RegionView3D *rv3d, Scene *scene, Object *ob,
+        View3D *v3d, RegionView3D *rv3d, Scene *scene, SceneLayer *sl, Object *ob,
         bool glsl, bool *do_alpha_after)
 {
 	Material *ma;
@@ -1749,7 +1726,7 @@ void GPU_begin_object_materials(
 
 #ifdef WITH_GAMEENGINE
 	if (rv3d->rflag & RV3D_IS_GAME_ENGINE) {
-		ob = BKE_object_lod_matob_get(ob, scene);
+		ob = BKE_object_lod_matob_get(ob, sl);
 	}
 #endif
 
@@ -1871,6 +1848,35 @@ void GPU_begin_object_materials(
 	GPU_object_material_unbind();
 }
 
+static int GPU_get_particle_info(GPUParticleInfo *pi)
+{
+	DupliObject *dob = GMS.dob;
+	if (dob->particle_system) {
+		int ind;
+		if (dob->persistent_id[0] < dob->particle_system->totpart)
+			ind = dob->persistent_id[0];
+		else {
+			ind = dob->particle_system->child[dob->persistent_id[0] - dob->particle_system->totpart].parent;
+		}
+		if (ind >= 0) {
+			ParticleData *p = &dob->particle_system->particles[ind];
+
+			pi->scalprops[0] = ind;
+			pi->scalprops[1] = GMS.gscene->r.cfra - p->time;
+			pi->scalprops[2] = p->lifetime;
+			pi->scalprops[3] = p->size;
+
+			copy_v3_v3(pi->location, p->state.co);
+			copy_v3_v3(pi->velocity, p->state.vel);
+			copy_v3_v3(pi->angular_velocity, p->state.ave);
+			return 1;
+		}
+		else return 0;
+	}
+	else
+		return 0;
+}
+
 int GPU_object_material_bind(int nr, void *attribs)
 {
 	GPUVertexAttribs *gattribs = attribs;
@@ -1929,18 +1935,22 @@ int GPU_object_material_bind(int nr, void *attribs)
 		if (gattribs && GMS.gmatbuf[nr]) {
 			/* bind glsl material and get attributes */
 			Material *mat = GMS.gmatbuf[nr];
+			GPUParticleInfo partile_info;
 
 			float auto_bump_scale;
 
 			GPUMaterial *gpumat = GPU_material_from_blender(GMS.gscene, mat, GMS.is_opensubdiv);
 			GPU_material_vertex_attributes(gpumat, gattribs);
 
+			if (GMS.dob)
+				GPU_get_particle_info(&partile_info);
+
 			GPU_material_bind(
 			        gpumat, GMS.gob->lay, GMS.glay, 1.0, !(GMS.gob->mode & OB_MODE_TEXTURE_PAINT),
 			        GMS.gviewmat, GMS.gviewinv, GMS.gviewcamtexcofac, GMS.gscenelock);
 
 			auto_bump_scale = GMS.gob->derivedFinal != NULL ? GMS.gob->derivedFinal->auto_bump_scale : 1.0f;
-			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, auto_bump_scale);
+			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, auto_bump_scale, &partile_info);
 			GMS.gboundmat = mat;
 
 			/* for glsl use alpha blend mode, unless it's set to solid and
@@ -2150,7 +2160,7 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 
 	int count = 0;
 
-	for (Base *base = scene->base.first; base; base = base->next) {
+	for (BaseLegacy *base = scene->base.first; base; base = base->next) {
 		if (base->object->type != OB_LAMP)
 			continue;
 
@@ -2309,7 +2319,7 @@ void GPU_state_init(void)
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 }
 
-void GPU_enable_program_point_size()
+void GPU_enable_program_point_size(void)
 {
 #ifdef __APPLE__
 	/* TODO: remove this when we switch to core profile */
@@ -2319,7 +2329,7 @@ void GPU_enable_program_point_size()
 #endif
 }
 
-void GPU_disable_program_point_size()
+void GPU_disable_program_point_size(void)
 {
 #ifdef __APPLE__
 	/* TODO: remove this when we switch to core profile */

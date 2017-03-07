@@ -95,11 +95,6 @@ void BLI_task_pool_push_from_thread(TaskPool *pool, TaskRunFunction run,
 void BLI_task_pool_work_and_wait(TaskPool *pool);
 /* cancel all tasks, keep worker threads running */
 void BLI_task_pool_cancel(TaskPool *pool);
-/* stop all worker threads */
-void BLI_task_pool_stop(TaskPool *pool);
-
-/* get number of threads allowed to be used by this pool */
-int BLI_pool_get_num_threads(TaskPool *pool);
 
 /* set number of threads allowed to be used by this pool */
 void BLI_pool_set_num_threads(TaskPool *pool, int num_threads);
@@ -112,9 +107,6 @@ void *BLI_task_pool_userdata(TaskPool *pool);
 
 /* optional mutex to use from run function */
 ThreadMutex *BLI_task_pool_user_mutex(TaskPool *pool);
-
-/* number of tasks done, for stats, don't use this to make decisions */
-size_t BLI_task_pool_tasks_done(TaskPool *pool);
 
 /* Parallel for routines */
 typedef void (*TaskParallelRangeFunc)(void *userdata, const int iter);

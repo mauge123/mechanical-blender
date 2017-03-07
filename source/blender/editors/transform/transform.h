@@ -54,6 +54,7 @@ struct Object;
 struct View3D;
 struct ScrArea;
 struct Scene;
+struct SceneLayer;
 struct bConstraint;
 struct wmKeyMap;
 struct wmKeyConfig;
@@ -91,8 +92,8 @@ typedef struct TransSnap {
 	bool	peel;
 	bool	snap_spatial_grid;
 	short  	status;
-	float	snapPoint[3]; /* snapping from this point */
-	float	snapTarget[3]; /* to this point */
+	float	snapPoint[3]; /* snapping from this point (in global-space)*/
+	float	snapTarget[3]; /* to this point (in global-space)*/
 	float	snapNormal[3];
 	char	snapNodeBorder;
 	ListBase points;
@@ -484,6 +485,7 @@ typedef struct TransInfo {
 	struct ScrArea	*sa;
 	struct ARegion	*ar;
 	struct Scene	*scene;
+	struct SceneLayer *sl;
 	struct ToolSettings *settings;
 	struct wmTimer *animtimer;
 	struct wmKeyMap *keymap;  /* so we can do lookups for header text */
@@ -681,6 +683,7 @@ void flushTransIntFrameActionData(TransInfo *t);
 void flushTransGraphData(TransInfo *t);
 void remake_graph_transdata(TransInfo *t, struct ListBase *anim_data);
 void flushTransUVs(TransInfo *t);
+void flushTransParticles(TransInfo *t);
 bool clipUVTransform(TransInfo *t, float vec[2], const bool resize);
 void clipUVData(TransInfo *t);
 void flushTransNodes(TransInfo *t);
@@ -705,7 +708,7 @@ bool transdata_check_local_islands(TransInfo *t, short around);
 int count_set_pose_transflags(int *out_mode, short around, struct Object *ob);
 
 /* auto-keying stuff used by special_aftertrans_update */
-void autokeyframe_ob_cb_func(struct bContext *C, struct Scene *scene, struct View3D *v3d, struct Object *ob, int tmode);
+void autokeyframe_ob_cb_func(struct bContext *C, struct Scene *scene, struct SceneLayer *sl, struct View3D *v3d, struct Object *ob, int tmode);
 void autokeyframe_pose_cb_func(struct bContext *C, struct Scene *scene, struct View3D *v3d, struct Object *ob, int tmode, short targetless_ik);
 
 /*********************** Constraints *****************************/
@@ -795,7 +798,7 @@ typedef enum {
 	INPUT_CUSTOM_RATIO_FLIP,
 } MouseInputMode;
 
-void initMouseInput(TransInfo *t, MouseInput *mi, const float center[2], const int mval[2]);
+void initMouseInput(TransInfo *t, MouseInput *mi, const float center[2], const int mval[2], const bool precision);
 void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode);
 eRedrawFlag handleMouseInput(struct TransInfo *t, struct MouseInput *mi, const struct wmEvent *event);
 void applyMouseInput(struct TransInfo *t, struct MouseInput *mi, const int mval[2], float output[3]);

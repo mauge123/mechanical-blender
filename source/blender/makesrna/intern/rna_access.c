@@ -79,9 +79,11 @@ void RNA_init(void)
 		if (!srna->cont.prophash) {
 			srna->cont.prophash = BLI_ghash_str_new("RNA_init gh");
 
-			for (prop = srna->cont.properties.first; prop; prop = prop->next)
-				if (!(prop->flag & PROP_BUILTIN))
+			for (prop = srna->cont.properties.first; prop; prop = prop->next) {
+				if (!(prop->flag_internal & PROP_INTERN_BUILTIN)) {
 					BLI_ghash_insert(srna->cont.prophash, (void *)prop->identifier, prop);
+				}
+			}
 		}
 	}
 }
@@ -822,6 +824,11 @@ PropertyUnit RNA_property_unit(PropertyRNA *prop)
 int RNA_property_flag(PropertyRNA *prop)
 {
 	return rna_ensure_property(prop)->flag;
+}
+
+bool RNA_property_builtin(PropertyRNA *prop)
+{
+	return (rna_ensure_property(prop)->flag_internal & PROP_INTERN_BUILTIN) != 0;
 }
 
 void *RNA_property_py_data_get(PropertyRNA *prop)
@@ -3107,7 +3114,7 @@ void RNA_property_collection_skip(CollectionPropertyIterator *iter, int num)
 	CollectionPropertyRNA *cprop = (CollectionPropertyRNA *)rna_ensure_property(iter->prop);
 	int i;
 
-	if (num > 1 && (iter->idprop || (cprop->property.flag & PROP_RAW_ARRAY))) {
+	if (num > 1 && (iter->idprop || (cprop->property.flag_internal & PROP_INTERN_RAW_ARRAY))) {
 		/* fast skip for array */
 		ArrayIterator *internal = &iter->internal.array;
 
@@ -3466,7 +3473,7 @@ int RNA_property_collection_raw_array(PointerRNA *ptr, PropertyRNA *prop, Proper
 
 	BLI_assert(RNA_property_type(prop) == PROP_COLLECTION);
 
-	if (!(prop->flag & PROP_RAW_ARRAY) || !(itemprop->flag & PROP_RAW_ACCESS))
+	if (!(prop->flag_internal & PROP_INTERN_RAW_ARRAY) || !(itemprop->flag_internal & PROP_INTERN_RAW_ACCESS))
 		return 0;
 
 	RNA_property_collection_begin(ptr, prop, &iter);
@@ -5587,15 +5594,16 @@ char *RNA_pointer_as_string_keywords_ex(bContext *C, PointerRNA *ptr,
 	DynStr *dynstr = BLI_dynstr_new();
 	char *cstring, *buf;
 	bool first_iter = true;
-	int flag;
+	int flag, flag_parameter;
 
 	RNA_PROP_BEGIN (ptr, propptr, iterprop)
 	{
 		prop = propptr.data;
 
 		flag = RNA_property_flag(prop);
+		flag_parameter = RNA_parameter_flag(prop);
 
-		if (as_function && (flag & PROP_OUTPUT)) {
+		if (as_function && (flag_parameter & PARM_OUTPUT)) {
 			continue;
 		}
 
@@ -5609,7 +5617,7 @@ char *RNA_pointer_as_string_keywords_ex(bContext *C, PointerRNA *ptr,
 			continue;
 		}
 
-		if (as_function && (flag & PROP_REQUIRED)) {
+		if (as_function && (prop->flag_parameter & PARM_REQUIRED)) {
 			/* required args don't have useful defaults */
 			BLI_dynstr_appendf(dynstr, first_iter ? "%s" : ", %s", arg_name);
 			first_iter = false;
@@ -5930,6 +5938,11 @@ const ListBase *RNA_function_defined_parameters(FunctionRNA *func)
 
 /* Utility */
 
+int RNA_parameter_flag(PropertyRNA *prop)
+{
+	return (int)rna_ensure_property(prop)->flag_parameter;
+}
+
 ParameterList *RNA_parameter_list_create(ParameterList *parms, PointerRNA *UNUSED(ptr), FunctionRNA *func)
 {
 	PropertyRNA *parm;
@@ -5943,7 +5956,7 @@ ParameterList *RNA_parameter_list_create(ParameterList *parms, PointerRNA *UNUSE
 	for (parm = func->cont.properties.first; parm; parm = parm->next) {
 		alloc_size += rna_parameter_size(parm);
 
-		if (parm->flag & PROP_OUTPUT)
+		if (parm->flag_parameter & PARM_OUTPUT)
 			parms->ret_count++;
 		else
 			parms->arg_count++;
@@ -5966,7 +5979,7 @@ ParameterList *RNA_parameter_list_create(ParameterList *parms, PointerRNA *UNUSE
 			data_alloc->array = NULL;
 		}
 		
-		if (!(parm->flag & PROP_REQUIRED) && !(parm->flag & PROP_DYNAMIC)) {
+		if (!(parm->flag_parameter & PARM_REQUIRED) && !(parm->flag & PROP_DYNAMIC)) {
 			switch (parm->type) {
 				case PROP_BOOLEAN:
 					if (parm->arraydimension) memcpy(data, ((BoolPropertyRNA *)parm)->defaultarray, size);
@@ -6390,7 +6403,7 @@ static int rna_function_parameter_parse(PointerRNA *ptr, PropertyRNA *prop, Prop
 
 			ptype = RNA_property_pointer_type(ptr, prop);
 
-			if (prop->flag & PROP_RNAPTR) {
+			if (prop->flag_parameter & PARM_RNAPTR) {
 				*((PointerRNA *)dest) = *((PointerRNA *)src);
 				break;
 			}
@@ -6460,7 +6473,7 @@ int RNA_function_call_direct_va(bContext *C, ReportList *reports, PointerRNA *pt
 	ParameterIterator iter;
 	PropertyRNA *pret, *parm;
 	PropertyType type;
-	int i, ofs, flen, flag, len, alen, err = 0;
+	int i, ofs, flen, flag_parameter, len, alen, err = 0;
 	const char *tid, *fid, *pid = NULL;
 	char ftype;
 	void **retdata = NULL;
@@ -6477,20 +6490,20 @@ int RNA_function_call_direct_va(bContext *C, ReportList *reports, PointerRNA *pt
 
 	for (i = 0, ofs = 0; iter.valid; RNA_parameter_list_next(&iter), i++) {
 		parm = iter.parm;
-		flag = RNA_property_flag(parm);
+		flag_parameter = RNA_parameter_flag(parm);
 
 		if (parm == pret) {
 			retdata = iter.data;
 			continue;
 		}
-		else if (flag & PROP_OUTPUT) {
+		else if (flag_parameter & PARM_OUTPUT) {
 			continue;
 		}
 
 		pid = RNA_property_identifier(parm);
 
 		if (ofs >= flen || format[ofs] == 'N') {
-			if (flag & PROP_REQUIRED) {
+			if (parm->flag_parameter & PARM_REQUIRED) {
 				err = -1;
 				fprintf(stderr, "%s.%s: missing required parameter %s\n", tid, fid, pid);
 				break;

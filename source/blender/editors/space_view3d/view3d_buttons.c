@@ -658,7 +658,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,
 				          totedgedata == 1 ? IFACE_("Crease:") : IFACE_("Mean Crease:"),
 				          0, yi -= buth + but_margin, 200, buth,
-				          &(tfp->ve_median[M_CREASE]), 0.0, 1.0, 1, 2, TIP_("Weight used by SubSurf modifier"));
+				          &(tfp->ve_median[M_CREASE]), 0.0, 1.0, 1, 2, TIP_("Weight used by the Subdivision Surface modifier"));
 			}
 		}
 		/* Curve... */
@@ -673,7 +673,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		else if (totcurvedata > 1) {
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Mean Weight:"),
 			          0, yi -= buth + but_margin, 200, buth,
-			          &(tfp->ve_median[C_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for SoftBody Goal"));
+			          &(tfp->ve_median[C_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for Soft Body Goal"));
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Mean Radius:"),
 			          0, yi -= buth + but_margin, 200, buth,
 			          &(tfp->ve_median[C_RADIUS]), 0.0, 100.0, 1, 3, TIP_("Radius of curve control points"));
@@ -691,7 +691,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		else if (totlattdata > 1) {
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Mean Weight:"),
 			          0, yi -= buth + but_margin, 200, buth,
-			          &(tfp->ve_median[L_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for SoftBody Goal"));
+			          &(tfp->ve_median[L_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for Soft Body Goal"));
 		}
 
 		UI_block_align_end(block);
@@ -984,8 +984,8 @@ static void do_view3d_vgroup_buttons(bContext *C, void *UNUSED(arg), int event)
 
 static int view3d_panel_vgroup_poll(const bContext *C, PanelType *UNUSED(pt))
 {
-	Scene *scene = CTX_data_scene(C);
-	Object *ob = OBACT;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *ob = OBACT_NEW;
 	if (ob && (BKE_object_is_in_editmode_vgroup(ob) ||
 	           BKE_object_is_in_wpaint_select_vert(ob)))
 	{
@@ -1304,9 +1304,9 @@ static void v3d_editmetaball_buts(uiLayout *layout, Object *ob)
 
 static void do_view3d_region_buttons(bContext *C, void *UNUSED(index), int event)
 {
-	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	View3D *v3d = CTX_wm_view3d(C);
-	Object *ob = OBACT;
+	Object *ob = OBACT_NEW;
 
 	switch (event) {
 

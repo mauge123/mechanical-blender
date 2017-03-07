@@ -12,6 +12,7 @@
 #pragma once
 
 #include "vertex_format.h"
+#include "primitive.h"
 
 #define IMM_BATCH_COMBO 1
 
@@ -21,8 +22,8 @@ VertexFormat* immVertexFormat(void); // returns a cleared vertex format, ready f
 void immBindProgram(GLuint program); // every immBegin must have a program bound first
 void immUnbindProgram(void); // call after your last immEnd, or before binding another program
 
-void immBegin(GLenum primitive, unsigned vertex_ct); // must supply exactly vertex_ct vertices
-void immBeginAtMost(GLenum primitive, unsigned max_vertex_ct); // can supply fewer vertices
+void immBegin(PrimitiveType, unsigned vertex_ct); // must supply exactly vertex_ct vertices
+void immBeginAtMost(PrimitiveType, unsigned max_vertex_ct); // can supply fewer vertices
 void immEnd(void); // finishes and draws
 
 #if IMM_BATCH_COMBO
@@ -30,8 +31,8 @@ void immEnd(void); // finishes and draws
 // immBegin a batch, then use standard immFunctions as usual.
 // immEnd will finalize the batch instead of drawing.
 // Then you can draw it as many times as you like! Partially replaces the need for display lists.
-Batch* immBeginBatch(GLenum prim_type, unsigned vertex_ct);
-Batch* immBeginBatchAtMost(GLenum prim_type, unsigned vertex_ct);
+Batch* immBeginBatch(PrimitiveType, unsigned vertex_ct);
+Batch* immBeginBatchAtMost(PrimitiveType, unsigned vertex_ct);
 #endif
 
 
@@ -44,6 +45,8 @@ void immAttrib3f(unsigned attrib_id, float x, float y, float z);
 void immAttrib4f(unsigned attrib_id, float x, float y, float z, float w);
 
 void immAttrib2i(unsigned attrib_id, int x, int y);
+
+void immAttrib2s(unsigned attrib_id, short x, short y);
 
 void immAttrib3fv(unsigned attrib_id, const float data[3]);
 void immAttrib4fv(unsigned attrib_id, const float data[4]);
@@ -66,6 +69,8 @@ void immVertex3f(unsigned attrib_id, float x, float y, float z);
 
 void immVertex2i(unsigned attrib_id, int x, int y);
 
+void immVertex2s(unsigned attrib_id, short x, short y);
+
 void immVertex2fv(unsigned attrib_id, const float data[2]);
 void immVertex3fv(unsigned attrib_id, const float data[3]);
 
@@ -75,8 +80,14 @@ void immVertex2iv(unsigned attrib_id, const int data[2]);
 // provide uniform values that don't change for the entire draw call
 void immUniform1i(const char* name, int x);
 void immUniform1f(const char* name, float x);
+void immUniform2f(const char* name, float x, float y);
+void immUniform2fv(const char* name, const float data[2]);
+void immUniform3f(const char* name, float x, float y, float z);
+void immUniform3fv(const char* name, const float data[3]);
+void immUniformArray3fv(const char* name, const float *data, int count);
 void immUniform4f(const char* name, float x, float y, float z, float w);
 void immUniform4fv(const char* name, const float data[4]);
+void immUniformMatrix4fv(const char* name, const float data[4][4]);
 
 
 // convenience functions for setting "uniform vec4 color"
