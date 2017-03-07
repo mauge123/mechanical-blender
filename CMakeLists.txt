@@ -448,6 +448,7 @@ option(WITH_BOOST					"Enable features depending on boost" ON)
 
 # Unit testsing
 option(WITH_GTESTS "Enable GTest unit testing" OFF)
+option(WITH_OPENGL_TESTS "Enable OpenGL related unit testing (Experimental)" OFF)
 
 
 # Documentation
@@ -726,7 +727,7 @@ if(NOT WITH_BOOST)
 	macro(set_and_warn
 		_setting _val)
 		if(${${_setting}})
-			message(STATUS "'WITH_BOOST' is disabled: forceing 'set(${_setting} ${_val})'")
+			message(STATUS "'WITH_BOOST' is disabled: forcing 'set(${_setting} ${_val})'")
 		endif()
 		set(${_setting} ${_val})
 	endmacro()

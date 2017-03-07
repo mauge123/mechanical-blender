@@ -3244,6 +3244,11 @@ static void direct_link_constraints(FileData *fd, ListBase *lb)
 					con->flag |= CONSTRAINT_SPACEONCE;
 				break;
 			}
+			case CONSTRAINT_TYPE_TRANSFORM_CACHE:
+			{
+				bTransformCacheConstraint *data = con->data;
+				data->reader = NULL;
+			}
 		}
 	}
 }
@@ -4716,12 +4721,12 @@ static void direct_link_latt(FileData *fd, Lattice *lt)
 /* ************ READ OBJECT ***************** */
 
 static void lib_link_modifiers__linkModifiers(
-        void *userData, Object *ob, ID **idpoin, int cd_flag)
+        void *userData, Object *ob, ID **idpoin, int cb_flag)
 {
 	FileData *fd = userData;
 
 	*idpoin = newlibadr(fd, ob->id.lib, *idpoin);
-	if (*idpoin != NULL && (cd_flag & IDWALK_USER) != 0) {
+	if (*idpoin != NULL && (cb_flag & IDWALK_CB_USER) != 0) {
 		id_us_plus_no_lib(*idpoin);
 	}
 }
@@ -8412,9 +8417,10 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 static void do_versions_after_linking(Main *main)
 {
-	UNUSED_VARS(main);
 //	printf("%s for %s (%s), %d.%d\n", __func__, main->curlib ? main->curlib->name : main->name,
 //	       main->curlib ? "LIB" : "MAIN", main->versionfile, main->subversionfile);
+
+	do_versions_after_linking_270(main);
 }
 
 static void lib_link_all(FileData *fd, Main *main)
@@ -9321,7 +9327,7 @@ static void expand_armature(FileData *fd, Main *mainvar, bArmature *arm)
 }
 
 static void expand_object_expandModifiers(
-        void *userData, Object *UNUSED(ob), ID **idpoin, int UNUSED(cd_flag))
+        void *userData, Object *UNUSED(ob), ID **idpoin, int UNUSED(cb_flag))
 {
 	struct { FileData *fd; Main *mainvar; } *data= userData;
 	
@@ -10413,6 +10419,9 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					else {
 						mainptr->curlib->filedata = NULL;
 						mainptr->curlib->id.tag |= LIB_TAG_MISSING;
+						/* Set lib version to current main one... Makes assert later happy. */
+						mainptr->versionfile = mainptr->curlib->versionfile = mainl->versionfile;
+						mainptr->subversionfile = mainptr->curlib->subversionfile = mainl->subversionfile;
 					}
 					
 					if (fd == NULL) {

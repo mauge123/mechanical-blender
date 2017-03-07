@@ -37,6 +37,7 @@
 #include "BLT_translation.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "BLI_string_utils.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_mesh.h"

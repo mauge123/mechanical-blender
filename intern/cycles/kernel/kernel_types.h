@@ -84,6 +84,7 @@ CCL_NAMESPACE_BEGIN
 #  define __VOLUME_SCATTER__
 #  define __SUBSURFACE__
 #  define __CMJ__
+#  define __SHADOW_RECORD_ALL__
 #endif  /* __KERNEL_CUDA__ */
 
 #ifdef __KERNEL_OPENCL__
@@ -1143,6 +1144,8 @@ typedef struct KernelIntegrator {
 	int max_transmission_bounce;
 	int max_volume_bounce;
 
+	int ao_bounces;
+
 	/* transparent */
 	int transparent_min_bounce;
 	int transparent_max_bounce;
@@ -1186,7 +1189,8 @@ typedef struct KernelIntegrator {
 
 	float light_inv_rr_threshold;
 
-	int pad1;
+	int start_sample;
+	int pad1, pad2, pad3;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
