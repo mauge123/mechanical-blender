@@ -551,6 +551,7 @@ EnumPropertyItem *rna_ucs_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSE
 EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
 {
 	Scene *scene = NULL;
+	SceneLayer *sl = CTX_data_scene_layer(C);;
 	EnumPropertyItem tmp = {0, "", 0, "", ""};
 	EnumPropertyItem *item = NULL;
 	int i = 0, totitem = 0;
@@ -562,8 +563,9 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 	else
 		scene = CTX_data_scene(C);  /* can't use scene from ptr->id.data because that enum is also used by operators */
 
-	if (scene) {
-		Object *ob = OBACT;
+	Object *ob = OBACT_NEW;
+
+	if(scene) {
 		Object *obedit = scene->obedit;
 		BMEditMesh *em = NULL;
 		if (obedit) {
