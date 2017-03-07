@@ -315,7 +315,7 @@ static void screen_opengl_render_doit(OGLRender *oglrender, RenderResult *rr)
 			RE_render_result_rect_from_ibuf(rr, &scene->r, out, oglrender->view_id);
 			IMB_freeImBuf(out);
 		}
-		else if (gpd){
+		else if (gpd) {
 			/* If there are no strips, Grease Pencil still needs a buffer to draw on */
 			ImBuf *out = IMB_allocImBuf(oglrender->sizex, oglrender->sizey, 32, IB_rect);
 			RE_render_result_rect_from_ibuf(rr, &scene->r, out, oglrender->view_id);
@@ -886,14 +886,15 @@ static void write_result_func(TaskPool * __restrict pool,
 	 */
 	ReportList reports;
 	BKE_reports_init(&reports, oglrender->reports->flag & ~RPT_PRINT);
-	/* Do actual save logic here, depending on the file format. */
+	/* Do actual save logic here, depending on the file format.
+	 *
+	 * NOTE: We have to construct temporary scene with proper scene->r.cfra.
+	 * This is because underlying calls do not use r.cfra but use scene
+	 * for that.
+	 */
+	Scene tmp_scene = *scene;
+	tmp_scene.r.cfra = cfra;
 	if (is_movie) {
-		/* We have to construct temporary scene with proper scene->r.cfra.
-		 * This is because underlying calls do not use r.cfra but use scene
-		 * for that.
-		 */
-		Scene tmp_scene = *scene;
-		tmp_scene.r.cfra = cfra;
 		ok = RE_WriteRenderViewsMovie(&reports,
 		                              rr,
 		                              &tmp_scene,
@@ -917,8 +918,8 @@ static void write_result_func(TaskPool * __restrict pool,
 		                             true,
 		                             NULL);
 
-		BKE_render_result_stamp_info(scene, scene->camera, rr, false);
-		ok = RE_WriteRenderViewsImage(NULL, rr, scene, true, name);
+		BKE_render_result_stamp_info(&tmp_scene, tmp_scene.camera, rr, false);
+		ok = RE_WriteRenderViewsImage(NULL, rr, &tmp_scene, true, name);
 		if (!ok) {
 			BKE_reportf(&reports,
 			            RPT_ERROR,

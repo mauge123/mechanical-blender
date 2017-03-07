@@ -1249,7 +1249,7 @@ class USERPREF_MT_addons_online_resources(Menu):
                 "wm.url_open", text="API Concepts", icon='URL',
                 ).url = bpy.types.WM_OT_doc_view._prefix + "/info_quickstart.html"
         layout.operator("wm.url_open", text="Add-on Tutorial", icon='URL',
-                ).url = "http://www.blender.org/api/blender_python_api_current/info_tutorial_addon.html"
+                ).url = bpy.types.WM_OT_doc_view._prefix + "/info_tutorial_addon.html"
 
 
 class USERPREF_PT_addons(Panel):
@@ -1323,11 +1323,18 @@ class USERPREF_PT_addons(Panel):
 
         # set in addon_utils.modules_refresh()
         if addon_utils.error_duplicates:
-            self.draw_error(col,
-                            "Multiple addons using the same name found!\n"
-                            "likely a problem with the script search path.\n"
-                            "(see console for details)",
-                            )
+            box = col.box()
+            row = box.row()
+            row.label("Multiple addons with the same name found!")
+            row.label(icon='ERROR')
+            box.label("Please delete one of each pair:")
+            for (addon_name, addon_file, addon_path) in addon_utils.error_duplicates:
+                box.separator()
+                sub_col = box.column(align=True)
+                sub_col.label(addon_name + ":")
+                sub_col.label("    " + addon_file)
+                sub_col.label("    " + addon_path)
+
 
         if addon_utils.error_encoding:
             self.draw_error(col,

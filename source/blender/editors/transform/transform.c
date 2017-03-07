@@ -2593,7 +2593,14 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	calculateCenter(t);
 
 	if (event) {
-		initMouseInput(t, &t->mouse, t->center2d, event->mval, event->shift);
+		/* Initialize accurate transform to settings requested by keymap. */
+		bool use_accurate = false;
+		if ((prop = RNA_struct_find_property(op->ptr, "use_accurate")) && RNA_property_is_set(op->ptr, prop)) {
+			if (RNA_property_boolean_get(op->ptr, prop)) {
+				use_accurate = true;
+			}
+		}
+		initMouseInput(t, &t->mouse, t->center2d, event->mval, use_accurate);
 
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 		if (t->spacetype == SPACE_VIEW3D) {

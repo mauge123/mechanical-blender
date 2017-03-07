@@ -106,7 +106,6 @@ struct TaskPool {
 	TaskScheduler *scheduler;
 
 	volatile size_t num;
-	volatile size_t done;
 	size_t num_threads;
 	size_t currently_running_tasks;
 	ThreadMutex num_mutex;
@@ -181,9 +180,9 @@ BLI_INLINE TaskMemPool *get_task_mempool(TaskPool *pool, const int thread_id)
 
 static Task *task_alloc(TaskPool *pool, const int thread_id)
 {
-	assert(thread_id <= pool->scheduler->num_threads);
+	BLI_assert(thread_id <= pool->scheduler->num_threads);
 	if (thread_id != -1) {
-		assert(thread_id >= 0);
+		BLI_assert(thread_id >= 0);
 		TaskMemPool *mem_pool = get_task_mempool(pool, thread_id);
 		/* Try to re-use task memory from a thread local storage. */
 		if (mem_pool->num_tasks > 0) {
@@ -205,8 +204,8 @@ static Task *task_alloc(TaskPool *pool, const int thread_id)
 static void task_free(TaskPool *pool, Task *task, const int thread_id)
 {
 	task_data_free(task, thread_id);
-	assert(thread_id >= 0);
-	assert(thread_id <= pool->scheduler->num_threads);
+	BLI_assert(thread_id >= 0);
+	BLI_assert(thread_id <= pool->scheduler->num_threads);
 	TaskMemPool *mem_pool = get_task_mempool(pool, thread_id);
 	if (mem_pool->num_tasks < MEMPOOL_SIZE - 1) {
 		/* Successfully allowed the task to be re-used later. */
@@ -238,7 +237,6 @@ static void task_pool_num_decrease(TaskPool *pool, size_t done)
 
 	pool->num -= done;
 	atomic_sub_and_fetch_z(&pool->currently_running_tasks, done);
-	pool->done += done;
 
 	if (pool->num == 0)
 		BLI_condition_notify_all(&pool->num_cond);
@@ -359,8 +357,8 @@ TaskScheduler *BLI_task_scheduler_create(int num_threads)
 
 	/* Add background-only thread if needed. */
 	if (num_threads == 0) {
-	    scheduler->background_thread_only = true;
-	    num_threads = 1;
+		scheduler->background_thread_only = true;
+		num_threads = 1;
 	}
 
 	/* launch threads that will be waiting for work */
@@ -504,7 +502,6 @@ static TaskPool *task_pool_create_ex(TaskScheduler *scheduler, void *userdata, c
 
 	pool->scheduler = scheduler;
 	pool->num = 0;
-	pool->done = 0;
 	pool->num_threads = 0;
 	pool->currently_running_tasks = 0;
 	pool->do_cancel = false;
@@ -568,7 +565,7 @@ TaskPool *BLI_task_pool_create_background(TaskScheduler *scheduler, void *userda
 
 void BLI_task_pool_free(TaskPool *pool)
 {
-	BLI_task_pool_stop(pool);
+	BLI_task_pool_cancel(pool);
 
 	BLI_mutex_end(&pool->num_mutex);
 	BLI_condition_end(&pool->num_cond);
@@ -690,16 +687,6 @@ void BLI_task_pool_work_and_wait(TaskPool *pool)
 	BLI_mutex_unlock(&pool->num_mutex);
 }
 
-int BLI_pool_get_num_threads(TaskPool *pool)
-{
-	if (pool->num_threads != 0) {
-		return pool->num_threads;
-	}
-	else {
-		return BLI_task_scheduler_num_threads(pool->scheduler);
-	}
-}
-
 void BLI_pool_set_num_threads(TaskPool *pool, int num_threads)
 {
 	/* NOTE: Don't try to modify threads while tasks are running! */
@@ -721,13 +708,6 @@ void BLI_task_pool_cancel(TaskPool *pool)
 	pool->do_cancel = false;
 }
 
-void BLI_task_pool_stop(TaskPool *pool)
-{
-	task_scheduler_clear(pool->scheduler, pool);
-
-	BLI_assert(pool->num == 0);
-}
-
 bool BLI_task_pool_canceled(TaskPool *pool)
 {
 	return pool->do_cancel;
@@ -741,11 +721,6 @@ void *BLI_task_pool_userdata(TaskPool *pool)
 ThreadMutex *BLI_task_pool_user_mutex(TaskPool *pool)
 {
 	return &pool->user_mutex;
-}
-
-size_t BLI_task_pool_tasks_done(TaskPool *pool)
-{
-	return pool->done;
 }
 
 /* Parallel range routines */

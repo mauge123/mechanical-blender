@@ -78,7 +78,7 @@
  * - write #TEST (#RenderInfo struct. 128x128 blend file preview is optional).
  * - write #GLOB (#FileGlobal struct) (some global vars).
  * - write #DNA1 (#SDNA struct)
- * - write #USER (#UserDef struct) if filename is ``~/X.XX/config/startup.blend``.
+ * - write #USER (#UserDef struct) if filename is ``~/.config/blender/X.XX/config/startup.blend``.
  */
 
 
@@ -1026,6 +1026,25 @@ static void write_nodetree(WriteData *wd, bNodeTree *ntree)
 			{
 				/* pass */
 			}
+			else if ((ntree->type == NTREE_COMPOSIT) && (node->type == CMP_NODE_GLARE)) {
+				/* Simple forward compat for fix for T50736.
+				 * Not ideal (there is no ideal solution here), but should do for now. */
+				NodeGlare *ndg = node->storage;
+				/* Not in undo case. */
+				if (!wd->current) {
+					switch (ndg->type) {
+						case 2:  /* Grrrr! magic numbers :( */
+							ndg->angle = ndg->streaks;
+							break;
+						case 0:
+							ndg->angle = ndg->star_45;
+							break;
+						default:
+							break;
+					}
+				}
+				writestruct_id(wd, DATA, node->typeinfo->storagename, 1, node->storage);
+			}
 			else {
 				writestruct_id(wd, DATA, node->typeinfo->storagename, 1, node->storage);
 			}
@@ -1816,6 +1835,32 @@ static void write_modifiers(WriteData *wd, ListBase *modbase)
 
 			if (csmd->bind_coords) {
 				writedata(wd, DATA, sizeof(float[3]) * csmd->bind_coords_num, csmd->bind_coords);
+			}
+		}
+		else if (md->type == eModifierType_SurfaceDeform) {
+			SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
+
+			writestruct(wd, DATA, SDefVert, smd->numverts, smd->verts);
+
+			if (smd->verts) {
+				for (int i = 0; i < smd->numverts; i++) {
+					writestruct(wd, DATA, SDefBind, smd->verts[i].numbinds, smd->verts[i].binds);
+
+					if (smd->verts[i].binds) {
+						for (int j = 0; j < smd->verts[i].numbinds; j++) {
+							writedata(wd, DATA, sizeof(int) * smd->verts[i].binds[j].numverts, smd->verts[i].binds[j].vert_inds);
+
+							if (smd->verts[i].binds[j].mode == MOD_SDEF_MODE_CENTROID ||
+							    smd->verts[i].binds[j].mode == MOD_SDEF_MODE_LOOPTRI)
+							{
+								writedata(wd, DATA, sizeof(float) * 3, smd->verts[i].binds[j].vert_weights);
+							}
+							else {
+								writedata(wd, DATA, sizeof(float) * smd->verts[i].binds[j].numverts, smd->verts[i].binds[j].vert_weights);
+							}
+						}
+					}
+				}
 			}
 		}
 	}

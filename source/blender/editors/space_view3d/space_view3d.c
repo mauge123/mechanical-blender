@@ -180,8 +180,8 @@ bool ED_view3d_context_user_region(bContext *C, View3D **r_v3d, ARegion **r_ar)
 		View3D *v3d = (View3D *)sa->spacedata.first;
 
 		if (ar) {
-			RegionView3D *rv3d = ar->regiondata;
-			if (rv3d && (rv3d->viewlock & RV3D_LOCKED) == 0) {
+			RegionView3D *rv3d;
+			if ((ar->regiontype == RGN_TYPE_WINDOW) && (rv3d = ar->regiondata) && (rv3d->viewlock & RV3D_LOCKED) == 0) {
 				*r_v3d = v3d;
 				*r_ar = ar;
 				return true;
@@ -869,6 +869,7 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 				case ND_CONSTRAINT:
 				case ND_KEYS:
 				case ND_PARTICLE:
+				case ND_POINTCACHE:
 				case ND_LOD:
 					ED_region_tag_redraw(ar);
 					break;
