@@ -2593,7 +2593,7 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	calculateCenter(t);
 
 	if (event) {
-		initMouseInput(t, &t->mouse, t->center2d, event->mval);
+		initMouseInput(t, &t->mouse, t->center2d, event->mval, event->shift);
 
 #ifdef WITH_MECHANICAL_EXIT_TRANSFORM_MODAL
 		if (t->spacetype == SPACE_VIEW3D) {
@@ -2621,7 +2621,6 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			}
 		}
 #endif
-
 	}
 
 	initTransformMode (t, op, event, mode);
@@ -9005,7 +9004,7 @@ static void initTimeScale(TransInfo *t)
 	center[1] = t->mouse.imval[1];
 
 	/* force a reinit with the center2d used here */
-	initMouseInput(t, &t->mouse, center, t->mouse.imval);
+	initMouseInput(t, &t->mouse, center, t->mouse.imval, false);
 
 	initMouseInputMode(t, &t->mouse, INPUT_SPRING_FLIP);
 

@@ -217,7 +217,7 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
         draw_samples_info(layout, context)
 
 
-class CyclesRender_PT_geometery(CyclesButtonsPanel, Panel):
+class CyclesRender_PT_geometry(CyclesButtonsPanel, Panel):
     bl_label = "Geometry"
     bl_options = {'DEFAULT_CLOSED'}
 
@@ -431,6 +431,10 @@ class CyclesRender_PT_performance(CyclesButtonsPanel, Panel):
         col.label(text="Acceleration structure:")
         col.prop(cscene, "debug_use_spatial_splits")
         col.prop(cscene, "debug_use_hair_bvh")
+
+        row = col.row()
+        row.active = not cscene.debug_use_spatial_splits
+        row.prop(cscene, "debug_bvh_time_steps")
 
 
 class CyclesRender_PT_layer_options(CyclesButtonsPanel, Panel):
@@ -787,10 +791,13 @@ class CyclesObject_PT_cycles_settings(CyclesButtonsPanel, Panel):
         col = layout.column()
         col.label(text="Performance:")
         row = col.row()
-        row.active = scene.render.use_simplify and cscene.use_camera_cull
-        row.prop(cob, "use_camera_cull")
-        row.active = scene.render.use_simplify and cscene.use_distance_cull
-        row.prop(cob, "use_distance_cull")
+        sub = row.row()
+        sub.active = scene.render.use_simplify and cscene.use_camera_cull
+        sub.prop(cob, "use_camera_cull")
+
+        sub = row.row()
+        sub.active = scene.render.use_simplify and cscene.use_distance_cull
+        sub.prop(cob, "use_distance_cull")
 
 
 class CYCLES_OT_use_shading_nodes(Operator):
