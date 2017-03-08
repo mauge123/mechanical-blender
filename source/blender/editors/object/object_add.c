@@ -455,6 +455,11 @@ Object *ED_object_add_type(
 		ED_render_id_flush_update(bmain, ob->data);
 	}
 
+// WITH_MECHANICAL_GEOMETRY
+	if (ob->type == OB_MESH) {
+		ob->geom_enabled = (U.flag & USER_MESH_GEOMETRY_ENABLE) != 0;
+	}
+
 	if (enter_editmode)
 		ED_object_editmode_enter(C, EM_IGNORE_LAYER);
 

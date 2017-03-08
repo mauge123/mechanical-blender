@@ -2828,6 +2828,11 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Level of Detail Levels", "A collection of detail levels to automatically switch between");
 	RNA_def_property_update(prop, NC_OBJECT | ND_LOD, NULL);
 
+// WITH_MECHANICAL_GEOMETRY
+	prop = RNA_def_property(srna, "geom_enabled", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Enable Geometry", "Enable Geometry Calcs On Object");
+	RNA_def_property_boolean_sdna(prop, NULL, "geom_enabled", 1);
+
 	RNA_api_object(srna);
 }
 

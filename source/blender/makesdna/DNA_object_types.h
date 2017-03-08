@@ -305,6 +305,10 @@ typedef struct Object {
 	struct PreviewImage *preview;
 
 	ListBase collection_settings; /* used by depsgraph, flushed from collection-tree */
+
+// WITH_MECHANICAL_GEOMETRY
+	int geom_enabled;
+	char pad3[4];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */

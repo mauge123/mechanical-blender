@@ -281,6 +281,7 @@ class USERPREF_PT_edit(Panel):
 
         col.label(text="New Objects:")
         col.prop(edit, "use_enter_edit_mode")
+        col.prop(edit, "enable_mesh_geometry")
         col.label(text="Align To:")
         col.prop(edit, "object_align", text="")
 
