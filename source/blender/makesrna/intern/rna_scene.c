@@ -8967,6 +8967,14 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_api_scene(srna);
 
 // WITH MECHANICAL_GEOMETRY
+	// Enable Geometry
+	prop = RNA_def_property(srna, "geom_enabled", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "geom_enabled", 1);
+	RNA_def_property_ui_text(prop, "Geometry Calculations",
+							 "Enables geometry calculations");
+	RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+
+
 	// Line end
 	prop = RNA_def_property(srna, "geom_line_end_point", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "geomsnapflag", GEOM_LINE_END_POINT);

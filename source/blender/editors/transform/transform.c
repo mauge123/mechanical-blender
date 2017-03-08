@@ -2941,7 +2941,7 @@ int transformEnd(bContext *C, TransInfo *t)
 			if (t->obedit->type == OB_MESH) {
 				em = BKE_editmesh_from_object(t->obedit);
 			}
-			if (em) {
+			if (em && t->scene->geom_enabled) {
 				mechanical_update_mesh_geometry(em->bm);
 			}
 		}
