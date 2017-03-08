@@ -1716,8 +1716,9 @@ typedef struct Scene {
 
 	struct PreviewImage *preview;
 
+	/* WITH_MECHANICAL_GEOMETRY */
 	int geomsnapflag;
-	char pad4[4];
+	int geom_enabled;
 } Scene;
 
 /* **************** RENDERDATA ********************* */
@@ -2351,8 +2352,6 @@ enum {
 	GEOM_ORTHO_POINT				= 1 << 5,
 	//tangents
 	GEOM_TANGENT_POINT				= 1 <<6,
-
-
 
 };
 

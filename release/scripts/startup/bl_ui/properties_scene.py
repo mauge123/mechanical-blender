@@ -89,7 +89,11 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
         scene = context.scene
 
         split = layout.split()
-        
+        col = split.column()
+        col.label(text="Settings:")
+        col.prop(scene, "geom_enabled", text="Mesh Geometry Calcs")
+
+        split = layout.split()
         col = split.column() 
         col.label(text="Snap Mode:")
 
@@ -101,7 +105,7 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
         col.prop(scene, "geom_ortho_point", text="Snap to Perpendicular Point")
         col.prop(scene, "geom_tangent_point", text="Snap to Tangent Point")
                 
-class SCENE_PT_dimenion(SceneButtonsPanel, Panel):
+class SCENE_PT_dimension(SceneButtonsPanel, Panel):
     bl_label = "Dimensions"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     

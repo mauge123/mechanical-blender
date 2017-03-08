@@ -293,7 +293,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
-			if (em && !G.moving) {
+			if (em && scene->geom_enabled && !G.moving) {
 				mechanical_update_mesh_geometry(em->bm);
 			}
 #endif
