@@ -93,6 +93,21 @@ class OBJECT_PT_delta_transform(ObjectButtonsPanel, Panel):
             row.column().prop(ob, "delta_rotation_euler", text="Delta Rotation")
 
         row.column().prop(ob, "delta_scale")
+        
+class OBJECT_PT_geometry(ObjectButtonsPanel, Panel):
+    bl_label = "Geometry"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        ob = context.object
+
+        row = layout.row()
+
+        col = row.column()
+        col.prop(ob, "geom_enabled", text = "Enable Geometry")
+
 
 
 class OBJECT_PT_transform_locks(ObjectButtonsPanel, Panel):

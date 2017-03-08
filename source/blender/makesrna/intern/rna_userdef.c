@@ -3662,6 +3662,12 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_ADD_EDITMODE);
 	RNA_def_property_ui_text(prop, "Enter Edit Mode", "Enter Edit Mode automatically after adding a new object");
 
+// WITH_MECHANICAL_GEOMETRY
+	prop = RNA_def_property(srna, "enable_mesh_geometry", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_MESH_GEOMETRY_ENABLE);
+	RNA_def_property_ui_text(prop, "Enable Mesh Geometry", "Set geometry enabled on new objects");
+
+
 	prop = RNA_def_property(srna, "use_drag_immediately", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_RELEASECONFIRM);
 	RNA_def_property_ui_text(prop, "Release confirms",

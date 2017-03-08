@@ -299,6 +299,10 @@ typedef struct Object {
 	LodLevel *currentlod;
 
 	struct PreviewImage *preview;
+
+// WITH_MECHANICAL_GEOMETRY
+	int geom_enabled;
+	char pad3[4];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
