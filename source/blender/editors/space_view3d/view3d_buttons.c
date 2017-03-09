@@ -1361,9 +1361,15 @@ static void do_view3d_mesh_dimensions_buttons(bContext *C, void *UNUSED(index), 
 static void view3d_panel_mesh_dimensions(const bContext *C, Panel *pa)
 {
 	uiBlock *block;
+
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
-	Object *ob = scene->basact->object;
+
+	// Mechanical 2.8
+	// Object *ob = scene->basact->object;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *ob = OBACT_NEW;
+
 	uiLayout *col;
 	View3D *v3d = CTX_wm_view3d(C);
 	const float lim = 10000.0f * max_ff(1.0f, ED_view3d_grid_scale(scene, v3d, NULL));
@@ -1386,8 +1392,11 @@ static void view3d_panel_mesh_references(const bContext *C, Panel *pa){
 	uiBlock *block;
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
-	Object *ob = scene->basact->object;
 
+	// Mechanical 2.8
+	// Object *ob = scene->basact->object;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *ob = OBACT_NEW;
 	block = uiLayoutGetBlock(pa->layout);
 
 	if (ob == obedit) {
