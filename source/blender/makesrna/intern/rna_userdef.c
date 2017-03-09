@@ -3022,8 +3022,7 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
 		{16, "FILE_BROWSER", ICON_FILESEL, "File Browser", ""},
 		{17, "CONSOLE", ICON_CONSOLE, "Python Console", ""},
 		{20, "CLIP_EDITOR", ICON_CLIP, "Movie Clip Editor", ""},
-#ifdef WITH_MECHANICAL_OUT
-		// Not used
+#ifdef WITH_MECHANICAL
 		{21, "MECHANICAL_PREFERENCES", ICON_MECHANICAL, "Mechanical", ""},
 #endif
 		{0, NULL, 0, NULL, NULL}

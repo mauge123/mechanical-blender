@@ -38,6 +38,7 @@
 #include "DNA_object_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_drawing_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_string.h"
@@ -675,6 +676,16 @@ View3D *CTX_wm_view3d(const bContext *C)
 		return sa->spacedata.first;
 	return NULL;
 }
+
+#ifdef WITH_MECHANICAL_DRAWINGS
+Drawing *CTX_wm_drawings(const bContext *C)
+{
+	ScrArea *sa = CTX_wm_area(C);
+	if (sa && sa->spacetype == SPACE_DRAWINGS)
+		return sa->spacedata.first;
+	return NULL;
+}
+#endif
 
 RegionView3D *CTX_wm_region_view3d(const bContext *C)
 {
