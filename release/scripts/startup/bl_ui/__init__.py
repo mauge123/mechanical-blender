@@ -80,6 +80,8 @@ _modules = [
     "space_userpref",
     "space_view3d",
     "space_view3d_toolbar",
+# WITH_MECHANICAL_DRAWINGS
+    "space_drawings",
     ]
 
 import bpy

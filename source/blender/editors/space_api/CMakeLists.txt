@@ -37,4 +37,8 @@ set(SRC
 	spacetypes.c
 )
 
+if(WITH_MECHANICAL)
+	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
+endif()
+
 blender_add_lib(bf_editor_space_api "${SRC}" "${INC}" "${INC_SYS}")

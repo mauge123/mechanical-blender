@@ -31,6 +31,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_SNAP_TO_CURSOR)
 	add_definitions(-DWITH_MECHANICAL_SELECT_TRANSFORM_CENTER)
+	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
 endif()
 
 add_subdirectory(intern)

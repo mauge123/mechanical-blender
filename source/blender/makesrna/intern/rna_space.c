@@ -65,6 +65,10 @@
 EnumPropertyItem rna_enum_space_type_items[] = {
 	/* empty must be here for python, is skipped for UI */
 	{SPACE_EMPTY, "EMPTY", ICON_NONE, "Empty", ""},
+#ifdef WITH_MECHANICAL_DRAWINGS
+	{SPACE_DRAWINGS, "DRAWINGS", ICON_DRAWING, "2D Drawings", "2D Drawings"},
+	{0, "", ICON_NONE, NULL, NULL},
+#endif
 	{SPACE_VIEW3D, "VIEW_3D", ICON_VIEW3D, "3D View", "3D viewport"},
 	{0, "", ICON_NONE, NULL, NULL},
 	{SPACE_TIME, "TIMELINE", ICON_TIME, "Timeline", "Timeline and playback controls"},

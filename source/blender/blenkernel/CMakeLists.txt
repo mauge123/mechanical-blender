@@ -510,6 +510,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_SNAP_TO_PLANE)
 	add_definitions(-DWITH_MECHANICAL_UNIT_FORCE)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
+	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
 
 	list(APPEND INC
 		 ../mechanical
