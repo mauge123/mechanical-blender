@@ -16,38 +16,20 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  *
- * The Original Code is: all of this file.
  *
- * Contributor(s): jaume bellet <developer@tmaq.es>.
+ * Contributor(s): Jaume bellet
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file DNA_drawing_types.h
- *  \ingroup DNA
+/** \file ED_node.h
+ *  \ingroup editors
  */
 
-#ifndef __DNA_DRAWING_TYPES_H__
-#define __DNA_DRAWING_TYPES_H__
+#ifndef __ED_DRAWINGS_H__
+#define __ED_DRAWINGS_H__
 
-struct SpaceLink;
-
-
-#include "DNA_defs.h"
-#include "DNA_listBase.h"
+#define DRAWING_GRID_STEPS     5
 
 
-/* Drawing ViewPort Struct */
-typedef struct Drawing {
-	struct SpaceLink *next, *prev;
-	ListBase regionbase;		/* storage of regions for inactive spaces */
-	int spacetype;
-	float blockscale;
-	short blockhandler[8];
-
-	float cursor[2];    /* mouse pos for drawing */
-
-
-} Drawing;
-
-#endif //__DNA_DRAWING_TYPES_H__
+#endif // __ED_DRAWINGS_H__

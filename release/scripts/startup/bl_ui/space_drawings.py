@@ -36,6 +36,51 @@ class DRAWINGS_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
+        DRAWINGS_MT_editor_menus.draw_collapsible(context, layout)
+
+
+class DRAWINGS_MT_editor_menus(Menu):
+    bl_idname = "DRAWINGS_MT_editor_menus"
+    bl_label = ""
+
+    def draw(self, context):
+        self.draw_menus(self.layout, context)
+
+    @staticmethod
+    def draw_menus(layout, context):
+        st = context.space_data
+        #text = st.text
+
+        layout.menu("DRAWINGS_MT_view")
+        
+        layout.menu("DRAWINGS_MT_drawing")
+
+        #if text:
+        #    layout.menu("DRAWINGS_MT_edit")
+        #    layout.menu("DRAWINGS_MT_format")
+
+        #layout.menu("DRAWINGS_MT_templates")
+        
+class DRAWINGS_MT_view(Menu):
+    bl_label = "View"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator("screen.area_dupli")
+        layout.operator("screen.screen_full_area")
+        layout.operator("screen.screen_full_area", text="Toggle Fullscreen Area").use_hide_panels = True
+        ayout.separator()
+        
+class DRAWINGS_MT_drawing(Menu):
+    bl_label = "Drawing"
+
+    def draw(self, context):
+        layout = self.layout
+
+        #layout.operator("text.properties", icon='MENU_PANEL')
+        layout.separator()
+   
 
 def register():
     bpy.utils.register_module(__name__)
