@@ -51,6 +51,7 @@
 
 #include "ED_space_api.h"
 #include "ED_screen.h"
+#include "ED_drawings.h"
 
 #include "BIF_gl.h"
 
@@ -61,6 +62,8 @@
 #include "RNA_access.h"
 
 #include "UI_resources.h"
+#include "UI_view2d.h"
+#include "UI_interface.h"
 
 
 /* add handlers, stuff you only do once or on area/region changes */
@@ -89,14 +92,64 @@ static void drawings_header_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED
 }
 
 
+static float ED_drawing_grid_size(void)
+{
+	return U.widget_unit;
+}
+
 static void drawings_main_region_draw(const bContext *C, ARegion *ar)
 {
+	wmWindow *win = CTX_wm_window(C);
+	View2DScrollers *scrollers;
+	View2D *v2d = &ar->v2d;
 	Scene *scene = CTX_data_scene(C);
 	Drawing *dwg = CTX_wm_drawings(C);
 
-	/* clear */
-	UI_ThemeClearColorAlpha(TH_HIGH_GRAD, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	UI_ThemeClearColor(TH_BACK);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	UI_view2d_view_ortho(v2d);
+
+	/* XXX snode->cursor set in coordspace for placing new nodes, used for drawing noodles too */
+	UI_view2d_region_to_view(&ar->v2d, win->eventstate->x - ar->winrct.xmin, win->eventstate->y - ar->winrct.ymin,
+	                         &dwg->cursor[0], &dwg->cursor[1]);
+	dwg->cursor[0] /= UI_DPI_FAC;
+	dwg->cursor[1] /= UI_DPI_FAC;
+
+	ED_region_draw_cb_draw(C, ar, REGION_DRAW_PRE_VIEW);
+
+	/* only set once */
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_MAP1_VERTEX_3);
+
+
+	/* default grid */
+	UI_view2d_multi_grid_draw(v2d, TH_BACK, ED_drawing_grid_size(), DRAWING_GRID_STEPS, 2);
+
+	{
+		float w=210,h=297;
+		glColor3f(0.9,0.9,0.9);
+		glBegin(GL_QUADS);
+			glVertex2f(0,0);
+			glVertex2f(w,0);
+			glVertex2f(w,h);
+			glVertex2f(0,h);
+		glEnd();
+	}
+
+	/* backdrop */
+	//draw_nodespace_back_pix(C, ar, snode, NODE_INSTANCE_KEY_NONE);
+
+	ED_region_draw_cb_draw(C, ar, REGION_DRAW_POST_VIEW);
+
+	/* reset view matrix */
+	UI_view2d_view_restore(C);
+
+	/* scrollers */
+	scrollers = UI_view2d_scrollers_calc(C, v2d, 10, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
+	UI_view2d_scrollers_draw(C, v2d, scrollers);
+	UI_view2d_scrollers_free(scrollers);
 
 	ED_region_pixelspace(ar);
 
@@ -159,8 +212,36 @@ static SpaceLink *drawings_new(const bContext *C)
 
 	ar->regiondata = MEM_callocN(sizeof(RegionView3D), "region view3d");
 
+	ar->v2d.tot.xmin =  -12.8f * U.widget_unit;
+	ar->v2d.tot.ymin =  -12.8f * U.widget_unit;
+	ar->v2d.tot.xmax = 38.4f * U.widget_unit;
+	ar->v2d.tot.ymax = 38.4f * U.widget_unit;
+
+	ar->v2d.cur =  ar->v2d.tot;
+
+	ar->v2d.min[0] = 1.0f;
+	ar->v2d.min[1] = 1.0f;
+
+	ar->v2d.max[0] = 32000.0f;
+	ar->v2d.max[1] = 32000.0f;
+
+	ar->v2d.minzoom = 0.09f;
+	ar->v2d.maxzoom = 10.00f;
+
+	ar->v2d.scroll = (V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM);
+	ar->v2d.keepzoom = V2D_LIMITZOOM | V2D_KEEPASPECT;
+	ar->v2d.keeptot = 0;
+
+
 	return (SpaceLink *)dwg;
 }
+
+/* Initialize main region, setting handlers. */
+static void drawings_main_region_init(wmWindowManager *wm, ARegion *ar)
+{
+	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_CUSTOM, ar->winx, ar->winy);
+}
+
 
 
 /* only called once, from space/spacetypes.c */
@@ -188,14 +269,15 @@ void ED_spacetype_drawings(void)
 	/* regions: main window */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype drawings main region");
 	art->regionid = RGN_TYPE_WINDOW;
-	//art->keymapflag = ED_KEYMAP_GPENCIL;
 	art->draw = drawings_main_region_draw;
-	//art->init = view3d_main_region_init;
+	art->init = drawings_main_region_init;
 	//art->exit = view3d_main_region_exit;
 	//art->duplicate = view3d_main_region_duplicate;
 	//art->listener = view3d_main_region_listener;
 	//art->cursor = view3d_main_region_cursor;
 	//art->lock = 1;   /* can become flag, see BKE_spacedata_draw_locks */
+	art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D;
+
 	BLI_addhead(&st->regiontypes, art);
 
 #if 0
