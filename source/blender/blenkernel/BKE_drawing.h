@@ -15,33 +15,32 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- *
  * The Original Code is: all of this file.
  *
- * Contributor(s): jaume bellet <developer@tmaq.es>.
+ * Contributor(s): Jaume Bellet <mauge@bixo.org>.
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+#ifndef __BKE_TEXT_H__
+#define __BKE_TEXT_H__
 
-/** \file DNA_drawing_types.h
- *  \ingroup DNA
+/** \file BKE_drawing.h
+ *  \ingroup bke
+ *  \since March 2017
+ *  \author jbb
  */
 
-#ifndef __DNA_DRAWING_TYPES_H__
-#define __DNA_DRAWING_TYPES_H__
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+struct Main;
+struct Drawing;
 
-#include "DNA_listBase.h"
-#include "DNA_ID.h"
+struct Drawing    *BKE_drawing_add	(struct Main *bmain, const char *name);
 
-typedef struct Drawing {
-	ID id;
+#ifdef __cplusplus
+}
+#endif
 
-	float width, height;
-
-	char *name;
-	ListBase views;
-
-} Drawing;
-
-#endif //__DNA_DRAWING_TYPES_H__
+#endif

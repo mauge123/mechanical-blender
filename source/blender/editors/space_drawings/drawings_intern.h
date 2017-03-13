@@ -16,32 +16,16 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  *
- * The Original Code is: all of this file.
- *
- * Contributor(s): jaume bellet <developer@tmaq.es>.
+ * Contributor(s): jaume bellet <developer@tmaq.es>
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file DNA_drawing_types.h
- *  \ingroup DNA
+/** \file blender/editors/space_drawings/drawings_intern.h
+ *  \ingroup spdrawings
  */
 
-#ifndef __DNA_DRAWING_TYPES_H__
-#define __DNA_DRAWING_TYPES_H__
 
 
-#include "DNA_listBase.h"
-#include "DNA_ID.h"
-
-typedef struct Drawing {
-	ID id;
-
-	float width, height;
-
-	char *name;
-	ListBase views;
-
-} Drawing;
-
-#endif //__DNA_DRAWING_TYPES_H__
+void DRAWINGS_OT_new(struct wmOperatorType *ot);
+void DRAWINGS_OT_unlink(struct wmOperatorType *ot);

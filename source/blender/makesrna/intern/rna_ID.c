@@ -172,7 +172,11 @@ short RNA_type_to_ID_code(StructRNA *type)
 	if (RNA_struct_is_a(type, &RNA_VectorFont)) return ID_VF;
 	if (RNA_struct_is_a(type, &RNA_World)) return ID_WO;
 	if (RNA_struct_is_a(type, &RNA_WindowManager)) return ID_WM;
+// WITH_MECHANICAL_DIMENSIONS
+	if (RNA_struct_is_a(type, &RNA_MDim)) return ID_DM;
 
+// WITH_MECHANICAL_DRAWINGS
+	if (RNA_struct_is_a(type, &RNA_Drawing)) return ID_DW;
 	return 0;
 }
 
@@ -212,7 +216,10 @@ StructRNA *ID_code_to_RNA_type(short idcode)
 		case ID_VF: return &RNA_VectorFont;
 		case ID_WM: return &RNA_WindowManager;
 		case ID_WO: return &RNA_World;
+//WITH_MECHANICAL_DIMENSIONS
 		case ID_DM: return &RNA_MDim;
+//WITH_MECHANICAL_DRAWINGS
+		case ID_DW: return &RNA_Drawing;
 
 		default: return &RNA_ID;
 	}

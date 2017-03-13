@@ -194,6 +194,8 @@ void RNA_def_mask(struct BlenderRNA *brna);
 // WITH_MECHANICAL_MESH_DIMENSIONS
 void RNA_def_dimension(struct BlenderRNA *brna);
 
+// WITH_MECHANICAL_DRAWINGS
+void RNA_def_drawings(struct BlenderRNA *brna);
 
 /* Common Define functions */
 

@@ -15,33 +15,53 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): jaume bellet <developer@tmaq.es>.
+ * Contributor(s): Blender Foundation (2008)
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file DNA_drawing_types.h
- *  \ingroup DNA
+/** \file blender/makesrna/intern/rna_drawings.c
+ *  \ingroup RNA
  */
 
-#ifndef __DNA_DRAWING_TYPES_H__
-#define __DNA_DRAWING_TYPES_H__
+
+#include <stdlib.h>
+#include <limits.h>
+
+#include "MEM_guardedalloc.h"
+
+#include "BLT_translation.h"
+
+#include "BKE_text.h"
+
+#include "RNA_define.h"
+
+#include "rna_internal.h"
+
+#include "DNA_text_types.h"
+
+#include "WM_types.h"
+
+#ifdef RNA_RUNTIME
+
+#else
+
+static void rna_def_drawings(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "Drawing", "ID");
+	RNA_def_struct_ui_text(srna, "Drawing", "MEchanical Drawing Sheet");
+	RNA_def_struct_ui_icon(srna, ICON_DRAWING);
+	RNA_def_struct_clear_flag(srna, STRUCT_ID_REFCOUNT);
+
+}
 
 
-#include "DNA_listBase.h"
-#include "DNA_ID.h"
+void RNA_def_drawings(BlenderRNA *brna)
+{
+	rna_def_drawings(brna);
+}
 
-typedef struct Drawing {
-	ID id;
-
-	float width, height;
-
-	char *name;
-	ListBase views;
-
-} Drawing;
-
-#endif //__DNA_DRAWING_TYPES_H__
+#endif

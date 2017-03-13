@@ -3368,6 +3368,9 @@ static RNAProcessItem PROCESS_ITEMS[] = {
 	{"rna_movieclip.c", NULL, RNA_def_movieclip},
 	{"rna_tracking.c", NULL, RNA_def_tracking},
 	{"rna_mask.c", NULL, RNA_def_mask},
+#ifdef WITH_MECHANICAL_DRAWINGS
+	{"rna_drawings.c", NULL, RNA_def_drawings},
+#endif
 	{NULL, NULL}
 };
 

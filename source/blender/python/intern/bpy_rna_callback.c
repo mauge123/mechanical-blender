@@ -174,6 +174,9 @@ static eSpace_Type rna_Space_refine_reverse(StructRNA *srna)
 	if (srna == &RNA_SpaceConsole)          return SPACE_CONSOLE;
 	if (srna == &RNA_SpaceUserPreferences)  return SPACE_USERPREF;
 	if (srna == &RNA_SpaceClipEditor)       return SPACE_CLIP;
+#ifdef WITH_MECHANICAL_DRAWINGS
+	if (srna == &RNA_SpaceDrawingsEditor)	return SPACE_DRAWINGS;
+#endif
 	return SPACE_EMPTY;
 }
 

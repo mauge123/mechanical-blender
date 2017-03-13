@@ -678,7 +678,7 @@ View3D *CTX_wm_view3d(const bContext *C)
 }
 
 #ifdef WITH_MECHANICAL_DRAWINGS
-Drawing *CTX_wm_drawings(const bContext *C)
+struct SpaceDrawings *CTX_wm_space_drawings(const bContext *C)
 {
 	ScrArea *sa = CTX_wm_area(C);
 	if (sa && sa->spacetype == SPACE_DRAWINGS)
@@ -1119,6 +1119,13 @@ struct Text *CTX_data_edit_text(const bContext *C)
 {
 	return ctx_data_pointer_get(C, "edit_text");
 }
+
+#ifdef WITH_MECHANICAL_DRAWINGS
+struct Drawing *CTX_data_edit_drawing(const bContext *C)
+{
+	return ctx_data_pointer_get(C, "edit_drawing");
+}
+#endif
 
 struct MovieClip *CTX_data_edit_movieclip(const bContext *C)
 {

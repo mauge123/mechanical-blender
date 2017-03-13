@@ -77,6 +77,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_DIMENSIONS)
 	add_definitions(-DWITH_MECHANICAL_UNIT_FORCE)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
+	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
 endif()
 
 

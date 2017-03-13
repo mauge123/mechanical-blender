@@ -192,6 +192,7 @@ set(SRC
 	intern/world.c
 	intern/writeavi.c
 	intern/writeframeserver.c
+	intern/drawing.c
 
 	BKE_DerivedMesh.h
 	BKE_action.h
@@ -302,6 +303,7 @@ set(SRC
 	BKE_world.h
 	BKE_writeavi.h
 	BKE_writeframeserver.h
+	BKE_drawing.h
 
 	depsgraph_private.h
 	nla_private.h
@@ -324,7 +326,7 @@ add_definitions(${GL_DEFINITIONS})
 
 if(WIN32)
 	list(APPEND INC
-		../../../intern/utfconv
+		../../.BKE_text_add./intern/utfconv
 	)
 endif()
 
