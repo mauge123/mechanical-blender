@@ -1295,6 +1295,23 @@ typedef struct SpaceClip {
 	MaskSpaceInfo mask_info;
 } SpaceClip;
 
+// WITH_MECHANICAL_DRAWINGS
+/* Drawing ViewPort Struct */
+typedef struct SpaceDrawings {
+	struct SpaceLink *next, *prev;
+	ListBase regionbase;		/* storage of regions for inactive spaces */
+	int spacetype;
+	float blockscale;
+	short blockhandler[8];
+
+	struct Drawing *drawing;
+
+
+	float cursor[2];    /* mouse pos for drawing */
+
+
+} SpaceDrawings;
+
 /* SpaceClip->flag */
 typedef enum eSpaceClip_Flag {
 	SC_SHOW_MARKER_PATTERN      = (1 << 0),

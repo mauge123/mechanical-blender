@@ -71,6 +71,7 @@
 #include "DNA_windowmanager_types.h"
 #include "DNA_world_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_drawing_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -471,6 +472,8 @@ bool id_make_local(Main *bmain, ID *id, const bool test, const bool lib_local)
 		case ID_LI:
 		case ID_KE:
 		case ID_WM:
+		case ID_DM:
+		case ID_DW:
 			return false; /* can't be linked */
 		case ID_IP:
 			return false; /* deprecated */
@@ -578,6 +581,8 @@ bool id_copy(Main *bmain, ID *id, ID **newid, bool test)
 		case ID_LI:
 		case ID_SCR:
 		case ID_WM:
+		case ID_DM:
+		case ID_DW:
 			return false;  /* can't be copied from here */
 		case ID_VF:
 		case ID_SO:
@@ -691,6 +696,8 @@ ListBase *which_libbase(Main *mainlib, short type)
 			return &(mainlib->cachefiles);
 		case ID_DM:
 			return &(mainlib->dimensions);
+		case ID_DW:
+			return &(mainlib->drawings);
 	}
 	return NULL;
 }
@@ -840,6 +847,8 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[INDEX_ID_MSK] = &(main->mask);
 // WITH_MECHANICAL
 	lb[INDEX_ID_DM]  = &(main->dimensions);
+// WITH_MECHANICAL_DRAWINGS
+	lb[INDEX_ID_DW] =  &(main->drawings);
 
 	lb[INDEX_ID_NULL] = NULL;
 
@@ -970,6 +979,8 @@ void *BKE_libblock_alloc_notest(short type)
 		case ID_DM:
 			id = MEM_callocN(sizeof(MDim), "Dimension");
 			break;
+		case ID_DW:
+			id = MEM_callocN(sizeof(Drawing), "Drawing");
 	}
 	return id;
 }

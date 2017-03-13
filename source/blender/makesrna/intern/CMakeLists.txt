@@ -95,6 +95,7 @@ set(DEFSRC
 	rna_vfont.c
 	rna_wm.c
 	rna_world.c
+	rna_drawings.c
 )
 
 set(APISRC

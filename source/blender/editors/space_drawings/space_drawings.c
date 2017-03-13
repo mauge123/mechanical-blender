@@ -21,7 +21,7 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/space_view3d/space_drawings.c
+/** \file blender/editors/space_drawings/space_drawings.c
  *  \ingroup spdrawings
  */
 
@@ -65,6 +65,7 @@
 #include "UI_view2d.h"
 #include "UI_interface.h"
 
+#include "drawings_intern.h"  /* own include */
 
 /* add handlers, stuff you only do once or on area/region changes */
 static void drawings_header_region_init(wmWindowManager *wm, ARegion *ar)
@@ -83,12 +84,7 @@ static void drawings_header_region_draw(const bContext *C, ARegion *ar)
 static void drawings_header_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)
 {
 	/* context changes */
-	switch (wmn->category) {
-		case NC_SPACE:
-			if (wmn->data == ND_SPACE_VIEW3D)
-				ED_region_tag_redraw(ar);
-			break;
-	}
+
 }
 
 
@@ -103,7 +99,7 @@ static void drawings_main_region_draw(const bContext *C, ARegion *ar)
 	View2DScrollers *scrollers;
 	View2D *v2d = &ar->v2d;
 	Scene *scene = CTX_data_scene(C);
-	Drawing *dwg = CTX_wm_drawings(C);
+	SpaceDrawings *dwg = CTX_wm_space_drawings(C);
 
 
 	UI_ThemeClearColor(TH_BACK);
@@ -165,13 +161,13 @@ static SpaceLink *drawings_new(const bContext *C)
 	Scene *scene = CTX_data_scene(C);
 	ARegion *ar;
 
-	Drawing *dwg;
+	SpaceDrawings *dwg;
 
-	dwg = MEM_callocN(sizeof(Drawing), "initview3d");
+	dwg = MEM_callocN(sizeof(SpaceDrawings), "init drawing");
 	dwg->spacetype = SPACE_DRAWINGS;
 
 	/* header */
-	ar = MEM_callocN(sizeof(ARegion), "header for view3d");
+	ar = MEM_callocN(sizeof(ARegion), "header for drawings");
 
 	BLI_addtail(&dwg->regionbase, ar);
 	ar->regiontype = RGN_TYPE_HEADER;
@@ -205,12 +201,12 @@ static SpaceLink *drawings_new(const bContext *C)
 #endif
 
 	/* main region */
-	ar = MEM_callocN(sizeof(ARegion), "main region for view3d");
+	ar = MEM_callocN(sizeof(ARegion), "main region for drawings");
 
 	BLI_addtail(&dwg->regionbase, ar);
 	ar->regiontype = RGN_TYPE_WINDOW;
 
-	ar->regiondata = MEM_callocN(sizeof(RegionView3D), "region view3d");
+	ar->regiondata = MEM_callocN(sizeof(RegionView3D), "region drawing");
 
 	ar->v2d.tot.xmin =  -12.8f * U.widget_unit;
 	ar->v2d.tot.ymin =  -12.8f * U.widget_unit;
@@ -236,12 +232,36 @@ static SpaceLink *drawings_new(const bContext *C)
 	return (SpaceLink *)dwg;
 }
 
+
+static int drawings_context(const bContext *C, const char *member, bContextDataResult *result)
+{
+	SpaceDrawings *sdwg = CTX_wm_space_drawings(C);
+
+	if (CTX_data_dir(member)) {
+		CTX_data_dir_set(result, "edit_drawing");
+		return 1;
+	}
+	else if (CTX_data_equals(member, "edit_drawing")) {
+		CTX_data_id_pointer_set(result, &sdwg->drawing->id);
+		return 1;
+	}
+
+	return 0;
+}
+
+
 /* Initialize main region, setting handlers. */
 static void drawings_main_region_init(wmWindowManager *wm, ARegion *ar)
 {
 	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_CUSTOM, ar->winx, ar->winy);
 }
 
+
+static void drawings_operatortypes(void)
+{
+	WM_operatortype_append(DRAWINGS_OT_new);
+	WM_operatortype_append(DRAWINGS_OT_unlink);
+}
 
 
 /* only called once, from space/spacetypes.c */
@@ -259,10 +279,10 @@ void ED_spacetype_drawings(void)
 	//st->init = view3d_init;
 	//st->listener = space_view3d_listener;
 	//st->duplicate = view3d_duplicate;
-	//st->operatortypes = view3d_operatortypes;
+	st->operatortypes = drawings_operatortypes;
 	//st->keymap = view3d_keymap;
 	//st->dropboxes = view3d_dropboxes;
-	//st->context = view3d_context;
+	st->context = drawings_context;
 	//st->id_remap = view3d_id_remap;
 
 

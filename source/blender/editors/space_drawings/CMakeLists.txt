@@ -41,6 +41,7 @@ set(INC_SYS
 
 set(SRC
 	space_drawings.c
+	drawings_ops.c
 )
 
 if(WITH_PYTHON)

@@ -123,7 +123,10 @@ typedef struct Main {
 	ListBase mask;
 	ListBase linestyle;
 	ListBase cachefiles;
+// WITH_MECHANICAL_DIMENSIONS
 	ListBase dimensions;
+// WITH_MECHANICAL_DRAWINGS
+	ListBase drawings;
 
 	char id_tag_update[MAX_LIBARRAY];
 

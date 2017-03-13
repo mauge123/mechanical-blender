@@ -711,6 +711,10 @@ extern StructRNA RNA_XorController;
 // WITH_MECHANICAL_MESH_DIMENSIONS
 extern StructRNA RNA_MDim;
 
+// WITH_MECHANICAL_DRAWINGS
+extern StructRNA RNA_SpaceDrawingsEditor;
+extern StructRNA RNA_Drawing;
+
 /* Pointer
  *
  * These functions will fill in RNA pointers, this can be done in three ways:

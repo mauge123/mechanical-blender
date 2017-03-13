@@ -18,30 +18,52 @@
  *
  * The Original Code is: all of this file.
  *
- * Contributor(s): jaume bellet <developer@tmaq.es>.
+ * Contributor(s): jaume Bellet <mauge@bixo.or>.
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file DNA_drawing_types.h
- *  \ingroup DNA
+/** \file blender/blenkernel/intern/drawing.c
+ *  \ingroup bke
  */
 
-#ifndef __DNA_DRAWING_TYPES_H__
-#define __DNA_DRAWING_TYPES_H__
+#include <stdlib.h> /* abort */
+#include <string.h> /* strstr */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <wchar.h>
+#include <wctype.h>
+
+#include "MEM_guardedalloc.h"
+
+#include "BLI_utildefines.h"
+#include "BLI_path_util.h"
+#include "BLI_string.h"
+#include "BLI_string_cursor_utf8.h"
+#include "BLI_string_utf8.h"
+#include "BLI_listbase.h"
+#include "BLI_fileops.h"
+
+#include "DNA_drawing_types.h"
+
+#include "BKE_global.h"
+#include "BKE_library.h"
+#include "BKE_main.h"
+#include "BKE_drawing.h"
 
 
-#include "DNA_listBase.h"
-#include "DNA_ID.h"
+#ifdef WITH_PYTHON
+#include "BPY_extern.h"
+#endif
 
-typedef struct Drawing {
-	ID id;
 
-	float width, height;
+Drawing *BKE_drawing_add(Main *bmain, const char *name)
+{
+	Drawing *dwg;
 
-	char *name;
-	ListBase views;
+	dwg = BKE_libblock_alloc(bmain, ID_DW, name);
 
-} Drawing;
+	//BKE_text_init(ta);
 
-#endif //__DNA_DRAWING_TYPES_H__
+	return dwg;
+}

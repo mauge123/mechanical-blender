@@ -904,6 +904,8 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 			case ID_PAL:
 			case ID_PC:
 			case ID_CF:
+			case ID_DM:
+			case ID_DW:
 				break;
 
 			/* Deprecated. */
@@ -1024,6 +1026,8 @@ bool BKE_library_idtype_can_use_idtype(const short id_type_owner, const short id
 		case ID_PAL:
 		case ID_PC:
 		case ID_CF:
+		case ID_DM:
+		case ID_DW:
 			/* Those types never use/reference other IDs... */
 			return false;
 		case ID_IP:

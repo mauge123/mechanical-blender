@@ -28,7 +28,10 @@ class DRAWINGS_HT_header(Header):
     def draw(self, context):
         layout = self.layout
 
-        view = context.space_data
+        st = context.space_data
+        # dwg = st.drawing
+
+        
         # mode_string = context.mode
         obj = context.active_object
         toolsettings = context.tool_settings
@@ -37,6 +40,9 @@ class DRAWINGS_HT_header(Header):
         row.template_header()
 
         DRAWINGS_MT_editor_menus.draw_collapsible(context, layout)
+        
+        row = layout.row(align=True)
+        row.template_ID(st, "drawing", new="drawings.new", unlink = "drawings.unlink")
 
 
 class DRAWINGS_MT_editor_menus(Menu):

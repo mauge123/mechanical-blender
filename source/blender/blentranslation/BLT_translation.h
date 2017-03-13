@@ -154,6 +154,8 @@ bool BLT_lang_is_ime_supported(void);
 #define BLT_I18NCONTEXT_ID_MASK                 "Mask"
 // WITH_MECHANICAL
 #define BLT_I18NCONTEXT_ID_DIMENSION            "Dimension"
+// WITH_MECHANICAL_DRAWINGS
+#define BLT_I18NCONTEXT_ID_DRAWING              "Drawing"
 
 /* Helper for bpy.app.i18n object... */
 typedef struct {
