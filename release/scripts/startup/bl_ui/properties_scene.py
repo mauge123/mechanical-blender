@@ -505,6 +505,7 @@ classes = (
     SCENE_PT_rigid_body_field_weights,
     SCENE_PT_simplify,
     SCENE_PT_custom_props,
+    SCENE_PT_geom,
 )
 
 if __name__ == "__main__":  # only for live edit.

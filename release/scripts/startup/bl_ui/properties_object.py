@@ -395,6 +395,7 @@ classes = (
     OBJECT_PT_duplication,
     OBJECT_PT_motion_paths,
     OBJECT_PT_custom_props,
+    OBJECT_PT_geometry,
 )
 
 if __name__ == "__main__":  # only for live edit.
