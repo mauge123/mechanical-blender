@@ -654,6 +654,8 @@ void Session::load_kernels()
 	if(!kernels_loaded) {
 		progress.set_status("Loading render kernels (may take a few minutes the first time)");
 
+		scoped_timer timer;
+
 		DeviceRequestedFeatures requested_features = get_requested_device_features();
 		VLOG(2) << "Requested features:\n" << requested_features;
 		if(!device->load_kernels(requested_features)) {
@@ -666,6 +668,9 @@ void Session::load_kernels()
 			progress.set_update();
 			return;
 		}
+
+		progress.add_skip_time(timer, false);
+		VLOG(1) << "Total time spent loading kernels: " << time_dt() - timer.get_start();
 
 		kernels_loaded = true;
 	}
@@ -828,7 +833,7 @@ void Session::update_status_time(bool show_pause, bool show_done)
 	int progressive_sample = tile_manager.state.sample;
 	int num_samples = tile_manager.get_num_effective_samples();
 
-	int tile = tile_manager.state.num_rendered_tiles;
+	int tile = progress.get_finished_tiles();
 	int num_tiles = tile_manager.state.num_tiles;
 
 	/* update status */
@@ -836,7 +841,7 @@ void Session::update_status_time(bool show_pause, bool show_done)
 
 	if(!params.progressive) {
 		const bool is_cpu = params.device.type == DEVICE_CPU;
-		const bool is_last_tile = (progress.get_finished_tiles() + 1) == num_tiles;
+		const bool is_last_tile = (tile + 1) == num_tiles;
 
 		substatus = string_printf("Path Tracing Tile %d/%d", tile, num_tiles);
 
@@ -887,6 +892,7 @@ void Session::path_trace()
 	task.need_finish_queue = params.progressive_refine;
 	task.integrator_branched = scene->integrator->method == Integrator::BRANCHED_PATH;
 	task.requested_tile_size = params.tile_size;
+	task.passes_size = tile_manager.params.get_passes_size();
 
 	device->task_add(task);
 }

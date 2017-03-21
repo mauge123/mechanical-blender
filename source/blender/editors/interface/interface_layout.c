@@ -1274,7 +1274,7 @@ static void ui_item_rna_size(
 	if (!w) {
 		if (type == PROP_ENUM && icon_only) {
 			w = ui_text_icon_width(layout, "", ICON_BLANK1, 0);
-			w += 0.5f * UI_UNIT_X;
+			w += 0.6f * UI_UNIT_X;
 		}
 		else {
 			w = ui_text_icon_width(layout, name, icon, 0);
@@ -2238,8 +2238,9 @@ static void ui_litem_layout_row(uiLayout *litem)
 	/* add extra pixel */
 	uiItem *last_item = litem->items.last;
 	extra_pixel = litem->w - (x - litem->x);
-	if (extra_pixel > 0 && litem->alignment == UI_LAYOUT_ALIGN_EXPAND && 
-			last_free_item && last_item && last_item->flag & UI_ITEM_FIXED) {
+	if (extra_pixel > 0 && litem->alignment == UI_LAYOUT_ALIGN_EXPAND &&
+	    last_free_item && last_item && last_item->flag & UI_ITEM_FIXED)
+	{
 		ui_item_move(last_free_item, 0, extra_pixel);
 		for (item = last_free_item->next; item; item = item->next)
 			ui_item_move(item, extra_pixel, extra_pixel);

@@ -113,6 +113,7 @@ public:
 	string last_status;
 	string last_error;
 	float last_progress;
+	double last_status_time;
 
 	int width, height;
 	double start_resize_time;
@@ -136,6 +137,10 @@ public:
 
 	/* Current resumable chunk index to render. */
 	static int current_resumable_chunk;
+
+	/* Alternative to single-chunk rendering to render a range of chunks. */
+	static int start_resumable_chunk;
+	static int end_resumable_chunk;
 
 protected:
 	void do_write_update_render_result(BL::RenderResult& b_rr,
