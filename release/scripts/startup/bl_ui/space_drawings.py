@@ -88,12 +88,13 @@ class DRAWINGS_MT_drawing(Menu):
         layout.separator()
    
 
-def register():
-    bpy.utils.register_module(__name__)
+classes = (
+    DRAWINGS_HT_header,
+    DRAWINGS_MT_editor_menus,
+    DRAWINGS_MT_view,
+)
 
-
-def unregister():
-    bpy.utils.unregister_module(__name__)
-
-if __name__ == "__main__":
-    register()
+if __name__ == "__main__":  # only for live edit.
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)
