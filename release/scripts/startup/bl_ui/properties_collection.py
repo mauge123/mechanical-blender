@@ -128,7 +128,20 @@ class COLLECTION_PT_edit_mode_settings(CollectionButtonsPanel, Panel):
         col = layout.column()
         template_engine_settings(col, settings, "show_occlude_wire")
         template_engine_settings(col, settings, "backwire_opacity")
+        template_engine_settings(col, settings, "face_normals_show")
+        template_engine_settings(col, settings, "vert_normals_show")
+        template_engine_settings(col, settings, "loop_normals_show")
+        template_engine_settings(col, settings, "normals_length")
 
+
+classes = (
+    COLLECTION_PT_context_collection,
+    COLLECTION_PT_clay_settings,
+    COLLECTION_PT_object_mode_settings,
+    COLLECTION_PT_edit_mode_settings,
+)
 
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

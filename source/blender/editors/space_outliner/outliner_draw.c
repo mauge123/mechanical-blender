@@ -834,9 +834,6 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 	struct DrawIconArg arg;
 	float aspect;
 	
-	/* icons tiny bit away from text */
-	x -= 0.15f * UI_UNIT_Y;
-	
 	/* make function calls a bit compacter */
 	arg.block = block;
 	arg.id = tselem->id;
@@ -847,8 +844,10 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 
 	/* placement of icons, copied from interface_widgets.c */
 	aspect = (0.8f * UI_UNIT_Y) / ICON_DEFAULT_HEIGHT;
-	arg.x = x = x + 4.0f * aspect;
-	arg.y = y = y + 0.1f * UI_UNIT_Y;
+	x += 2.0f * aspect;
+	y += 2.0f * aspect;
+	arg.x = x = x;
+	arg.y = y = y;
 
 #define ICON_DRAW(_icon) UI_icon_draw_alpha(x, y, _icon, alpha)
 
@@ -1256,9 +1255,9 @@ static void outliner_draw_iconrow(bContext *C, uiBlock *block, Scene *scene, Sce
 				color[3] *= alpha_fac;
 
 				UI_draw_roundbox(
-				        (float) *offsx - 1.0f * ufac,
+				        (float) *offsx + 1.0f * ufac,
 				        (float)ys + 1.0f * ufac,
-				        (float)*offsx + UI_UNIT_X - 2.0f * ufac,
+				        (float)*offsx + UI_UNIT_X - 1.0f * ufac,
 				        (float)ys + UI_UNIT_Y - ufac,
 				        (float)UI_UNIT_Y / 2.0f - ufac,
 				         color);
@@ -1382,9 +1381,9 @@ static void outliner_draw_tree_element(
 		if (active != OL_DRAWSEL_NONE) {
 			UI_draw_roundbox_corner_set(UI_CNR_ALL);
 			UI_draw_roundbox(
-			        (float)startx + UI_UNIT_X,
+			        (float)startx + UI_UNIT_X + 1.0f * ufac,
 			        (float)*starty + 1.0f * ufac,
-			        (float)startx + 2.0f * UI_UNIT_X - 2.0f * ufac,
+			        (float)startx + 2.0f * UI_UNIT_X - 1.0f * ufac,
 			        (float)*starty + UI_UNIT_Y - 1.0f * ufac,
 			        UI_UNIT_Y / 2.0f - 1.0f * ufac, color);
 			glEnable(GL_BLEND); /* roundbox disables it */
@@ -1402,10 +1401,10 @@ static void outliner_draw_tree_element(
 
 			// icons a bit higher
 			if (TSELEM_OPEN(tselem, soops))
-				UI_icon_draw_alpha((float)icon_x, (float)*starty + 2 * ufac, ICON_DISCLOSURE_TRI_DOWN,
+				UI_icon_draw_alpha((float)icon_x + 2 * ufac, (float)*starty + 1 * ufac, ICON_DISCLOSURE_TRI_DOWN,
 				                   alpha_fac);
 			else
-				UI_icon_draw_alpha((float)icon_x, (float)*starty + 2 * ufac, ICON_DISCLOSURE_TRI_RIGHT,
+				UI_icon_draw_alpha((float)icon_x + 2 * ufac, (float)*starty + 1 * ufac, ICON_DISCLOSURE_TRI_RIGHT,
 				                   alpha_fac);
 		}
 		offsx += UI_UNIT_X;
@@ -1414,25 +1413,25 @@ static void outliner_draw_tree_element(
 		
 		if (!(ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM))) {
 			tselem_draw_icon(block, xmax, (float)startx + offsx, (float)*starty, tselem, te, alpha_fac);
-			offsx += UI_UNIT_X;
+			offsx += UI_UNIT_X + 2 * ufac;
 		}
 		else
 			offsx += 2 * ufac;
 		
 		if (tselem->type == 0 && ID_IS_LINKED_DATABLOCK(tselem->id)) {
 			if (tselem->id->tag & LIB_TAG_MISSING) {
-				UI_icon_draw_alpha((float)startx + offsx, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_BROKEN,
+				UI_icon_draw_alpha((float)startx + offsx + 2 * ufac, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_BROKEN,
 				                   alpha_fac);
 			}
 			else if (tselem->id->tag & LIB_TAG_INDIRECT) {
-				UI_icon_draw_alpha((float)startx + offsx, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_INDIRECT,
+				UI_icon_draw_alpha((float)startx + offsx + 2 * ufac, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_INDIRECT,
 				                   alpha_fac);
 			}
 			else {
-				UI_icon_draw_alpha((float)startx + offsx, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_DIRECT,
+				UI_icon_draw_alpha((float)startx + offsx + 2 * ufac, (float)*starty + 2 * ufac, ICON_LIBRARY_DATA_DIRECT,
 				                   alpha_fac);
 			}
-			offsx += UI_UNIT_X;
+			offsx += UI_UNIT_X + 2 * ufac;
 		}
 		glDisable(GL_BLEND);
 		
@@ -1520,34 +1519,15 @@ static void outliner_draw_tree_element(
 	}
 }
 
-/**
- * Count how many visible childs (and open grandchilds, great-grandchilds, ...) \a te has.
- */
-static int outliner_count_visible_childs(const SpaceOops *soops, const TreeElement *te)
-{
-	TreeStoreElem *tselem = TREESTORE(te);
-	int current_count = 0;
-
-	if (TSELEM_OPEN(tselem, soops)) {
-		for (TreeElement *te_child = te->subtree.first; te_child; te_child = te_child->next) {
-			current_count += outliner_count_visible_childs(soops, te_child);
-			current_count++;
-		}
-	}
-
-	return current_count;
-}
-
-static void outliner_draw_tree_element_floating(const SpaceOops *soops, const ARegion *ar,
-                                                const TreeElement *te_floating)
+static void outliner_draw_tree_element_floating(
+        const ARegion *ar, const TreeElement *te_floating)
 {
 	const TreeElement *te_insert = te_floating->drag_data->insert_handle;
-	const ListBase *lb_parent = te_floating->parent ? &te_floating->parent->subtree : &soops->tree;
-	const TreeElement *te_insert_fallback = te_insert ? te_insert : lb_parent->first;
 	const int line_width = 2;
 
 	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	int coord_y = (te_insert ? te_insert->ys : (te_insert_fallback->ys + UI_UNIT_Y)) - (int)(line_width * 0.5f);
+	int coord_y = te_insert->ys;
+	int coord_x = te_insert->xs;
 	unsigned char col[4];
 
 	if (te_insert == te_floating) {
@@ -1555,20 +1535,19 @@ static void outliner_draw_tree_element_floating(const SpaceOops *soops, const AR
 		return;
 	}
 
-	if (te_insert) {
-		coord_y -= UI_UNIT_Y * outliner_count_visible_childs(soops, te_insert);
-	}
-
 	UI_GetThemeColorShade4ubv(TH_BACK, -40, col);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	glEnable(GL_BLEND);
 
-	if (!te_insert || (te_floating->drag_data->insert_type == TE_INSERT_AFTER)) {
+	if (ELEM(te_floating->drag_data->insert_type, TE_INSERT_BEFORE, TE_INSERT_AFTER)) {
+		if (te_floating->drag_data->insert_type == TE_INSERT_BEFORE) {
+			coord_y += UI_UNIT_Y;
+		}
 		immUniformColor4ubv(col);
 		glLineWidth(line_width);
 
 		immBegin(PRIM_LINE_STRIP, 2);
-		immVertex2f(pos, 0, coord_y);
+		immVertex2f(pos, coord_x, coord_y);
 		immVertex2f(pos, ar->v2d.cur.xmax, coord_y);
 		immEnd();
 	}
@@ -1577,8 +1556,8 @@ static void outliner_draw_tree_element_floating(const SpaceOops *soops, const AR
 		immUniformColor4ub(UNPACK3(col), col[3] * 0.5f);
 
 		immBegin(PRIM_QUADS, 4);
-		immVertex2f(pos, 0, coord_y);
-		immVertex2f(pos, 0, coord_y + UI_UNIT_Y);
+		immVertex2f(pos, coord_x, coord_y);
+		immVertex2f(pos, coord_x, coord_y + UI_UNIT_Y);
 		immVertex2f(pos, ar->v2d.cur.xmax, coord_y + UI_UNIT_Y);
 		immVertex2f(pos, ar->v2d.cur.xmax, coord_y);
 		immEnd();
@@ -1792,8 +1771,8 @@ static void outliner_draw_tree(
 		outliner_draw_tree_element(C, block, fstyle, scene, sl, ar, soops, te, te->drag_data != NULL,
 		                           startx, &starty, te_edit, &te_floating);
 	}
-	if (te_floating) {
-		outliner_draw_tree_element_floating(soops, ar, te_floating);
+	if (te_floating && te_floating->drag_data->insert_handle) {
+		outliner_draw_tree_element_floating(ar, te_floating);
 	}
 
 	if (has_restrict_icons) {

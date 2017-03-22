@@ -1019,18 +1019,6 @@ static PyObject *Method_##funcname (PyObject *UNUSED(self), PyObject *args)   \
 	ret_ret_##ret;                                                            \
 }
 
-#define BGLU_Wrap(funcname, ret, arg_list)                                    \
-static PyObject *Method_##funcname (PyObject *UNUSED(self), PyObject *args)   \
-{                                                                             \
-	arg_def arg_list;                                                         \
-	ret_def_##ret;                                                            \
-	if (!PyArg_ParseTuple(args, arg_str arg_list, arg_ref arg_list)) {        \
-		return NULL;                                                          \
-	}                                                                         \
-	ret_set_##ret glu##funcname (arg_var arg_list);                           \
-	ret_ret_##ret;                                                            \
-}
-
 /* GL_VERSION_1_0 */
 BGL_Wrap(BlendFunc,                 void,      (GLenum, GLenum))
 BGL_Wrap(Clear,                     void,      (GLbitfield))
@@ -1279,44 +1267,7 @@ BGL_Wrap(TexImage3DMultisample,     void,      (GLenum, GLsizei, GLenum, GLsizei
 
 
 /* GL_VERSION_3_3 */
-BGL_Wrap(ColorP3ui,                 void,      (GLenum, GLuint))
-BGL_Wrap(ColorP3uiv,                void,      (GLenum, GLuintP))
-BGL_Wrap(ColorP4ui,                 void,      (GLenum, GLuint))
-BGL_Wrap(ColorP4uiv,                void,      (GLenum, GLuintP))
-BGL_Wrap(MultiTexCoordP1ui,         void,      (GLenum, GLenum, GLuint))
-BGL_Wrap(MultiTexCoordP1uiv,        void,      (GLenum, GLenum, GLuintP))
-BGL_Wrap(MultiTexCoordP2ui,         void,      (GLenum, GLenum, GLuint))
-BGL_Wrap(MultiTexCoordP2uiv,        void,      (GLenum, GLenum, GLuintP))
-BGL_Wrap(MultiTexCoordP3ui,         void,      (GLenum, GLenum, GLuint))
-BGL_Wrap(MultiTexCoordP3uiv,        void,      (GLenum, GLenum, GLuintP))
-BGL_Wrap(MultiTexCoordP4ui,         void,      (GLenum, GLenum, GLuint))
-BGL_Wrap(MultiTexCoordP4uiv,        void,      (GLenum, GLenum, GLuintP))
-BGL_Wrap(NormalP3ui,                void,      (GLenum, GLuint))
-BGL_Wrap(NormalP3uiv,               void,      (GLenum, GLuintP))
-BGL_Wrap(SecondaryColorP3ui,        void,      (GLenum, GLuint))
-BGL_Wrap(SecondaryColorP3uiv,       void,      (GLenum, GLuintP))
-BGL_Wrap(TexCoordP1ui,              void,      (GLenum, GLuint))
-BGL_Wrap(TexCoordP1uiv,             void,      (GLenum, GLuintP))
-BGL_Wrap(TexCoordP2ui,              void,      (GLenum, GLuint))
-BGL_Wrap(TexCoordP2uiv,             void,      (GLenum, GLuintP))
-BGL_Wrap(TexCoordP3ui,              void,      (GLenum, GLuint))
-BGL_Wrap(TexCoordP3uiv,             void,      (GLenum, GLuintP))
-BGL_Wrap(TexCoordP4ui,              void,      (GLenum, GLuint))
-BGL_Wrap(TexCoordP4uiv,             void,      (GLenum, GLuintP))
-BGL_Wrap(VertexP2ui,                void,      (GLenum, GLuint))
-BGL_Wrap(VertexP2uiv,               void,      (GLenum, GLuintP))
-BGL_Wrap(VertexP3ui,                void,      (GLenum, GLuint))
-BGL_Wrap(VertexP3uiv,               void,      (GLenum, GLuintP))
-BGL_Wrap(VertexP4ui,                void,      (GLenum, GLuint))
-BGL_Wrap(VertexP4uiv,               void,      (GLenum, GLuintP))
-
-
-BGLU_Wrap(Perspective,       void,       (GLdouble, GLdouble, GLdouble, GLdouble))
-BGLU_Wrap(LookAt,            void,       (GLdouble, GLdouble, GLdouble, GLdouble, GLdouble, GLdouble, GLdouble, GLdouble, GLdouble))
-BGLU_Wrap(Ortho2D,           void,       (GLdouble, GLdouble, GLdouble, GLdouble))
-BGLU_Wrap(PickMatrix,        void,       (GLdouble, GLdouble, GLdouble, GLdouble, GLintP))
-BGLU_Wrap(Project,           GLint,      (GLdouble, GLdouble, GLdouble, GLdoubleP, GLdoubleP, GLintP, GLdoubleP, GLdoubleP, GLdoubleP))
-BGLU_Wrap(UnProject,         GLint,      (GLdouble, GLdouble, GLdouble, GLdoubleP, GLdoubleP, GLintP, GLdoubleP, GLdoubleP, GLdoubleP))
+/* no new functions besides packed immediate mode (not part of core profile) */
 
 /** \} */
 
@@ -1326,26 +1277,12 @@ BGLU_Wrap(UnProject,         GLint,      (GLdouble, GLdouble, GLdouble, GLdouble
 /** \name Module Definition
  * \{ */
 
-#define MethodDefu(func) {"glu"#func, Method_##func, METH_VARARGS, NULL}
-
-static struct PyMethodDef BGL_methods[] = {
-	MethodDefu(Perspective),
-	MethodDefu(LookAt),
-	MethodDefu(Ortho2D),
-	MethodDefu(PickMatrix),
-	MethodDefu(Project),
-	MethodDefu(UnProject),
-	{NULL, NULL, 0, NULL}
-};
-
-#undef MethodDefu
-
 static struct PyModuleDef BGL_module_def = {
 	PyModuleDef_HEAD_INIT,
 	"bgl",  /* m_name */
 	NULL,  /* m_doc */
 	0,  /* m_size */
-	BGL_methods,  /* m_methods */
+	NULL,  /* m_methods */
 	NULL,  /* m_reload */
 	NULL,  /* m_traverse */
 	NULL,  /* m_clear */
@@ -1663,36 +1600,6 @@ PyObject *BPyInit_bgl(void)
 
 	/* GL_VERSION_3_3 */
 	{
-		PY_MOD_ADD_METHOD(ColorP3ui);
-		PY_MOD_ADD_METHOD(ColorP3uiv);
-		PY_MOD_ADD_METHOD(ColorP4ui);
-		PY_MOD_ADD_METHOD(ColorP4uiv);
-		PY_MOD_ADD_METHOD(MultiTexCoordP1ui);
-		PY_MOD_ADD_METHOD(MultiTexCoordP1uiv);
-		PY_MOD_ADD_METHOD(MultiTexCoordP2ui);
-		PY_MOD_ADD_METHOD(MultiTexCoordP2uiv);
-		PY_MOD_ADD_METHOD(MultiTexCoordP3ui);
-		PY_MOD_ADD_METHOD(MultiTexCoordP3uiv);
-		PY_MOD_ADD_METHOD(MultiTexCoordP4ui);
-		PY_MOD_ADD_METHOD(MultiTexCoordP4uiv);
-		PY_MOD_ADD_METHOD(NormalP3ui);
-		PY_MOD_ADD_METHOD(NormalP3uiv);
-		PY_MOD_ADD_METHOD(SecondaryColorP3ui);
-		PY_MOD_ADD_METHOD(SecondaryColorP3uiv);
-		PY_MOD_ADD_METHOD(TexCoordP1ui);
-		PY_MOD_ADD_METHOD(TexCoordP1uiv);
-		PY_MOD_ADD_METHOD(TexCoordP2ui);
-		PY_MOD_ADD_METHOD(TexCoordP2uiv);
-		PY_MOD_ADD_METHOD(TexCoordP3ui);
-		PY_MOD_ADD_METHOD(TexCoordP3uiv);
-		PY_MOD_ADD_METHOD(TexCoordP4ui);
-		PY_MOD_ADD_METHOD(TexCoordP4uiv);
-		PY_MOD_ADD_METHOD(VertexP2ui);
-		PY_MOD_ADD_METHOD(VertexP2uiv);
-		PY_MOD_ADD_METHOD(VertexP3ui);
-		PY_MOD_ADD_METHOD(VertexP3uiv);
-		PY_MOD_ADD_METHOD(VertexP4ui);
-		PY_MOD_ADD_METHOD(VertexP4uiv);
 	}
 
 #define PY_DICT_ADD_INT(x) py_module_dict_add_int(dict, #x, x)

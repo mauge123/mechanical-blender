@@ -145,6 +145,8 @@ void drawSelectedPoint(const struct bContext *C, TransInfo *t)
 		unsigned char activeCol[4];
 		float size;
 		float imat[4][4];
+		const int unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 3, KEEP_FLOAT);
+
 
 		UI_GetThemeColor3ubv(TH_ACTIVE, activeCol);
 		activeCol[3] = 192;
@@ -158,11 +160,11 @@ void drawSelectedPoint(const struct bContext *C, TransInfo *t)
 		glColor4ubv(activeCol);
 
 		for (p = t->tsnap.targets.first; p; p = p->next) {
-			drawcircball(GL_LINE_LOOP, p->co, ED_view3d_pixel_size(rv3d, p->co) * size * 0.75f, imat);
+			imm_drawcircball(p->co, ED_view3d_pixel_size(rv3d, p->co) * size * 0.75f, imat, pos);
 		}
 
 		if (t->flag & T_USE_SELECTED_POINT) {
-			drawcircball(GL_LINE_LOOP, t->selected_point, ED_view3d_pixel_size(rv3d, t->selected_point) * size, imat);
+			imm_drawcircball(t->selected_point, ED_view3d_pixel_size(rv3d, t->selected_point) * size, imat,pos);
 		}
 
 	if (v3d->zbuf)
@@ -245,35 +247,7 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 	else if (t->spacetype == SPACE_IMAGE) {
 		if (validSnap(t)) {
 			/* This will not draw, and Im nor sure why - campbell */
-#if 0
-			float xuser_asp, yuser_asp;
-			int wi, hi;
-			float w, h;
-			
-			calc_image_view(G.sima, 'f');   // float
-			myortho2(G.v2d->cur.xmin, G.v2d->cur.xmax, G.v2d->cur.ymin, G.v2d->cur.ymax);
-			glLoadIdentity();
-			
-			ED_space_image_get_aspect(t->sa->spacedata.first, &xuser_aspx, &yuser_asp);
-			ED_space_image_width(t->sa->spacedata.first, &wi, &hi);
-			w = (((float)wi) / IMG_SIZE_FALLBACK) * G.sima->zoom * xuser_asp;
-			h = (((float)hi) / IMG_SIZE_FALLBACK) * G.sima->zoom * yuser_asp;
-			
-			cpack(0xFFFFFF);
-			glTranslate2fv(t->tsnap.snapPoint);
-			
-			//glRectf(0, 0, 1, 1);
-			
-			setlinestyle(0);
-			cpack(0x0);
-			fdrawline(-0.020 / w, 0, -0.1 / w, 0);
-			fdrawline(0.1 / w, 0, 0.020 / w, 0);
-			fdrawline(0, -0.020 / h, 0, -0.1 / h);
-			fdrawline(0, 0.1 / h, 0, 0.020 / h);
-			
-			glTranslatef(-t->tsnap.snapPoint[0], -t->tsnap.snapPoint[1], 0.0f);
-			setlinestyle(0);
-#endif
+			/* TODO: see 2.7x for non-working code */
 		}
 	}
 	else if (t->spacetype == SPACE_NODE) {

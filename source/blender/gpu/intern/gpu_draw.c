@@ -78,6 +78,7 @@
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
 #include "GPU_material.h"
+#include "GPU_matrix.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
@@ -137,7 +138,7 @@ void GPU_render_text(
 		else if (!col)
 			glColor3f(1.0f, 1.0f, 1.0f);
 
-		glPushMatrix();
+		gpuPushMatrix();
 		
 		/* get the tab width */
 		ImBuf *first_ibuf = BKE_image_get_first_ibuf(ima);
@@ -155,12 +156,12 @@ void GPU_render_text(
 			character = BLI_str_utf8_as_unicode_and_size_safe(textstr + index, &index);
 			
 			if (character == '\n') {
-				glTranslatef(line_start, -line_height, 0.0f);
+				gpuTranslate2f(line_start, -line_height);
 				line_start = 0.0f;
 				continue;
 			}
 			else if (character == '\t') {
-				glTranslatef(advance_tab, 0.0f, 0.0f);
+				gpuTranslate2f(advance_tab, 0.0f);
 				line_start -= advance_tab; /* so we can go back to the start of the line */
 				continue;
 				
@@ -209,10 +210,10 @@ void GPU_render_text(
 			}
 			glEnd();
 
-			glTranslatef(advance, 0.0f, 0.0f);
+			gpuTranslate2f(advance, 0.0f);
 			line_start -= advance; /* so we can go back to the start of the line */
 		}
-		glPopMatrix();
+		gpuPopMatrix();
 
 		BKE_image_release_ibuf(ima, first_ibuf, NULL);
 	}
@@ -419,7 +420,7 @@ void GPU_clear_tpage(bool force)
 	GTS.curima = NULL;
 	if (GTS.curtilemode != 0) {
 		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
+		gpuLoadIdentity();
 		glMatrixMode(GL_MODELVIEW);
 	}
 	GTS.curtilemode = 0;
@@ -603,10 +604,10 @@ int GPU_verify_image(
 	    GTS.curtileYRep != GTS.tileYRep)
 	{
 		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
+		gpuLoadIdentity();
 
 		if (ima && (ima->tpageflag & IMA_TILES))
-			glScalef(ima->xrep, ima->yrep, 1.0f);
+			gpuScale2f(ima->xrep, ima->yrep);
 
 		glMatrixMode(GL_MODELVIEW);
 	}
@@ -1728,6 +1729,8 @@ void GPU_begin_object_materials(
 	if (rv3d->rflag & RV3D_IS_GAME_ENGINE) {
 		ob = BKE_object_lod_matob_get(ob, sl);
 	}
+#else
+	UNUSED_VARS(sl);
 #endif
 
 	/* initialize state */
@@ -2093,7 +2096,7 @@ void GPU_end_object_materials(void)
 	/* resetting the texture matrix after the scaling needed for tiled textures */
 	if (GTS.tilemode) {
 		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
+		gpuLoadIdentity();
 		glMatrixMode(GL_MODELVIEW);
 	}
 }
@@ -2170,8 +2173,8 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 		Lamp *la = base->object->data;
 		
 		/* setup lamp transform */
-		glPushMatrix();
-		glLoadMatrixf((float *)viewmat);
+		gpuPushMatrix();
+		gpuLoadMatrix3D(viewmat);
 		
 		/* setup light */
 		GPULightData light = {0};
@@ -2205,7 +2208,7 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 		
 		GPU_basic_shader_light_set(count, &light);
 		
-		glPopMatrix();
+		gpuPopMatrix();
 		
 		count++;
 		if (count == 8)
@@ -2253,15 +2256,6 @@ static void gpu_multisample(bool enable)
 
 void GPU_state_init(void)
 {
-	float mat_ambient[] = { 0.0, 0.0, 0.0, 0.0 };
-	float mat_specular[] = { 0.5, 0.5, 0.5, 1.0 };
-	
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, mat_ambient);
-	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, mat_specular);
-	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, mat_specular);
-	glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 35);
-	glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
-
 	GPU_default_lights();
 
 	GPU_disable_program_point_size();
@@ -2277,9 +2271,6 @@ void GPU_state_init(void)
 	glDisable(GL_ALPHA_TEST);
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_FOG);
-	glDisable(GL_LIGHTING);
-	glDisable(GL_COLOR_MATERIAL);
 	glDisable(GL_LOGIC_OP);
 	glDisable(GL_STENCIL_TEST);
 	glDisable(GL_TEXTURE_1D);
@@ -2292,22 +2283,10 @@ void GPU_state_init(void)
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-	glPixelTransferi(GL_MAP_COLOR, GL_FALSE);
-	glPixelTransferi(GL_RED_SCALE, 1);
-	glPixelTransferi(GL_RED_BIAS, 0);
-	glPixelTransferi(GL_GREEN_SCALE, 1);
-	glPixelTransferi(GL_GREEN_BIAS, 0);
-	glPixelTransferi(GL_BLUE_SCALE, 1);
-	glPixelTransferi(GL_BLUE_BIAS, 0);
-	glPixelTransferi(GL_ALPHA_SCALE, 1);
-	glPixelTransferi(GL_ALPHA_BIAS, 0);
-
-	glPixelTransferi(GL_DEPTH_BIAS, 0);
-	glPixelTransferi(GL_DEPTH_SCALE, 1);
 	glDepthRange(0.0, 1.0);
 
 	glMatrixMode(GL_TEXTURE);
-	glLoadIdentity();
+	gpuLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 
 	glFrontFace(GL_CCW);

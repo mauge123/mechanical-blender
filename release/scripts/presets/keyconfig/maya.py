@@ -8,7 +8,7 @@ kc = wm.keyconfigs.new(os.path.splitext(os.path.basename(__file__))[0])
 # Map Window
 km = kc.keymaps.new('Window', space_type='EMPTY', region_type='WINDOW', modal=False)
 
-kmi = km.keymap_items.new('wm.window_duplicate', 'W', 'PRESS', ctrl=True, alt=True)
+kmi = km.keymap_items.new('wm.window_new', 'W', 'PRESS', ctrl=True, alt=True)
 kmi = km.keymap_items.new('wm.read_homefile', 'N', 'PRESS', ctrl=True)
 kmi = km.keymap_items.new('wm.save_homefile', 'U', 'PRESS', ctrl=True)
 kmi = km.keymap_items.new('wm.call_menu', 'O', 'PRESS', shift=True, ctrl=True)
@@ -935,6 +935,9 @@ kmi = km.keymap_items.new('view3d.rotate', 'LEFTMOUSE', 'PRESS', alt=True)
 kmi = km.keymap_items.new('view3d.manipulator', 'LEFTMOUSE', 'PRESS', shift=True)
 kmi.properties.release_confirm = True
 kmi.properties.use_planar_constraint = True
+kmi = km.keymap_items.new('view3d.manipulator', 'LEFTMOUSE', 'PRESS', shift=True)
+kmi.properties.release_confirm = True
+kmi.properties.use_accurate = True
 kmi = km.keymap_items.new('view3d.manipulator', 'LEFTMOUSE', 'PRESS', any=True)
 kmi.properties.release_confirm = True
 kmi = km.keymap_items.new('view3d.move', 'MIDDLEMOUSE', 'PRESS', alt=True)

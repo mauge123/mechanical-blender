@@ -61,6 +61,8 @@
 #include "DNA_view3d_types.h"
 #include "DNA_windowmanager_types.h"
 
+#include "DRW_engine.h"
+
 #include "ED_keyframing.h"
 #include "ED_armature.h"
 #include "ED_keyframing.h"
@@ -231,11 +233,10 @@ static void view3d_main_region_setup_view(Scene *scene, View3D *v3d, ARegion *ar
 	ED_view3d_update_viewmat(scene, v3d, ar, viewmat, winmat);
 
 	/* set for opengl */
-	/* TODO(merwin): transition to GPU_matrix API */
 	glMatrixMode(GL_PROJECTION);
-	glLoadMatrixf(rv3d->winmat);
+	gpuLoadMatrix3D(rv3d->winmat); /* XXX make a gpuLoadProjectionMatrix function? */
 	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixf(rv3d->viewmat);
+	gpuLoadMatrix3D(rv3d->viewmat);
 }
 
 static bool view3d_stereo3d_active(const bContext *C, Scene *scene, View3D *v3d, RegionView3D *rv3d)
@@ -797,9 +798,9 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 
 	/* background draw */
 	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
+	gpuPushMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
+	gpuPushMatrix();
 	ED_region_pixelspace(ar);
 
 	if (clip_border) {
@@ -828,9 +829,9 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 	}
 
 	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
+	gpuPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
+	gpuPopMatrix();
 
 	return true;
 }
@@ -1552,9 +1553,9 @@ static void view3d_draw_grid(const bContext *C, ARegion *ar)
 		drawgrid(&scene->unit, ar, v3d, &grid_unit);
 
 		glMatrixMode(GL_PROJECTION);
-		glLoadMatrixf(rv3d->winmat);
+		gpuLoadMatrix3D(rv3d->winmat); /* XXX make a gpuLoadProjectionMatrix function? */
 		glMatrixMode(GL_MODELVIEW);
-		glLoadMatrixf(rv3d->viewmat);
+		gpuLoadMatrix3D(rv3d->viewmat);
 	}
 	else {
 #ifdef WITH_MECHANICAL_UCS
@@ -1845,9 +1846,9 @@ Scene *scene, SceneLayer *sl, Object *ob, Base *base, View3D *v3d,
 RegionView3D *rv3d, const bool is_boundingbox, const unsigned char color[4])
 {
 	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
+	gpuPushMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
+	gpuPushMatrix();
 
 	/* multiply view with object matrix.
 	* local viewmat and persmat, to calculate projections */
@@ -1893,9 +1894,9 @@ RegionView3D *rv3d, const bool is_boundingbox, const unsigned char color[4])
 	ED_view3d_clear_mats_rv3d(rv3d);
 
 	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
+	gpuPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
+	gpuPopMatrix();
 }
 
 /* ******************** info ***************** */
@@ -2391,34 +2392,18 @@ static void view3d_draw_view(const bContext *C, ARegion *ar, DrawData *draw_data
 #endif
 }
 
-static void view3d_render_pass(const bContext *C, ARegion *UNUSED(ar))
-{
-	Scene *scene = CTX_data_scene(C);
-	RenderEngineType *type = RE_engines_find(scene->r.engine); /* In the future we should get that from Layers */
-
-	if (type->flag & RE_USE_OGL_PIPELINE) {
-		type->view_draw(NULL, C);
-	}
-	else {
-		// Offline Render engine
-	}
-}
-
 static void view3d_draw_view_new(const bContext *C, ARegion *ar, DrawData *UNUSED(draw_data))
 {
-
 	view3d_draw_setup_view(C, ar);
 
 	/* Only 100% compliant on new spec goes bellow */
-	view3d_render_pass(C, ar);
+	DRW_draw_view(C);
 }
-
 
 void view3d_main_region_draw(const bContext *C, ARegion *ar)
 {
 	Scene *scene = CTX_data_scene(C);
 	View3D *v3d = CTX_wm_view3d(C);
-	int mode = CTX_data_mode_enum(C);
 	RegionView3D *rv3d = ar->regiondata;
 	/* TODO layers - In the future we should get RE from Layers */
 	RenderEngineType *type = RE_engines_find(scene->r.engine);
@@ -2431,13 +2416,13 @@ void view3d_main_region_draw(const bContext *C, ARegion *ar)
 	if (!rv3d->viewport)
 		rv3d->viewport = GPU_viewport_create();
 
-	GPU_viewport_bind(rv3d->viewport, &ar->winrct, scene->r.engine, mode);
-
 	/* TODO viewport - there is so much to be done, in fact a lot will need to happen in the space_view3d.c
 	 * before we even call the drawing routine, but let's move on for now (dfelinto)
 	 * but this is a provisory way to start seeing things in the viewport */
 	DrawData draw_data;
 	view3d_draw_data_init(C, ar, rv3d, &draw_data);
+
+	GPU_viewport_bind(rv3d->viewport, &ar->winrct);
 
 	if (type->flag & RE_USE_OGL_PIPELINE)
 		view3d_draw_view_new(C, ar, &draw_data);

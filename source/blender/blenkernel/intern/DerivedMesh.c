@@ -76,8 +76,8 @@ static DerivedMesh *navmesh_dm_createNavMeshForVisualization(DerivedMesh *dm);
 #include "BLI_sys_types.h" /* for intptr_t support */
 
 #include "GPU_buffers.h"
-#include "GPU_glew.h"
 #include "GPU_shader.h"
+#include "GPU_immediate.h"
 
 #ifdef WITH_OPENSUBDIV
 #  include "BKE_depsgraph.h"
@@ -2917,9 +2917,6 @@ DerivedMesh *editbmesh_get_derived_base(Object *obedit, BMEditMesh *em, CustomDa
 /* get derived mesh from an object, using editbmesh if available. */
 DerivedMesh *object_get_derived_final(Object *ob, const bool for_render)
 {
-	Mesh *me = ob->data;
-	BMEditMesh *em = me->edit_btmesh;
-
 	if (for_render) {
 		/* TODO(sergey): use proper derived render here in the future. */
 		return ob->derivedFinal;
@@ -2927,9 +2924,13 @@ DerivedMesh *object_get_derived_final(Object *ob, const bool for_render)
 
 	/* only return the editmesh if its from this object because
 	 * we don't a mesh from another object's modifier stack: T43122 */
-	if (em && (em->ob == ob)) {
-		DerivedMesh *dm = em->derivedFinal;
-		return dm;
+	if (ob->type == OB_MESH) {
+		Mesh *me = ob->data;
+		BMEditMesh *em = me->edit_btmesh;
+		if (em && (em->ob == ob)) {
+			DerivedMesh *dm = em->derivedFinal;
+			return dm;
+		}
 	}
 
 	return ob->derivedFinal;
@@ -3941,7 +3942,6 @@ BLI_INLINE void navmesh_intToCol(int i, float col[3])
 
 static void navmesh_drawColored(DerivedMesh *dm)
 {
-	int a, glmode;
 	MVert *mvert = (MVert *)CustomData_get_layer(&dm->vertData, CD_MVERT);
 	MFace *mface = (MFace *)CustomData_get_layer(&dm->faceData, CD_MFACE);
 	int *polygonIdx = (int *)CustomData_get_layer(&dm->polyData, CD_RECAST);
@@ -3956,34 +3956,42 @@ static void navmesh_drawColored(DerivedMesh *dm)
 	dm->drawEdges(dm, 0, 1);
 #endif
 
-	/* if (GPU_buffer_legacy(dm) ) */ /* TODO - VBO draw code, not high priority - campbell */
-	{
-		DEBUG_VBO("Using legacy code. drawNavMeshColored\n");
-		glBegin(glmode = GL_QUADS);
-		for (a = 0; a < dm->numTessFaceData; a++, mface++) {
-			int new_glmode = mface->v4 ? GL_QUADS : GL_TRIANGLES;
-			int pi = polygonIdx[a];
-			if (pi <= 0) {
-				zero_v3(col);
-			}
-			else {
-				navmesh_intToCol(pi, col);
-			}
+	VertexFormat *format = immVertexFormat();
+	unsigned pos = add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+	unsigned color = add_attrib(format, "color", COMP_F32, 3, KEEP_FLOAT);
 
-			if (new_glmode != glmode) {
-				glEnd();
-				glBegin(glmode = new_glmode);
-			}
-			glColor3fv(col);
-			glVertex3fv(mvert[mface->v1].co);
-			glVertex3fv(mvert[mface->v2].co);
-			glVertex3fv(mvert[mface->v3].co);
-			if (mface->v4) {
-				glVertex3fv(mvert[mface->v4].co);
-			}
+	immBindBuiltinProgram(GPU_SHADER_3D_FLAT_COLOR);
+
+	/* Note: batch drawing API would let us share vertices */
+	immBeginAtMost(PRIM_TRIANGLES, dm->numTessFaceData * 6);
+	for (int a = 0; a < dm->numTessFaceData; a++, mface++) {
+		int pi = polygonIdx[a];
+		if (pi <= 0) {
+			zero_v3(col);
 		}
-		glEnd();
+		else {
+			navmesh_intToCol(pi, col);
+		}
+
+		immSkipAttrib(color);
+		immVertex3fv(pos, mvert[mface->v1].co);
+		immSkipAttrib(color);
+		immVertex3fv(pos, mvert[mface->v2].co);
+		immAttrib3fv(color, col);
+		immVertex3fv(pos, mvert[mface->v3].co);
+
+		if (mface->v4) {
+			/* this tess face is a quad, so draw the other triangle */
+			immSkipAttrib(color);
+			immVertex3fv(pos, mvert[mface->v1].co);
+			immSkipAttrib(color);
+			immVertex3fv(pos, mvert[mface->v3].co);
+			immAttrib3fv(color, col);
+			immVertex3fv(pos, mvert[mface->v4].co);
+		}
 	}
+	immEnd();
+	immUnbindProgram();
 }
 
 static void navmesh_DM_drawFacesTex(

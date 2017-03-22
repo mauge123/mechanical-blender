@@ -56,7 +56,7 @@
 #include "BKE_screen.h"
 #include "BKE_idprop.h"
 
-#include "BIF_gl.h"
+#include "GPU_matrix.h"
 
 #include "BLF_api.h"
 #include "BLT_translation.h"
@@ -1379,10 +1379,10 @@ void UI_block_draw(const bContext *C, uiBlock *block)
 	
 	/* pixel space for AA widgets */
 	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
+	gpuPushMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
+	gpuPushMatrix();
+	gpuLoadIdentity();
 
 	wmOrtho2_region_pixelspace(ar);
 	
@@ -1408,9 +1408,9 @@ void UI_block_draw(const bContext *C, uiBlock *block)
 	
 	/* restore matrix */
 	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
+	gpuPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
+	gpuPopMatrix();
 
 	if (multisample_enabled)
 		glEnable(GL_MULTISAMPLE);
@@ -1464,6 +1464,7 @@ int ui_but_is_pushed_ex(uiBut *but, double *value)
 				break;
 			case UI_BTYPE_ROW:
 			case UI_BTYPE_LISTROW:
+			case UI_BTYPE_TAB:
 				UI_GET_BUT_VALUE_INIT(but, *value);
 				/* support for rna enum buts */
 				if (but->rnaprop && (RNA_property_flag(but->rnaprop) & PROP_ENUM_FLAG)) {
@@ -2295,7 +2296,7 @@ char *ui_but_string_get_dynamic(uiBut *but, int *r_str_size)
 
 #ifdef WITH_PYTHON
 
-static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char *str, double *value)
+static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char *str, double *r_value)
 {
 	char str_unit_convert[256];
 	const int unit_type = UI_but_unit_type_get(but);
@@ -2307,13 +2308,13 @@ static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char 
 	bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), but->drawstr,
 	                    ui_get_but_scale_unit(but, 1.0), but->block->unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));
 
-	return BPY_execute_string_as_number(C, str_unit_convert, value, true);
+	return BPY_execute_string_as_number(C, str_unit_convert, true, r_value);
 }
 
 #endif /* WITH_PYTHON */
 
 
-bool ui_but_string_set_eval_num(bContext *C, uiBut *but, const char *str, double *value)
+bool ui_but_string_set_eval_num(bContext *C, uiBut *but, const char *str, double *r_value)
 {
 	bool ok = false;
 
@@ -2322,13 +2323,13 @@ bool ui_but_string_set_eval_num(bContext *C, uiBut *but, const char *str, double
 	if (str[0] != '\0') {
 		bool is_unit_but = (ui_but_is_float(but) && ui_but_is_unit(but));
 		/* only enable verbose if we won't run again with units */
-		if (BPY_execute_string_as_number(C, str, value, is_unit_but == false)) {
+		if (BPY_execute_string_as_number(C, str, is_unit_but == false, r_value)) {
 			/* if the value parsed ok without unit conversion this button may still need a unit multiplier */
 			if (is_unit_but) {
 				char str_new[128];
 
-				BLI_snprintf(str_new, sizeof(str_new), "%f", *value);
-				ok = ui_set_but_string_eval_num_unit(C, but, str_new, value);
+				BLI_snprintf(str_new, sizeof(str_new), "%f", *r_value);
+				ok = ui_set_but_string_eval_num_unit(C, but, str_new, r_value);
 			}
 			else {
 				ok = true; /* parse normal string via py (no unit conversion needed) */
@@ -2336,7 +2337,7 @@ bool ui_but_string_set_eval_num(bContext *C, uiBut *but, const char *str, double
 		}
 		else if (is_unit_but) {
 			/* parse failed, this is a unit but so run replacements and parse again */
-			ok = ui_set_but_string_eval_num_unit(C, but, str, value);
+			ok = ui_set_but_string_eval_num_unit(C, but, str, r_value);
 		}
 	}
 
@@ -3920,6 +3921,8 @@ uiBut *uiDefIconTextButO_ptr(uiBlock *block, int type, wmOperatorType *ot, int o
 uiBut *uiDefIconTextButO(uiBlock *block, int type, const char *opname, int opcontext, int icon, const char *str, int x, int y, short width, short height, const char *tip)
 {
 	wmOperatorType *ot = WM_operatortype_find(opname, 0);
+	if (str[0] == '\0') 
+		return uiDefIconButO_ptr(block, type, ot, opcontext, icon, x, y, width, height, tip);
 	return uiDefIconTextButO_ptr(block, type, ot, opcontext, icon, str, x, y, width, height, tip);
 }
 
@@ -4405,7 +4408,7 @@ static void operator_enum_search_cb(const struct bContext *C, void *but, const c
 		for (item = item_array; item->identifier; item++) {
 			/* note: need to give the index rather than the identifier because the enum can be freed */
 			if (BLI_strcasestr(item->name, str)) {
-				if (false == UI_search_item_add(items, item->name, SET_INT_IN_POINTER(item->value), 0))
+				if (false == UI_search_item_add(items, item->name, SET_INT_IN_POINTER(item->value), item->icon))
 					break;
 			}
 		}

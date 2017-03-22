@@ -50,11 +50,11 @@
 #include "BLF_api.h"
 #include "BLT_translation.h"
 
-#include "BIF_gl.h"
 #include "BIF_glutil.h"
 
 #include "GPU_draw.h"
 #include "GPU_immediate.h"
+#include "GPU_matrix.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -547,10 +547,6 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 	char showname[128]; /* 128 used below */
 	rctf *rct = &node->totr;
 
-#if 0   /* UNUSED */
-	float size = NODE_REROUTE_SIZE;
-#endif
-
 	/* skip if out of view */
 	if (node->totr.xmax < ar->v2d.cur.xmin || node->totr.xmin > ar->v2d.cur.xmax ||
 	    node->totr.ymax < ar->v2d.cur.ymin || node->totr.ymin > ar->v2d.cur.ymax)
@@ -564,11 +560,14 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 	 * selection state is indicated by socket outline below!
 	 */
 #if 0
+	float size = NODE_REROUTE_SIZE;
+
 	/* body */
+	float debug_color[4];
 	UI_draw_roundbox_corner_set(UI_CNR_ALL);
-	UI_ThemeColor4(TH_NODE);
+	UI_GetThemeColor4fv(TH_NODE, debug_color);
 	glEnable(GL_BLEND);
-	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, size);
+	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, size, debug_color);
 	glDisable(GL_BLEND);
 
 	/* outline active and selected emphasis */
@@ -576,11 +575,13 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 		glEnable(GL_BLEND);
 		glEnable(GL_LINE_SMOOTH);
 		/* using different shades of TH_TEXT_HI for the empasis, like triangle */
-		if (node->flag & NODE_ACTIVE)
-			UI_ThemeColorShadeAlpha(TH_TEXT_HI, 0, -40);
-		else
-			UI_ThemeColorShadeAlpha(TH_TEXT_HI, -20, -120);
-		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, size);
+		if (node->flag & NODE_ACTIVE) {
+			UI_GetThemeColorShadeAlpha4fv(TH_TEXT_HI, 0, -40, debug_color);
+		}
+		else {
+			UI_GetThemeColorShadeAlpha4fv(TH_TEXT_HI, -20, -120, debug_color);
+		}
+		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, size, debug_color);
 
 		glDisable(GL_LINE_SMOOTH);
 		glDisable(GL_BLEND);
@@ -3197,9 +3198,9 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		float x, y; 
 		
 		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
+		gpuPushMatrix();
 		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
+		gpuPushMatrix();
 		
 		/* somehow the offset has to be calculated inverse */
 		
@@ -3285,9 +3286,9 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		}
 		
 		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
+		gpuPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
-		glPopMatrix();
+		gpuPopMatrix();
 	}
 	
 	BKE_image_release_ibuf(ima, ibuf, lock);
@@ -3507,85 +3508,6 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		glDisable(GL_LINE_SMOOTH);
 	}
 }
-
-#if 0 /* not used in 2.5x yet */
-static void node_link_straight_points(View2D *UNUSED(v2d), SpaceNode *snode, bNodeLink *link, float coord_array[][2])
-{
-	if (link->fromsock) {
-		coord_array[0][0] = link->fromsock->locx;
-		coord_array[0][1] = link->fromsock->locy;
-	}
-	else {
-		if (snode == NULL) return;
-		coord_array[0][0] = snode->mx;
-		coord_array[0][1] = snode->my;
-	}
-	if (link->tosock) {
-		coord_array[1][0] = link->tosock->locx;
-		coord_array[1][1] = link->tosock->locy;
-	}
-	else {
-		if (snode == NULL) return;
-		coord_array[1][0] = snode->mx;
-		coord_array[1][1] = snode->my;
-	}
-}
-
-void node_draw_link_straight(View2D *v2d, SpaceNode *snode, bNodeLink *link,
-                             int th_col1, int do_shaded, int th_col2, int do_triple, int th_col3)
-{
-	float coord_array[2][2];
-	int i;
-	
-	node_link_straight_points(v2d, snode, link, coord_array);
-	
-	glEnable(GL_LINE_SMOOTH);
-	
-	if (do_triple) {
-		UI_ThemeColorShadeAlpha(th_col3, -80, -120);
-		glLineWidth(4.0f);
-		
-		glBegin(GL_LINES);
-		glVertex2fv(coord_array[0]);
-		glVertex2fv(coord_array[1]);
-		glEnd();
-	}
-	
-	UI_ThemeColor(th_col1);
-	glLineWidth(1.5f);
-	
-	/* XXX using GL_LINES for shaded node lines is a workaround
-	 * for Intel hardware, this breaks with GL_LINE_STRIP and
-	 * changing color in begin/end blocks.
-	 */
-	if (do_shaded) {
-		glBegin(GL_LINES);
-		for (i = 0; i < LINK_RESOL - 1; ++i) {
-			float t = (float)i / (float)(LINK_RESOL - 1);
-			UI_ThemeColorBlend(th_col1, th_col2, t);
-			glVertex2f((1.0f - t) * coord_array[0][0] + t * coord_array[1][0],
-			           (1.0f - t) * coord_array[0][1] + t * coord_array[1][1]);
-			
-			t = (float)(i + 1) / (float)(LINK_RESOL - 1);
-			UI_ThemeColorBlend(th_col1, th_col2, t);
-			glVertex2f((1.0f - t) * coord_array[0][0] + t * coord_array[1][0],
-			           (1.0f - t) * coord_array[0][1] + t * coord_array[1][1]);
-		}
-		glEnd();
-	}
-	else {
-		glBegin(GL_LINE_STRIP);
-		for (i = 0; i < LINK_RESOL; ++i) {
-			float t = (float)i / (float)(LINK_RESOL - 1);
-			glVertex2f((1.0f - t) * coord_array[0][0] + t * coord_array[1][0],
-			           (1.0f - t) * coord_array[0][1] + t * coord_array[1][1]);
-		}
-		glEnd();
-	}
-	
-	glDisable(GL_LINE_SMOOTH);
-}
-#endif
 
 /* note; this is used for fake links in groups too */
 void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)

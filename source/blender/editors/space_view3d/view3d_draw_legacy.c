@@ -76,7 +76,6 @@
 #include "IMB_imbuf.h"
 #include "IMB_colormanagement.h"
 
-#include "BIF_gl.h"
 #include "BIF_glutil.h"
 
 #include "WM_api.h"
@@ -102,25 +101,14 @@
 #include "GPU_compositing.h"
 #include "GPU_extensions.h"
 #include "GPU_immediate.h"
+#include "GPU_select.h"
+#include "GPU_matrix.h"
 
 #include "view3d_intern.h"  /* own include */
 
 /* prototypes */
 static void view3d_stereo3d_setup_offscreen(Scene *scene, View3D *v3d, ARegion *ar,
                                             float winmat[4][4], const char *viewname);
-
-void circ(float x, float y, float rad)
-{
-	glBegin(GL_LINE_LOOP);
-	const int segments = 32;
-	for (int i = 0; i < segments; ++i) {
-		float angle = 2 * M_PI * ((float)i / (float)segments);
-		glVertex2f(x + rad * cosf(angle),
-		           y + rad * sinf(angle));
-	}
-	glEnd();
-}
-
 
 /* ********* custom clipping *********** */
 
@@ -764,13 +752,13 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			glBlendFunc(GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA);
 
 			glMatrixMode(GL_PROJECTION);
-			glPushMatrix();
+			gpuPushMatrix();
 			glMatrixMode(GL_MODELVIEW);
-			glPushMatrix();
+			gpuPushMatrix();
 			ED_region_pixelspace(ar);
 
-			glTranslatef(centx, centy, 0.0);
-			glRotatef(RAD2DEGF(-bgpic->rotation), 0.0f, 0.0f, 1.0f);
+			gpuTranslate2f(centx, centy);
+			gpuRotate2D(RAD2DEGF(-bgpic->rotation));
 
 			if (bgpic->flag & V3D_BGPIC_FLIP_X) {
 				zoomx *= -1.0f;
@@ -786,12 +774,10 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			immDrawPixelsTex(x1 - centx, y1 - centy, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, ibuf->rect,
 			                 zoomx, zoomy, col);
 
-			glPixelTransferf(GL_ALPHA_SCALE, 1.0f);
-
 			glMatrixMode(GL_PROJECTION);
-			glPopMatrix();
+			gpuPopMatrix();
 			glMatrixMode(GL_MODELVIEW);
-			glPopMatrix();
+			gpuPopMatrix();
 
 			glDisable(GL_BLEND);
 
@@ -906,6 +892,35 @@ static void view3d_draw_xraytransp(Scene *scene, SceneLayer *sl, ARegion *ar, Vi
 	v3d->xray = false;
 
 	glDepthMask(GL_TRUE);
+}
+
+/* clears zbuffer and draws it over,
+ * note that in the select version we don't care about transparent flag as with regular drawing */
+static void view3d_draw_xray_select(Scene *scene, SceneLayer *sl, ARegion *ar, View3D *v3d, bool *clear)
+{
+	/* Not ideal, but we need to read from the previous depths before clearing
+	 * otherwise we could have a function to load the depths after drawing.
+	 *
+	 * Clearing the depth buffer isn't all that common between drawing objects so accept this for now.
+	 */
+	if (U.gpu_select_pick_deph) {
+		GPU_select_load_id(-1);
+	}
+
+	View3DAfter *v3da;
+	if (*clear && v3d->zbuf) {
+		glClear(GL_DEPTH_BUFFER_BIT);
+		*clear = false;
+	}
+
+	v3d->xray = true;
+	while ((v3da = BLI_pophead(&v3d->afterdraw_xray))) {
+		if (GPU_select_load_id(v3da->base->selcol)) {
+			draw_object_select(scene, sl, ar, v3d, v3da->base, v3da->dflag);
+		}
+		MEM_freeN(v3da);
+	}
+	v3d->xray = false;
 }
 
 /* *********************** */
@@ -1175,7 +1190,7 @@ void ED_view3d_draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d)
 
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	glLoadMatrixf(rv3d->viewmat);
+	gpuLoadMatrix3D(rv3d->viewmat);
 
 	v3d->zbuf = true;
 	glEnable(GL_DEPTH_TEST);
@@ -1213,7 +1228,7 @@ void ED_view3d_draw_depth(Scene *scene, ARegion *ar, View3D *v3d, bool alphaover
 	
 	glClear(GL_DEPTH_BUFFER_BIT);
 	
-	glLoadMatrixf(rv3d->viewmat);
+	gpuLoadMatrix3D(rv3d->viewmat);
 	
 	if (rv3d->rflag & RV3D_CLIPPING) {
 		ED_view3d_clipping_set(rv3d);
@@ -1309,6 +1324,57 @@ void ED_view3d_draw_depth(Scene *scene, ARegion *ar, View3D *v3d, bool alphaover
 	U.glalphaclip = glalphaclip;
 	v3d->flag = flag;
 	U.obcenter_dia = obcenter_dia;
+}
+
+void ED_view3d_draw_select_loop(
+        ViewContext *vc, Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *ar,
+        bool use_obedit_skip, bool use_nearest)
+{
+	short code = 1;
+	const short dflag = DRAW_PICKING | DRAW_CONSTCOLOR;
+
+	if (vc->obedit && vc->obedit->type == OB_MBALL) {
+		draw_object(scene, sl, ar, v3d, BASACT_NEW, dflag);
+	}
+	else if ((vc->obedit && vc->obedit->type == OB_ARMATURE)) {
+		/* if not drawing sketch, draw bones */
+		if (!BDR_drawSketchNames(vc)) {
+			draw_object(scene, sl, ar, v3d, BASACT_NEW, dflag);
+		}
+	}
+	else {
+		Base *base;
+
+		for (base = sl->object_bases.first; base; base = base->next) {
+			if ((base->flag & BASE_VISIBLED) != 0) {
+				if (((base->flag & BASE_SELECTABLED) == 0) ||
+				    (use_obedit_skip && (scene->obedit->data == base->object->data)))
+				{
+					base->selcol = 0;
+				}
+				else {
+					base->selcol = code;
+
+					if (use_nearest && (base->object->dtx & OB_DRAWXRAY)) {
+						ED_view3d_after_add(&v3d->afterdraw_xray, base, dflag);
+					}
+					else {
+						if (GPU_select_load_id(code)) {
+							draw_object(scene, sl, ar, v3d, base, dflag);
+						}
+					}
+					code++;
+				}
+			}
+		}
+
+		if (use_nearest) {
+			bool xrayclear = true;
+			if (v3d->afterdraw_xray.first) {
+				view3d_draw_xray_select(scene, sl, ar, v3d, &xrayclear);
+			}
+		}
+	}
 }
 
 typedef struct View3DShadow {
@@ -1520,9 +1586,9 @@ static void view3d_draw_objects(
 			VP_legacy_drawgrid(&scene->unit, ar, v3d, grid_unit);
 			/* XXX make function? replaces persp(1) */
 			glMatrixMode(GL_PROJECTION);
-			glLoadMatrixf(rv3d->winmat);
+			gpuLoadMatrix3D(rv3d->winmat); /* XXX make a gpuLoadProjectionMatrix function? */
 			glMatrixMode(GL_MODELVIEW);
-			glLoadMatrixf(rv3d->viewmat);
+			gpuLoadMatrix3D(rv3d->viewmat);
 		}
 		else if (!draw_grids_after) {
 #ifdef WITH_MECHANICAL_UCS
@@ -1741,7 +1807,7 @@ void ED_view3d_draw_offscreen(
 	bool do_compositing = false;
 	RegionView3D *rv3d = ar->regiondata;
 
-	glPushMatrix();
+	gpuPushMatrix();
 
 	/* set temporary new size */
 	int bwinx = ar->winx;
@@ -1827,7 +1893,7 @@ void ED_view3d_draw_offscreen(
 	ar->winy = bwiny;
 	ar->winrct = brect;
 
-	glPopMatrix();
+	gpuPopMatrix();
 
 	UI_Theme_Restore(&theme_state);
 

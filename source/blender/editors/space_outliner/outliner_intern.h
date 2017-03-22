@@ -50,7 +50,7 @@ struct wmKeyConfig;
 
 
 typedef enum TreeElementInsertType {
-	/* no INSERT_BEFORE needed for now */
+	TE_INSERT_BEFORE,
 	TE_INSERT_AFTER,
 	TE_INSERT_INTO,
 } TreeElementInsertType;
@@ -70,6 +70,13 @@ typedef enum TreeTraversalAction {
  */
 typedef void (*TreeElementReinsertFunc)(const struct Scene *scene, struct TreeElement *insert_element,
                                         struct TreeElement *insert_handle, TreeElementInsertType action);
+/**
+ * Executed on (almost) each mouse move while dragging. It's supposed to give info
+ * if reinserting insert_element before/after/into insert_handle would be allowed.
+ * It's allowed to change the reinsert info here for non const pointers.
+ */
+typedef bool (*TreeElementReinsertPollFunc)(const struct Scene *scene, const struct TreeElement *insert_element,
+                                            struct TreeElement **io_insert_handle, TreeElementInsertType *io_action);
 typedef TreeTraversalAction (*TreeTraversalFunc)(struct TreeElement *te, void *customdata);
 
 
@@ -86,12 +93,13 @@ typedef struct TreeElement {
 	void *directdata;          // Armature Bones, Base, Sequence, Strip...
 	PointerRNA rnaptr;         // RNA Pointer
 
-	/* callbacks */
+	/* callbacks - TODO should be moved into a type (like TreeElementType) */
 	TreeElementReinsertFunc reinsert;
+	TreeElementReinsertPollFunc reinsert_poll;
 
 	struct {
 		TreeElementInsertType insert_type;
-		/* the element after which we may insert the dragged one (NULL to insert at top) */
+		/* the element before/after/into which we may insert the dragged one (NULL to insert at top) */
 		struct TreeElement *insert_handle;
 	} *drag_data;
 } TreeElement;

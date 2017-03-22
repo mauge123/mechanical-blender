@@ -30,6 +30,7 @@
 
 #include "BKE_context.h"
 
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 
 #include "ED_screen.h"
@@ -52,11 +53,6 @@ enum {
 	OUTLINER_ITEM_DRAG_CONFIRM,
 };
 
-typedef struct OutlinerItemDrag {
-	TreeElement *dragged_te;
-	int init_mouse_xy[2];
-} OutlinerItemDrag;
-
 static int outliner_item_drag_drop_poll(bContext *C)
 {
 	SpaceOops *soops = CTX_wm_space_outliner(C);
@@ -67,90 +63,134 @@ static int outliner_item_drag_drop_poll(bContext *C)
 
 static TreeElement *outliner_item_drag_element_find(SpaceOops *soops, ARegion *ar, const wmEvent *event)
 {
+	/* note: using EVT_TWEAK_ events to trigger dragging is fine,
+	 * it sends coordinates from where dragging was started */
 	const float my = UI_view2d_region_to_view_y(&ar->v2d, event->mval[1]);
 	return outliner_find_item_at_y(soops, &soops->tree, my);
 }
 
-static OutlinerItemDrag *outliner_item_drag_data_create(TreeElement *dragged_te, const int mouse_xy[2])
+static void outliner_item_drag_end(TreeElement *dragged_te)
 {
-	OutlinerItemDrag *drag_data = MEM_mallocN(sizeof(*drag_data), __func__);
-
-	drag_data->dragged_te = dragged_te;
-	copy_v2_v2_int(drag_data->init_mouse_xy, mouse_xy);
-
-	return drag_data;
+	MEM_SAFE_FREE(dragged_te->drag_data);
 }
 
-static void outliner_item_drag_end(OutlinerItemDrag *op_drag_data)
+static void outliner_item_drag_get_insert_data(
+        const SpaceOops *soops, ARegion *ar, const wmEvent *event, TreeElement *te_dragged,
+        TreeElement **r_te_insert_handle, TreeElementInsertType *r_insert_type)
 {
-	MEM_SAFE_FREE(op_drag_data->dragged_te->drag_data);
-	MEM_freeN(op_drag_data);
-}
+	TreeElement *te_hovered;
+	float view_mval[2];
 
-static void outliner_item_drag_handle(ARegion *ar, const wmEvent *event, OutlinerItemDrag *op_drag_data)
-{
-	TreeElement *dragged_te = op_drag_data->dragged_te;
-	const int delta_mouse_y = event->y - op_drag_data->init_mouse_xy[1];
-	const int cmp_coord = (int)UI_view2d_region_to_view_y(&ar->v2d, event->mval[1]);
-	const float margin = UI_UNIT_Y * (1.0f / 3);
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &view_mval[0], &view_mval[1]);
+	te_hovered = outliner_find_item_at_y(soops, &soops->tree, view_mval[1]);
 
-	/* by default we don't change the item position */
-	dragged_te->drag_data->insert_handle = dragged_te;
+	if (te_hovered) {
+		/* mouse hovers an element (ignoring x-axis), now find out how to insert the dragged item exactly */
 
-	if (delta_mouse_y > 0) {
-		for (TreeElement *te = dragged_te->prev; te && (cmp_coord >= (te->ys + margin)); te = te->prev) {
-			if (cmp_coord > (te->ys + (2 * margin))) {
-				dragged_te->drag_data->insert_type = TE_INSERT_AFTER;
-				/* will be NULL if we want to insert as first element */
-				dragged_te->drag_data->insert_handle = te->prev;
+		if (te_hovered == te_dragged) {
+			*r_te_insert_handle = te_dragged;
+		}
+		else if (te_hovered != te_dragged) {
+			const float margin = UI_UNIT_Y * (1.0f / 4);
+
+			*r_te_insert_handle = te_hovered;
+			if (view_mval[1] < (te_hovered->ys + margin)) {
+				if (TSELEM_OPEN(TREESTORE(te_hovered), soops)) {
+					/* inserting after a open item means we insert into it, but as first child */
+					if (BLI_listbase_is_empty(&te_hovered->subtree)) {
+						*r_insert_type = TE_INSERT_INTO;
+					}
+					else {
+						*r_insert_type = TE_INSERT_BEFORE;
+						*r_te_insert_handle = te_hovered->subtree.first;
+					}
+				}
+				else {
+					*r_insert_type = TE_INSERT_AFTER;
+				}
+			}
+			else if (view_mval[1] > (te_hovered->ys + (3 * margin))) {
+				*r_insert_type = TE_INSERT_BEFORE;
 			}
 			else {
-				dragged_te->drag_data->insert_type = TE_INSERT_INTO;
-				dragged_te->drag_data->insert_handle = te;
+				*r_insert_type = TE_INSERT_INTO;
 			}
 		}
 	}
 	else {
-		for (TreeElement *te = dragged_te->next; te && (cmp_coord <= (te->ys + UI_UNIT_Y - margin)); te = te->next) {
-			if (cmp_coord < (te->ys + margin)) {
-				dragged_te->drag_data->insert_type = TE_INSERT_AFTER;
-				dragged_te->drag_data->insert_handle = te;
-				BLI_assert(te->prev != NULL);
-			}
-			else {
-				dragged_te->drag_data->insert_type = TE_INSERT_INTO;
-				dragged_te->drag_data->insert_handle = te;
-			}
+		/* mouse doesn't hover any item (ignoring x-axis), so it's either above list bounds or below. */
+
+		TreeElement *first = soops->tree.first;
+		TreeElement *last = soops->tree.last;
+
+		if (view_mval[1] < last->ys) {
+			*r_te_insert_handle = last;
+			*r_insert_type = TE_INSERT_AFTER;
+		}
+		else if (view_mval[1] > (first->ys + UI_UNIT_Y)) {
+			*r_te_insert_handle = first;
+			*r_insert_type = TE_INSERT_BEFORE;
+		}
+		else {
+			BLI_assert(0);
 		}
 	}
 }
 
-static bool outliner_item_drag_drop_apply(const Scene *scene, OutlinerItemDrag *op_drag_data)
+static void outliner_item_drag_handle(
+        const Scene *scene, SpaceOops *soops, ARegion *ar, const wmEvent *event, TreeElement *te_dragged)
 {
-	TreeElement *dragged_te = op_drag_data->dragged_te;
-	TreeElement *insert_after = dragged_te->drag_data->insert_handle;
+	TreeElement *te_insert_handle;
+	TreeElementInsertType insert_type;
 
-	if (insert_after == dragged_te) {
+	outliner_item_drag_get_insert_data(soops, ar, event, te_dragged, &te_insert_handle, &insert_type);
+
+	if (!te_dragged->reinsert_poll &&
+	    /* there is no reinsert_poll, so we do some generic checks (same types and reinsert callback is available) */
+	    (TREESTORE(te_dragged)->type == TREESTORE(te_insert_handle)->type) &&
+	    te_dragged->reinsert)
+	{
+		/* pass */
+	}
+	else if (te_dragged == te_insert_handle) {
+		/* nothing will happen anyway, no need to do poll check */
+	}
+	else if (!te_dragged->reinsert_poll ||
+	         !te_dragged->reinsert_poll(scene, te_dragged, &te_insert_handle, &insert_type))
+	{
+		te_insert_handle = NULL;
+	}
+	te_dragged->drag_data->insert_type = insert_type;
+	te_dragged->drag_data->insert_handle = te_insert_handle;
+}
+
+static bool outliner_item_drag_drop_apply(const Scene *scene, TreeElement *dragged_te)
+{
+	TreeElement *insert_handle = dragged_te->drag_data->insert_handle;
+	TreeElementInsertType insert_type = dragged_te->drag_data->insert_type;
+
+	if ((insert_handle == dragged_te) || !insert_handle) {
 		/* No need to do anything */
-		return false;
+	}
+	else if (dragged_te->reinsert) {
+		BLI_assert(!dragged_te->reinsert_poll || dragged_te->reinsert_poll(scene, dragged_te, &insert_handle,
+		                                                                   &insert_type));
+		/* call of assert above should not have changed insert_handle and insert_type at this point */
+		BLI_assert(dragged_te->drag_data->insert_handle == insert_handle &&
+		           dragged_te->drag_data->insert_type == insert_type);
+		dragged_te->reinsert(scene, dragged_te, insert_handle, insert_type);
+		return true;
 	}
 
-	if (dragged_te->reinsert) {
-		/* Not sure yet what the best way to handle reordering elements of different types
-		 * (and stored in different lists). For collection display mode this is enough. */
-		if (!insert_after || (insert_after->reinsert == dragged_te->reinsert)) {
-			dragged_te->reinsert(scene, dragged_te, insert_after, dragged_te->drag_data->insert_type);
-		}
-	}
-
-	return true;
+	return false;
 }
 
 static int outliner_item_drag_drop_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
+	Scene *scene = CTX_data_scene(C);
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
-	OutlinerItemDrag *op_drag_data = op->customdata;
+	TreeElement *te_dragged = op->customdata;
 	int retval = OPERATOR_RUNNING_MODAL;
 	bool redraw = false;
 	bool skip_rebuild = true;
@@ -158,8 +198,9 @@ static int outliner_item_drag_drop_modal(bContext *C, wmOperator *op, const wmEv
 	switch (event->type) {
 		case EVT_MODAL_MAP:
 			if (event->val == OUTLINER_ITEM_DRAG_CONFIRM) {
-				outliner_item_drag_drop_apply(CTX_data_scene(C), op_drag_data);
-				skip_rebuild = false;
+				if (outliner_item_drag_drop_apply(scene, te_dragged)) {
+					skip_rebuild = false;
+				}
 				retval = OPERATOR_FINISHED;
 			}
 			else if (event->val == OUTLINER_ITEM_DRAG_CANCEL) {
@@ -169,11 +210,11 @@ static int outliner_item_drag_drop_modal(bContext *C, wmOperator *op, const wmEv
 				BLI_assert(0);
 			}
 			WM_event_add_mousemove(C); /* update highlight */
-			outliner_item_drag_end(op_drag_data);
+			outliner_item_drag_end(te_dragged);
 			redraw = true;
 			break;
 		case MOUSEMOVE:
-			outliner_item_drag_handle(ar, event, op_drag_data);
+			outliner_item_drag_handle(scene, soops, ar, event, te_dragged);
 			redraw = true;
 			break;
 	}
@@ -192,17 +233,16 @@ static int outliner_item_drag_drop_invoke(bContext *C, wmOperator *op, const wmE
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
-	TreeElement *te = outliner_item_drag_element_find(soops, ar, event);
+	TreeElement *te_dragged = outliner_item_drag_element_find(soops, ar, event);
 
-	if (!te) {
+	if (!te_dragged) {
 		return (OPERATOR_FINISHED | OPERATOR_PASS_THROUGH);
 	}
 
-
-	op->customdata = outliner_item_drag_data_create(te, &event->x);
-	te->drag_data = MEM_callocN(sizeof(*te->drag_data), __func__);
+	op->customdata = te_dragged;
+	te_dragged->drag_data = MEM_callocN(sizeof(*te_dragged->drag_data), __func__);
 	/* by default we don't change the item position */
-	te->drag_data->insert_handle = te;
+	te_dragged->drag_data->insert_handle = te_dragged;
 	/* unset highlighted tree element, dragged one will be highlighted instead */
 	outliner_set_flag(&soops->tree, TSE_HIGHLIGHTED, false);
 

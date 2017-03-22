@@ -42,6 +42,7 @@ set(INC
 	../../../intern/glew-mx
 	../../../intern/guardedalloc
 	../../../intern/smoke/extern
+	../../../intern/gawain
 )
 
 set(INC_SYS
@@ -63,32 +64,12 @@ set(SRC
 	intern/gpu_material.c
 	intern/gpu_matrix.c
 	intern/gpu_select.c
+	intern/gpu_select_pick.c
+	intern/gpu_select_sample_query.c
 	intern/gpu_shader.c
 	intern/gpu_texture.c
 	intern/gpu_uniformbuffer.c
 	intern/gpu_viewport.c
-
-	gawain/attrib_binding.c
-	gawain/attrib_binding.h
-	gawain/batch.c
-	gawain/batch.h
-	gawain/buffer_id.h
-	gawain/buffer_id.cpp
-	gawain/common.h
-	gawain/element.c
-	gawain/element.h
-	gawain/immediate.c
-	gawain/immediate.h
-	gawain/imm_util.c
-	gawain/imm_util.h
-	gawain/primitive.h
-	gawain/primitive.c
-	gawain/shader_interface.c
-	gawain/shader_interface.h
-	gawain/vertex_buffer.c
-	gawain/vertex_buffer.h
-	gawain/vertex_format.c
-	gawain/vertex_format.h
 
 	shaders/gpu_shader_fx_lib.glsl
 	shaders/gpu_shader_fx_ssao_frag.glsl
@@ -97,7 +78,7 @@ set(SRC
 	shaders/gpu_shader_fx_dof_hq_frag.glsl
 	shaders/gpu_shader_fx_dof_hq_vert.glsl
 	shaders/gpu_shader_fx_dof_hq_geo.glsl
-	shaders/gpu_shader_fx_vert.glsl
+	shaders/gpu_shader_fullscreen_vert.glsl
 	shaders/gpu_shader_material.glsl
 	shaders/gpu_shader_sep_gaussian_blur_frag.glsl
 	shaders/gpu_shader_sep_gaussian_blur_vert.glsl
@@ -133,6 +114,8 @@ set(SRC
 
 	intern/gpu_codegen.h
 	intern/gpu_private.h
+	intern/gpu_select_private.h
+	intern/gpu_shader_private.h
 )
 
 data_to_c_simple(shaders/gpu_shader_depth_only_frag.glsl SRC)
@@ -140,6 +123,7 @@ data_to_c_simple(shaders/gpu_shader_uniform_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_checker_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_diag_stripes_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_simple_lighting_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_simple_lighting_smooth_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_flat_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_flat_color_alpha_test_0_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_vert.glsl SRC)
@@ -218,7 +202,7 @@ data_to_c_simple(shaders/gpu_shader_vertex.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_vertex_world.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_vsm_store_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_vsm_store_vert.glsl SRC)
-data_to_c_simple(shaders/gpu_shader_fx_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_fullscreen_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_fx_ssao_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_fx_dof_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_fx_dof_vert.glsl SRC)

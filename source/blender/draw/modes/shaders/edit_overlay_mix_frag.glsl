@@ -8,10 +8,10 @@ uniform float alpha;
 
 void main()
 {
-	ivec2 co = ivec2(gl_FragCoord.xy);
-	float wire_depth = texelFetch(wireDepth, co, 0).r;
-	float scene_depth = texelFetch(sceneDepth, co, 0).r;
-	vec4 wire_color = texelFetch(wireColor, co, 0).rgba;
+	ivec2 uv = ivec2(gl_FragCoord.xy);
+	float wire_depth = texelFetch(wireDepth, uv, 0).r;
+	float scene_depth = texelFetch(sceneDepth, uv, 0).r;
+	vec4 wire_color = texelFetch(wireColor, uv, 0).rgba;
 
 	FragColor = wire_color;
 

@@ -943,7 +943,7 @@ static int arg_handle_native_pixels_set(int UNUSED(argc), const char **UNUSED(ar
 }
 
 static const char arg_handle_with_borders_doc[] =
-"\n\tForce opening without borders"
+"\n\tForce opening with borders"
 ;
 static int arg_handle_with_borders(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
@@ -1180,16 +1180,6 @@ static int arg_handle_threads_set(int argc, const char **argv, void *UNUSED(data
 		printf("\nError: you must specify a number of threads in [%d..%d] '%s'.\n", min, max, arg_id);
 		return 0;
 	}
-}
-
-static const char arg_handle_basic_shader_use_legacy_doc[] =
-"\n\tUse legacy (non-GLSL) basic shader"
-;
-static int arg_handle_basic_shader_use_legacy(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
-{
-	printf("Using legacy (non-GLSL) basic shader.\n");
-	GPU_basic_shader_use_glsl_set(false);
-	return 0;
 }
 
 static const char arg_handle_verbosity_set_doc[] =
@@ -1828,8 +1818,6 @@ void main_args_setup(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	            CB_EX(arg_handle_debug_mode_generic_set, depsgraph_no_threads), (void *)G_DEBUG_DEPSGRAPH_NO_THREADS);
 	BLI_argsAdd(ba, 1, NULL, "--debug-gpumem",
 	            CB_EX(arg_handle_debug_mode_generic_set, gpumem), (void *)G_DEBUG_GPU_MEM);
-
-	BLI_argsAdd(ba, 1, NULL, "--enable-legacy-basic-shader", CB(arg_handle_basic_shader_use_legacy), NULL);
 
 	BLI_argsAdd(ba, 1, NULL, "--verbose", CB(arg_handle_verbosity_set), NULL);
 

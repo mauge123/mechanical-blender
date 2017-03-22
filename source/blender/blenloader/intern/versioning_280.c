@@ -35,12 +35,14 @@
 #include "DNA_screen_types.h"
 #include "DNA_genfile.h"
 
+#include "BKE_blender.h"
 #include "BKE_collection.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
 
 #include "BLI_listbase.h"
+#include "BLI_mempool.h"
 #include "BLI_string.h"
 
 #include "BLO_readfile.h"
@@ -51,6 +53,9 @@
 void do_versions_after_linking_280(Main *main)
 {
 	if (!MAIN_VERSION_ATLEAST(main, 280, 0)) {
+		char version[48];
+		BKE_blender_version_string(version, sizeof(version), main->versionfile, main->subversionfile, false, false);
+
 		for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
 			/* since we don't have access to FileData we check the (always valid) first render layer instead */
 			if (scene->render_layers.first == NULL) {
@@ -64,7 +69,7 @@ void do_versions_after_linking_280(Main *main)
 				for (int i = 0; i < 20; i++) {
 					char name[MAX_NAME];
 
-					BLI_snprintf(name, sizeof(collections[i]->name), "%d", i + 1);
+					BLI_snprintf(name, sizeof(collections[i]->name), "Collection %d [converted from %s]", i + 1, version);
 					collections[i] = BKE_collection_add(scene, sc_master, name);
 
 					is_visible[i] = (scene->lay & (1 << i));
@@ -163,12 +168,41 @@ void do_versions_after_linking_280(Main *main)
 					}
 				}
 
+				/* Fallback name if only one layer was found in the original file */
+				if (BLI_listbase_count_ex(&sc_master->scene_collections, 2) == 1) {
+					BKE_collection_rename(scene, sc_master->scene_collections.first, "Default Collection");
+				}
+
 				/* remove bases once and for all */
 				for (Base *base = scene->base.first; base; base = base->next) {
 					id_us_min(&base->object->id);
 				}
 				BLI_freelistN(&scene->base);
 				scene->basact = NULL;
+			}
+		}
+
+		for (bScreen *screen = main->screen.first; screen; screen = screen->id.next) {
+			for (ScrArea *sa = screen->areabase.first; sa; sa = sa->next) {
+				for (SpaceLink *sl = sa->spacedata.first; sl; sl = sl->next) {
+					if (sl->spacetype == SPACE_OUTLINER) {
+						SpaceOops *soutliner = (SpaceOops *)sl;
+						SceneLayer *layer = BKE_scene_layer_context_active(screen->scene);
+
+						soutliner->outlinevis = SO_ACT_LAYER;
+
+						if (BLI_listbase_count_ex(&layer->layer_collections, 2) == 1) {
+							/* Create a tree store element for the collection. This is normally
+							 * done in check_persistent (outliner_tree.c), but we need to access
+							 * it here :/ (expand element if it's the only one) */
+							TreeStoreElem *tselem = BLI_mempool_alloc(soutliner->treestore);
+							tselem->type = TSE_LAYER_COLLECTION;
+							tselem->id = layer->layer_collections.first;
+							tselem->nr = tselem->used = 0;
+							tselem->flag &= ~TSE_CLOSED;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -193,5 +227,4 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *main)
 		/* temporary validation of 280 files for layers */
 		blo_do_version_temporary(main);
 	}
-
 }

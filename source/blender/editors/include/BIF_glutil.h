@@ -38,7 +38,7 @@ struct bContext;
 struct ColorManagedViewSettings;
 struct ColorManagedDisplaySettings;
 
-/* Several functions defined here are being DEPRECATED for Blender 2.8
+/* A few functions defined here are being DEPRECATED for Blender 2.8
  *
  * Do not use them in new code, and you are encouraged to
  * convert existing code to draw without these.
@@ -46,8 +46,6 @@ struct ColorManagedDisplaySettings;
  * These will be deleted before we ship 2.8!
  * - merwin
  */
-
-void fdrawline(float x1, float y1, float x2, float y2); /* DEPRECATED */
 
 /**
  * Draw a circle outline with the given \a radius.
@@ -114,6 +112,7 @@ void imm_cpack(unsigned int x);
 */
 void imm_cylinder_nor(unsigned int pos, unsigned int nor, float base, float top, float height, int slices, int stacks);
 void imm_cylinder_wire(unsigned int pos, float base, float top, float height, int slices, int stacks);
+void imm_cylinder(unsigned int pos, float base, float top, float height, int slices, int stacks);
 
 /**
  * Returns a float value as obtained by glGetFloatv.

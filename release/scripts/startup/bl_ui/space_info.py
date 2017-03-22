@@ -281,7 +281,7 @@ class INFO_MT_window(Menu):
 
         layout = self.layout
 
-        layout.operator("wm.window_duplicate")
+        layout.operator("wm.window_new")
         layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER')
 
         layout.separator()
@@ -334,5 +334,23 @@ class INFO_MT_help(Menu):
 
         layout.operator("wm.splash", icon='BLENDER')
 
+
+classes = (
+    INFO_HT_header,
+    INFO_MT_editor_menus,
+    INFO_MT_file,
+    INFO_MT_file_import,
+    INFO_MT_file_export,
+    INFO_MT_file_external_data,
+    INFO_MT_file_previews,
+    INFO_MT_game,
+    INFO_MT_render,
+    INFO_MT_opengl_render,
+    INFO_MT_window,
+    INFO_MT_help,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

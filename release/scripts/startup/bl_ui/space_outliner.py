@@ -60,7 +60,7 @@ class OUTLINER_HT_header(Header):
         elif space.display_mode == 'ORPHAN_DATA':
             layout.operator("outliner.orphans_purge")
 
-        elif space.display_mode in {'ACT_LAYER', 'COLLECTIONS'}:
+        elif space.display_mode in {'ACT_LAYER', 'MASTER_COLLECTION'}:
             row = layout.row(align=True)
 
             row.operator("outliner.collection_new", text="", icon='NEW')
@@ -98,7 +98,7 @@ class OUTLINER_MT_view(Menu):
         space = context.space_data
 
         if space.display_mode not in {'DATABLOCKS', 'USER_PREFERENCES', 'KEYMAPS'}:
-            if space.display_mode != 'COLLECTIONS':
+            if space.display_mode not in {'ACT_LAYER', 'MASTER_COLLECTION'}:
                 layout.prop(space, "use_sort_alpha")
             layout.prop(space, "show_restrict_columns")
             layout.separator()
@@ -141,5 +141,16 @@ class OUTLINER_MT_edit_datablocks(Menu):
         layout.operator("outliner.drivers_add_selected")
         layout.operator("outliner.drivers_delete_selected")
 
+
+classes = (
+    OUTLINER_HT_header,
+    OUTLINER_MT_editor_menus,
+    OUTLINER_MT_view,
+    OUTLINER_MT_search,
+    OUTLINER_MT_edit_datablocks,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

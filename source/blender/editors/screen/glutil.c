@@ -50,17 +50,9 @@
 
 #include "GPU_basic_shader.h"
 #include "GPU_immediate.h"
+#include "GPU_matrix.h"
 
 #include "UI_interface.h"
-
-/* DEPRECATED: use imm_draw_line instead */
-void fdrawline(float x1, float y1, float x2, float y2)
-{
-	glBegin(GL_LINES);
-	glVertex2f(x1, y1);
-	glVertex2f(x2, y2);
-	glEnd();
-}
 
 /* ******************************************** */
 
@@ -247,6 +239,44 @@ void imm_cylinder_wire(unsigned int pos, float base, float top, float height, in
 
 			immVertex3fv(pos, v1);
 			immVertex3fv(pos, v4);
+		}
+	}
+	immEnd();
+}
+
+void imm_cylinder(unsigned int pos, float base, float top, float height, int slices, int stacks)
+{
+	immBegin(GL_TRIANGLES, 6 * slices * stacks);
+	for (int i = 0; i < slices; ++i) {
+		const float angle1 = 2 * M_PI * ((float)i / (float)slices);
+		const float angle2 = 2 * M_PI * ((float)(i + 1) / (float)slices);
+		const float cos1 = cosf(angle1);
+		const float sin1 = sinf(angle1);
+		const float cos2 = cosf(angle2);
+		const float sin2 = sinf(angle2);
+
+		for (int j = 0; j < stacks; ++j) {
+			float fac1 = (float)j / (float)stacks;
+			float fac2 = (float)(j + 1) / (float)stacks;
+			float r1 = base * (1.f - fac1) + top * fac1;
+			float r2 = base * (1.f - fac2) + top * fac2;
+			float h1 = height * ((float)j / (float)stacks);
+			float h2 = height * ((float)(j + 1) / (float)stacks);
+
+			float v1[3] = { r1 * cos2, r1 * sin2, h1 };
+			float v2[3] = { r2 * cos2, r2 * sin2, h2 };
+			float v3[3] = { r2 * cos1, r2 * sin1, h2 };
+			float v4[3] = { r1 * cos1, r1 * sin1, h1 };
+
+			/* first tri */
+			immVertex3fv(pos, v1);
+			immVertex3fv(pos, v2);
+			immVertex3fv(pos, v3);
+
+			/* second tri */
+			immVertex3fv(pos, v3);
+			immVertex3fv(pos, v4);
+			immVertex3fv(pos, v1);
 		}
 	}
 	immEnd();
@@ -530,12 +560,12 @@ void glaDefine2DArea(rcti *screen_rect)
 	 */
 
 	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
+	gpuLoadIdentity();
 	glOrtho(0.0, sc_w, 0.0, sc_h, -1, 1);
-	glTranslatef(GLA_PIXEL_OFS, GLA_PIXEL_OFS, 0.0);
+	gpuTranslate2f(GLA_PIXEL_OFS, GLA_PIXEL_OFS);
 
 	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+	gpuLoadIdentity();
 }
 
 /* TODO(merwin): put the following 2D code to use, or build new 2D code inspired & informd by it */
@@ -593,8 +623,8 @@ gla2DDrawInfo *glaBegin2DDraw(rcti *screen_rect, rctf *world_rect)
 
 	glGetIntegerv(GL_VIEWPORT, (GLint *)di->orig_vp);
 	glGetIntegerv(GL_SCISSOR_BOX, (GLint *)di->orig_sc);
-	glGetFloatv(GL_PROJECTION_MATRIX, (GLfloat *)di->orig_projmat);
-	glGetFloatv(GL_MODELVIEW_MATRIX, (GLfloat *)di->orig_viewmat);
+	gpuGetProjectionMatrix3D(di->orig_projmat);
+	gpuGetModelViewMatrix3D(di->orig_viewmat);
 
 	di->screen_rect = *screen_rect;
 	if (world_rect) {
@@ -646,9 +676,9 @@ void glaEnd2DDraw(gla2DDrawInfo *di)
 	glViewport(di->orig_vp[0], di->orig_vp[1], di->orig_vp[2], di->orig_vp[3]);
 	glScissor(di->orig_vp[0], di->orig_vp[1], di->orig_vp[2], di->orig_vp[3]);
 	glMatrixMode(GL_PROJECTION);
-	glLoadMatrixf(di->orig_projmat);
+	gpuLoadMatrix3D(di->orig_projmat);
 	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixf(di->orig_viewmat);
+	gpuLoadMatrix3D(di->orig_viewmat);
 
 	MEM_freeN(di);
 }
@@ -673,7 +703,7 @@ void bglPolygonOffset(float viewdist, float dist)
 
 		/* hack below is to mimic polygon offset */
 		glMatrixMode(GL_PROJECTION);
-		glGetFloatv(GL_PROJECTION_MATRIX, (float *)winmat);
+		gpuGetProjectionMatrix3D(winmat);
 		
 		/* dist is from camera to center point */
 		
@@ -705,14 +735,14 @@ void bglPolygonOffset(float viewdist, float dist)
 		winmat[14] -= offs;
 		offset += offs;
 		
-		glLoadMatrixf(winmat);
+		gpuLoadMatrix3D(winmat);
 		glMatrixMode(GL_MODELVIEW);
 	}
 	else {
 		glMatrixMode(GL_PROJECTION);
 		winmat[14] += offset;
 		offset = 0.0;
-		glLoadMatrixf(winmat);
+		gpuLoadMatrix3D(winmat);
 		glMatrixMode(GL_MODELVIEW);
 	}
 }

@@ -59,8 +59,7 @@
 #include "GPU_framebuffer.h"
 #include "GPU_material.h"
 #include "GPU_viewport.h"
-
-#include "BIF_gl.h"
+#include "GPU_matrix.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -252,7 +251,7 @@ void ED_view3d_init_mats_rv3d_gl(struct Object *ob, struct RegionView3D *rv3d)
 	/* we have to multiply instead of loading viewmatob to make
 	 * it work with duplis using displists, otherwise it will
 	 * override the dupli-matrix */
-	glMultMatrixf(ob->obmat);
+	gpuMultMatrix3D(ob->obmat);
 }
 
 #ifdef DEBUG
@@ -882,6 +881,7 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 				case ND_CONSTRAINT:
 				case ND_KEYS:
 				case ND_PARTICLE:
+				case ND_POINTCACHE:
 				case ND_LOD:
 					ED_region_tag_redraw(ar);
 					break;

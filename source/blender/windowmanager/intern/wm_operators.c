@@ -89,7 +89,9 @@
 #include "BLF_api.h"
 
 #include "BIF_glutil.h" /* for paint cursor */
+
 #include "GPU_immediate.h"
+#include "GPU_matrix.h"
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -1107,45 +1109,70 @@ int WM_menu_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 	return WM_menu_invoke_ex(C, op, WM_OP_INVOKE_REGION_WIN);
 }
 
+struct EnumSearchMenu {
+	wmOperator *op; /* the operator that will be executed when selecting an item */
+
+	bool use_previews;
+	short prv_cols, prv_rows;
+};
 
 /* generic enum search invoke popup */
-static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg_op)
+static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg)
 {
-	static char search[256] = "";
-	wmEvent event;
+	struct EnumSearchMenu *search_menu = arg;
 	wmWindow *win = CTX_wm_window(C);
+	wmOperator *op = search_menu->op;
+	/* template_ID uses 4 * widget_unit for width, we use a bit more, some items may have a suffix to show */
+	const int width = search_menu->use_previews ? 5 * U.widget_unit * search_menu->prv_cols : UI_searchbox_size_x();
+	const int height = search_menu->use_previews ? 5 * U.widget_unit * search_menu->prv_rows : UI_searchbox_size_y();
+	static char search[256] = "";
 	uiBlock *block;
 	uiBut *but;
-	wmOperator *op = (wmOperator *)arg_op;
 
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
 	UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
 
+	search[0] = '\0';
+	BLI_assert(search_menu->use_previews || (search_menu->prv_cols == 0 && search_menu->prv_rows == 0));
 #if 0 /* ok, this isn't so easy... */
 	uiDefBut(block, UI_BTYPE_LABEL, 0, RNA_struct_ui_name(op->type->srna), 10, 10, UI_searchbox_size_x(), UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
 #endif
 	but = uiDefSearchButO_ptr(block, op->type, op->ptr->data, search, 0, ICON_VIEWZOOM, sizeof(search),
-	                          10, 10, UI_searchbox_size_x(), UI_UNIT_Y, 0, 0, "");
+	                          10, 10, width, UI_UNIT_Y, search_menu->prv_rows, search_menu->prv_cols, "");
 
 	/* fake button, it holds space for search items */
-	uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 10 - UI_searchbox_size_y(), UI_searchbox_size_x(), UI_searchbox_size_y(), NULL, 0, 0, 0, 0, NULL);
+	uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 10 - UI_searchbox_size_y(), width, height, NULL, 0, 0, 0, 0, NULL);
 
 	UI_block_bounds_set_popup(block, 6, 0, -UI_UNIT_Y); /* move it downwards, mouse over button */
-
-	wm_event_init_from_window(win, &event);
-	event.type = EVT_BUT_OPEN;
-	event.val = KM_PRESS;
-	event.customdata = but;
-	event.customdatafree = false;
-	wm_event_add(win, &event);
+	UI_but_focus_on_enter_event(win, but);
 
 	return block;
 }
 
+/**
+ * Similar to #WM_enum_search_invoke, but draws previews. Also, this can't
+ * be used as invoke callback directly since it needs additional info.
+ */
+int WM_enum_search_invoke_previews(
+        bContext *C, wmOperator *op, short prv_cols, short prv_rows)
+{
+	static struct EnumSearchMenu search_menu;
+
+	search_menu.op = op;
+	search_menu.use_previews = true;
+	search_menu.prv_cols = prv_cols;
+	search_menu.prv_rows = prv_rows;
+
+	UI_popup_block_invoke(C, wm_enum_search_menu, &search_menu);
+
+	return OPERATOR_INTERFACE;
+}
 
 int WM_enum_search_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
-	UI_popup_block_invoke(C, wm_enum_search_menu, op);
+	static struct EnumSearchMenu search_menu;
+	search_menu.op = op;
+	UI_popup_block_invoke(C, wm_enum_search_menu, &search_menu);
 	return OPERATOR_INTERFACE;
 }
 
@@ -2081,14 +2108,22 @@ static void WM_OT_window_close(wmOperatorType *ot)
 	ot->poll = WM_operator_winactive;
 }
 
-static void WM_OT_window_duplicate(wmOperatorType *ot)
+static void WM_OT_window_new(wmOperatorType *ot)
 {
-	ot->name = "Duplicate Window";
-	ot->idname = "WM_OT_window_duplicate";
-	ot->description = "Duplicate the current Blender window";
-		
-	ot->exec = wm_window_duplicate_exec;
+	PropertyRNA *prop;
+
+	ot->name = "New Window";
+	ot->idname = "WM_OT_window_new";
+	ot->description = "Create a new Blender window";
+
+	ot->exec = wm_window_new_exec;
+	ot->invoke = wm_window_new_invoke;
 	ot->poll = wm_operator_winactive_normal;
+
+	prop = RNA_def_enum(ot->srna, "screen", DummyRNA_NULL_items, 0, "Screen", "");
+	RNA_def_enum_funcs(prop, wm_window_new_screen_itemf);
+	RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
+	ot->prop = prop;
 }
 
 static void WM_OT_window_fullscreen_toggle(wmOperatorType *ot)
@@ -3049,8 +3084,8 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 		/* set up rotation if available */
 		if (rc->rot_prop) {
 			rot = RNA_property_float_get(&rc->rot_ptr, rc->rot_prop);
-			glPushMatrix();
-			glRotatef(RAD2DEGF(rot), 0, 0, 1);
+			gpuPushMatrix();
+			gpuRotate2D(RAD2DEGF(rot));
 		}
 
 		/* draw textured quad */
@@ -3072,7 +3107,7 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 
 		/* undo rotation */
 		if (rc->rot_prop)
-			glPopMatrix();
+			gpuPopMatrix();
 	}
 	else {
 		/* flat color if no texture available */
@@ -3140,7 +3175,7 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 	/* Keep cursor in the original place */
 	x = rc->initial_mouse[0] - ar->winrct.xmin;
 	y = rc->initial_mouse[1] - ar->winrct.ymin;
-	glTranslatef((float)x, (float)y, 0.0f);
+	gpuTranslate2f((float)x, (float)y);
 
 	glEnable(GL_BLEND);
 	glEnable(GL_LINE_SMOOTH);
@@ -3148,7 +3183,7 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 	/* apply zoom if available */
 	if (rc->zoom_prop) {
 		RNA_property_float_get_array(&rc->zoom_ptr, rc->zoom_prop, zoom);
-		glScalef(zoom[0], zoom[1], 1);
+		gpuScale2fv(zoom);
 	}
 
 	/* draw rotated texture */
@@ -3165,23 +3200,23 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 	immUniformColor3fvAlpha(col, 0.5); 
 
 	if (rc->subtype == PROP_ANGLE) {
-		glPushMatrix();
+		gpuPushMatrix();
 
 		/* draw original angle line */
-		glRotatef(RAD2DEGF(rc->initial_value), 0, 0, 1);
+		gpuRotate2D(RAD2DEGF(rc->initial_value));
 		immBegin(GL_LINES, 2);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
 		immEnd();
 
 		/* draw new angle line */
-		glRotatef(RAD2DEGF(rc->current_value - rc->initial_value), 0, 0, 1);
+		gpuRotate2D(RAD2DEGF(rc->current_value - rc->initial_value));
 		immBegin(GL_LINES, 2);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
 		immEnd();
 
-		glPopMatrix();
+		gpuPopMatrix();
 	}
 
 	/* draw circles on top */
@@ -4179,7 +4214,7 @@ void wm_operatortype_init(void)
 	global_ops_hash = BLI_ghash_str_new_ex("wm_operatortype_init gh", 2048);
 
 	WM_operatortype_append(WM_OT_window_close);
-	WM_operatortype_append(WM_OT_window_duplicate);
+	WM_operatortype_append(WM_OT_window_new);
 	WM_operatortype_append(WM_OT_read_history);
 	WM_operatortype_append(WM_OT_read_homefile);
 	WM_operatortype_append(WM_OT_read_factory_settings);
@@ -4421,7 +4456,7 @@ void wm_window_keymap(wmKeyConfig *keyconf)
 	wmKeyMapItem *kmi;
 	
 	/* note, this doesn't replace existing keymap items */
-	WM_keymap_verify_item(keymap, "WM_OT_window_duplicate", WKEY, KM_PRESS, KM_CTRL | KM_ALT, 0);
+	WM_keymap_verify_item(keymap, "WM_OT_window_new", WKEY, KM_PRESS, KM_CTRL | KM_ALT, 0);
 #ifdef __APPLE__
 	WM_keymap_add_item(keymap, "WM_OT_read_homefile", NKEY, KM_PRESS, KM_OSKEY, 0);
 	WM_keymap_add_menu(keymap, "INFO_MT_file_open_recent", OKEY, KM_PRESS, KM_SHIFT | KM_OSKEY, 0);

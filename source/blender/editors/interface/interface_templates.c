@@ -429,7 +429,8 @@ static void template_ID(
 		but = uiDefBlockButN(block, id_search_menu, MEM_dupallocN(template), "", 0, 0, width, height,
 		                     TIP_(template_id_browse_tip(type)));
 		if (use_preview_icon) {
-			ui_def_but_icon(but, ui_id_icon_get(C, id, use_big_size), UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
+			int icon = id ? ui_id_icon_get(C, id, use_big_size) : RNA_struct_ui_icon(type);
+			ui_def_but_icon(but, icon, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
 		}
 		else {
 			ui_def_but_icon(but, RNA_struct_ui_icon(type), UI_HAS_ICON);
@@ -443,7 +444,7 @@ static void template_ID(
 		}
 	}
 	else if (flag & UI_ID_BROWSE) {
-		but = uiDefBlockButN(block, id_search_menu, MEM_dupallocN(template), "", 0, 0, UI_UNIT_X * 1.5, UI_UNIT_Y,
+		but = uiDefBlockButN(block, id_search_menu, MEM_dupallocN(template), "", 0, 0, UI_UNIT_X * 1.6, UI_UNIT_Y,
 		                     TIP_(template_id_browse_tip(type)));
 		ui_def_but_icon(but, RNA_struct_ui_icon(type), UI_HAS_ICON);
 		/* default dragging of icon for id browse buttons */
