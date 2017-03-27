@@ -319,7 +319,7 @@ add_definitions(${GL_DEFINITIONS})
 
 if(WIN32)
 	list(APPEND INC
-		../../.BKE_text_add./intern/utfconv
+		../../../intern/utfconv
 	)
 endif()
 
