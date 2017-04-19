@@ -91,6 +91,10 @@ add_test(script_pyapi_idprop ${TEST_BLENDER_EXE}
 	--python ${CMAKE_CURRENT_LIST_DIR}/bl_pyapi_idprop.py
 )
 
+add_test(script_pyapi_idprop_datablock ${TEST_BLENDER_EXE}
+	--python ${CMAKE_CURRENT_LIST_DIR}/bl_pyapi_idprop_datablock.py
+)
+
 # ------------------------------------------------------------------------------
 # MODELING TESTS
 add_test(bevel ${TEST_BLENDER_EXE}
@@ -436,5 +440,25 @@ if(WITH_CYCLES)
 		add_cycles_render_test(shader)
 	else()
 		MESSAGE(STATUS "Disabling Cycles tests because tests folder does not exist")
+	endif()
+endif()
+
+if(WITH_ALEMBIC)
+	if(MSVC)
+		add_test(NAME cycles_${subject}_test
+			COMMAND
+				"$<TARGET_FILE_DIR:blender>/${BLENDER_VERSION_MAJOR}.${BLENDER_VERSION_MINOR}/python/bin/python$<$<CONFIG:Debug>:_d>"
+				${CMAKE_CURRENT_LIST_DIR}/alembic_tests.py
+			--blender "${TEST_BLENDER_EXE_BARE}"
+			--testdir "${TEST_SRC_DIR}/alembic"
+			--alembic-root "${ALEMBIC_ROOT_DIR}"
+		)
+	else()
+		add_test(alembic_tests
+			${CMAKE_CURRENT_LIST_DIR}/alembic_tests.py
+			--blender "${TEST_BLENDER_EXE_BARE}"
+			--testdir "${TEST_SRC_DIR}/alembic"
+			--alembic-root "${ALEMBIC_ROOT_DIR}"
+		)
 	endif()
 endif()
