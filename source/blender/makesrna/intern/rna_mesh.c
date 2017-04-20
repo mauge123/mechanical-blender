@@ -3835,6 +3835,11 @@ static void rna_def_dimension(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop,  NULL, "dir_flag");
 	RNA_def_property_enum_items(prop, rna_enum_dimension_directions);
 	RNA_def_property_ui_text(prop, "Direction", "Dimension Direction");
+
+	prop = RNA_def_property(srna, "dimension_angle_complementary", PROP_BOOLEAN , PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dimension_flag", DIMENSION_FLAG_ANGLE_COMPLEMENTARY);
+	RNA_def_property_ui_text(prop, "Complementary Angle", "Sets the complementary angle");
+
 }
 
 void RNA_def_mesh(BlenderRNA *brna)

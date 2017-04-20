@@ -3163,6 +3163,7 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 */
 static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
+	float p1[3],p2[3];
 
 	if(check_dim_visibility(edm, rv3d, obedit)){
 

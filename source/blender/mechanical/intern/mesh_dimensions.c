@@ -538,6 +538,12 @@ static void set_dimension_angle_start_end(BMDim *edm, float *a, float *b) {
 	normalize_v3(edm->mdim->end);
 	mul_v3_fl(edm->mdim->end,len);
 	add_v3_v3(edm->mdim->end,edm->mdim->center);
+
+	if (edm->mdim->dimension_flag & DIMENSION_FLAG_ANGLE_COMPLEMENTARY ) {
+		BLI_assert (ELEM(edm->mdim->dim_type, DIM_TYPE_ANGLE_3P, DIM_TYPE_ANGLE_3P_CON));
+		sub_v3_v3(edm->mdim->start, edm->mdim->center);
+		sub_v3_v3v3(edm->mdim->start, edm->mdim->center, edm->mdim->start);
+	}
 }
 
 static void set_dimension_diameter_start_end(BMDim* edm) {
