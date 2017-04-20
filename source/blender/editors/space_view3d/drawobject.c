@@ -2697,25 +2697,14 @@ static void get_dimension_theme_values (int selected, unsigned char *r_lines, un
  * @param end
  * @param txt_pos
  */
-static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected)
+static void draw_linear_dimension (float* p1, float *p2, float *start, float *end, float *txt_pos, int selected)
 {
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
-	float start[3], end[3], txt_pos[3];
 
 	get_dimension_theme_values(selected, col, tcol);
-
-	// Baseline
-	add_v3_v3v3(start,fpos, p1);
-	add_v3_v3v3(end, fpos, p2);
-
-	// Set txt pos acording pos factor
-	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos,  dpos_fact);
-	add_v3_v3(txt_pos, start);
-
 
 	glColor3ubv(col);
 	glPointSize(2);
@@ -2745,27 +2734,14 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected)
+static void draw_diameter_dimension(float* center, float *start, float *end,  float *txt_pos, int selected)
 {
 
-	float start[3], end[3], vr[3], txt_pos[3];
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
 	get_dimension_theme_values(selected, col, tcol);
-
-	copy_v3_v3(vr,v_dir);
-	normalize_v3(vr);
-	mul_v3_fl(vr, diameter/2.0f); //Vector radius
-
-	add_v3_v3v3(start, center, vr);
-	sub_v3_v3v3(end, center, vr);
-
-	// Set txt pos acording pos factor
-	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos,  dpos_fact);
-	add_v3_v3(txt_pos, start);
 
 	glColor3ubv(col);
 
@@ -2791,27 +2767,14 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 }
 
 
-static void draw_radius_dimension(float* center, float *v_dir, float radius, float dpos_fact, int selected)
+static void draw_radius_dimension(float* center, float *start, float *end, float *txt_pos, int selected)
 {
 
-	float start[3], end[3], vr[3], txt_pos[3];
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
 	get_dimension_theme_values(selected, col, tcol);
-
-	copy_v3_v3(vr,v_dir);
-	normalize_v3(vr);
-	mul_v3_fl(vr, radius); //Vector radius
-
-	copy_v3_v3(start,center);
-	add_v3_v3v3(end, center, vr);
-
-	// Set txt pos acording pos factor
-	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos,  dpos_fact);
-	add_v3_v3(txt_pos, start);
 
 	glColor3ubv(col);
 
@@ -2836,12 +2799,10 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected)
+static void draw_angle_3p_dimension(float *center, float *start, float *end, float *txt_pos, int selected)
 {
-
-	float start[3], end[3], vr1[3], vr2[3], txt_pos[3];
+	float vr1[3],vr2[3];
 	float axis[3];
-	float lpos;
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
@@ -2849,27 +2810,16 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
 
 	get_dimension_theme_values(selected, col, tcol);
 
-	lpos = len_v3(fpos);
-
-	sub_v3_v3v3(vr1,p1,center);
+	sub_v3_v3v3(vr1,start,center);
 	normalize_v3(vr1);
 
-	sub_v3_v3v3(vr2,p2,center);
+	sub_v3_v3v3(vr2,end,center);
 	normalize_v3(vr2);
 
 	cross_v3_v3v3(axis,vr1,vr2);
 	//dim_angle = RAD2DEG(angle_v3v3(vr1,vr2));
 	dim_angle = RAD2DEG(acos(dot_v3v3(vr1,vr2)));
 
-	mul_v3_fl(vr1,lpos);
-	add_v3_v3v3(start, center, vr1);
-
-	mul_v3_fl(vr2,lpos);
-	add_v3_v3v3(end, center, vr2);
-
-	// Set txt pos acording pos factor
-	rotate_v3_v3v3fl(txt_pos,vr1,axis, DEG2RAD(dim_angle*dpos_fact));
-	add_v3_v3(txt_pos, center);
 
 	glColor3ubv(col);
 	glPointSize(2);
@@ -2880,6 +2830,7 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
 	}
 	glEnd();
 
+	sub_v3_v3v3(vr1,start,center);
 	mechanical_draw_circle(center,vr1,axis,dim_angle);
 
 	glBegin(GL_LINES);
@@ -2913,34 +2864,22 @@ static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 		case DIM_TYPE_LINEAR:
 			draw_linear_dimension (CDDM_get_vert(dm,mdm->v[0])->co,
 								   CDDM_get_vert(dm,mdm->v[1])->co,
-								   mdm->fpos,
-								   mdm->dpos_fact,
+								   mdm->start,
+								   mdm->end,
+								   mdm->dpos,
 								   false);
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
+			draw_diameter_dimension(mdm->center, mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		case DIM_TYPE_RADIUS:
-			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
+			draw_radius_dimension(mdm->center,mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
-			draw_angle_3p_dimension(
-			            CDDM_get_vert(dm,mdm->v[0])->co,
-						CDDM_get_vert(dm,mdm->v[2])->co,
-						CDDM_get_vert(dm,mdm->v[1])->co,
-						mdm->fpos,
-						mdm->dpos_fact,
-						false);
-			break;
 		case DIM_TYPE_ANGLE_4P:
 			draw_angle_3p_dimension(
-			            CDDM_get_vert(dm,mdm->v[0])->co,
-						CDDM_get_vert(dm,mdm->v[3])->co,
-						mdm->center,
-						mdm->fpos,
-						mdm->dpos_fact,
-						false);
+			            mdm->center, mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		default:
 			BLI_assert(0);
@@ -3040,41 +2979,43 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 
 		switch (edm->mdim->dim_type) {
 			case DIM_TYPE_LINEAR:
-				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->mdim->fpos, edm->mdim->dpos_fact,
-										   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_linear_dimension(
+					edm->v[0]->co,
+				    edm->v[1]->co,
+				    edm->mdim->start,
+				    edm->mdim->end,
+				    edm->mdim->dpos,
+				    BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 
 			break;
 			case DIM_TYPE_DIAMETER:
 
-				draw_diameter_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
-										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_diameter_dimension(
+				            edm->mdim->center,
+				            edm->mdim->start,
+				            edm->mdim->end,
+				            edm->mdim->dpos,
+							BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_RADIUS:
 
-				draw_radius_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
-										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_radius_dimension(
+				            edm->mdim->center,
+				            edm->mdim->start,
+				            edm->mdim->end,
+				            edm->mdim->dpos,
+				            BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_ANGLE_3P:
+			case DIM_TYPE_ANGLE_4P:
 			case DIM_TYPE_ANGLE_3P_CON:
-				copy_v3_v3(p1, edm->v[0]->co);
-				copy_v3_v3(p2, edm->v[2]->co);
-				if (edm->mdim->dimension_flag & DIMENSION_FLAG_ANGLE_COMPLEMENTARY) {
-					// invert p1
-					sub_v3_v3(p1, edm->v[1]->co);
-					sub_v3_v3v3(p1,edm->v[1]->co,p1);
-				}
-				draw_angle_3p_dimension(p1, p2, edm->v[1]->co, edm->mdim->fpos, edm->mdim->dpos_fact,
+				draw_angle_3p_dimension(edm->mdim->center,edm->mdim->start, edm->mdim->end, edm->mdim->dpos,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
 					draw_dimension_axis(edm);
 				}
-				break;
-			case DIM_TYPE_ANGLE_4P:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->mdim->center, edm->mdim->fpos, edm->mdim->dpos_fact,
-									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
-				draw_dimension_direction_points(edm);
 				break;
 			default:
 				BLI_assert(0);
