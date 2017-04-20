@@ -540,13 +540,22 @@ static void set_dimension_angle_start_end(BMDim *edm, float *a, float *b) {
 	add_v3_v3(edm->mdim->end,edm->mdim->center);
 }
 
-static void set_dimension_circ_start_end(BMDim* edm, float value) {
+static void set_dimension_diameter_start_end(BMDim* edm) {
 	float v[3];
-	sub_v3_v3v3(v,edm->mdim->fpos, edm->mdim->center);
+	copy_v3_v3(v,edm->mdim->fpos);
 	normalize_v3(v);
-	mul_v3_fl(v,value);
+	mul_v3_fl(v,get_dimension_value(edm)/2.0f);
 	add_v3_v3v3(edm->mdim->start,edm->mdim->center,v);
 	sub_v3_v3v3(edm->mdim->end, edm->mdim->center,v);
+}
+
+static void set_dimension_radius_start_end(BMDim* edm) {
+	float v[3];
+	copy_v3_v3(v, edm->mdim->fpos);
+	normalize_v3(v);
+	mul_v3_fl(v, get_dimension_value(edm));
+	add_v3_v3v3(edm->mdim->end, edm->mdim->center, v);
+	copy_v3_v3(edm->mdim->start, edm->mdim->center);
 }
 
 static void set_dimension_start_end(BMDim *edm) {
@@ -556,10 +565,10 @@ static void set_dimension_start_end(BMDim *edm) {
 			add_v3_v3v3(edm->mdim->end, edm->mdim->fpos, edm->v[1]->co);
 			break;
 		case DIM_TYPE_DIAMETER:
-			set_dimension_circ_start_end(edm,get_dimension_value(edm)/2.0f);
+			set_dimension_diameter_start_end(edm);
 			break;
 		case DIM_TYPE_RADIUS:
-			set_dimension_circ_start_end(edm,get_dimension_value(edm));
+			set_dimension_radius_start_end(edm);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
