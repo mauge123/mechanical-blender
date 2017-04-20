@@ -74,6 +74,9 @@ typedef struct MVert {
 // Mdim::flag
 // SELECT			(1 << 0)
 
+// MDim::dimension_flag
+#define DIMENSION_FLAG_ANGLE_COMPLEMENTARY (1 << 0)
+
 typedef struct MDim {
 	ID id;
 	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
@@ -105,9 +108,10 @@ typedef struct MDim {
 	float value; //stored value
 	float value_pr; //previous value
 
+	int dimension_flag;
 	char flag;
 
-	char pad[7];
+	char pad[3];
 
 } MDim;
 /* */

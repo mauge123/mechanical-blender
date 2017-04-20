@@ -3034,6 +3034,7 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 */
 static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
+	float p1[3],p2[3];
 
 	if(check_dim_visibility(edm, rv3d, obedit)){
 
@@ -3056,7 +3057,14 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 				break;
 			case DIM_TYPE_ANGLE_3P:
 			case DIM_TYPE_ANGLE_3P_CON:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->mdim->fpos, edm->mdim->dpos_fact,
+				copy_v3_v3(p1, edm->v[0]->co);
+				copy_v3_v3(p2, edm->v[2]->co);
+				if (edm->mdim->dimension_flag & DIMENSION_FLAG_ANGLE_COMPLEMENTARY) {
+					// invert p1
+					sub_v3_v3(p1, edm->v[1]->co);
+					sub_v3_v3v3(p1,edm->v[1]->co,p1);
+				}
+				draw_angle_3p_dimension(p1, p2, edm->v[1]->co, edm->mdim->fpos, edm->mdim->dpos_fact,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
