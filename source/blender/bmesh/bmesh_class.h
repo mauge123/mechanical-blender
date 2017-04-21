@@ -421,14 +421,17 @@ enum {
 #define _BM_GENERIC_TYPE_ELEM_NONCONST \
 	void *, BMVert *, BMEdge *, BMLoop *, BMFace *, \
 	BMVert_OFlag *, BMEdge_OFlag *, BMFace_OFlag *, \
-	BMElem *, BMElemF *, BMHeader *
+	BMElem *, BMElemF *, BMHeader *, \
+	BMGeom *, BMDim *, BMReference *
 
 #define _BM_GENERIC_TYPE_ELEM_CONST \
 	const void *, const BMVert *, const BMEdge *, const BMLoop *, const BMFace *, \
 	const BMVert_OFlag *, const BMEdge_OFlag *, const BMFace_OFlag *, \
 	const BMElem *, const BMElemF *, const BMHeader *, \
+	const BMGeom *, const BMDim *, const BMReference *, \
 	void * const, BMVert * const, BMEdge * const, BMLoop * const, BMFace * const, \
-	BMElem * const, BMElemF * const, BMHeader * const
+	BMElem * const, BMElemF * const, BMHeader * const, \
+	BMGeom * const, BMDim * const, BMReference * const
 
 #define BM_CHECK_TYPE_ELEM_CONST(ele) \
 	CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPES_CONST)
