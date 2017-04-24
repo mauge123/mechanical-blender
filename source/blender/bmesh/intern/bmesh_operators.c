@@ -1145,7 +1145,7 @@ static void bmo_slot_buffer_from_flag(
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 		if (htype & BM_REFERENCE) {
 			BM_ITER_MESH (ele, &iter, bm, BM_REFERENCES_OF_MESH) {
-				if (BMO_reference_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_reference_flag_test_bool(bm, (BMReference *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
@@ -1155,7 +1155,7 @@ static void bmo_slot_buffer_from_flag(
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 		if (htype & BM_DIM) {
 			BM_ITER_MESH(ele, &iter, bm, BM_DIMS_OF_MESH) {
-				if (BMO_dim_flag_test_bool(bm, (BMElemF *)ele, oflag) == test_for_enabled) {
+				if (BMO_dim_flag_test_bool(bm, (BMDim *)ele, oflag) == test_for_enabled) {
 					ele_array[i] = ele;
 					i++;
 				}
