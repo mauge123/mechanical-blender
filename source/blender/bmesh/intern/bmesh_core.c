@@ -3249,8 +3249,8 @@ static bool unique_name_reference_check(void *arg, const char *name)
  *
  * \note base on BM_edge_create function
  */
-BMReference *BM_reference_plane_create(
-		BMesh *bm, float *v1, float *v2, float *v3, float *v4, char *name,
+BMReference *BM_reference_create(
+		BMesh *bm,  int ref_type, float *v1, float *v2, float *v3, float *v4, char *name,
 		const BMReference *UNUSED(d_example), const eBMCreateFlag UNUSED(create_flag))
 {
 	BMReference *erf = 	BLI_mempool_alloc(bm->ppool);
@@ -3282,7 +3282,7 @@ BMReference *BM_reference_plane_create(
 
 	bm->totref++;
 
-	erf->type = BM_REFERENCE_TYPE_PLANE;
+	erf->type = ref_type;
 	erf->name[0] = '\0';
 	copy_v3_v3(erf->v1,v1);
 	copy_v3_v3(erf->v2,v2);
@@ -3294,8 +3294,6 @@ BMReference *BM_reference_plane_create(
 	} else {
 		BLI_strncpy(erf->name, name, MAX_NAME);
 	}
-
-
 
 	return erf;
 }

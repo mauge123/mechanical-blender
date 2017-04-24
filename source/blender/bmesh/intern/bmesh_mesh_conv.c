@@ -230,7 +230,7 @@ static void BM_references_from_me_references(BMesh *bm, Mesh *me)
 		BM_mesh_elem_toolflags_ensure(bm);
 
 
-		erf = BM_reference_plane_create(bm,mrf->p1,mrf->p2, mrf->p3, mrf->p4, mrf->name, NULL,BM_CREATE_SKIP_CD);
+		erf = BM_reference_create(bm, mrf->type, mrf->p1,mrf->p2, mrf->p3, mrf->p4, mrf->name, NULL,BM_CREATE_SKIP_CD);
 
 		BM_elem_index_set(erf, i); /* set_ok */
 
