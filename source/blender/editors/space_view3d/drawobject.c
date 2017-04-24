@@ -2899,7 +2899,7 @@ static void draw_linear_dimension (float* p1, float *p2, float *start, float *en
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_diameter_dimension(float* center, float *start, float *end,  float *txt_pos, int selected)
+static void draw_diameter_dimension(float *start, float *end,  float *txt_pos, int selected)
 {
 
 	float w,h;
@@ -2932,7 +2932,7 @@ static void draw_diameter_dimension(float* center, float *start, float *end,  fl
 }
 
 
-static void draw_radius_dimension(float* center, float *start, float *end, float *txt_pos, int selected)
+static void draw_radius_dimension(float *start, float *end, float *txt_pos, int selected)
 {
 
 	float w,h;
@@ -3035,10 +3035,10 @@ static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 								   false);
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension(mdm->center, mdm->start, mdm->end, mdm->dpos, false);
+			draw_diameter_dimension(mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		case DIM_TYPE_RADIUS:
-			draw_radius_dimension(mdm->center,mdm->start, mdm->end, mdm->dpos, false);
+			draw_radius_dimension(mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
@@ -3138,8 +3138,6 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 */
 static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
-	float p1[3],p2[3];
-
 	if(check_dim_visibility(edm, rv3d, obedit)){
 
 		switch (edm->mdim->dim_type) {
@@ -3157,7 +3155,6 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 			case DIM_TYPE_DIAMETER:
 
 				draw_diameter_dimension(
-				            edm->mdim->center,
 				            edm->mdim->start,
 				            edm->mdim->end,
 				            edm->mdim->dpos,
@@ -3166,7 +3163,6 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 			case DIM_TYPE_RADIUS:
 
 				draw_radius_dimension(
-				            edm->mdim->center,
 				            edm->mdim->start,
 				            edm->mdim->end,
 				            edm->mdim->dpos,
