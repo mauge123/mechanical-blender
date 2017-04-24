@@ -295,7 +295,8 @@ static void bmo_mesh_copy(BMOperator *op, BMesh *bm_dst, BMesh *bm_src)
 		if (BMO_elem_flag_test(bm_src, erf, DUPE_INPUT) &&
 		    !BMO_elem_flag_test(bm_src, erf, DUPE_DONE))
 		{
-			BMReference *nerf = BM_reference_plane_create(bm_dst, erf->v1, erf->v2, erf->v3, erf->v4, erf->name, NULL, 0);
+			BMReference *nerf = BM_reference_create(bm_dst, erf->type, erf->v1, erf->v2, erf->v3, erf->v4,
+			                                        erf->name, NULL, 0);
 			BMO_elem_flag_enable(bm_src, erf, DUPE_DONE);
 			BMO_elem_flag_enable(bm_src, nerf, DUPE_NEW);
 		}

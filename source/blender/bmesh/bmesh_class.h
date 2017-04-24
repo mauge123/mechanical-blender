@@ -198,6 +198,7 @@ typedef struct BMDim_OFlag {
 
 /* BMReference->type */
 #define BM_REFERENCE_TYPE_PLANE 1
+#define BM_REFERENCE_TYPE_AXIS 2
 
 typedef struct BMReference {
 	BMHeader head;

@@ -60,7 +60,13 @@
 #include "mesh_references.h"
 
 
-static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
+static EnumPropertyItem reference_type_items[] = {
+	{BM_REFERENCE_TYPE_PLANE, "plane", 0, "Plane", "Plane Reference"},
+	{BM_REFERENCE_TYPE_AXIS, "axis", 0, "Axis", "Axis Reference"},
+    {0, NULL, 0, NULL, NULL}
+};
+
+static int mechanical_add_reference_exec(bContext *C, wmOperator *op)
 {
 
 	float loc[3], rot[3], mat[4][4], dia;
@@ -72,6 +78,8 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 
 	BMReference *erf = NULL;
 
+	int reference_type = RNA_enum_get(op->ptr, "reference_type");
+
 	BMOperator bmop;
 	char op_str [255] = {0};
 
@@ -80,9 +88,9 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 	dia = ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
 	bool create_ts = RNA_boolean_get(op->ptr,"create_ts");
 
-	sprintf(op_str,"create_reference_plane %s %s %s", "verts=%hv", "matrix=%m4", "dia=%f");
+	sprintf(op_str,"create_reference_plane %s %s %s %s", "verts=%hv", "matrix=%m4", "dia=%f", "ref_type=%i");
 
-	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, mat, dia);
+	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, mat, dia, reference_type);
 
 	BMO_op_exec(em->bm, &bmop);
 
@@ -104,15 +112,40 @@ static int mechanical_add_reference_plane_exec(bContext *C, wmOperator *op)
 
 }
 
+
 void MESH_OT_mechanical_reference_plane_add(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	/* identifiers */
 	ot->name = "Add Reference Plane";
 	ot->description = "Adds a Reference plane to be used on Mesh";
 	ot->idname = "MESH_OT_mechanical_reference_plane_add";
 
 	/* api callbacks */
-	ot->exec = mechanical_add_reference_plane_exec;
+	ot->exec = mechanical_add_reference_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	ot->prop = RNA_def_enum(ot->srna,"reference_type",reference_type_items,BM_REFERENCE_TYPE_PLANE,"reference type","reference type");
+
+	prop = RNA_def_boolean(ot->srna,"create_ts",false,"Create transform orientation","creates a tranform orientation");
+
+	ED_object_add_generic_props(ot,false);
+}
+
+
+void MESH_OT_mechanical_reference_axis_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Reference Axis";
+	ot->description = "Adds a Reference Axis to be used on Mesh";
+	ot->idname = "MESH_OT_mechanical_reference_axis_add";
+
+	/* api callbacks */
+	ot->exec = mechanical_add_reference_exec;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */

@@ -3042,6 +3042,8 @@ static void draw_ob_dims(Object *ob, DerivedMesh *dm)
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void draw_em_reference_plane(View3D *v3d,BMReference *erf, int index)
 {
+	BLI_assert(erf->type == BM_REFERENCE_TYPE_PLANE);
+
 	// May be set to other values
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glEnable (GL_BLEND);
@@ -3065,6 +3067,14 @@ static void draw_em_reference_plane(View3D *v3d,BMReference *erf, int index)
 	glVertex3fv(erf->v4);
 	glEnd();
 	glDisable(GL_BLEND);
+}
+
+
+static void draw_em_reference_axis(View3D *v3d,BMReference *erf, int index)
+{
+	BLI_assert(erf->type == BM_REFERENCE_TYPE_AXIS);
+
+	// TODO
 }
 #endif
 
@@ -3769,7 +3779,16 @@ static void draw_em_reference_planes(View3D *v3d, BMEditMesh *em)
 	BMIter iter;
 	int i =0;
 	BM_ITER_MESH_INDEX(erf,&iter,em->bm, BM_REFERENCES_OF_MESH, i) {
-		draw_em_reference_plane(v3d, erf, i);
+		switch (erf->type) {
+			case BM_REFERENCE_TYPE_PLANE:
+				draw_em_reference_plane(v3d, erf, i);
+				break;
+			case BM_REFERENCE_TYPE_AXIS:
+				draw_em_reference_axis(v3d, erf, i);
+				break;
+		}
+
+
 	}
 
 }
