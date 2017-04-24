@@ -72,7 +72,6 @@ extern "C" {
 #include "BKE_animsys.h"
 #include "BKE_constraint.h"
 #include "BKE_curve.h"
-#include "BKE_depsgraph.h"
 #include "BKE_effect.h"
 #include "BKE_fcurve.h"
 #include "BKE_idcode.h"
@@ -387,29 +386,14 @@ SubgraphDepsNode *DepsgraphNodeBuilder::build_subgraph(Group *group)
 
 void DepsgraphNodeBuilder::build_object(Scene *scene, Object *ob)
 {
-	const bool has_object = (ob->id.tag & LIB_TAG_DOIT);
-	IDDepsNode *id_node = (has_object)
-	        ? m_graph->find_id_node(&ob->id)
-	        : add_id_node(&ob->id);
-	/* Update node layers.
-	 * Do it for both new and existing ID nodes. This is so because several
-	 * bases might be sharing same object.
-	 */
-
-	/* Blender 2.8 transition: we don't have bases and do not have
-	 * layer masks, but still want objects to be updated
-	 */
-	id_node->layers |= ((1 << 20) - 1);
-
-	if (ob == scene->camera) {
-		/* Camera should always be updated, it used directly by viewport. */
-		id_node->layers |= (unsigned int)(-1);
-	}
 	/* Skip rest of components if the ID node was already there. */
-	if (has_object) {
+	if (ob->id.tag & LIB_TAG_DOIT) {
 		return;
 	}
 	ob->id.tag |= LIB_TAG_DOIT;
+
+	/* Create ID node for obejct and begin init. */
+	IDDepsNode *id_node = add_id_node(&ob->id);
 	ob->customdata_mask = 0;
 
 	/* Standard components. */

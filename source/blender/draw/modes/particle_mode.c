@@ -40,7 +40,6 @@
  * initialize most of them and PARTICLE_cache_init()
  * for PARTICLE_PassList */
 
-/* keep it under MAX_PASSES */
 typedef struct PARTICLE_PassList {
 	/* Declare all passes here and init them in
 	 * PARTICLE_cache_init().
@@ -48,14 +47,12 @@ typedef struct PARTICLE_PassList {
 	struct DRWPass *pass;
 } PARTICLE_PassList;
 
-/* keep it under MAX_BUFFERS */
 typedef struct PARTICLE_FramebufferList {
 	/* Contains all framebuffer objects needed by this engine.
 	 * Only contains (GPUFrameBuffer *) */
 	struct GPUFrameBuffer *fb;
 } PARTICLE_FramebufferList;
 
-/* keep it under MAX_TEXTURES */
 typedef struct PARTICLE_TextureList {
 	/* Contains all framebuffer textures / utility textures
 	 * needed by this engine. Only viewport specific textures
@@ -63,20 +60,20 @@ typedef struct PARTICLE_TextureList {
 	struct GPUTexture *texture;
 } PARTICLE_TextureList;
 
-/* keep it under MAX_STORAGE */
 typedef struct PARTICLE_StorageList {
 	/* Contains any other memory block that the engine needs.
 	 * Only directly MEM_(m/c)allocN'ed blocks because they are
 	 * free with MEM_freeN() when viewport is freed.
 	 * (not per object) */
 	struct CustomStruct *block;
+	struct g_data *g_data;
 } PARTICLE_StorageList;
 
 typedef struct PARTICLE_Data {
 	/* Struct returned by DRW_viewport_engine_data_get.
 	 * If you don't use one of these, just make it a (void *) */
 	// void *fbl;
-	char engine_name[32]; /* Required */
+	void *engine_type; /* Required */
 	PARTICLE_FramebufferList *fbl;
 	PARTICLE_TextureList *txl;
 	PARTICLE_PassList *psl;
@@ -93,35 +90,29 @@ static struct {
 	struct GPUShader *custom_shader;
 } e_data = {NULL}; /* Engine data */
 
-static struct {
+typedef struct g_data {
 	/* This keeps the references of the shading groups for
 	 * easy access in PARTICLE_cache_populate() */
 	DRWShadingGroup *group;
-
-	/* This keeps the reference of the viewport engine data because
-	 * DRW_viewport_engine_data_get is slow and we don't want to
-	 * call it for every object */
-	PARTICLE_Data *vedata;
-} g_data = {NULL}; /* Transient data */
+} g_data; /* Transient data */
 
 /* *********** FUNCTIONS *********** */
 
 /* Init Textures, Framebuffers, Storage and Shaders.
  * It is called for every frames.
  * (Optional) */
-static void PARTICLE_engine_init(void)
+static void PARTICLE_engine_init(void *vedata)
 {
-	PARTICLE_Data *ved = DRW_viewport_engine_data_get("ParticleMode");
-	PARTICLE_TextureList *txl = ved->txl;
-	PARTICLE_FramebufferList *fbl = ved->fbl;
-	PARTICLE_StorageList *stl = ved->stl;
+	PARTICLE_TextureList *txl = ((PARTICLE_Data *)vedata)->txl;
+	PARTICLE_FramebufferList *fbl = ((PARTICLE_Data *)vedata)->fbl;
+	PARTICLE_StorageList *stl = ((PARTICLE_Data *)vedata)->stl;
 
 	UNUSED_VARS(txl, fbl, stl);
 
 	/* Init Framebuffers like this: order is attachment order (for color texs) */
 	/*
-	 * DRWFboTexture tex[2] = {{&txl->depth, DRW_BUF_DEPTH_24},
-	 *                         {&txl->color, DRW_BUF_RGBA_8}};
+	 * DRWFboTexture tex[2] = {{&txl->depth, DRW_BUF_DEPTH_24, 0},
+	 *                         {&txl->color, DRW_BUF_RGBA_8, DRW_TEX_FILTER}};
 	 */
 
 	/* DRW_framebuffer_init takes care of checking if
@@ -140,13 +131,15 @@ static void PARTICLE_engine_init(void)
 
 /* Here init all passes and shading groups
  * Assume that all Passes are NULL */
-static void PARTICLE_cache_init(void)
+static void PARTICLE_cache_init(void *vedata)
 {
-	g_data.vedata = DRW_viewport_engine_data_get("ParticleMode");
-	PARTICLE_PassList *psl = g_data.vedata->psl;
-	PARTICLE_StorageList *stl = g_data.vedata->stl;
+	PARTICLE_PassList *psl = ((PARTICLE_Data *)vedata)->psl;
+	PARTICLE_StorageList *stl = ((PARTICLE_Data *)vedata)->stl;
 
-	UNUSED_VARS(stl);
+	if (!stl->g_data) {
+		/* Alloc transient pointers */
+		stl->g_data = MEM_mallocN(sizeof(g_data), "g_data");
+	}
 
 	{
 		/* Create a pass */
@@ -155,53 +148,53 @@ static void PARTICLE_cache_init(void)
 
 		/* Create a shadingGroup using a function in draw_common.c or custom one */
 		/*
-		 * g_data.group = shgroup_dynlines_uniform_color(psl->pass, ts.colorWire);
+		 * stl->g_data->group = shgroup_dynlines_uniform_color(psl->pass, ts.colorWire);
 		 * -- or --
-		 * g_data.group = DRW_shgroup_create(e_data.custom_shader, psl->pass);
+		 * stl->g_data->group = DRW_shgroup_create(e_data.custom_shader, psl->pass);
 		 */
-		g_data.group = DRW_shgroup_create(e_data.custom_shader, psl->pass);
+		stl->g_data->group = DRW_shgroup_create(e_data.custom_shader, psl->pass);
 
 		/* Uniforms need a pointer to it's value so be sure it's accessible at
 		 * any given time (i.e. use static vars) */
 		static float color[4] = {0.2f, 0.5f, 0.3f, 1.0};
-		DRW_shgroup_uniform_vec4(g_data.group, "color", color, 1);
+		DRW_shgroup_uniform_vec4(stl->g_data->group, "color", color, 1);
 	}
 
 }
 
 /* Add geometry to shadingGroups. Execute for each objects */
-static void PARTICLE_cache_populate(Object *ob)
+static void PARTICLE_cache_populate(void *vedata, Object *ob)
 {
-	PARTICLE_PassList *psl = g_data.vedata->psl;
-	PARTICLE_StorageList *stl = g_data.vedata->stl;
+	PARTICLE_PassList *psl = ((PARTICLE_Data *)vedata)->psl;
+	PARTICLE_StorageList *stl = ((PARTICLE_Data *)vedata)->stl;
 
 	UNUSED_VARS(psl, stl);
 
 	if (ob->type == OB_MESH) {
 		/* Get geometry cache */
-		struct Batch *geom = DRW_cache_surface_get(ob);
+		struct Batch *geom = DRW_cache_mesh_surface_get(ob);
 
 		/* Add geom to a shading group */
-		DRW_shgroup_call_add(g_data.group, geom, ob->obmat);
+		DRW_shgroup_call_add(stl->g_data->group, geom, ob->obmat);
 	}
 }
 
 /* Optional: Post-cache_populate callback */
-static void PARTICLE_cache_finish(void)
+static void PARTICLE_cache_finish(void *vedata)
 {
-	PARTICLE_PassList *psl = g_data.vedata->psl;
-	PARTICLE_StorageList *stl = g_data.vedata->stl;
+	PARTICLE_PassList *psl = ((PARTICLE_Data *)vedata)->psl;
+	PARTICLE_StorageList *stl = ((PARTICLE_Data *)vedata)->stl;
 
 	/* Do something here! dependant on the objects gathered */
 	UNUSED_VARS(psl, stl);
 }
 
 /* Draw time ! Control rendering pipeline from here */
-static void PARTICLE_draw_scene(void)
+static void PARTICLE_draw_scene(void *vedata)
 {
-	PARTICLE_Data *ved = DRW_viewport_engine_data_get("ParticleMode");
-	PARTICLE_PassList *psl = ved->psl;
-	PARTICLE_FramebufferList *fbl = ved->fbl;
+
+	PARTICLE_PassList *psl = ((PARTICLE_Data *)vedata)->psl;
+	PARTICLE_FramebufferList *fbl = ((PARTICLE_Data *)vedata)->fbl;
 
 	/* Default framebuffer and texture */
 	DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
@@ -214,7 +207,7 @@ static void PARTICLE_draw_scene(void)
 	 * DRW_framebuffer_texture_detach(dtxl->depth);
 	 * DRW_framebuffer_bind(fbl->custom_fb);
 	 * DRW_draw_pass(psl->pass);
-	 * DRW_framebuffer_texture_attach(dfbl->default_fb, dtxl->depth, 0);
+	 * DRW_framebuffer_texture_attach(dfbl->default_fb, dtxl->depth, 0, 0);
 	 * DRW_framebuffer_bind(dfbl->default_fb);
 	 */
 
@@ -230,8 +223,7 @@ static void PARTICLE_draw_scene(void)
  * Mostly used for freeing shaders */
 static void PARTICLE_engine_free(void)
 {
-	// if (custom_shader)
-	// 	DRW_shader_free(custom_shader);
+	// DRW_SHADER_FREE_SAFE(custom_shader);
 }
 
 /* Create collection settings here.
@@ -255,9 +247,12 @@ void PARTICLE_collection_settings_create(CollectionEngineSettings *ces)
 }
 #endif
 
+static const DrawEngineDataSize PARTICLE_data_size = DRW_VIEWPORT_DATA_SIZE(PARTICLE_Data);
+
 DrawEngineType draw_engine_particle_type = {
 	NULL, NULL,
 	N_("ParticleMode"),
+	&PARTICLE_data_size,
 	&PARTICLE_engine_init,
 	&PARTICLE_engine_free,
 	&PARTICLE_cache_init,

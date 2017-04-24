@@ -1207,6 +1207,16 @@ class INFO_MT_lamp_add(Menu):
         layout.operator_enum("object.lamp_add", "type")
 
 
+class INFO_MT_camera_add(Menu):
+    bl_idname = "INFO_MT_camera_add"
+    bl_label = "Camera"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'EXEC_REGION_WIN'
+        layout.operator("object.camera_add", text="Camera", icon='OUTLINER_OB_CAMERA')
+
+
 class INFO_MT_add(Menu):
     bl_label = "Add"
 
@@ -1238,7 +1248,11 @@ class INFO_MT_add(Menu):
         layout.operator("object.speaker_add", text="Speaker", icon='OUTLINER_OB_SPEAKER')
         layout.separator()
 
-        layout.operator("object.camera_add", text="Camera", icon='OUTLINER_OB_CAMERA')
+        if INFO_MT_camera_add.is_extended():
+            layout.menu("INFO_MT_camera_add", icon='OUTLINER_OB_CAMERA')
+        else:
+            INFO_MT_camera_add.draw(self, context)
+
         layout.menu("INFO_MT_lamp_add", icon='OUTLINER_OB_LAMP')
         layout.separator()
 
@@ -1666,7 +1680,7 @@ class VIEW3D_MT_brush(Menu):
         layout = self.layout
 
         settings = UnifiedPaintPanel.paint_settings(context)
-        brush = settings.brush
+        brush = getattr(settings, "brush", None)
 
         ups = context.tool_settings.unified_paint_settings
         layout.prop(ups, "use_unified_size", text="Unified Size")
@@ -1674,6 +1688,11 @@ class VIEW3D_MT_brush(Menu):
         if context.image_paint_object or context.vertex_paint_object:
             layout.prop(ups, "use_unified_color", text="Unified Color")
         layout.separator()
+
+        # skip if no active brush
+        if not brush:
+            layout.label(text="No Brushes currently available", icon="INFO")
+            return
 
         # brush paint modes
         layout.menu("VIEW3D_MT_brush_paint_modes")
@@ -1686,10 +1705,6 @@ class VIEW3D_MT_brush(Menu):
             layout.prop_menu_enum(brush, "image_tool")
         elif context.vertex_paint_object or context.weight_paint_object:
             layout.prop_menu_enum(brush, "vertex_tool")
-
-        # skip if no active brush
-        if not brush:
-            return
 
         # TODO: still missing a lot of brush options here
 
@@ -3904,6 +3919,7 @@ classes = (
     INFO_MT_edit_armature_add,
     INFO_MT_armature_add,
     INFO_MT_lamp_add,
+    INFO_MT_camera_add,
     INFO_MT_add,
     VIEW3D_MT_object,
     VIEW3D_MT_object_animation,

@@ -71,6 +71,7 @@
 #include "WM_types.h"
 
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 
 #include "filelist.h"
 
@@ -262,7 +263,7 @@ static void draw_tile(int sx, int sy, int width, int height, int colorid, int sh
 	float color[4];
 	UI_GetThemeColorShade4fv(colorid, shade, color);
 	UI_draw_roundbox_corner_set(UI_CNR_ALL);
-	UI_draw_roundbox((float)sx, (float)(sy - height), (float)(sx + width), (float)sy, 5.0f, color);
+	UI_draw_roundbox_aa(true, (float)sx, (float)(sy - height), (float)(sx + width), (float)sy, 5.0f, color);
 }
 
 
@@ -388,8 +389,8 @@ static void file_draw_preview(
 		UI_GetThemeColor4fv(TH_TEXT, col);
 	}
 
-	immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-	immDrawPixelsTexScaled((float)xco, (float)yco, imb->x, imb->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, imb->rect,
+	IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+	immDrawPixelsTexScaled(&state, (float)xco, (float)yco, imb->x, imb->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, imb->rect,
 	                       scale, scale, 1.0f, 1.0f, col);
 
 	if (icon) {
@@ -399,7 +400,7 @@ static void file_draw_preview(
 	/* border */
 	if (use_dropshadow) {
 		VertexFormat *format = immVertexFormat();
-		unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2,KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2,KEEP_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		immUniformColor4f(0.0f, 0.0f, 0.0f, 0.4f);
@@ -460,7 +461,7 @@ static void draw_background(FileLayout *layout, View2D *v2d)
 	int i;
 	int sy;
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColorShade(TH_BACK, -7);
 
@@ -476,46 +477,54 @@ static void draw_background(FileLayout *layout, View2D *v2d)
 
 static void draw_dividers(FileLayout *layout, View2D *v2d)
 {
-	const int step = (layout->tile_w + 2 * layout->tile_border_x);
-	int v1[2], v2[2];
-	int sx;
-	unsigned int vertex_ct = 0;
-	unsigned char col_hi[3], col_lo[3];
-
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
-	unsigned int color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 3, NORMALIZE_INT_TO_FLOAT);
-
-	vertex_ct = (v2d->cur.xmax - v2d->tot.xmin) / step + 1; /* paint at least 1 divider */
-	vertex_ct *= 4; /* vertex_count = 2 points per divider * 2 lines per divider */
-
-	UI_GetThemeColorShade3ubv(TH_BACK,  30, col_hi);
-	UI_GetThemeColorShade3ubv(TH_BACK, -30, col_lo);
-
-	v1[1] = v2d->cur.ymax - layout->tile_border_y;
-	v2[1] = v2d->cur.ymin;
-
-	immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
-	immBegin(GL_LINES, vertex_ct);
-
 	/* vertical column dividers */
-	sx = (int)v2d->tot.xmin;
+
+	const int step = (layout->tile_w + 2 * layout->tile_border_x);
+
+	unsigned int vertex_ct = 0;
+	int sx = (int)v2d->tot.xmin;
 	while (sx < v2d->cur.xmax) {
 		sx += step;
-
-		v1[0] = v2[0] = sx;
-		immAttrib3ubv(color, col_lo);
-		immVertex2iv(pos, v1);
-		immVertex2iv(pos, v2);
-
-		v1[0] = v2[0] = sx + 1;
-		immAttrib3ubv(color, col_hi);
-		immVertex2iv(pos, v1);
-		immVertex2iv(pos, v2);
+		vertex_ct += 4; /* vertex_count = 2 points per line * 2 lines per divider */
 	}
 
-	immEnd();
-	immUnbindProgram();
+	if (vertex_ct > 0) {
+		int v1[2], v2[2];
+		unsigned char col_hi[3], col_lo[3];
+
+		UI_GetThemeColorShade3ubv(TH_BACK,  30, col_hi);
+		UI_GetThemeColorShade3ubv(TH_BACK, -30, col_lo);
+
+		v1[1] = v2d->cur.ymax - layout->tile_border_y;
+		v2[1] = v2d->cur.ymin;
+
+		VertexFormat *format = immVertexFormat();
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+		unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+
+		immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
+		immBegin(PRIM_LINES, vertex_ct);
+
+		sx = (int)v2d->tot.xmin;
+		while (sx < v2d->cur.xmax) {
+			sx += step;
+
+			v1[0] = v2[0] = sx;
+			immSkipAttrib(color);
+			immVertex2iv(pos, v1);
+			immAttrib3ubv(color, col_lo);
+			immVertex2iv(pos, v2);
+
+			v1[0] = v2[0] = sx + 1;
+			immSkipAttrib(color);
+			immVertex2iv(pos, v1);
+			immAttrib3ubv(color, col_hi);
+			immVertex2iv(pos, v2);
+		}
+
+		immEnd();
+		immUnbindProgram();
+	}
 }
 
 void file_draw_list(const bContext *C, ARegion *ar)

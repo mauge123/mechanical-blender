@@ -52,7 +52,7 @@
 
 #include "BKE_animsys.h"
 #include "BKE_curve.h"
-#include "BKE_depsgraph.h"
+#include "BKE_curve_render.h"
 #include "BKE_displist.h"
 #include "BKE_font.h"
 #include "BKE_global.h"
@@ -63,6 +63,8 @@
 #include "BKE_main.h"
 #include "BKE_object.h"
 #include "BKE_material.h"
+
+#include "DEG_depsgraph.h"
 
 /* globals */
 
@@ -125,6 +127,8 @@ void BKE_curve_editNurb_free(Curve *cu)
 void BKE_curve_free(Curve *cu)
 {
 	BKE_animdata_free((ID *)cu, false);
+
+	BKE_curve_batch_cache_free(cu);
 
 	BKE_nurbList_free(&cu->nurb);
 	BKE_curve_editfont_free(cu);
@@ -4568,7 +4572,7 @@ int BKE_curve_material_index_validate(Curve *cu)
 	}
 
 	if (!is_valid) {
-		DAG_id_tag_update(&cu->id, OB_RECALC_DATA);
+		DEG_id_tag_update(&cu->id, OB_RECALC_DATA);
 		return true;
 	}
 	else {

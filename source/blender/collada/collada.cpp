@@ -48,7 +48,8 @@ int collada_import(bContext *C,
 				   int find_chains,
 				   int auto_connect,
 				   int fix_orientation,
-				   int min_chain_length)
+				   int min_chain_length,
+				   int keep_bind_info)
 {
 
 	ImportSettings import_settings;
@@ -58,6 +59,7 @@ int collada_import(bContext *C,
 	import_settings.find_chains      = find_chains != 0;
 	import_settings.fix_orientation  = fix_orientation != 0;
 	import_settings.min_chain_length = min_chain_length;
+	import_settings.keep_bind_info = keep_bind_info !=0;
 
 	DocumentImporter imp(C, &import_settings);
 	if (imp.import()) return 1;
@@ -66,6 +68,7 @@ int collada_import(bContext *C,
 }
 
 int collada_export(Scene *sce,
+                   SceneLayer *scene_layer,
                    const char *filepath,
 
                    int apply_modifiers,
@@ -87,7 +90,9 @@ int collada_export(Scene *sce,
 				   int use_blender_profile,
 				   int sort_by_name,
 				   BC_export_transformation_type export_transformation_type,
-                   int open_sim)
+				   int open_sim,
+				   int limit_precision,
+				   int keep_bind_info)
 {
 	ExportSettings export_settings;
 
@@ -112,14 +117,15 @@ int collada_export(Scene *sce,
 	export_settings.sort_by_name               = sort_by_name != 0;
 	export_settings.export_transformation_type = export_transformation_type;
 	export_settings.open_sim                   = open_sim != 0;
-
+	export_settings.limit_precision = limit_precision != 0;
+	export_settings.keep_bind_info = keep_bind_info !=0;
 
 	int includeFilter = OB_REL_NONE;
 	if (export_settings.include_armatures) includeFilter |= OB_REL_MOD_ARMATURE;
 	if (export_settings.include_children) includeFilter |= OB_REL_CHILDREN_RECURSIVE;
 
 	eObjectSet objectSet = (export_settings.selected) ? OB_SET_SELECTED : OB_SET_ALL;
-	export_settings.export_set = BKE_object_relational_superset(sce, objectSet, (eObRelationTypes)includeFilter);
+	export_settings.export_set = BKE_object_relational_superset(scene_layer, objectSet, (eObRelationTypes)includeFilter);
 	int export_count = BLI_linklist_count(export_settings.export_set);
 
 	if (export_count == 0) {

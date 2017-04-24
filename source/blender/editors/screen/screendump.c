@@ -54,9 +54,9 @@
 #include "BKE_writeavi.h"
 
 #include "BIF_gl.h"
-#include "BIF_glutil.h"
 
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -457,15 +457,15 @@ static void screencast_draw_cursor(bContext *UNUSED(C), int x, int y, void *UNUS
 	glEnable(GL_BLEND);
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor4ub(0, 0, 0, 32);
-	imm_draw_filled_circle(pos, (float)x, (float)y, 20, 40);
+	imm_draw_circle_fill(pos, (float)x, (float)y, 20, 40);
 
 	immUniformColor4ub(255, 255, 255, 128);
-	imm_draw_lined_circle(pos, (float)x, (float)y, 20, 40);
+	imm_draw_circle_wire(pos, (float)x, (float)y, 20, 40);
 
 	immUnbindProgram();
 	

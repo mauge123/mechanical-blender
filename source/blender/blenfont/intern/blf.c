@@ -552,24 +552,24 @@ static void blf_draw_gl__start(FontBLF *font)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	gpuMatrixBegin3D_legacy();
+	gpuPushMatrix();
 
 	if (font->flags & BLF_MATRIX)
-		gpuMultMatrix3D(font->m);
+		gpuMultMatrix(font->m);
 
 	gpuTranslate3fv(font->pos);
 
 	if (font->flags & BLF_ASPECT)
 		gpuScale3fv(font->aspect);
 
-	if (font->flags & BLF_ROTATION)  /* radians -> degrees */
-		gpuRotateAxis(RAD2DEG(font->angle), 'Z');
+	if (font->flags & BLF_ROTATION)
+		gpuRotate2D(RAD2DEG(font->angle));
 
 #ifndef BLF_STANDALONE
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned texCoord = add_attrib(format, "texCoord", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int texCoord = VertexFormat_add_attrib(format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	BLI_assert(pos == BLF_POS_ID);
 	BLI_assert(texCoord == BLF_COORD_ID);
@@ -584,7 +584,7 @@ static void blf_draw_gl__start(FontBLF *font)
 
 static void blf_draw_gl__end(void)
 {
-	gpuMatrixEnd();
+	gpuPopMatrix();
 
 #ifndef BLF_STANDALONE
 	immUnbindProgram();

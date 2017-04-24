@@ -1,3 +1,8 @@
+
+uniform mat4 ModelViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+
 #ifdef USE_OPENSUBDIV
 in vec3 normal;
 in vec4 position;
@@ -7,8 +12,13 @@ out block {
 } outpt;
 #endif
 
-varying vec3 varposition;
-varying vec3 varnormal;
+#if __VERSION__ == 120
+  varying vec3 varposition;
+  varying vec3 varnormal;
+#else
+  out vec3 varposition;
+  out vec3 varnormal;
+#endif
 
 #ifdef CLIP_WORKAROUND
 varying float gl_ClipDistance[6];
@@ -89,11 +99,11 @@ void main()
 	vec3 normal = gl_Normal;
 #endif
 
-	vec4 co = gl_ModelViewMatrix * position;
+	vec4 co = ModelViewMatrix * position;
 
 	varposition = co.xyz;
-	varnormal = normalize(gl_NormalMatrix * normal);
-	gl_Position = gl_ProjectionMatrix * co;
+	varnormal = normalize(NormalMatrix * normal);
+	gl_Position = ProjectionMatrix * co;
 
 #ifdef CLIP_WORKAROUND
 	int i;

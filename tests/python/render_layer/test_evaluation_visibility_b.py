@@ -1,13 +1,10 @@
-# ./blender.bin --background -noaudio --python tests/python/render_layer/test_link.py -- --testdir="/data/lib/tests/"
-
 # ############################################################
 # Importing - Same For All Render Layer Tests
 # ############################################################
 
 import unittest
-
-import os, sys
-sys.path.append(os.path.dirname(__file__))
+import os
+import sys
 
 from render_layer_common import *
 
@@ -19,7 +16,7 @@ from render_layer_common import *
 class UnitTesting(RenderLayerTesting):
     def test_visibility(self):
         """
-        See if we can link objects
+        See if the depsgraph evaluation is correct
         """
         import bpy
 
@@ -30,8 +27,8 @@ class UnitTesting(RenderLayerTesting):
         layer.collections.unlink(layer.collections[0])
         scene.render_layers.active = layer
 
-        scene_collection_mom = scene.master_collection.collections.new("Visible")
-        scene_collection_kid = scene_collection_mom.collections.new("Invisible")
+        scene_collection_mom = scene.master_collection.collections.new("Mom")
+        scene_collection_kid = scene_collection_mom.collections.new("Kid")
 
         scene_collection_kid.objects.link(cube)
 
@@ -42,7 +39,8 @@ class UnitTesting(RenderLayerTesting):
         layer_collection_mom.collections[layer_collection_kid.name].hide = True
         layer_collection_kid.hide = True
 
-        self.assertFalse(cube.visible_get(), "Object is not invisible")
+        bpy.context.scene.update()  # update depsgraph
+        self.assertFalse(cube.visible_get(), "Object should be invisible")
 
 
 # ############################################################

@@ -49,7 +49,7 @@
 #include "RNA_types.h"
 
 /* not very important, but the stack solver likes to know a maximum */
-#define MAX_SOCKET	64
+#define MAX_SOCKET	512
 
 struct bContext;
 struct bNode;
@@ -792,6 +792,7 @@ struct ShadeResult;
 #define SH_NODE_OUTPUT_LINESTYLE		190
 #define SH_NODE_UVALONGSTROKE			191
 #define SH_NODE_TEX_POINTDENSITY		192
+#define SH_NODE_BSDF_PRINCIPLED         193
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF   1

@@ -51,7 +51,6 @@
 #include "BKE_brush.h"
 #include "BKE_cachefile.h"
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
 #include "BKE_image.h"
@@ -61,6 +60,8 @@
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_sequencer.h"
+
+#include "DEG_depsgraph.h"
 
 #include "RE_pipeline.h"
 #include "RE_render_ext.h"
@@ -87,7 +88,7 @@ void BKE_blender_free(void)
 	IMB_exit();
 	BKE_cachefiles_exit();
 	BKE_images_exit();
-	DAG_exit();
+	DEG_free_node_types();
 
 	BKE_brush_system_exit();
 	RE_texture_rng_exit();	
@@ -236,6 +237,44 @@ void BKE_blender_userdef_refresh(void)
 	BLF_default_dpi(U.pixelsize * U.dpi);
 	U.widget_unit = (U.pixelsize * U.dpi * 20 + 36) / 72;
 
+}
+
+/**
+ * Write U from userdef.
+ * This function defines which settings a template will override for the user preferences.
+ */
+void BKE_blender_userdef_set_app_template(UserDef *userdef)
+{
+	/* TODO:
+	 * - keymaps
+	 * - various minor settings (add as needed).
+	 */
+
+#define LIST_OVERRIDE(id) { \
+	BLI_freelistN(&U.id); \
+	BLI_movelisttolist(&U.id, &userdef->id); \
+} ((void)0)
+
+#define MEMCPY_OVERRIDE(id) \
+	memcpy(U.id, userdef->id, sizeof(U.id));
+
+	/* for some types we need custom free functions */
+	userdef_free_addons(&U);
+	userdef_free_keymaps(&U);
+
+	LIST_OVERRIDE(uistyles);
+	LIST_OVERRIDE(uifonts);
+	LIST_OVERRIDE(themes);
+	LIST_OVERRIDE(addons);
+	LIST_OVERRIDE(user_keymaps);
+
+	MEMCPY_OVERRIDE(light);
+
+	MEMCPY_OVERRIDE(font_path_ui);
+	MEMCPY_OVERRIDE(font_path_ui_mono);
+
+#undef LIST_OVERRIDE
+#undef MEMCPY_OVERRIDE
 }
 
 /* *****************  testing for break ************* */

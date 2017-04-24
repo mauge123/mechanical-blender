@@ -115,7 +115,7 @@ static void gp_set_point_uniform_color(const bGPDspoint *pt, const float ink[4])
 {
 	float alpha = ink[3] * pt->strength;
 	CLAMP(alpha, GPENCIL_STRENGTH_MIN, 1.0f);
-	immUniform4f("color", ink[0], ink[1], ink[2], alpha);
+	immUniformColor3fvAlpha(ink, alpha);
 }
 
 static void gp_set_point_varying_color(const bGPDspoint *pt, const float ink[4], unsigned attrib_id)
@@ -150,13 +150,13 @@ static void gp_draw_stroke_buffer_fill(const tGPspoint *points, int totpoints, f
 	/* draw triangulation data */
 	if (tot_triangles > 0) {
 		VertexFormat *format = immVertexFormat();
-		unsigned pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
-		unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+		unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
 
 		/* Draw all triangles for filling the polygon */
-		immBegin(GL_TRIANGLES, tot_triangles * 3);
+		immBegin(PRIM_TRIANGLES, tot_triangles * 3);
 		/* TODO: use batch instead of immediate mode, to share vertices */
 
 		const tGPspoint *pt;
@@ -208,8 +208,8 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 	}
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	const tGPspoint *pt = points;
 
@@ -217,7 +217,7 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 		/* if drawing a single point, draw it larger */
 		glPointSize((float)(thickness + 2) * points->pressure);
 		immBindBuiltinProgram(GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR);
-		immBegin(GL_POINTS, 1);
+		immBegin(PRIM_POINTS, 1);
 		gp_set_tpoint_varying_color(pt, ink, color);
 		immVertex2iv(pos, &pt->x);
 	}
@@ -229,7 +229,7 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 
 		glLineWidth(max_ff(oldpressure * thickness, 1.0));
 		immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
-		immBeginAtMost(GL_LINE_STRIP, totpoints);
+		immBeginAtMost(PRIM_LINE_STRIP, totpoints);
 
 		/* TODO: implement this with a geometry shader to draw one continuous tapered stroke */
 
@@ -248,7 +248,7 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 				draw_points = 0;
 
 				glLineWidth(max_ff(pt->pressure * thickness, 1.0f));
-				immBeginAtMost(GL_LINE_STRIP, totpoints - i + 1);
+				immBeginAtMost(PRIM_LINE_STRIP, totpoints - i + 1);
 
 				/* need to roll-back one point to ensure that there are no gaps in the stroke */
 				if (i != 0) { 
@@ -323,13 +323,13 @@ static void gp_draw_stroke_volumetric_buffer(const tGPspoint *points, int totpoi
 		return;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned size = add_attrib(format, "size", GL_FLOAT, 1, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int size = VertexFormat_add_attrib(format, "size", COMP_F32, 1, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR);
 	GPU_enable_program_point_size();
-	immBegin(GL_POINTS, totpoints);
+	immBegin(PRIM_POINTS, totpoints);
 
 	const tGPspoint *pt = points;
 	for (int i = 0; i < totpoints; i++, pt++) {
@@ -350,13 +350,13 @@ static void gp_draw_stroke_volumetric_2d(const bGPDspoint *points, int totpoints
                                          const float diff_mat[4][4], const float ink[4])
 {
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned size = add_attrib(format, "size", GL_FLOAT, 1, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int size = VertexFormat_add_attrib(format, "size", COMP_F32, 1, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR);
 	GPU_enable_program_point_size();
-	immBegin(GL_POINTS, totpoints);
+	immBegin(PRIM_POINTS, totpoints);
 
 	const bGPDspoint *pt = points;
 	for (int i = 0; i < totpoints; i++, pt++) {
@@ -383,13 +383,13 @@ static void gp_draw_stroke_volumetric_3d(
         const float ink[4])
 {
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-	unsigned size = add_attrib(format, "size", GL_FLOAT, 1, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+	unsigned int size = VertexFormat_add_attrib(format, "size", COMP_F32, 1, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR);
 	GPU_enable_program_point_size();
-	immBegin(GL_POINTS, totpoints);
+	immBegin(PRIM_POINTS, totpoints);
 
 	const bGPDspoint *pt = points;
 	for (int i = 0; i < totpoints && pt; i++, pt++) {
@@ -523,20 +523,20 @@ static void gp_draw_stroke_fill(
 		}
 		BLI_assert(gps->tot_triangles >= 1);
 
-		unsigned pos;
+		unsigned int pos;
 		if (gps->flag & GP_STROKE_3DSPACE) {
-			pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 3, KEEP_FLOAT);
+			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 		}
 		else {
-			pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		}
 
 		immUniformColor4fv(color);
 
 		/* Draw all triangles for filling the polygon (cache must be calculated before) */
-		immBegin(GL_TRIANGLES, gps->tot_triangles * 3);
+		immBegin(PRIM_TRIANGLES, gps->tot_triangles * 3);
 		/* TODO: use batch instead of immediate mode, to share vertices */
 
 		bGPDtriangle *stroke_triangle = gps->triangles;
@@ -596,7 +596,7 @@ static void gp_draw_stroke_point(
 	mul_v3_m4v3(fpt, diff_mat, &pt->x);
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	if (sflag & GP_STROKE_3DSPACE) {
 		immBindBuiltinProgram(GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
@@ -614,7 +614,7 @@ static void gp_draw_stroke_point(
 	/* set point thickness (since there's only one of these) */
 	immUniform1f("size", (float)(thickness + 2) * pt->pressure);
 
-	immBegin(GL_POINTS, 1);
+	immBegin(PRIM_POINTS, 1);
 	immVertex3fv(pos, fpt);
 	immEnd();
 
@@ -638,8 +638,8 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_SMOOTH_COLOR);
 
@@ -647,7 +647,7 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 
 	/* draw stroke curve */
 	glLineWidth(max_ff(curpressure * thickness, 1.0f));
-	immBeginAtMost(GL_LINE_STRIP, totpoints + cyclic_add);
+	immBeginAtMost(PRIM_LINE_STRIP, totpoints + cyclic_add);
 	const bGPDspoint *pt = points;
 	for (int i = 0; i < totpoints; i++, pt++) {
 		gp_set_point_varying_color(pt, ink, color);
@@ -668,7 +668,7 @@ static void gp_draw_stroke_3d(const bGPDspoint *points, int totpoints, short thi
 
 			curpressure = pt->pressure;
 			glLineWidth(max_ff(curpressure * thickness, 1.0f));
-			immBeginAtMost(GL_LINE_STRIP, totpoints - i + 1 + cyclic_add);
+			immBeginAtMost(PRIM_LINE_STRIP, totpoints - i + 1 + cyclic_add);
 
 			/* need to roll-back one point to ensure that there are no gaps in the stroke */
 			if (i != 0) { 
@@ -726,34 +726,34 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 
 	/* TODO: fancy++ with the magic of shaders */
 
-	/* tessellation code - draw stroke as series of connected quads with connection
+	/* tessellation code - draw stroke as series of connected quads (triangle strips in fact) with connection
 	 * edges rotated to minimize shrinking artifacts, and rounded endcaps
 	 */
 	{
 		const bGPDspoint *pt1, *pt2;
-		float pm[2];
+		float s0[2], s1[2];     /* segment 'center' points */
+		float pm[2];  /* normal from previous segment. */
 		int i;
 		float fpt[3];
 
 		VertexFormat *format = immVertexFormat();
-		unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-		unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 4, NORMALIZE_INT_TO_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
-		/* this code previously used glShadeModel(GL_FLAT) */
 		immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
-		immBegin(GL_QUADS, (totpoints - 2) * 4 + 12);
+		immBegin(PRIM_TRIANGLE_STRIP, totpoints * 2 + 4);
+
+		/* get x and y coordinates from first point */
+		mul_v3_m4v3(fpt, diff_mat, &points->x);
+		gp_calc_2d_stroke_fxy(fpt, sflag, offsx, offsy, winx, winy, s0);
 
 		for (i = 0, pt1 = points, pt2 = points + 1; i < (totpoints - 1); i++, pt1++, pt2++) {
-			float s0[2], s1[2];     /* segment 'center' points */
 			float t0[2], t1[2];     /* tessellated coordinates */
 			float m1[2], m2[2];     /* gradient and normal */
 			float mt[2], sc[2];     /* gradient for thickness, point for end-cap */
 			float pthick;           /* thickness at segment point */
 
-			/* get x and y coordinates from points */
-			mul_v3_m4v3(fpt, diff_mat, &pt1->x);
-			gp_calc_2d_stroke_fxy(fpt, sflag, offsx, offsy, winx, winy, s0);
-
+			/* get x and y coordinates from point2 (point1 has already been computed in previous iteration). */
 			mul_v3_m4v3(fpt, diff_mat, &pt2->x);
 			gp_calc_2d_stroke_fxy(fpt, sflag, offsx, offsy, winx, winy, s1);
 
@@ -785,6 +785,7 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 				t1[0] = sc[0] + mt[0];
 				t1[1] = sc[1] + mt[1];
 
+				/* First two points of cap. */
 				immVertex2fv(pos, t0);
 				immVertex2fv(pos, t1);
 
@@ -797,9 +798,7 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 				t1[0] = s0[0] + mt[0];
 				t1[1] = s0[1] + mt[1];
 
-				/* draw this line twice (first to finish off start cap, then for stroke) */
-				immVertex2fv(pos, t1);
-				immVertex2fv(pos, t0);
+				/* Last two points of start cap (and first two points of first segment). */
 				immVertex2fv(pos, t0);
 				immVertex2fv(pos, t1);
 			}
@@ -833,9 +832,7 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 				t1[0] = s0[0] + mt[0];
 				t1[1] = s0[1] + mt[1];
 
-				/* draw this line twice (once for end of current segment, and once for start of next) */
-				immVertex2fv(pos, t1);
-				immVertex2fv(pos, t0);
+				/* Last two points of previous segment, and first two points of current segment. */
 				immVertex2fv(pos, t0);
 				immVertex2fv(pos, t1);
 			}
@@ -857,9 +854,7 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 				t1[0] = s1[0] + mt[0];
 				t1[1] = s1[1] + mt[1];
 
-				/* draw this line twice (once for end of stroke, and once for endcap)*/
-				immVertex2fv(pos, t1);
-				immVertex2fv(pos, t0);
+				/* Last two points of last segment (and first two points of end cap). */
 				immVertex2fv(pos, t0);
 				immVertex2fv(pos, t1);
 
@@ -876,10 +871,13 @@ static void gp_draw_stroke_2d(const bGPDspoint *points, int totpoints, short thi
 				t1[0] = sc[0] + mt[0];
 				t1[1] = sc[1] + mt[1];
 
-				immVertex2fv(pos, t1);
+				/* Last two points of end cap. */
 				immVertex2fv(pos, t0);
+				immVertex2fv(pos, t1);
 			}
 
+			/* store computed point2 coordinates as point1 ones of next segment. */
+			copy_v2_v2(s0, s1);
 			/* store stroke's 'natural' normal for next stroke to use */
 			copy_v2_v2(pm, m2);
 		}
@@ -1173,20 +1171,20 @@ static void gp_draw_strokes_edit(
 		selectColor[3] = alpha;
 
 		VertexFormat *format = immVertexFormat();
-		unsigned pos; /* specified later */
-		unsigned size = add_attrib(format, "size", GL_FLOAT, 1, KEEP_FLOAT);
-		unsigned color = add_attrib(format, "color", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos; /* specified later */
+		unsigned int size = VertexFormat_add_attrib(format, "size", COMP_F32, 1, KEEP_FLOAT);
+		unsigned int color = VertexFormat_add_attrib(format, "color", COMP_F32, 3, KEEP_FLOAT);
 
 		if (gps->flag & GP_STROKE_3DSPACE) {
-			pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+			pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR);
 		}
 		else {
-			pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+			pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_2D_POINT_VARYING_SIZE_VARYING_COLOR);
 		}
 
-		immBegin(GL_POINTS, gps->totpoints);
+		immBegin(PRIM_POINTS, gps->totpoints);
 
 		/* Draw start and end point differently if enabled stroke direction hint */
 		bool show_direction_hint = (gpd->flag & GP_DATA_SHOW_DIRECTION) && (gps->totpoints > 1);

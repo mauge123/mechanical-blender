@@ -63,6 +63,7 @@
 #include "BIF_glutil.h"
 
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_matrix.h"
 
 #include "BLF_api.h"
@@ -125,7 +126,7 @@ static void draw_render_info(const bContext *C,
 				               (int)(-rd->border.ymin * rd->ysch * rd->size * 0.01f));
 			}
 
-			unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 			immUniformThemeColor(TH_FACE_SELECT);
 
@@ -172,7 +173,7 @@ void ED_image_draw_info(Scene *scene, ARegion *ar, bool color_manage, bool use_d
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 
-	unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	/* noisy, high contrast make impossible to read if lower alpha is used. */
@@ -328,7 +329,7 @@ void ED_image_draw_info(Scene *scene, ARegion *ar, bool color_manage, bool use_d
 	BLI_rcti_init(&color_rect, dx, dx + (1.5f * UI_UNIT_X), 0.15f * UI_UNIT_Y, 0.85f * UI_UNIT_Y);
 
 	/* BLF uses immediate mode too, so we must reset our vertex format */
-	pos = add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	if (channels == 4) {
@@ -354,7 +355,7 @@ void ED_image_draw_info(Scene *scene, ARegion *ar, bool color_manage, bool use_d
 		immRecti(pos, color_rect_half.xmin, color_rect_half.ymin, color_quater_x, color_quater_y);
 
 		glEnable(GL_BLEND);
-		immUniformColor4f(UNPACK3(finalcol), fp ? fp[3] : (cp[3] / 255.0f));
+		immUniformColor3fvAlpha(finalcol, fp ? fp[3] : (cp[3] / 255.0f));
 		immRecti(pos, color_rect.xmin, color_rect.ymin, color_rect.xmax, color_rect.ymax);
 		glDisable(GL_BLEND);
 	}
@@ -365,7 +366,7 @@ void ED_image_draw_info(Scene *scene, ARegion *ar, bool color_manage, bool use_d
 	immUnbindProgram();
 
 	/* draw outline */
-	pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformColor3ub(128, 128, 128);
 	imm_draw_line_box(pos, color_rect.xmin, color_rect.ymin, color_rect.xmax, color_rect.ymax);
@@ -431,10 +432,10 @@ static void sima_draw_zbuf_pixels(float x1, float y1, int rectx, int recty, int 
 		recti[a] = rect[a] * 0.5f + 0.5f;
 	}
 
-	GPUShader *shader = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
-	GPU_shader_uniform_vector(shader, GPU_shader_get_uniform(shader, "shuffle"), 4, 1, red);
+	IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
+	GPU_shader_uniform_vector(state.shader, GPU_shader_get_uniform(state.shader, "shuffle"), 4, 1, red);
 
-	immDrawPixelsTex(x1, y1, rectx, recty, GL_RED, GL_INT, GL_NEAREST, recti, zoomx, zoomy, NULL);
+	immDrawPixelsTex(&state, x1, y1, rectx, recty, GL_RED, GL_INT, GL_NEAREST, recti, zoomx, zoomy, NULL);
 
 	MEM_freeN(recti);
 }
@@ -469,10 +470,10 @@ static void sima_draw_zbuffloat_pixels(Scene *scene, float x1, float y1, int rec
 		}
 	}
 
-	GPUShader *shader = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
-	GPU_shader_uniform_vector(shader, GPU_shader_get_uniform(shader, "shuffle"), 4, 1, red);
+	IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
+	GPU_shader_uniform_vector(state.shader, GPU_shader_get_uniform(state.shader, "shuffle"), 4, 1, red);
 
-	immDrawPixelsTex(x1, y1, rectx, recty, GL_RED, GL_FLOAT, GL_NEAREST, rectf, zoomx, zoomy, NULL);
+	immDrawPixelsTex(&state, x1, y1, rectx, recty, GL_RED, GL_FLOAT, GL_NEAREST, rectf, zoomx, zoomy, NULL);
 
 	MEM_freeN(rectf);
 }
@@ -481,7 +482,6 @@ static void draw_image_buffer(const bContext *C, SpaceImage *sima, ARegion *ar, 
 {
 	int x, y;
 
-	/* set zoom */
 	glaDefine2DArea(&ar->winrct);
 	
 	/* find window pixel coordinates of origin */
@@ -531,14 +531,14 @@ static void draw_image_buffer(const bContext *C, SpaceImage *sima, ARegion *ar, 
 			else if (sima->flag & SI_SHOW_ALPHA)
 				shuffle[3] = 1.0f;
 
-			GPUShader *shader = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
-			GPU_shader_uniform_vector(shader, GPU_shader_get_uniform(shader, "shuffle"), 4, 1, shuffle);
+			IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
+			GPU_shader_uniform_vector(state.shader, GPU_shader_get_uniform(state.shader, "shuffle"), 4, 1, shuffle);
 
 			IMB_colormanagement_display_settings_from_ctx(C, &view_settings, &display_settings);
 			display_buffer = IMB_display_buffer_acquire(ibuf, view_settings, display_settings, &cache_handle);
 
 			if (display_buffer) {
-				immDrawPixelsTex_clipping(x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer,
+				immDrawPixelsTex_clipping(&state, x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer,
 				                          0, 0, clip_max_x, clip_max_y, zoomx, zoomy, NULL);
 			}
 
@@ -548,9 +548,6 @@ static void draw_image_buffer(const bContext *C, SpaceImage *sima, ARegion *ar, 
 		if (sima->flag & SI_USE_ALPHA)
 			glDisable(GL_BLEND);
 	}
-
-	/* reset zoom */
-	glPixelZoom(1.0f, 1.0f);
 }
 
 static unsigned int *get_part_from_buffer(unsigned int *buffer, int width, short startx, short starty, short endx, short endy)
@@ -622,14 +619,14 @@ static void draw_image_buffer_tiled(SpaceImage *sima, ARegion *ar, Scene *scene,
 			UI_view2d_view_to_region(&ar->v2d, fx + (float)sx / (float)ibuf->x, fy + (float)sy / (float)ibuf->y, &x, &y);
 
 			if ((sima->flag & (SI_SHOW_R | SI_SHOW_G | SI_SHOW_B | SI_SHOW_ALPHA)) == 0) {
-				immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-				immDrawPixelsTex(x, y, dx, dy, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, rect, zoomx, zoomy, NULL);
+				IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+				immDrawPixelsTex(&state, x, y, dx, dy, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, rect, zoomx, zoomy, NULL);
 			}
 			else {
-				GPUShader *shader = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
-				GPU_shader_uniform_vector(shader, GPU_shader_get_uniform(shader, "shuffle"), 4, 1, shuffle);
+				IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
+				GPU_shader_uniform_vector(state.shader, GPU_shader_get_uniform(state.shader, "shuffle"), 4, 1, shuffle);
 
-				immDrawPixelsTex(x, y, dx, dy, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, rect, zoomx, zoomy, NULL);
+				immDrawPixelsTex(&state, x, y, dx, dy, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, rect, zoomx, zoomy, NULL);
 			}
 		}
 	}
@@ -689,17 +686,17 @@ void draw_image_sample_line(SpaceImage *sima)
 	if (sima->sample_line_hist.flag & HISTO_FLAG_SAMPLELINE) {
 		Histogram *hist = &sima->sample_line_hist;
 
-		unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immUniformColor3ub(0, 0, 0);
 		immVertex2fv(pos, hist->co[0]);
 		immVertex2fv(pos, hist->co[1]);
 		immEnd();
 
 		setlinestyle(1);
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immUniformColor3ub(255, 255, 255);
 		immVertex2fv(pos, hist->co[0]);
 		immVertex2fv(pos, hist->co[1]);
@@ -707,7 +704,6 @@ void draw_image_sample_line(SpaceImage *sima)
 		setlinestyle(0);
 
 		immUnbindProgram();
-
 	}
 }
 
@@ -738,8 +734,8 @@ static void draw_image_paint_helpers(const bContext *C, ARegion *ar, Scene *scen
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-			immDrawPixelsTex(x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer, zoomx, zoomy, col);
+			IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+			immDrawPixelsTex(&state, x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer, zoomx, zoomy, col);
 
 			glDisable(GL_BLEND);
 
@@ -840,23 +836,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 	if (show_paint)
 		draw_image_paint_helpers(C, ar, scene, zoomx, zoomy);
 
-	/* XXX integrate this code */
-#if 0
-	if (ibuf) {
-		float xoffs = 0.0f, yoffs = 0.0f;
-		
-		if (image_preview_active(sa, &xim, &yim)) {
-			xoffs = scene->r.disprect.xmin;
-			yoffs = scene->r.disprect.ymin;
-			glColor3ub(0, 0, 0);
-			calc_image_view(sima, 'f');
-			myortho2(G.v2d->cur.xmin, G.v2d->cur.xmax, G.v2d->cur.ymin, G.v2d->cur.ymax);
-			glRectf(0.0f, 0.0f, 1.0f, 1.0f);
-			gpuLoadIdentity();
-		}
-	}
-#endif
-
 	if (show_viewer) {
 		BLI_unlock_thread(LOCK_DRAW_IMAGE);
 	}
@@ -918,8 +897,12 @@ void draw_image_cache(const bContext *C, ARegion *ar)
 	/* Draw current frame. */
 	x = (cfra - sfra) / (efra - sfra + 1) * ar->winx;
 
-	UI_ThemeColor(TH_CFRAME);
-	glRecti(x, 0, x + ceilf(framelen), 8 * UI_DPI_FAC);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immUniformThemeColor(TH_CFRAME);
+	immRecti(pos, x, 0, x + ceilf(framelen), 8 * UI_DPI_FAC);
+	immUnbindProgram();
+
 	ED_region_cache_draw_curfra_label(cfra, x, 8.0f * UI_DPI_FAC);
 
 	if (mask != NULL) {

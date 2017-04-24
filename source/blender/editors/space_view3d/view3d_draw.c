@@ -73,6 +73,7 @@
 
 #include "GPU_matrix.h"
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_material.h"
 #include "GPU_viewport.h"
 
@@ -84,6 +85,7 @@
 #include "RE_engine.h"
 
 #include "WM_api.h"
+#include "WM_types.h"
 
 #include "view3d_intern.h"  /* own include */
 
@@ -233,10 +235,8 @@ static void view3d_main_region_setup_view(Scene *scene, View3D *v3d, ARegion *ar
 	ED_view3d_update_viewmat(scene, v3d, ar, viewmat, winmat);
 
 	/* set for opengl */
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadMatrix3D(rv3d->winmat); /* XXX make a gpuLoadProjectionMatrix function? */
-	glMatrixMode(GL_MODELVIEW);
-	gpuLoadMatrix3D(rv3d->viewmat);
+	gpuLoadProjectionMatrix(rv3d->winmat);
+	gpuLoadMatrix(rv3d->viewmat);
 }
 
 static bool view3d_stereo3d_active(const bContext *C, Scene *scene, View3D *v3d, RegionView3D *rv3d)
@@ -452,7 +452,7 @@ static void drawviewborder_grid3(unsigned pos, float x1, float x2, float y1, flo
 	x4 = x1 + (1.0f - fac) * (x2 - x1);
 	y4 = y1 + (1.0f - fac) * (y2 - y1);
 
-	immBegin(GL_LINES, 8);
+	immBegin(PRIM_LINES, 8);
 	immVertex2f(pos, x1, y3);
 	immVertex2f(pos, x2, y3);
 
@@ -474,7 +474,7 @@ static void drawviewborder_triangle(unsigned pos, float x1, float x2, float y1, 
 	float w = x2 - x1;
 	float h = y2 - y1;
 
-	immBegin(GL_LINES, 6);
+	immBegin(PRIM_LINES, 6);
 	if (w > h) {
 		if (golden) {
 			ofs = w * (1.0f - (1.0f / 1.61803399f));
@@ -550,7 +550,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 	y2i = (int)(y2 + (1.0f - 0.0001f));
 
 	/* use the same program for everything */
-	unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	/* passepartout, specified in camera edit buttons */
@@ -628,7 +628,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 			y3 = y1 + 0.5f * (y2 - y1);
 
 			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
-			immBegin(GL_LINES, 4);
+			immBegin(PRIM_LINES, 4);
 
 			immVertex2f(pos, x1, y3);
 			immVertex2f(pos, x2, y3);
@@ -642,7 +642,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		if (ca->dtx & CAM_DTX_CENTER_DIAG) {
 
 			immUniformThemeColorBlendShade(TH_VIEW_OVERLAY, TH_BACK, 0.25f, 0);
-			immBegin(GL_LINES, 4);
+			immBegin(PRIM_LINES, 4);
 
 			immVertex2f(pos, x1, y1);
 			immVertex2f(pos, x2, y2);
@@ -732,7 +732,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 			/* draw */
 			float color[4];
 			UI_GetThemeColorShade4fv(TH_VIEW_OVERLAY, 100, color);
-			UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 2.0f, color);
+			UI_draw_roundbox_4fv(false, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 2.0f, color);
 		}
 	}
 
@@ -751,7 +751,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 static void drawrenderborder(ARegion *ar, View3D *v3d)
 {
 	/* use the same program for everything */
-	unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	glLineWidth(1.0f);
@@ -796,11 +796,10 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 		rv3d->render_engine = engine;
 	}
 
-	/* background draw */
-	glMatrixMode(GL_PROJECTION);
+	/* rendered draw */
 	gpuPushMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	gpuPushMatrix();
+	float original_proj[4][4];
+	gpuGetProjectionMatrix(original_proj);
 	ED_region_pixelspace(ar);
 
 	if (clip_border) {
@@ -815,8 +814,8 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 		}
 	}
 
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	/* don't change depth buffer */
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT); /* is this necessary? -- merwin */
 
 	/* render result draw */
@@ -828,9 +827,7 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 	}
 
-	glMatrixMode(GL_PROJECTION);
-	gpuPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
+	gpuLoadProjectionMatrix(original_proj);
 	gpuPopMatrix();
 
 	return true;
@@ -840,13 +837,11 @@ static bool view3d_draw_render_draw(const bContext *C, Scene *scene,
 
 static void view3d_draw_background_gradient(void)
 {
-	gpuMatrixBegin3D(); /* TODO: finish 2D API */
-
-	glClear(GL_DEPTH_BUFFER_BIT);
+	/* TODO: finish 2D API & draw background with that */
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 	unsigned char col_hi[3], col_lo[3];
 
 	immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
@@ -854,7 +849,7 @@ static void view3d_draw_background_gradient(void)
 	UI_GetThemeColor3ubv(TH_LOW_GRAD, col_lo);
 	UI_GetThemeColor3ubv(TH_HIGH_GRAD, col_hi);
 
-	immBegin(GL_QUADS, 4);
+	immBegin(PRIM_TRIANGLE_FAN, 4);
 	immAttrib3ubv(color, col_lo);
 	immVertex2f(pos, -1.0f, -1.0f);
 	immVertex2f(pos, 1.0f, -1.0f);
@@ -865,19 +860,12 @@ static void view3d_draw_background_gradient(void)
 	immEnd();
 
 	immUnbindProgram();
-
-	gpuMatrixEnd();
 }
 
 static void view3d_draw_background_none(void)
 {
-	if (UI_GetThemeValue(TH_SHOW_BACK_GRAD)) {
-		view3d_draw_background_gradient();
-	}
-	else {
-		UI_ThemeClearColorAlpha(TH_HIGH_GRAD, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	}
+	UI_ThemeClearColorAlpha(TH_HIGH_GRAD, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
 }
 
 static void view3d_draw_background_world(Scene *scene, View3D *v3d, RegionView3D *rv3d)
@@ -889,9 +877,6 @@ static void view3d_draw_background_world(Scene *scene, View3D *v3d, RegionView3D
 		GPU_material_bind(gpumat, 1, 1, 1.0f, false, rv3d->viewmat, rv3d->viewinv, rv3d->viewcamtexcofac, (v3d->scenelock != 0));
 
 		if (GPU_material_bound(gpumat)) {
-
-			glClear(GL_DEPTH_BUFFER_BIT);
-
 			/* TODO viewport (dfelinto): GPU_material_bind relies on immediate mode,
 			* we can't get rid of the following code without a bigger refactor
 			* or we dropping this functionality. */
@@ -904,14 +889,12 @@ static void view3d_draw_background_world(Scene *scene, View3D *v3d, RegionView3D
 			glEnd();
 
 			GPU_material_unbind(gpumat);
-		}
-		else {
-			view3d_draw_background_none();
+			return;
 		}
 	}
-	else {
-		view3d_draw_background_none();
-	}
+
+	/* if any of the above fails */
+	view3d_draw_background_none();
 }
 
 /* ******************** solid plates ***************** */
@@ -925,11 +908,8 @@ static void view3d_draw_background(const bContext *C)
 	View3D *v3d = CTX_wm_view3d(C);
 	RegionView3D *rv3d = CTX_wm_region_view3d(C);
 
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
 	/* Background functions do not read or write depth, but they do clear or completely
-	 * overwrite color buffer. It's more efficient to clear color & depth in once call, so
-	 * background functions do this even though they don't use depth.
+	 * overwrite color buffer.
 	 */
 
 	switch (v3d->debug.background) {
@@ -942,7 +922,6 @@ static void view3d_draw_background(const bContext *C)
 		case V3D_DEBUG_BACKGROUND_NONE:
 		default:
 			view3d_draw_background_none();
-			break;
 	}
 }
 
@@ -1171,8 +1150,8 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 #endif
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-	unsigned int color = add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
 
@@ -1209,7 +1188,7 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 					if (gridline_ct == 0)
 						goto drawgrid_cleanup; /* nothing to draw */
 
-					immBegin(GL_LINES, gridline_ct * 2);
+					immBegin(PRIM_LINES, gridline_ct * 2);
 				}
 
 				float blend_fac = 1.0f - ((GRID_MIN_PX_F * 2.0f) / (float)dx_scalar);
@@ -1269,7 +1248,7 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 		if (gridline_ct == 0)
 			goto drawgrid_cleanup; /* nothing to draw */
 
-		immBegin(GL_LINES, gridline_ct * 2);
+		immBegin(PRIM_LINES, gridline_ct * 2);
 
 		if (grids_to_draw == 2) {
 			UI_GetThemeColorBlend3ubv(TH_HIGH_GRAD, TH_GRID, dx / (GRID_MIN_PX_D * 6.0), col2);
@@ -1357,12 +1336,12 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 			unsigned char col_bg[3], col_grid_emphasise[3], col_grid_light[3];
 
 			VertexFormat *format = immVertexFormat();
-			unsigned int pos = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-			unsigned int color = add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+			unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_3D_FLAT_COLOR);
 
-			immBegin(GL_LINES, vertex_ct);
+			immBegin(PRIM_LINES, vertex_ct);
 
 			/* draw normal grid lines */
 			UI_GetColorPtrShade3ubv(col_grid, col_grid_light, 10);
@@ -1445,11 +1424,11 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit, bool wr
 			/* draw axis lines -- sometimes grid floor is off, other times we still need to draw the Z axis */
 
 			VertexFormat *format = immVertexFormat();
-			unsigned int pos = add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
-			unsigned int color = add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+			unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_3D_FLAT_COLOR);
-			immBegin(GL_LINES, (show_axis_x + show_axis_y + show_axis_z) * 2);
+			immBegin(PRIM_LINES, (show_axis_x + show_axis_y + show_axis_z) * 2);
 
 			if (show_axis_x) {
 				UI_make_axis_color(col_grid, col_axis, 'X');
@@ -1552,10 +1531,8 @@ static void view3d_draw_grid(const bContext *C, ARegion *ar)
 		*(&grid_unit) = NULL;  /* drawgrid need this to detect/affect smallest valid unit... */
 		drawgrid(&scene->unit, ar, v3d, &grid_unit);
 
-		glMatrixMode(GL_PROJECTION);
-		gpuLoadMatrix3D(rv3d->winmat); /* XXX make a gpuLoadProjectionMatrix function? */
-		glMatrixMode(GL_MODELVIEW);
-		gpuLoadMatrix3D(rv3d->viewmat);
+		gpuLoadProjectionMatrix(rv3d->winmat);
+		gpuLoadMatrix(rv3d->viewmat);
 	}
 	else {
 #ifdef WITH_MECHANICAL_UCS
@@ -1583,7 +1560,7 @@ static bool is_cursor_visible(Scene *scene, SceneLayer *sl)
 		}
 		/* exception: object in texture paint mode, clone brush, use_clone_layer disabled */
 		else if (ob->mode & OB_MODE_TEXTURE_PAINT) {
-			const Paint *p = BKE_paint_get_active(scene);
+			const Paint *p = BKE_paint_get_active(scene, sl);
 
 			if (p && p->brush && p->brush->imagepaint_tool == PAINT_TOOL_CLONE) {
 				if ((scene->toolsettings->imapaint.flag & IMAGEPAINT_PROJECT_LAYER_CLONE) == 0) {
@@ -1612,14 +1589,14 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 		glLineWidth(1.0f);
 
 		VertexFormat *format = immVertexFormat();
-		unsigned int pos = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-		unsigned int color = add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
 
 		const int segments = 16;
 
-		immBegin(GL_LINE_LOOP, segments);
+		immBegin(PRIM_LINE_LOOP, segments);
 
 		for (int i = 0; i < segments; ++i) {
 			float angle = 2 * M_PI * ((float)i / (float)segments);
@@ -1638,7 +1615,7 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 		immUnbindProgram();
 
 		VertexFormat_clear(format);
-		pos = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -1646,7 +1623,7 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 		UI_GetThemeColor3ubv(TH_VIEW_OVERLAY, crosshair_color);
 		immUniformColor3ubv(crosshair_color);
 
-		immBegin(GL_LINES, 8);
+		immBegin(PRIM_LINES, 8);
 		immVertex2f(pos, co[0] - f20, co[1]);
 		immVertex2f(pos, co[0] - f5, co[1]);
 		immVertex2f(pos, co[0] + f5, co[1]);
@@ -1697,11 +1674,11 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-	unsigned col = add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int col = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
-	immBegin(GL_LINES, 6);
+	immBegin(PRIM_LINES, 6);
 
 	for (int axis_i = 0; axis_i < 3; axis_i++) {
 		int i = axis_order[axis_i];
@@ -1741,8 +1718,8 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 	glDepthMask(GL_FALSE);  /* don't overwrite zbuf */
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
-	unsigned col = add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+	unsigned int col = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_SMOOTH_COLOR);
 
@@ -1753,7 +1730,7 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 		mul_v3_v3fl(scaled_axis, rv3d->rot_axis, scale);
 
 
-		immBegin(GL_LINE_STRIP, 3);
+		immBegin(PRIM_LINE_STRIP, 3);
 		color[3] = 0; /* more transparent toward the ends */
 		immAttrib4ubv(col, color);
 		add_v3_v3v3(end, o, scaled_axis);
@@ -1792,7 +1769,7 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 				axis_angle_to_quat(q, vis_axis, vis_angle);
 			}
 
-			immBegin(GL_LINE_LOOP, ROT_AXIS_DETAIL);
+			immBegin(PRIM_LINE_LOOP, ROT_AXIS_DETAIL);
 			color[3] = 63; /* somewhat faint */
 			immAttrib4ubv(col, color);
 			float angle = 0.0f;
@@ -1821,7 +1798,7 @@ static void draw_rotation_guide(RegionView3D *rv3d)
 	/* -- draw rotation center -- */
 	immBindBuiltinProgram(GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR);
 	glPointSize(5.0f);
-	immBegin(GL_POINTS, 1);
+	immBegin(PRIM_POINTS, 1);
 	immAttrib4ubv(col, color);
 	immVertex3fv(pos, o);
 	immEnd();
@@ -1845,10 +1822,7 @@ static void view3d_draw_non_mesh(
 Scene *scene, SceneLayer *sl, Object *ob, Base *base, View3D *v3d,
 RegionView3D *rv3d, const bool is_boundingbox, const unsigned char color[4])
 {
-	glMatrixMode(GL_PROJECTION);
-	gpuPushMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	gpuPushMatrix();
+	gpuPushMatrix(); /* necessary? --merwin */
 
 	/* multiply view with object matrix.
 	* local viewmat and persmat, to calculate projections */
@@ -1891,12 +1865,9 @@ RegionView3D *rv3d, const bool is_boundingbox, const unsigned char color[4])
 		draw_rigidbody_shape(ob, color);
 	}
 
-	ED_view3d_clear_mats_rv3d(rv3d);
+	ED_view3d_clear_mats_rv3d(rv3d); /* no effect in release builds */
 
-	glMatrixMode(GL_PROJECTION);
-	gpuPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	gpuPopMatrix();
+	gpuPopMatrix(); /* see above */
 }
 
 /* ******************** info ***************** */
@@ -2206,17 +2177,17 @@ static void view3d_draw_solid_plates(const bContext *C, ARegion *ar, DrawData *d
 {
 	/* realtime plates */
 	if ((!draw_data->is_render) || draw_data->clip_border) {
-		view3d_draw_background(C);
 		view3d_draw_render_solid_surfaces(C, ar, true);
 		view3d_draw_render_transparent_surfaces(C);
 		view3d_draw_post_draw(C);
 	}
 
-	/* offline plates*/
+	/* offline plates */
 	if (draw_data->is_render) {
 		Scene *scene = CTX_data_scene(C);
 		View3D *v3d = CTX_wm_view3d(C);
 
+		/* TODO: move this outside of solid plates, after solid & before other 3D elements */
 		view3d_draw_render_draw(C, scene, ar, v3d, draw_data->clip_border, &draw_data->border_rect);
 	}
 
@@ -2250,7 +2221,6 @@ static void view3d_draw_non_meshes(const bContext *C, ARegion *ar)
 	                        ((v3d->drawtype == OB_RENDER) && (v3d->prev_drawtype == OB_BOUNDBOX)));
 
 	glEnable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
 	/* TODO Viewport
 	 * we are already temporarily writing to zbuffer in draw_object()
 	 * for now let's avoid writing again to zbuffer to prevent glitches
@@ -2266,7 +2236,6 @@ static void view3d_draw_non_meshes(const bContext *C, ARegion *ar)
 		}
 	}
 
-	glDepthMask(GL_FALSE);
 	glDisable(GL_DEPTH_TEST);
 }
 
@@ -2304,12 +2273,18 @@ static void view3d_draw_reference_images(const bContext *UNUSED(C))
 
 /**
 * 3D manipulators
-*/
-static void view3d_draw_manipulator(const bContext *C)
+ */
+static void view3d_draw_manipulators(const bContext *C, const ARegion *ar)
 {
 	View3D *v3d = CTX_wm_view3d(C);
 	v3d->zbuf = false;
-	BIF_draw_manipulator(C);
+
+	/* TODO, only draws 3D manipulators right now, need to see how 2D drawing will work in new viewport */
+
+	/* draw depth culled manipulators - manipulators need to be updated *after* view matrix was set up */
+	/* TODO depth culling manipulators is not yet supported, just drawing _3D here, should
+	 * later become _IN_SCENE (and draw _3D separate) */
+	WM_manipulatormap_draw(ar->manipulator_map, C, WM_MANIPULATORMAP_DRAWSTEP_3D);
 }
 
 /**
@@ -2376,15 +2351,34 @@ static void view3d_draw_view(const bContext *C, ARegion *ar, DrawData *draw_data
 	/* TODO - Technically this should be drawn to a few FBO, so we can handle
 	 * compositing better, but for now this will get the ball rolling (dfelinto) */
 
+	glDepthMask(GL_TRUE); /* should be set by default */
+	glClear(GL_DEPTH_BUFFER_BIT);
+//	glDisable(GL_DEPTH_TEST); /* should be set by default */
+
+	view3d_draw_background(C); /* clears/overwrites entire color buffer */
+
 	view3d_draw_setup_view(C, ar);
-	view3d_draw_prerender_buffers(C, ar, draw_data);
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	view3d_draw_prerender_buffers(C, ar, draw_data); /* depth pre-pass */
+
+//	glDepthFunc(GL_EQUAL); /* TODO: do this after separating surfaces from wires */
+//	glDepthMask(GL_FALSE); /* same TODO as above */
 	view3d_draw_solid_plates(C, ar, draw_data);
+
+//	glDepthFunc(GL_LEQUAL); /* same TODO as above */
+//	glDepthMask(GL_TRUE); /* same TODO as above */
+
 	view3d_draw_geometry_overlay(C);
 	view3d_draw_non_meshes(C, ar);
 	view3d_draw_other_elements(C, ar);
 	view3d_draw_tool_ui(C);
 	view3d_draw_reference_images(C);
-	view3d_draw_manipulator(C);
+	view3d_draw_manipulators(C, ar);
+
+	glDisable(GL_DEPTH_TEST);
+
 	view3d_draw_region_info(C, ar);
 
 #if VIEW3D_DRAW_DEBUG
@@ -2512,7 +2506,12 @@ void VP_drawrenderborder(ARegion *ar, View3D *v3d)
 
 void VP_view3d_draw_background_none(void)
 {
-	view3d_draw_background_none();
+	if (UI_GetThemeValue(TH_SHOW_BACK_GRAD)) {
+		view3d_draw_background_gradient();
+	}
+	else {
+		view3d_draw_background_none();
+	}
 }
 
 void VP_view3d_draw_background_world(Scene *scene, View3D *v3d, RegionView3D *rv3d)

@@ -33,6 +33,14 @@
 
 #include "draw_common.h"
 
+
+#if 0
+#define UI_COLOR_RGB_FROM_U8(r, g, b, v4) \
+	ARRAY_SET_ITEMS(v4, (float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, 1.0)
+#endif
+#define UI_COLOR_RGBA_FROM_U8(r, g, b, a, v4) \
+	ARRAY_SET_ITEMS(v4, (float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f)
+
 /* Colors & Constant */
 GlobalsUboStorage ts;
 struct GPUUniformBuffer *globals_ubo = NULL;
@@ -45,7 +53,10 @@ void DRW_globals_update(void)
 	UI_GetThemeColor4fv(TH_SELECT, ts.colorSelect);
 	UI_GetThemeColor4fv(TH_TRANSFORM, ts.colorTransform);
 	UI_GetThemeColor4fv(TH_GROUP_ACTIVE, ts.colorGroupActive);
+	UI_GetThemeColorShade4fv(TH_GROUP_ACTIVE, -25, ts.colorGroupSelect);
 	UI_GetThemeColor4fv(TH_GROUP, ts.colorGroup);
+	UI_COLOR_RGBA_FROM_U8(0x88, 0xFF, 0xFF, 155, ts.colorLibrarySelect);
+	UI_COLOR_RGBA_FROM_U8(0x55, 0xCC, 0xCC, 155, ts.colorLibrary);
 	UI_GetThemeColor4fv(TH_LAMP, ts.colorLamp);
 	UI_GetThemeColor4fv(TH_SPEAKER, ts.colorSpeaker);
 	UI_GetThemeColor4fv(TH_CAMERA, ts.colorCamera);
@@ -65,6 +76,19 @@ void DRW_globals_update(void)
 	UI_GetThemeColor4fv(TH_VNORMAL, ts.colorVNormal);
 	UI_GetThemeColor4fv(TH_LNORMAL, ts.colorLNormal);
 	UI_GetThemeColor4fv(TH_FACE_DOT, ts.colorFaceDot);
+	UI_GetThemeColor4fv(TH_BACK, ts.colorBackground);
+
+	/* Grid */
+	UI_GetThemeColorShade4fv(TH_GRID, 10, ts.colorGrid);
+	/* emphasise division lines lighter instead of darker, if background is darker than grid */
+	UI_GetThemeColorShade4fv(TH_GRID,
+		(ts.colorGrid[0] + ts.colorGrid[1] + ts.colorGrid[2] + 0.12 >
+		ts.colorBackground[0] + ts.colorBackground[1] + ts.colorBackground[2])
+		? 20 : -10, ts.colorGridEmphasise);
+	/* Grid Axis */
+	UI_GetThemeColorBlendShade4fv(TH_GRID, TH_AXIS_X, 0.5f, -10, ts.colorGridAxisX);
+	UI_GetThemeColorBlendShade4fv(TH_GRID, TH_AXIS_Y, 0.5f, -10, ts.colorGridAxisY);
+	UI_GetThemeColorBlendShade4fv(TH_GRID, TH_AXIS_Z, 0.5f, -10, ts.colorGridAxisZ);
 
 	UI_GetThemeColorShadeAlpha4fv(TH_TRANSFORM, 0, -80, ts.colorDeselect);
 	UI_GetThemeColorShadeAlpha4fv(TH_WIRE, 0, -30, ts.colorOutline);
@@ -75,8 +99,8 @@ void DRW_globals_update(void)
 	ts.sizeLampCircleShadow = ts.sizeLampCircle + U.pixelsize * 3.0f;
 
 	/* M_SQRT2 to be at least the same size of the old square */
-	ts.sizeVertex = UI_GetThemeValuef(TH_VERTEX_SIZE) * M_SQRT2 / 2.0f;
-	ts.sizeFaceDot = UI_GetThemeValuef(TH_FACEDOT_SIZE) * M_SQRT2;
+	ts.sizeVertex = ceil(UI_GetThemeValuef(TH_VERTEX_SIZE) * M_SQRT2 / 2.0f);
+	ts.sizeFaceDot = ceil(UI_GetThemeValuef(TH_FACEDOT_SIZE) * M_SQRT2);
 	ts.sizeEdge = 1.0f / 2.0f; /* TODO Theme */
 	ts.sizeEdgeFix = 0.5f + 2.0f * (2.0f * (MAX2(ts.sizeVertex, ts.sizeEdge)) * M_SQRT1_2);
 
@@ -142,7 +166,7 @@ DRWShadingGroup *shgroup_instance_screenspace(DRWPass *pass, struct Batch *geom,
 	DRW_shgroup_attrib_float(grp, "color", 3);
 	DRW_shgroup_uniform_float(grp, "size", size, 1);
 	DRW_shgroup_uniform_float(grp, "pixel_size", DRW_viewport_pixelsize_get(), 1);
-	DRW_shgroup_uniform_vec3(grp, "screen_vecs", DRW_viewport_screenvecs_get(), 2);
+	DRW_shgroup_uniform_vec3(grp, "screen_vecs[0]", DRW_viewport_screenvecs_get(), 2);
 	DRW_shgroup_state_set(grp, DRW_STATE_STIPPLE_3);
 
 	return grp;
@@ -174,6 +198,19 @@ DRWShadingGroup *shgroup_instance_objspace_wire(DRWPass *pass, struct Batch *geo
 	return grp;
 }
 
+DRWShadingGroup *shgroup_instance_screen_aligned(DRWPass *pass, struct Batch *geom)
+{
+	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED);
+
+	DRWShadingGroup *grp = DRW_shgroup_instance_create(sh, pass, geom);
+	DRW_shgroup_attrib_float(grp, "color", 3);
+	DRW_shgroup_attrib_float(grp, "size", 1);
+	DRW_shgroup_attrib_float(grp, "InstanceModelMatrix", 16);
+	DRW_shgroup_uniform_vec3(grp, "screen_vecs[0]", DRW_viewport_screenvecs_get(), 2);
+
+	return grp;
+}
+
 DRWShadingGroup *shgroup_instance_axis_names(DRWPass *pass, struct Batch *geom)
 {
 	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED_AXIS);
@@ -182,7 +219,19 @@ DRWShadingGroup *shgroup_instance_axis_names(DRWPass *pass, struct Batch *geom)
 	DRW_shgroup_attrib_float(grp, "color", 3);
 	DRW_shgroup_attrib_float(grp, "size", 1);
 	DRW_shgroup_attrib_float(grp, "InstanceModelMatrix", 16);
-	DRW_shgroup_uniform_vec3(grp, "screen_vecs", DRW_viewport_screenvecs_get(), 2);
+	DRW_shgroup_uniform_vec3(grp, "screen_vecs[0]", DRW_viewport_screenvecs_get(), 2);
+
+	return grp;
+}
+
+DRWShadingGroup *shgroup_instance_scaled(DRWPass *pass, struct Batch *geom)
+{
+	GPUShader *sh_inst = GPU_shader_get_builtin_shader(GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SCALE);
+
+	DRWShadingGroup *grp = DRW_shgroup_instance_create(sh_inst, pass, geom);
+	DRW_shgroup_attrib_float(grp, "color", 3);
+	DRW_shgroup_attrib_float(grp, "size", 3);
+	DRW_shgroup_attrib_float(grp, "InstanceModelMatrix", 16);
 
 	return grp;
 }
@@ -244,14 +293,17 @@ DRWShadingGroup *shgroup_spot_instance(DRWPass *pass, struct Batch *geom)
 	return grp;
 }
 
-/* ******************************************** WIRES *********************************************** */
+/* ******************************************** COLOR UTILS *********************************************** */
 
 /* TODO FINISH */
-/* Get the wire color theme_id of an object based on it's state
- * **color is a way to get a pointer to the static color var associated */
-int DRW_object_wire_theme_get(Object *ob, SceneLayer *sl, float **color)
+/**
+ * Get the wire color theme_id of an object based on it's state
+ * \a r_color is a way to get a pointer to the static color var associated
+ */
+int DRW_object_wire_theme_get(Object *ob, SceneLayer *sl, float **r_color)
 {
 	const bool is_edit = (ob->mode & OB_MODE_EDIT) != 0;
+	const bool active = (sl->basact && sl->basact->object == ob);
 	/* confusing logic here, there are 2 methods of setting the color
 	 * 'colortab[colindex]' and 'theme_id', colindex overrides theme_id.
 	 *
@@ -268,12 +320,7 @@ int DRW_object_wire_theme_get(Object *ob, SceneLayer *sl, float **color)
 		/* Sets the 'theme_id' or fallback to wire */
 		if ((ob->flag & OB_FROMGROUP) != 0) {
 			if ((ob->base_flag & BASE_SELECTED) != 0) {
-				/* uses darker active color for non-active + selected */
 				theme_id = TH_GROUP_ACTIVE;
-
-				// if (sl->basact->object != ob) {
-				// 	theme_shade = -16;
-				// }
 			}
 			else {
 				theme_id = TH_GROUP;
@@ -281,7 +328,7 @@ int DRW_object_wire_theme_get(Object *ob, SceneLayer *sl, float **color)
 		}
 		else {
 			if ((ob->base_flag & BASE_SELECTED) != 0) {
-				theme_id = (sl->basact->object == ob) ? TH_ACTIVE : TH_SELECT;
+				theme_id = (active) ? TH_ACTIVE : TH_SELECT;
 			}
 			else {
 				if (ob->type == OB_LAMP) theme_id = TH_LAMP;
@@ -293,21 +340,51 @@ int DRW_object_wire_theme_get(Object *ob, SceneLayer *sl, float **color)
 		}
 	}
 
-	if (color != NULL) {
+	if (r_color != NULL) {
 		switch (theme_id) {
-			case TH_WIRE_EDIT:    *color = ts.colorTransform; break;
-			case TH_ACTIVE:       *color = ts.colorActive; break;
-			case TH_SELECT:       *color = ts.colorSelect; break;
-			case TH_GROUP:        *color = ts.colorGroup; break;
-			case TH_GROUP_ACTIVE: *color = ts.colorGroupActive; break;
-			case TH_TRANSFORM:    *color = ts.colorTransform; break;
-			case OB_SPEAKER:      *color = ts.colorSpeaker; break;
-			case OB_CAMERA:       *color = ts.colorCamera; break;
-			case OB_EMPTY:        *color = ts.colorEmpty; break;
-			case OB_LAMP:         *color = ts.colorLamp; break;
-			default:              *color = ts.colorWire; break;
+			case TH_WIRE_EDIT:    *r_color = ts.colorTransform; break;
+			case TH_ACTIVE:       *r_color = ts.colorActive; break;
+			case TH_SELECT:       *r_color = ts.colorSelect; break;
+			case TH_GROUP:        *r_color = ts.colorGroup; break;
+			case TH_GROUP_ACTIVE: *r_color = ts.colorGroupActive; break;
+			case TH_TRANSFORM:    *r_color = ts.colorTransform; break;
+			case OB_SPEAKER:      *r_color = ts.colorSpeaker; break;
+			case OB_CAMERA:       *r_color = ts.colorCamera; break;
+			case OB_EMPTY:        *r_color = ts.colorEmpty; break;
+			case OB_LAMP:         *r_color = ts.colorLamp; break;
+			default:              *r_color = ts.colorWire; break;
+		}
+
+		/* uses darker active color for non-active + selected */
+		if ((theme_id == TH_GROUP_ACTIVE) && !active) {
+			*r_color = ts.colorGroupSelect;
 		}
 	}
 
 	return theme_id;
+}
+
+/* XXX This is utter shit, better find something more general */
+float *DRW_color_background_blend_get(int theme_id)
+{
+	static float colors[11][4];
+	float *ret;
+
+	switch (theme_id) {
+		case TH_WIRE_EDIT:    ret = colors[0]; break;
+		case TH_ACTIVE:       ret = colors[1]; break;
+		case TH_SELECT:       ret = colors[2]; break;
+		case TH_GROUP:        ret = colors[3]; break;
+		case TH_GROUP_ACTIVE: ret = colors[4]; break;
+		case TH_TRANSFORM:    ret = colors[5]; break;
+		case OB_SPEAKER:      ret = colors[6]; break;
+		case OB_CAMERA:       ret = colors[7]; break;
+		case OB_EMPTY:        ret = colors[8]; break;
+		case OB_LAMP:         ret = colors[9]; break;
+		default:              ret = colors[10]; break;
+	}
+
+	UI_GetThemeColorBlendShade4fv(theme_id, TH_BACK, 0.5, 0, ret);
+
+	return ret;
 }

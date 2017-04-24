@@ -242,7 +242,7 @@ int rna_object_shapekey_index_set(struct ID *id, PointerRNA value, int current);
 /* named internal so as not to conflict with obj.update() rna func */
 void rna_Object_internal_update_data(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
 void rna_Mesh_update_draw(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
-void rna_TextureSlot_update(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
+void rna_TextureSlot_update(struct bContext *C, struct PointerRNA *ptr);
 
 /* basic poll functions for object types */
 int rna_Armature_object_poll(struct PointerRNA *ptr, struct PointerRNA value);
@@ -350,6 +350,7 @@ extern IntPropertyRNA rna_PropertyGroupItem_int_array;
 extern FloatPropertyRNA rna_PropertyGroupItem_float;
 extern FloatPropertyRNA rna_PropertyGroupItem_float_array;
 extern PointerPropertyRNA rna_PropertyGroupItem_group;
+extern PointerPropertyRNA rna_PropertyGroupItem_id;
 extern CollectionPropertyRNA rna_PropertyGroupItem_collection;
 extern CollectionPropertyRNA rna_PropertyGroupItem_idp_array;
 extern FloatPropertyRNA rna_PropertyGroupItem_double;

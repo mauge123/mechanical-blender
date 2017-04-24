@@ -119,7 +119,7 @@ static void nla_action_draw_keyframes(AnimData *adt, bAction *act, float y, floa
 	color[3] *= 2.5f;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos_id = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos_id = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immUniformColor4fv(color);
 
@@ -140,10 +140,10 @@ static void nla_action_draw_keyframes(AnimData *adt, bAction *act, float y, floa
 
 	if (key_ct > 0) {
 		format = immVertexFormat();
-		pos_id = add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-		unsigned int size_id = add_attrib(format, "size", COMP_F32, 1, KEEP_FLOAT);
-		unsigned int color_id = add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
-		unsigned int outline_color_id = add_attrib(format, "outlineColor", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
+		pos_id = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int size_id = VertexFormat_add_attrib(format, "size", COMP_F32, 1, KEEP_FLOAT);
+		unsigned int color_id = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
+		unsigned int outline_color_id = VertexFormat_add_attrib(format, "outlineColor", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
 		immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
 		GPU_enable_program_point_size();
 		immBegin(PRIM_POINTS, key_ct);
@@ -286,7 +286,7 @@ static void nla_strip_get_color_inside(AnimData *adt, NlaStrip *strip, float col
 /* helper call for drawing influence/time control curves for a given NLA-strip */
 static void nla_draw_strip_curves(NlaStrip *strip, float yminc, float ymaxc, unsigned int pos)
 {
-	immUniformColor4f(0.7f, 0.7f, 0.7f, 1.0f);
+	immUniformColor3f(0.7f, 0.7f, 0.7f);
 
 	const float yheight = ymaxc - yminc;
 		
@@ -300,7 +300,7 @@ static void nla_draw_strip_curves(NlaStrip *strip, float yminc, float ymaxc, uns
 		float cfra;
 		
 		/* plot the curve (over the strip's main region) */
-		immBegin(GL_LINE_STRIP, abs((int)(strip->end - strip->start) + 1));
+		immBegin(PRIM_LINE_STRIP, abs((int)(strip->end - strip->start) + 1));
 
 		/* sample at 1 frame intervals, and draw
 		 *	- min y-val is yminc, max is y-maxc, so clamp in those regions
@@ -316,7 +316,7 @@ static void nla_draw_strip_curves(NlaStrip *strip, float yminc, float ymaxc, uns
 	else {
 		/* use blend in/out values only if both aren't zero */
 		if ((IS_EQF(strip->blendin, 0.0f) && IS_EQF(strip->blendout, 0.0f)) == 0) {
-			immBeginAtMost(GL_LINE_STRIP, 4);
+			immBeginAtMost(PRIM_LINE_STRIP, 4);
 
 			/* start of strip - if no blendin, start straight at 1, otherwise from 0 to 1 over blendin frames */
 			if (IS_EQF(strip->blendin, 0.0f) == 0) {
@@ -352,7 +352,7 @@ static void nla_draw_strip(SpaceNla *snla, AnimData *adt, NlaTrack *nlt, NlaStri
 	/* get color of strip */
 	nla_strip_get_color_inside(adt, strip, color);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	/* draw extrapolation info first (as backdrop)
@@ -402,10 +402,10 @@ static void nla_draw_strip(SpaceNla *snla, AnimData *adt, NlaTrack *nlt, NlaStri
 
 		/* strip is in normal track */
 		UI_draw_roundbox_corner_set(UI_CNR_ALL); /* all corners rounded */
-		UI_draw_roundbox_shade_x(GL_TRIANGLE_FAN, strip->start, yminc, strip->end, ymaxc, 0.0, 0.5, 0.1, color);
+		UI_draw_roundbox_shade_x(true, strip->start, yminc, strip->end, ymaxc, 0.0, 0.5, 0.1, color);
 
 		/* restore current vertex format & program (roundbox trashes it) */
-		pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	}
 	else {
@@ -450,10 +450,10 @@ static void nla_draw_strip(SpaceNla *snla, AnimData *adt, NlaTrack *nlt, NlaStri
 		setlinestyle(4);
 
 	/* draw outline */
-	UI_draw_roundbox_shade_x(GL_LINE_LOOP, strip->start, yminc, strip->end, ymaxc, 0.0, 0.0, 0.1, color);
+	UI_draw_roundbox_shade_x(false, strip->start, yminc, strip->end, ymaxc, 0.0, 0.0, 0.1, color);
 
 	/* restore current vertex format & program (roundbox trashes it) */
-	pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor3fv(color);
@@ -652,7 +652,7 @@ void draw_nla_main_data(bAnimContext *ac, SpaceNla *snla, ARegion *ar)
 				{
 					AnimData *adt = ale->adt;
 
-					unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+					unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 					immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 					/* just draw a semi-shaded rect spanning the width of the viewable area if there's data,
@@ -674,7 +674,7 @@ void draw_nla_main_data(bAnimContext *ac, SpaceNla *snla, ARegion *ar)
 					/* draw 'embossed' lines above and below the strip for effect */
 					/* white base-lines */
 					glLineWidth(2.0f);
-					immUniformColor4f(1.0f, 1.0f, 1.0f, 0.3);
+					immUniformColor4f(1.0f, 1.0f, 1.0f, 0.3f);
 					immBegin(PRIM_LINES, 4);
 					immVertex2f(pos, v2d->cur.xmin, yminc + NLACHANNEL_SKIP);
 					immVertex2f(pos, v2d->cur.xmax, yminc + NLACHANNEL_SKIP);

@@ -1,5 +1,5 @@
 
-// Gawain geometry batch
+// Gawain vertex buffer
 //
 // This code is part of the Gawain library, with modifications
 // specific to integration with Blender.
@@ -11,6 +11,7 @@
 
 #include "vertex_buffer.h"
 #include "buffer_id.h"
+#include "vertex_format_private.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -92,7 +93,7 @@ void VertexBuffer_resize_data(VertexBuffer* verts, unsigned v_ct)
 	// extra space will be reclaimed, and never sent to VRAM (see VertexBuffer_prime)
 	}
 
-void setAttrib(VertexBuffer* verts, unsigned a_idx, unsigned v_idx, const void* data)
+void VertexBuffer_set_attrib(VertexBuffer* verts, unsigned a_idx, unsigned v_idx, const void* data)
 	{
 	const VertexFormat* format = &verts->format;
 	const Attrib* a = format->attribs + a_idx;
@@ -106,7 +107,7 @@ void setAttrib(VertexBuffer* verts, unsigned a_idx, unsigned v_idx, const void* 
 	memcpy((GLubyte*)verts->data + a->offset + v_idx * format->stride, data, a->sz);
 	}
 
-void fillAttrib(VertexBuffer* verts, unsigned a_idx, const void* data)
+void VertexBuffer_fill_attrib(VertexBuffer* verts, unsigned a_idx, const void* data)
 	{
 	const VertexFormat* format = &verts->format;
 	const Attrib* a = format->attribs + a_idx;
@@ -117,10 +118,10 @@ void fillAttrib(VertexBuffer* verts, unsigned a_idx, const void* data)
 
 	const unsigned stride = a->sz; // tightly packed input data
 
-	fillAttribStride(verts, a_idx, stride, data);
+	VertexBuffer_fill_attrib_stride(verts, a_idx, stride, data);
 	}
 
-void fillAttribStride(VertexBuffer* verts, unsigned a_idx, unsigned stride, const void* data)
+void VertexBuffer_fill_attrib_stride(VertexBuffer* verts, unsigned a_idx, unsigned stride, const void* data)
 	{
 	const VertexFormat* format = &verts->format;
 	const Attrib* a = format->attribs + a_idx;

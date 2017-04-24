@@ -45,7 +45,6 @@
 #include "BKE_armature.h"
 #include "BKE_action.h"
 #include "BKE_constraint.h"
-#include "BKE_depsgraph.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_animsys.h"
 #include "BKE_displist.h"
@@ -53,7 +52,6 @@
 #include "BKE_key.h"
 #include "BKE_lamp.h"
 #include "BKE_lattice.h"
-#include "BKE_mesh_render.h"
 #include "BKE_editmesh.h"
 #include "BKE_object.h"
 #include "BKE_particle.h"
@@ -65,6 +63,10 @@
 #include "ED_mesh.h"
 
 #include "MEM_guardedalloc.h"
+
+#include "BKE_curve_render.h"
+#include "BKE_lattice_render.h"
+#include "BKE_mesh_render.h"
 
 #include "DEG_depsgraph.h"
 
@@ -446,8 +448,18 @@ void BKE_object_eval_uber_data(EvaluationContext *eval_ctx,
 	BLI_assert(ob->type != OB_ARMATURE);
 	BKE_object_handle_data_update(eval_ctx, scene, ob);
 
-	if (ob->type == OB_MESH) {
-		BKE_mesh_batch_cache_dirty(ob->data);
+	switch (ob->type) {
+		case OB_MESH:
+			BKE_mesh_batch_cache_dirty(ob->data);
+			break;
+		case OB_LATTICE:
+			BKE_lattice_batch_cache_dirty(ob->data);
+			break;
+		case OB_CURVE:
+		case OB_FONT:
+		case OB_SURF:
+			BKE_curve_batch_cache_dirty(ob->data);
+			break;
 	}
 
 	ob->recalc &= ~(OB_RECALC_DATA | OB_RECALC_TIME);

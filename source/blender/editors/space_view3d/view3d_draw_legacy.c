@@ -79,6 +79,7 @@
 #include "BIF_glutil.h"
 
 #include "WM_api.h"
+#include "WM_types.h"
 
 #include "BLF_api.h"
 #include "BLT_translation.h"
@@ -97,10 +98,12 @@
 
 #include "GPU_draw.h"
 #include "GPU_framebuffer.h"
+#include "GPU_lamp.h"
 #include "GPU_material.h"
 #include "GPU_compositing.h"
 #include "GPU_extensions.h"
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_select.h"
 #include "GPU_matrix.h"
 
@@ -353,7 +356,7 @@ static void view3d_opengl_read_Z_pixels(ARegion *ar, int x, int y, int w, int h,
 void ED_view3d_backbuf_validate(ViewContext *vc)
 {
 	if (vc->v3d->flag & V3D_INVALID_BACKBUF)
-		backdrawview3d(vc->scene, vc->sl, vc->win, vc->ar, vc->v3d);
+		backdrawview3d(vc->scene, vc->scene_layer, vc->win, vc->ar, vc->v3d);
 }
 
 /**
@@ -751,9 +754,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA);
 
-			glMatrixMode(GL_PROJECTION);
-			gpuPushMatrix();
-			glMatrixMode(GL_MODELVIEW);
+			gpuPushProjectionMatrix();
 			gpuPushMatrix();
 			ED_region_pixelspace(ar);
 
@@ -770,13 +771,11 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			}
 
 			float col[4] = {1.0f, 1.0f, 1.0f, 1.0f - bgpic->blend};
-			immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-			immDrawPixelsTex(x1 - centx, y1 - centy, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, ibuf->rect,
+			IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+			immDrawPixelsTex(&state, x1 - centx, y1 - centy, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, ibuf->rect,
 			                 zoomx, zoomy, col);
 
-			glMatrixMode(GL_PROJECTION);
-			gpuPopMatrix();
-			glMatrixMode(GL_MODELVIEW);
+			gpuPopProjectionMatrix();
 			gpuPopMatrix();
 
 			glDisable(GL_BLEND);
@@ -1178,7 +1177,7 @@ float view3d_depth_near(ViewDepths *d)
 
 void ED_view3d_draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d)
 {
-	short zbuf = v3d->zbuf;
+	bool zbuf = v3d->zbuf;
 	RegionView3D *rv3d = ar->regiondata;
 
 	view3d_winmatrix_set(ar, v3d, NULL);
@@ -1190,7 +1189,7 @@ void ED_view3d_draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d)
 
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	gpuLoadMatrix3D(rv3d->viewmat);
+	gpuLoadMatrix(rv3d->viewmat);
 
 	v3d->zbuf = true;
 	glEnable(GL_DEPTH_TEST);
@@ -1198,8 +1197,9 @@ void ED_view3d_draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d)
 	if (v3d->flag2 & V3D_SHOW_GPENCIL) {
 		ED_gpencil_draw_view3d(NULL, scene, v3d, ar, true);
 	}
-	
+
 	v3d->zbuf = zbuf;
+	if (!zbuf) glDisable(GL_DEPTH_TEST);
 }
 
 void ED_view3d_draw_depth(Scene *scene, ARegion *ar, View3D *v3d, bool alphaoverride)
@@ -1228,7 +1228,7 @@ void ED_view3d_draw_depth(Scene *scene, ARegion *ar, View3D *v3d, bool alphaover
 	
 	glClear(GL_DEPTH_BUFFER_BIT);
 	
-	gpuLoadMatrix3D(rv3d->viewmat);
+	gpuLoadMatrix(rv3d->viewmat);
 	
 	if (rv3d->rflag & RV3D_CLIPPING) {
 		ED_view3d_clipping_set(rv3d);
@@ -1584,11 +1584,8 @@ static void view3d_draw_objects(
 			ED_region_pixelspace(ar);
 			*grid_unit = NULL;  /* drawgrid need this to detect/affect smallest valid unit... */
 			VP_legacy_drawgrid(&scene->unit, ar, v3d, grid_unit);
-			/* XXX make function? replaces persp(1) */
-			glMatrixMode(GL_PROJECTION);
-			gpuLoadMatrix3D(rv3d->winmat); /* XXX make a gpuLoadProjectionMatrix function? */
-			glMatrixMode(GL_MODELVIEW);
-			gpuLoadMatrix3D(rv3d->viewmat);
+			gpuLoadProjectionMatrix(rv3d->winmat);
+			gpuLoadMatrix(rv3d->viewmat);
 		}
 		else if (!draw_grids_after) {
 #ifdef WITH_MECHANICAL_UCS
@@ -1718,10 +1715,6 @@ static void view3d_draw_objects(
 		view3d_draw_bgpic_test(scene, ar, v3d, true, do_camera_frame);
 	}
 
-	if (!draw_offscreen) {
-		BIF_draw_manipulator(C);
-	}
-
 	/* cleanup */
 	if (v3d->zbuf) {
 		v3d->zbuf = false;
@@ -1786,6 +1779,8 @@ void ED_view3d_draw_offscreen_init(Scene *scene, SceneLayer *sl, View3D *v3d)
  */
 static void view3d_main_region_clear(Scene *scene, View3D *v3d, ARegion *ar)
 {
+	glClear(GL_DEPTH_BUFFER_BIT);
+
 	if (scene->world && (v3d->flag3 & V3D_SHOW_WORLD)) {
 		VP_view3d_draw_background_world(scene, v3d, ar->regiondata);
 	}
@@ -1806,8 +1801,6 @@ void ED_view3d_draw_offscreen(
 {
 	bool do_compositing = false;
 	RegionView3D *rv3d = ar->regiondata;
-
-	gpuPushMatrix();
 
 	/* set temporary new size */
 	int bwinx = ar->winx;
@@ -1834,7 +1827,20 @@ void ED_view3d_draw_offscreen(
 		GPU_free_images_anim();
 	}
 
-	/* setup view matrices before fx or unbinding the offscreen buffers will cause issues */
+	gpuPushProjectionMatrix();
+	gpuLoadIdentity();
+	gpuPushMatrix();
+	gpuLoadIdentity();
+
+	/* clear opengl buffers */
+	if (do_sky) {
+		view3d_main_region_clear(scene, v3d, ar);
+	}
+	else {
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	}
+
 	if ((viewname != NULL && viewname[0] != '\0') && (viewmat == NULL) && rv3d->persp == RV3D_CAMOB && v3d->camera)
 		view3d_stereo3d_setup_offscreen(scene, v3d, ar, winmat, viewname);
 	else
@@ -1855,15 +1861,6 @@ void ED_view3d_draw_offscreen(
 			v3d->fx_settings.ssao = ssao;
 	}
 
-	/* clear opengl buffers */
-	if (do_sky) {
-		view3d_main_region_clear(scene, v3d, ar);
-	}
-	else {
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	}
-
 	/* main drawing call */
 	view3d_draw_objects(NULL, scene, v3d, ar, NULL, do_bgpic, true, do_compositing ? fx : NULL);
 
@@ -1877,7 +1874,6 @@ void ED_view3d_draw_offscreen(
 	if ((v3d->flag2 & V3D_RENDER_SHADOW) == 0) {
 		/* draw grease-pencil stuff */
 		ED_region_pixelspace(ar);
-
 
 		if (v3d->flag2 & V3D_SHOW_GPENCIL) {
 			/* draw grease-pencil stuff - needed to get paint-buffer shown too (since it's 2D) */
@@ -1893,6 +1889,7 @@ void ED_view3d_draw_offscreen(
 	ar->winy = bwiny;
 	ar->winrct = brect;
 
+	gpuPopProjectionMatrix();
 	gpuPopMatrix();
 
 	UI_Theme_Restore(&theme_state);
@@ -2422,9 +2419,6 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Sce
 		do_compositing = GPU_fx_compositor_initialize_passes(rv3d->compositor, &ar->winrct, &ar->drawrct, &fx_settings);
 	}
 	
-	/* clear the background */
-	view3d_main_region_clear(scene, v3d, ar);
-
 	/* enables anti-aliasing for 3D view drawing */
 	if (win->multisamples != USER_MULTISAMPLE_NONE) {
 		glEnable(GL_MULTISAMPLE);
@@ -2432,6 +2426,11 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Sce
 
 	/* main drawing call */
 	view3d_draw_objects(C, scene, v3d, ar, grid_unit, true, false, do_compositing ? rv3d->compositor : NULL);
+
+	/* draw depth culled manipulators - manipulators need to be updated *after* view matrix was set up */
+	/* TODO depth culling manipulators is not yet supported, just drawing _3D here, should
+	 * later become _IN_SCENE (and draw _3D separate) */
+	WM_manipulatormap_draw(ar->manipulator_map, C, WM_MANIPULATORMAP_DRAWSTEP_3D);
 
 	/* post process */
 	if (do_compositing) {
@@ -2534,21 +2533,38 @@ void view3d_main_region_draw_legacy(const bContext *C, ARegion *ar)
 	bool render_border = ED_view3d_calc_render_border(scene, v3d, ar, &border_rect);
 	bool clip_border = (render_border && !BLI_rcti_compare(&ar->drawrct, &border_rect));
 
+	gpuPushProjectionMatrix();
+	gpuLoadIdentityProjectionMatrix();
+	gpuPushMatrix();
+	gpuLoadIdentity();
+
 	/* draw viewport using opengl */
 	if (v3d->drawtype != OB_RENDER || !view3d_main_region_do_render_draw(scene) || clip_border) {
+		view3d_main_region_clear(scene, v3d, ar); /* background */
 		view3d_main_region_draw_objects(C, scene, sl, v3d, ar, &grid_unit);
 
 		if (G.debug & G_DEBUG_SIMDATA)
 			draw_sim_debug_data(scene, v3d, ar);
-		
+
+		glDisable(GL_DEPTH_TEST);
 		ED_region_pixelspace(ar);
 	}
 
 	/* draw viewport using external renderer */
 	if (v3d->drawtype == OB_RENDER)
 		view3d_main_region_draw_engine(C, scene, ar, v3d, clip_border, &border_rect);
-	
+
+	VP_legacy_view3d_main_region_setup_view(scene, v3d, ar, NULL, NULL);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	WM_manipulatormap_draw(ar->manipulator_map, C, WM_MANIPULATORMAP_DRAWSTEP_2D);
+
+	ED_region_pixelspace(ar);
+
 	view3d_main_region_draw_info(C, scene, ar, v3d, grid_unit, render_border);
+
+	gpuPopProjectionMatrix();
+	gpuPopMatrix();
 
 	v3d->flag |= V3D_INVALID_BACKBUF;
 

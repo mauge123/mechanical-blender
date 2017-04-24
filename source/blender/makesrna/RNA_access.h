@@ -386,8 +386,6 @@ extern StructRNA RNA_MaterialStrand;
 extern StructRNA RNA_MaterialSubsurfaceScattering;
 extern StructRNA RNA_MaterialTextureSlot;
 extern StructRNA RNA_MaterialVolume;
-extern StructRNA RNA_MaterialEngineSettings;
-extern StructRNA RNA_MaterialEngineSettingsClay;
 extern StructRNA RNA_Mask;
 extern StructRNA RNA_MaskLayer;
 extern StructRNA RNA_Menu;
@@ -782,6 +780,8 @@ void RNA_struct_blender_type_set(StructRNA *srna, void *blender_type);
 struct IDProperty *RNA_struct_idprops(PointerRNA *ptr, bool create);
 bool RNA_struct_idprops_check(StructRNA *srna);
 bool RNA_struct_idprops_register_check(const StructRNA *type);
+bool RNA_struct_idprops_datablock_allowed(const StructRNA *type);
+bool RNA_struct_idprops_contains_datablock(const StructRNA *type);
 bool RNA_struct_idprops_unset(PointerRNA *ptr, const char *identifier);
 
 PropertyRNA *RNA_struct_find_property(PointerRNA *ptr, const char *identifier);

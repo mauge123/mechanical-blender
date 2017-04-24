@@ -44,6 +44,7 @@
 
 /* Include external manipulator API's */
 #include "manipulators/WM_manipulator_api.h"
+#include "manipulators/WM_manipulator_library.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -109,7 +110,7 @@ enum {
 };
 
 struct wmWindow	*WM_window_open(struct bContext *C, const struct rcti *rect);
-struct wmWindow *WM_window_open_temp(struct bContext *C, const struct rcti *rect_init, int type);
+struct wmWindow *WM_window_open_temp(struct bContext *C, int x, int y, int sizex, int sizey, int type);
 			
 			/* returns true if draw method is triple buffer */
 bool		WM_is_draw_triple(struct wmWindow *win);
@@ -422,9 +423,7 @@ ListBase	*WM_dropboxmap_find(const char *idname, int spaceid, int regionid);
 void		wmSubWindowSet			(struct wmWindow *win, int swinid);
 void		wmSubWindowScissorSet	(struct wmWindow *win, int swinid, const struct rcti *srct, bool srct_pad);
 
-			/* OpenGL utilities with safety check + working in modelview matrix mode */
-void		wmFrustum			(float x1, float x2, float y1, float y2, float n, float f);
-void		wmOrtho				(float x1, float x2, float y1, float y2, float n, float f);
+			/* OpenGL utilities with safety check */
 void		wmOrtho2			(float x1, float x2, float y1, float y2);
 			/* use for conventions (avoid hard-coded offsets all over) */
 void		wmOrtho2_region_pixelspace(const struct ARegion *ar);

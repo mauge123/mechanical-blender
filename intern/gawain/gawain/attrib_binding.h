@@ -11,14 +11,9 @@
 
 #pragma once
 
-#include "vertex_format.h"
+#include "common.h"
 
 typedef struct {
 	uint64_t loc_bits; // store 4 bits for each of the 16 attribs
 	uint16_t enabled_bits; // 1 bit for each attrib
 } AttribBinding;
-
-void clear_AttribBinding(AttribBinding*);
-
-void get_attrib_locations(const VertexFormat*, AttribBinding*, GLuint program);
-unsigned read_attrib_location(const AttribBinding*, unsigned a_idx);

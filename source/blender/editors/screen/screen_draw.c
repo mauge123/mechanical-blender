@@ -94,7 +94,7 @@ static void draw_horizontal_join_shape(ScrArea *sa, char dir, unsigned int pos)
 		}
 	}
 
-	immBegin(GL_TRIANGLE_FAN, 5);
+	immBegin(PRIM_TRIANGLE_FAN, 5);
 
 	for (i = 0; i < 5; i++) {
 		immVertex2f(pos, points[i].x, points[i].y);
@@ -102,7 +102,7 @@ static void draw_horizontal_join_shape(ScrArea *sa, char dir, unsigned int pos)
 
 	immEnd();
 
-	immBegin(GL_TRIANGLE_FAN, 5);
+	immBegin(PRIM_TRIANGLE_FAN, 5);
 
 	for (i = 4; i < 8; i++) {
 		immVertex2f(pos, points[i].x, points[i].y);
@@ -175,7 +175,7 @@ static void draw_vertical_join_shape(ScrArea *sa, char dir, unsigned int pos)
 		}
 	}
 
-	immBegin(GL_TRIANGLE_FAN, 5);
+	immBegin(PRIM_TRIANGLE_FAN, 5);
 
 	for (i = 0; i < 5; i++) {
 		immVertex2f(pos, points[i].x, points[i].y);
@@ -183,7 +183,7 @@ static void draw_vertical_join_shape(ScrArea *sa, char dir, unsigned int pos)
 
 	immEnd();
 
-	immBegin(GL_TRIANGLE_FAN, 5);
+	immBegin(PRIM_TRIANGLE_FAN, 5);
 
 	for (i = 4; i < 8; i++) {
 		immVertex2f(pos, points[i].x, points[i].y);
@@ -246,7 +246,7 @@ static void drawscredge_area_draw(int sizex, int sizey, short x1, short y1, shor
 		return;
 	}
 
-	immBegin(GL_LINES, count);
+	immBegin(PRIM_LINES, count);
 
 	/* right border area */
 	if (x2 < sizex - 1) {
@@ -303,7 +303,7 @@ void ED_screen_draw(wmWindow *win)
 
 	wmSubWindowSet(win, win->screen->mainwin);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	/* Note: first loop only draws if U.pixelsize > 1, skip otherwise */
@@ -367,7 +367,7 @@ void ED_screen_draw(wmWindow *win)
 		glEnable(GL_BLEND);
 		immUniformColor4ub(255, 255, 255, 100);
 
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 
 		if (sa3->flag & AREA_FLAG_DRAWSPLIT_H) {
 			immVertex2f(pos, sa3->totrct.xmin, win->eventstate->y);
@@ -377,7 +377,7 @@ void ED_screen_draw(wmWindow *win)
 
 			immUniformColor4ub(0, 0, 0, 100);
 
-			immBegin(GL_LINES, 2);
+			immBegin(PRIM_LINES, 2);
 
 			immVertex2f(pos, sa3->totrct.xmin, win->eventstate->y + 1);
 			immVertex2f(pos, sa3->totrct.xmax, win->eventstate->y + 1);
@@ -390,7 +390,7 @@ void ED_screen_draw(wmWindow *win)
 
 			immUniformColor4ub(0, 0, 0, 100);
 
-			immBegin(GL_LINES, 2);
+			immBegin(PRIM_LINES, 2);
 
 			immVertex2f(pos, win->eventstate->x + 1, sa3->totrct.ymin);
 			immVertex2f(pos, win->eventstate->x + 1, sa3->totrct.ymax);
@@ -432,17 +432,18 @@ static void screen_preview_draw_areas(const bScreen *screen, const float scale[2
                                       const float ofs_between_areas)
 {
 	const float ofs_h = ofs_between_areas * 0.5f;
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	rctf rect;
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformColor4fv(col);
 
 	for (ScrArea *sa = screen->areabase.first; sa; sa = sa->next) {
-		rect.xmin = sa->totrct.xmin * scale[0] + ofs_h;
-		rect.xmax = sa->totrct.xmax * scale[0] - ofs_h;
-		rect.ymin = sa->totrct.ymin * scale[1] + ofs_h;
-		rect.ymax = sa->totrct.ymax * scale[1] - ofs_h;
+		rctf rect = {
+			.xmin = sa->totrct.xmin * scale[0] + ofs_h,
+			.xmax = sa->totrct.xmax * scale[0] - ofs_h,
+			.ymin = sa->totrct.ymin * scale[1] + ofs_h,
+			.ymax = sa->totrct.ymax * scale[1] - ofs_h
+		};
 
 		immBegin(PRIM_TRIANGLE_FAN, 4);
 		immVertex2f(pos, rect.xmin, rect.ymin);
@@ -464,10 +465,13 @@ static void screen_preview_draw(const bScreen *screen, int size_x, int size_y)
 
 	wmOrtho2(0.0f, size_x, 0.0f, size_y);
 	/* center */
+	gpuPushMatrix();
 	gpuTranslate2f(size_x * (1.0f - asp[0]) * 0.5f, size_y * (1.0f - asp[1]) * 0.5f);
 
 	screen_preview_scale_get(screen, size_x, size_y, asp, scale);
 	screen_preview_draw_areas(screen, scale, col, 1.5f);
+
+	gpuPopMatrix();
 }
 
 /**

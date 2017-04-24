@@ -245,15 +245,13 @@ static void restrictbutton_gp_layer_flag_cb(bContext *C, void *UNUSED(poin), voi
 	WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
 }
 
-static void restrictbutton_collection_hide_cb(bContext *C, void *poin, void *poin2)
+static void restrictbutton_collection_hide_cb(bContext *C, void *poin, void *UNUSED(poin2))
 {
 	Scene *scene = poin;
-	LayerCollection *collection = poin2;
-	SceneLayer *sl = BKE_scene_layer_find_from_collection(scene, collection);
 
 	/* hide and deselect bases that are directly influenced by this LayerCollection */
-	BKE_scene_layer_base_flag_recalculate(sl);
-	BKE_scene_layer_engine_settings_collection_recalculate(sl, collection);
+	/* TODO(sergey): Use proper flag for tagging here. */
+	DAG_id_tag_update(&scene->id, 0);
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
 	WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, NULL);
 }
@@ -264,10 +262,9 @@ static void restrictbutton_collection_hide_select_cb(bContext *C, void *poin, vo
 	LayerCollection *collection = poin2;
 
 	if ((collection->flag & COLLECTION_SELECTABLE) == 0) {
-		SceneLayer *sl = BKE_scene_layer_find_from_collection(scene, collection);
-
 		/* deselect bases that are directly influenced by this LayerCollection */
-		BKE_scene_layer_base_flag_recalculate(sl);
+		/* TODO(sergey): Use proper flag for tagging here. */
+		DAG_id_tag_update(&scene->id, 0);
 		WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, CTX_data_scene(C));
 	}
 	WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, NULL);
@@ -669,7 +666,7 @@ static void outliner_draw_rnacols(ARegion *ar, int sizex)
 
 	glLineWidth(1.0f);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColorShadeAlpha(TH_BACK, -15, -200);
 
@@ -846,8 +843,8 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 	aspect = (0.8f * UI_UNIT_Y) / ICON_DEFAULT_HEIGHT;
 	x += 2.0f * aspect;
 	y += 2.0f * aspect;
-	arg.x = x = x;
-	arg.y = y = y;
+	arg.x = x;
+	arg.y = y;
 
 #define ICON_DRAW(_icon) UI_icon_draw_alpha(x, y, _icon, alpha)
 
@@ -1254,13 +1251,14 @@ static void outliner_draw_iconrow(bContext *C, uiBlock *block, Scene *scene, Sce
 				UI_draw_roundbox_corner_set(UI_CNR_ALL);
 				color[3] *= alpha_fac;
 
-				UI_draw_roundbox(
+				UI_draw_roundbox_aa(
+				        true,
 				        (float) *offsx + 1.0f * ufac,
 				        (float)ys + 1.0f * ufac,
 				        (float)*offsx + UI_UNIT_X - 1.0f * ufac,
 				        (float)ys + UI_UNIT_Y - ufac,
 				        (float)UI_UNIT_Y / 2.0f - ufac,
-				         color);
+				        color);
 				glEnable(GL_BLEND); /* roundbox disables */
 			}
 			
@@ -1380,7 +1378,8 @@ static void outliner_draw_tree_element(
 		/* active circle */
 		if (active != OL_DRAWSEL_NONE) {
 			UI_draw_roundbox_corner_set(UI_CNR_ALL);
-			UI_draw_roundbox(
+			UI_draw_roundbox_aa(
+			        true,
 			        (float)startx + UI_UNIT_X + 1.0f * ufac,
 			        (float)*starty + 1.0f * ufac,
 			        (float)startx + 2.0f * UI_UNIT_X - 1.0f * ufac,
@@ -1471,7 +1470,7 @@ static void outliner_draw_tree_element(
 					/* divider */
 					{
 						VertexFormat *format = immVertexFormat();
-						unsigned int pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+						unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 						unsigned char col[4];
 
 						immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -1525,17 +1524,17 @@ static void outliner_draw_tree_element_floating(
 	const TreeElement *te_insert = te_floating->drag_data->insert_handle;
 	const int line_width = 2;
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	int coord_y = te_insert->ys;
 	int coord_x = te_insert->xs;
-	unsigned char col[4];
+	float col[4];
 
 	if (te_insert == te_floating) {
 		/* don't draw anything */
 		return;
 	}
 
-	UI_GetThemeColorShade4ubv(TH_BACK, -40, col);
+	UI_GetThemeColorShade4fv(TH_BACK, -40, col);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	glEnable(GL_BLEND);
 
@@ -1543,7 +1542,7 @@ static void outliner_draw_tree_element_floating(
 		if (te_floating->drag_data->insert_type == TE_INSERT_BEFORE) {
 			coord_y += UI_UNIT_Y;
 		}
-		immUniformColor4ubv(col);
+		immUniformColor4fv(col);
 		glLineWidth(line_width);
 
 		immBegin(PRIM_LINE_STRIP, 2);
@@ -1553,11 +1552,11 @@ static void outliner_draw_tree_element_floating(
 	}
 	else {
 		BLI_assert(te_floating->drag_data->insert_type == TE_INSERT_INTO);
-		immUniformColor4ub(UNPACK3(col), col[3] * 0.5f);
+		immUniformColor3fvAlpha(col, col[3] * 0.5f);
 
-		immBegin(PRIM_QUADS, 4);
-		immVertex2f(pos, coord_x, coord_y);
+		immBegin(PRIM_TRIANGLE_STRIP, 4);
 		immVertex2f(pos, coord_x, coord_y + UI_UNIT_Y);
+		immVertex2f(pos, coord_x, coord_y);
 		immVertex2f(pos, ar->v2d.cur.xmax, coord_y + UI_UNIT_Y);
 		immVertex2f(pos, ar->v2d.cur.xmax, coord_y);
 		immEnd();
@@ -1579,13 +1578,20 @@ static void outliner_draw_hierarchy_lines_recursive(unsigned pos, SpaceOops *soo
 		return;
 	}
 
+	const unsigned char grayed_alpha = col[3] / 2;
+
 	y1 = y2 = *starty; /* for vertical lines between objects */
 	for (te = lb->first; te; te = te->next) {
 		bool draw_childs_grayed_out = draw_grayed_out || (te->drag_data != NULL);
 		y2 = *starty;
 		tselem = TREESTORE(te);
 
-		immUniformColor4ub(UNPACK3(col), col[3] * (draw_childs_grayed_out ? 0.5f : 1.0f));
+		if (draw_childs_grayed_out) {
+			immUniformColor3ubvAlpha(col, grayed_alpha);
+		}
+		else {
+			immUniformColor4ubv(col);
+		}
 
 		/* horizontal line? */
 		if (tselem->type == 0 && (te->idcode == ID_OB || te->idcode == ID_SCE))
@@ -1598,7 +1604,12 @@ static void outliner_draw_hierarchy_lines_recursive(unsigned pos, SpaceOops *soo
 			                                        col, draw_childs_grayed_out, starty);
 	}
 
-	immUniformColor4ub(UNPACK3(col), col[3] * (draw_grayed_out ? 0.5f : 1.0f));
+	if (draw_grayed_out) {
+		immUniformColor3ubvAlpha(col, grayed_alpha);
+	}
+	else {
+		immUniformColor4ubv(col);
+	}
 
 	/* vertical line */
 	te = lb->last;
@@ -1612,7 +1623,7 @@ static void outliner_draw_hierarchy_lines_recursive(unsigned pos, SpaceOops *soo
 static void outliner_draw_hierarchy_lines(SpaceOops *soops, ListBase *lb, int startx, int *starty)
 {
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 	unsigned char col[4];
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -1638,7 +1649,7 @@ static void outliner_draw_struct_marks(ARegion *ar, SpaceOops *soops, ListBase *
 		if (TSELEM_OPEN(tselem, soops))
 			if (tselem->type == TSE_RNA_STRUCT) {
 				VertexFormat *format = immVertexFormat();
-				unsigned pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+				unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 				immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 				immThemeColorShadeAlpha(TH_BACK, -15, -200);
 				immRecti(pos, 0, *starty + 1, (int)ar->v2d.cur.xmax, *starty + UI_UNIT_Y - 1);
@@ -1650,11 +1661,11 @@ static void outliner_draw_struct_marks(ARegion *ar, SpaceOops *soops, ListBase *
 			outliner_draw_struct_marks(ar, soops, &te->subtree, starty);
 			if (tselem->type == TSE_RNA_STRUCT) {
 				VertexFormat *format = immVertexFormat();
-				unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+				unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 				immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 				immThemeColorShadeAlpha(TH_BACK, -15, -200);
 
-				immBegin(GL_LINES, 2);
+				immBegin(PRIM_LINES, 2);
 				immVertex2f(pos, 0, (float)*starty + UI_UNIT_Y);
 				immVertex2f(pos, ar->v2d.cur.xmax, (float)*starty + UI_UNIT_Y);
 				immEnd();
@@ -1718,7 +1729,7 @@ static void outliner_draw_highlights(ARegion *ar, SpaceOops *soops, int startx, 
 
 	glEnable(GL_BLEND);
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	outliner_draw_highlights_recursive(pos, ar, soops, &soops->tree, col_selection, col_highlight, col_searchmatch,
 	                                   startx, starty);
@@ -1790,7 +1801,7 @@ static void outliner_back(ARegion *ar)
 	ystart = UI_UNIT_Y * (ystart / (UI_UNIT_Y)) - OL_Y_OFFSET;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColorShade(TH_BACK, 6);
@@ -1800,12 +1811,15 @@ static void outliner_back(ARegion *ar)
 	int tot = (int)floor(ystart - ar->v2d.cur.ymin + 2 * UI_UNIT_Y) / (2 * UI_UNIT_Y);
 
 	if (tot > 0) {
-		immBegin(GL_QUADS, 4 * tot);
+		immBegin(PRIM_TRIANGLES, 6 * tot);
 		while (tot--) {
 			y1 -= 2 * UI_UNIT_Y;
 			y2 = y1 + UI_UNIT_Y;
 			immVertex2f(pos, x1, y1);
 			immVertex2f(pos, x2, y1);
+			immVertex2f(pos, x2, y2);
+
+			immVertex2f(pos, x1, y1);
 			immVertex2f(pos, x2, y2);
 			immVertex2f(pos, x1, y2);
 		}
@@ -1818,7 +1832,7 @@ static void outliner_draw_restrictcols(ARegion *ar)
 {
 	glLineWidth(1.0f);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColorShadeAlpha(TH_BACK, -15, -200);
 	immBegin(PRIM_LINES, 6);

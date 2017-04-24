@@ -149,7 +149,7 @@ static void wm_swin_matrix_get(wmWindow *win, wmSubWindow *swin, float mat[4][4]
 		orthographic_m4(mat, -GLA_PIXEL_OFS, (float)width - GLA_PIXEL_OFS, -GLA_PIXEL_OFS, (float)height - GLA_PIXEL_OFS, -100, 100);
 	}
 	else {
-		gpuGetProjectionMatrix3D(mat);
+		gpuGetProjectionMatrix(mat);
 	}
 }
 void wm_subwindow_matrix_get(wmWindow *win, int swinid, float mat[4][4])
@@ -332,31 +332,13 @@ void wmSubWindowSet(wmWindow *win, int swinid)
 	wmSubWindowScissorSet(win, swinid, NULL, true);
 }
 
-void wmFrustum(float x1, float x2, float y1, float y2, float n, float f)
-{
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadIdentity();
-	glFrustum(x1, x2, y1, y2, n, f);
-	glMatrixMode(GL_MODELVIEW);
-}
-
-void wmOrtho(float x1, float x2, float y1, float y2, float n, float f)
-{
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadIdentity();
-
-	glOrtho(x1, x2, y1, y2, n, f);
-
-	glMatrixMode(GL_MODELVIEW);
-}
-
 void wmOrtho2(float x1, float x2, float y1, float y2)
 {
 	/* prevent opengl from generating errors */
 	if (x1 == x2) x2 += 1.0f;
 	if (y1 == y2) y2 += 1.0f;
 
-	wmOrtho(x1, x2, y1, y2, -100, 100);
+	gpuOrtho(x1, x2, y1, y2, -100, 100);
 }
 
 static void wmOrtho2_offset(const float x, const float y, const float ofs)

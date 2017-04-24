@@ -203,6 +203,7 @@ extern bool pyrna_id_FromPyObject(struct PyObject *obj, struct ID **id);
 extern const char *BPY_app_translations_py_pgettext(const char *msgctxt, const char *msgid);
 extern const char *BPY_app_translations_py_pgettext(const char *msgctxt, const char *msgid);
 extern struct PyObject *pyrna_id_CreatePyObject(struct ID *id);
+extern bool pyrna_id_CheckPyObject(struct PyObject *obj);
 /* bpy_interface.c */
 bool BPY_string_is_keyword(const char *str) { return false; }
 
@@ -277,6 +278,8 @@ struct Object *RE_GetCamera(struct Render *re) RET_NULL
 float RE_lamp_get_data(struct ShadeInput *shi, struct Object *lamp_obj, float col[4], float lv[3], float *dist, float shadow[4]) RET_ZERO
 const float (*RE_object_instance_get_matrix(struct ObjectInstanceRen *obi, int matrix_id))[4] RET_NULL
 const float (*RE_render_current_get_matrix(int matrix_id))[4] RET_NULL
+float RE_object_instance_get_object_pass_index(struct ObjectInstanceRen *obi) RET_ZERO
+float RE_object_instance_get_random_id(struct ObjectInstanceRen *obi) RET_ZERO
 
 /* blenkernel */
 bool BKE_paint_proj_mesh_data_check(struct Scene *scene, struct Object *ob, bool *uvs, bool *mat, bool *tex, bool *stencil) RET_ZERO
@@ -547,9 +550,9 @@ bool ED_texture_context_check_others(const struct bContext *C) RET_ZERO
 bool ED_text_region_location_from_cursor(SpaceText *st, ARegion *ar, const int cursor_co[2], int r_pixel_co[2]) RET_ZERO
 
 SnapObjectContext *ED_transform_snap_object_context_create(
-        struct Main *bmain, struct Scene *scene, int flag) RET_NULL
+        struct Main *bmain, struct Scene *scene, struct SceneLayer *sl, int flag) RET_NULL
 SnapObjectContext *ED_transform_snap_object_context_create_view3d(
-        struct Main *bmain, struct Scene *scene, int flag,
+        struct Main *bmain, struct Scene *scene, struct SceneLayer *sl, int flag,
         const struct ARegion *ar, const struct View3D *v3d) RET_NULL
 void ED_transform_snap_object_context_destroy(SnapObjectContext *sctx) RET_NONE
 bool ED_transform_snap_object_project_ray_ex(
@@ -600,6 +603,7 @@ const char *uiLayoutIntrospect(uiLayout *layout) RET_NULL
 void UI_reinit_font(void) RET_NONE
 int UI_rnaptr_icon_get(struct bContext *C, struct PointerRNA *ptr, int rnaicon, const bool big) RET_ZERO
 struct bTheme *UI_GetTheme(void) RET_NULL
+void UI_GetThemeColor3fv(int colorid, float col[4]) RET_NONE
 void UI_GetThemeColor4fv(int colorid, float col[4]) RET_NONE
 void UI_GetThemeColorShade4fv(int colorid, int offset, float col[4]) RET_NONE
 void UI_GetThemeColorShadeAlpha4fv(int colorid, int coloffset, int alphaoffset, float col[4]) RET_NONE
@@ -639,6 +643,7 @@ void uiTemplateNodeView(struct uiLayout *layout, struct bContext *C, struct bNod
 void uiTemplateTextureUser(struct uiLayout *layout, struct bContext *C) RET_NONE
 void uiTemplateTextureShow(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop) RET_NONE
 void uiTemplateKeymapItemProperties(struct uiLayout *layout, struct PointerRNA *ptr) RET_NONE
+void uiTemplateOverrideProperty(struct uiLayout *layout, struct PointerRNA *collection_props_ptr, struct PointerRNA *scene_props_ptr, const char *name, const char *custom_template) RET_NONE
 void uiTemplateMovieClip(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, int compact) RET_NONE
 void uiTemplateMovieclipInformation(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, struct PointerRNA *userptr) RET_NONE
 void uiTemplateTrack(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname) RET_NONE
@@ -689,11 +694,10 @@ void RE_FreeAllPersistentData(void) RET_NONE
 float RE_fresnel_dielectric(float incoming[3], float normal[3], float eta) RET_ZERO
 
 /* Draw */
-void *DRW_render_settings_get(struct Scene *scene, const char *engine_name) RET_NULL
-
-void OBJECT_collection_settings_create(struct CollectionEngineSettings *ces) RET_NONE
-void EDIT_MESH_collection_settings_create(struct CollectionEngineSettings *ces) RET_NONE
-void EDIT_ARMATURE_collection_settings_create(struct CollectionEngineSettings *ces) RET_NONE
+void OBJECT_collection_settings_create(struct IDProperty *properties) RET_NONE
+void EDIT_MESH_collection_settings_create(struct IDProperty *properties) RET_NONE
+void EDIT_ARMATURE_collection_settings_create(struct IDProperty *properties) RET_NONE
+void DRW_object_engine_data_free(struct Object *ob) RET_NONE
 
 /* python */
 struct wmOperatorType *WM_operatortype_find(const char *idname, bool quiet) RET_NULL
@@ -736,6 +740,7 @@ int UI_pie_menu_invoke_from_operator_enum(struct bContext *C, const char *title,
 
 /* RNA COLLADA dependency */
 int collada_export(struct Scene *sce,
+                   struct SceneLayer *scene_layer,
                    const char *filepath,
                    int apply_modifiers,
                    BC_export_mesh_type export_mesh_type,
@@ -756,7 +761,9 @@ int collada_export(struct Scene *sce,
                    int use_blender_profile,
                    int sort_by_name,
                    BC_export_transformation_type export_transformation_type,
-                   int open_sim) RET_ZERO
+                   int open_sim,
+                   int limit_precision,
+                   int keep_bind_info) RET_ZERO
 
 void ED_mesh_calc_tessface(struct Mesh *mesh, bool free_mpoly) RET_NONE
 
@@ -772,6 +779,7 @@ void BPY_pyconstraint_exec(struct bPythonConstraint *con, struct bConstraintOb *
 void macro_wrapper(struct wmOperatorType *ot, void *userdata) RET_NONE
 bool pyrna_id_FromPyObject(struct PyObject *obj, struct ID **id) RET_ZERO
 struct PyObject *pyrna_id_CreatePyObject(struct ID *id) RET_NULL
+bool pyrna_id_CheckPyObject(struct PyObject *obj) RET_ZERO
 void BPY_context_update(struct bContext *C) RET_NONE
 const char *BPY_app_translations_py_pgettext(const char *msgctxt, const char *msgid) RET_ARG(msgid)
 

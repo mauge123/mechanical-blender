@@ -1103,9 +1103,13 @@ static void tex_mat_set_texture_cb(void *userData, int mat_nr, void *attribs)
 			/* bind texture */
 			glBindTexture(GL_TEXTURE_2D, ima->bindcode[TEXTARGET_TEXTURE_2D]);
 
+#if SUPPORT_LEGACY_MATRIX
 			glMatrixMode(GL_TEXTURE);
-			gpuLoadMatrix3D(texbase->tex_mapping.mat);
+			glLoadMatrixf((float*) texbase->tex_mapping.mat); /* TEXTURE */
 			glMatrixMode(GL_MODELVIEW);
+#else
+			(void)texbase;
+#endif
 
 			/* use active UV texture layer */
 			memset(gattribs, 0, sizeof(*gattribs));
@@ -1140,7 +1144,7 @@ static void tex_mat_set_texture_cb(void *userData, int mat_nr, void *attribs)
 	}
 	else {
 		glMatrixMode(GL_TEXTURE);
-		gpuLoadIdentity();
+		glLoadIdentity(); /* TEXTURE */
 		glMatrixMode(GL_MODELVIEW);
 
 		/* enable solid material */
@@ -1243,7 +1247,7 @@ void draw_mesh_textured(Scene *scene, SceneLayer *sl, View3D *v3d, RegionView3D 
 	glFrontFace(GL_CCW);
 
 	glMatrixMode(GL_TEXTURE);
-	gpuLoadIdentity();
+	glLoadIdentity(); /* TEXTURE */
 	glMatrixMode(GL_MODELVIEW);
 
 	/* faceselect mode drawing over textured mesh */

@@ -54,6 +54,7 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_editmesh.h"
 #include "BKE_key.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_material.h"
 #include "BKE_modifier.h"
@@ -80,7 +81,8 @@ static DerivedMesh *navmesh_dm_createNavMeshForVisualization(DerivedMesh *dm);
 #include "GPU_immediate.h"
 
 #ifdef WITH_OPENSUBDIV
-#  include "BKE_depsgraph.h"
+#  include "DEG_depsgraph.h"
+#  include "DEG_depsgraph_query.h"
 #  include "DNA_userdef_types.h"
 #endif
 
@@ -2604,7 +2606,7 @@ static bool calc_modifiers_skip_orco(Scene *scene,
 		else if ((ob->mode & (OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT | OB_MODE_TEXTURE_PAINT)) != 0) {
 			return false;
 		}
-		else if ((DAG_get_eval_flags_for_object(scene, ob) & DAG_EVAL_NEED_CPU) != 0) {
+		else if ((DEG_get_eval_flags_for_id(scene->depsgraph, &ob->id) & DAG_EVAL_NEED_CPU) != 0) {
 			return false;
 		}
 		SubsurfModifierData *smd = (SubsurfModifierData *)last_md;
@@ -2680,7 +2682,9 @@ static void editbmesh_build_data(Scene *scene, Object *obedit, BMEditMesh *em, C
 
 static CustomDataMask object_get_datamask(const Scene *scene, Object *ob, bool *r_need_mapping)
 {
-	Object *actob = scene->basact ? scene->basact->object : NULL;
+	/* TODO(sergey): Avoid this linear list lookup. */
+	SceneLayer *sl = BKE_scene_layer_context_active(scene);
+	Object *actob = sl->basact ? sl->basact->object : NULL;
 	CustomDataMask mask = ob->customdata_mask;
 
 	if (r_need_mapping) {
@@ -3957,8 +3961,8 @@ static void navmesh_drawColored(DerivedMesh *dm)
 #endif
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", COMP_F32, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_F32, 3, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_FLAT_COLOR);
 

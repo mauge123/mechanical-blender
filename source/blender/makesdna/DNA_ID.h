@@ -82,8 +82,6 @@ enum {
 	IDP_FLOAT            = 2,
 	IDP_ARRAY            = 5,
 	IDP_GROUP            = 6,
-	/* the ID link property type hasn't been implemented yet, this will require
-	 * some cleanup of blenkernel, most likely. */
 	IDP_ID               = 7,
 	IDP_DOUBLE           = 8,
 	IDP_IDPARRAY         = 9,
@@ -96,6 +94,15 @@ enum {
 enum {
 	IDP_STRING_SUB_UTF8  = 0,  /* default */
 	IDP_STRING_SUB_BYTE  = 1,  /* arbitrary byte array, _not_ null terminated */
+};
+
+/* IDP_GROUP */
+enum {
+	IDP_GROUP_SUB_NONE          = 0,  /* default */
+	IDP_GROUP_SUB_MODE_OBJECT   = 1,  /* object mode settings */
+	IDP_GROUP_SUB_MODE_EDIT     = 2,  /* mesh edit mode settings */
+	IDP_GROUP_SUB_ENGINE_RENDER = 3,  /* render engine settings */
+	IDP_GROUP_SUB_OVERRIDE      = 4,  /* data override */
 };
 
 /*->flag*/

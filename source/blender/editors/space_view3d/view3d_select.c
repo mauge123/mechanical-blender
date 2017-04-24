@@ -74,9 +74,6 @@
 #include "BKE_tracking.h"
 #include "BKE_utildefines.h"
 
-
-#include "BIF_glutil.h"
-
 #include "WM_api.h"
 #include "WM_types.h"
 
@@ -113,7 +110,7 @@ void view3d_set_viewcontext(bContext *C, ViewContext *vc)
 	memset(vc, 0, sizeof(ViewContext));
 	vc->ar = CTX_wm_region(C);
 	vc->scene = CTX_data_scene(C);
-	vc->sl = CTX_data_scene_layer(C);
+	vc->scene_layer = CTX_data_scene_layer(C);
 	vc->v3d = CTX_wm_view3d(C);
 	vc->win = CTX_wm_window(C);
 	vc->rv3d = CTX_wm_region_view3d(C);
@@ -393,9 +390,9 @@ static void do_lasso_select_objects(ViewContext *vc, const int mcords[][2], cons
 	Base *base;
 	
 	if (extend == false && select)
-		object_deselect_all_visible(vc->sl);
+		object_deselect_all_visible(vc->scene_layer);
 
-	for (base = vc->sl->object_bases.first; base; base = base->next) {
+	for (base = vc->scene_layer->object_bases.first; base; base = base->next) {
 		if (BASE_SELECTABLE_NEW(base)) { /* use this to avoid un-needed lasso lookups */
 			if (ED_view3d_project_base(vc->ar, base) == V3D_PROJ_RET_OK) {
 				if (BLI_lasso_is_point_inside(mcords, moves, base->sx, base->sy, IS_CLIPPED)) {
@@ -477,7 +474,7 @@ static void do_lasso_select_mesh(ViewContext *vc, const int mcords[][2], short m
 	/* for non zbuf projections, don't change the GL state */
 	ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
 
-	gpuLoadMatrix3D(vc->rv3d->viewmat);
+	gpuLoadMatrix(vc->rv3d->viewmat);
 	bbsel = EDBM_backbuf_border_mask_init(vc, mcords, moves, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
 	
 	if (ts->selectmode & SCE_SELECT_VERTEX) {
@@ -1267,7 +1264,7 @@ finally:
 static Base *mouse_select_eval_buffer(ViewContext *vc, unsigned int *buffer, int hits,
                                       Base *startbase, bool has_bones, bool do_nearest)
 {
-	SceneLayer *sl = vc->sl;
+	SceneLayer *sl = vc->scene_layer;
 	Base *base, *basact = NULL;
 	int a;
 	
@@ -1362,7 +1359,7 @@ Base *ED_view3d_give_base_under_cursor(bContext *C, const int mval[2])
 	
 	if (hits > 0) {
 		const bool has_bones = selectbuffer_has_bones(buffer, hits);
-		basact = mouse_select_eval_buffer(&vc, buffer, hits, vc.sl->object_bases.first, has_bones, do_nearest);
+		basact = mouse_select_eval_buffer(&vc, buffer, hits, vc.scene_layer->object_bases.first, has_bones, do_nearest);
 	}
 	
 	return basact;
@@ -1849,7 +1846,7 @@ static int do_mesh_box_select(ViewContext *vc, rcti *rect, bool select, bool ext
 	/* for non zbuf projections, don't change the GL state */
 	ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
 
-	gpuLoadMatrix3D(vc->rv3d->viewmat);
+	gpuLoadMatrix(vc->rv3d->viewmat);
 	bbsel = EDBM_backbuf_border_init(vc, rect->xmin, rect->ymin, rect->xmax, rect->ymax);
 
 	if (ts->selectmode & SCE_SELECT_VERTEX) {
@@ -2022,7 +2019,7 @@ static int do_object_pose_box_select(bContext *C, ViewContext *vc, rcti *rect, b
 			CTX_DATA_END;
 		}
 		else {
-			object_deselect_all_visible(vc->sl);
+			object_deselect_all_visible(vc->scene_layer);
 		}
 	}
 
@@ -2045,7 +2042,7 @@ static int do_object_pose_box_select(bContext *C, ViewContext *vc, rcti *rect, b
 		Base *base;
 		col = vbuffer + 3;
 		
-		for (base = vc->sl->object_bases.first; base && hits; base = base->next) {
+		for (base = vc->scene_layer->object_bases.first; base && hits; base = base->next) {
 			if (BASE_SELECTABLE_NEW(base)) {
 				while (base->selcol == (*col & 0xFFFF)) {   /* we got an object */
 					if (*col & 0xFFFF0000) {                    /* we got a bone */
@@ -2777,7 +2774,7 @@ static void obedit_circle_select(ViewContext *vc, const bool select, const int m
 
 static bool object_circle_select(ViewContext *vc, const bool select, const int mval[2], float rad)
 {
-	SceneLayer *sl = vc->sl;
+	SceneLayer *sl = vc->scene_layer;
 	const float radius_squared = rad * rad;
 	const float mval_fl[2] = {mval[0], mval[1]};
 	bool changed = false;

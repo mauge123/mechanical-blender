@@ -217,7 +217,6 @@ enum {
 /* scale fixed button widths by this to account for DPI */
 
 #define UI_DPI_FAC ((U.pixelsize * (float)U.dpi) / 72.0f)
-#define UI_DPI_WINDOW_FAC (((float)U.dpi) / 72.0f)
 /* 16 to copy ICON_DEFAULT_HEIGHT */
 #define UI_DPI_ICON_SIZE ((float)16 * UI_DPI_FAC)
 
@@ -309,16 +308,19 @@ typedef enum {
  * Functions to draw various shapes, taking theme settings into account.
  * Used for code that draws its own UI style elements. */
 
-void UI_draw_roundbox(float minx, float miny, float maxx, float maxy, float rad, const float color[4]);
 void UI_draw_roundbox_corner_set(int type);
+void UI_draw_roundbox_aa(bool filled, float minx, float miny, float maxx, float maxy, float rad, const float color[4]);
+void UI_draw_roundbox_4fv(bool filled, float minx, float miny, float maxx, float maxy, float rad, const float col[4]);
+void UI_draw_roundbox_3ubAlpha(bool filled, float minx, float miny, float maxx, float maxy, float rad, const unsigned char col[3], unsigned char alpha);
+void UI_draw_roundbox_3fvAlpha(bool filled, float minx, float miny, float maxx, float maxy, float rad, const float col[3], float alpha);
+void UI_draw_roundbox_shade_x(bool filled, float minx, float miny, float maxx, float maxy, float rad, float shadetop, float shadedown, const float col[4]);
+
+#if 0 /* unused */
 int  UI_draw_roundbox_corner_get(void);
-void UI_draw_roundbox_unfilled(float minx, float miny, float maxx, float maxy, float rad, const float color[4]);
+void UI_draw_roundbox_shade_y(bool filled, float minx, float miny, float maxx, float maxy, float rad, float shadeleft, float shaderight, const float col[4]);
+#endif
+
 void UI_draw_box_shadow(unsigned char alpha, float minx, float miny, float maxx, float maxy);
-void UI_draw_roundbox_gl_mode_3ubAlpha(int mode, float minx, float miny, float maxx, float maxy, float rad, unsigned char col[3], unsigned char alpha);
-void UI_draw_roundbox_gl_mode_3fvAlpha(int mode, float minx, float miny, float maxx, float maxy, float rad, float col[3], float alpha);
-void UI_draw_roundbox_gl_mode(int mode, float minx, float miny, float maxx, float maxy, float rad, float col[4]);
-void UI_draw_roundbox_shade_x(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadetop, float shadedown, const float col[4]);
-void UI_draw_roundbox_shade_y(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadeleft, float shaderight, const float col[4]);
 void UI_draw_text_underline(int pos_x, int pos_y, int len, int height, const float color[4]);
 
 void UI_draw_safe_areas(
@@ -424,7 +426,7 @@ typedef void (*uiBlockCancelFunc)(struct bContext *C, void *arg1);
 
 void UI_popup_block_invoke(struct bContext *C, uiBlockCreateFunc func, void *arg);
 void UI_popup_block_invoke_ex(struct bContext *C, uiBlockCreateFunc func, void *arg, const char *opname, int opcontext);
-void UI_popup_block_ex(struct bContext *C, uiBlockCreateFunc func, uiBlockHandleFunc popup_func, uiBlockCancelFunc cancel_func, void *arg);
+void UI_popup_block_ex(struct bContext *C, uiBlockCreateFunc func, uiBlockHandleFunc popup_func, uiBlockCancelFunc cancel_func, void *arg, struct wmOperator *op);
 /* void uiPupBlockOperator(struct bContext *C, uiBlockCreateFunc func, struct wmOperator *op, int opcontext); */ /* UNUSED */
 
 void UI_popup_block_close(struct bContext *C, struct wmWindow *win, uiBlock *block);
@@ -698,7 +700,7 @@ void    UI_but_func_search_set(
 int     UI_searchbox_size_y(void);
 int     UI_searchbox_size_x(void);
 /* check if a string is in an existing search box */
-int     UI_search_items_find_index(uiSearchItems *items, const char *name);
+int     UI_search_items_find_index(uiSearchItems *items, const char *name, const size_t offset);
 
 void    UI_block_func_handle_set(uiBlock *block, uiBlockHandleFunc func, void *arg);
 void    UI_block_func_butmenu_set(uiBlock *block, uiMenuHandleFunc func, void *arg);
@@ -790,7 +792,6 @@ void UI_popup_handlers_remove_all(struct bContext *C, struct ListBase *handlers)
 void UI_init(void);
 void UI_init_userdef(void);
 void UI_reinit_font(void);
-void UI_reinit_gl_state(void);
 void UI_exit(void);
 
 /* Layout
@@ -854,9 +855,6 @@ enum {
 	UI_CNR_NONE         = 0,
 	UI_CNR_ALL          = (UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT | UI_CNR_BOTTOM_LEFT)
 };
-
-/* not apart of the corner flags but mixed in some functions  */
-#define UI_RB_ALPHA (UI_CNR_ALL + 1)
 
 uiLayout *UI_block_layout(uiBlock *block, int dir, int type, int x, int y, int size, int em, int padding, struct uiStyle *style);
 void UI_block_layout_set_current(uiBlock *block, uiLayout *layout);
@@ -948,6 +946,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C);
 void uiTemplateEditModeSelection(uiLayout *layout, struct bContext *C);
 void uiTemplateReportsBanner(uiLayout *layout, struct bContext *C);
 void uiTemplateKeymapItemProperties(uiLayout *layout, struct PointerRNA *ptr);
+void uiTemplateOverrideProperty(uiLayout *layout, struct PointerRNA *collection_props_ptr, struct PointerRNA *scene_props_ptr, const char *name, const char *custom_template);
 void uiTemplateComponentMenu(uiLayout *layout, struct PointerRNA *ptr, const char *propname, const char *name);
 void uiTemplateNodeSocket(uiLayout *layout, struct bContext *C, float *color);
 void uiTemplateCacheFile(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname);

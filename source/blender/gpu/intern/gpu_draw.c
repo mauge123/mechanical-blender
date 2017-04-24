@@ -43,6 +43,7 @@
 #include "BLI_math.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
+#include "BLI_hash.h"
 
 #include "DNA_lamp_types.h"
 #include "DNA_material_types.h"
@@ -120,10 +121,10 @@ void GPU_render_text(
 		Image *ima = (Image *)mtexpoly->tpage;
 		const size_t textlen_st = textlen;
 		float centerx, centery, sizex, sizey, transx, transy, movex, movey, advance;
-		
+
 		/* multiline */
 		float line_start = 0.0f, line_height;
-		
+
 		if (v4)
 			line_height = max_ffff(v1[1], v2[1], v3[1], v4[2]) - min_ffff(v1[1], v2[1], v3[1], v4[2]);
 		else
@@ -131,7 +132,7 @@ void GPU_render_text(
 		line_height *= 1.2f; /* could be an option? */
 		/* end multiline */
 
-		
+
 		/* color has been set */
 		if (mtexpoly->mode & TF_OBCOL)
 			col = NULL;
@@ -139,22 +140,22 @@ void GPU_render_text(
 			glColor3f(1.0f, 1.0f, 1.0f);
 
 		gpuPushMatrix();
-		
+
 		/* get the tab width */
 		ImBuf *first_ibuf = BKE_image_get_first_ibuf(ima);
 		matrixGlyph(first_ibuf, ' ', &centerx, &centery,
-			&sizex, &sizey, &transx, &transy, &movex, &movey, &advance);
-		
+		    &sizex, &sizey, &transx, &transy, &movex, &movey, &advance);
+
 		float advance_tab = advance * 4; /* tab width could also be an option */
-		
-		
+
+
 		for (size_t index = 0; index < textlen_st; ) {
 			unsigned int character;
 			float uv[4][2];
 
 			/* lets calculate offset stuff */
 			character = BLI_str_utf8_as_unicode_and_size_safe(textstr + index, &index);
-			
+
 			if (character == '\n') {
 				gpuTranslate2f(line_start, -line_height);
 				line_start = 0.0f;
@@ -164,17 +165,17 @@ void GPU_render_text(
 				gpuTranslate2f(advance_tab, 0.0f);
 				line_start -= advance_tab; /* so we can go back to the start of the line */
 				continue;
-				
+
 			}
 			else if (character > USHRT_MAX) {
 				/* not much we can do here bmfonts take ushort */
 				character = '?';
 			}
-			
+
 			/* space starts at offset 1 */
 			/* character = character - ' ' + 1; */
 			matrixGlyph(first_ibuf, character, & centerx, &centery,
-				&sizex, &sizey, &transx, &transy, &movex, &movey, &advance);
+			    &sizex, &sizey, &transx, &transy, &movex, &movey, &advance);
 
 			uv[0][0] = (uv_quad[0][0] - centerx) * sizex + transx;
 			uv[0][1] = (uv_quad[0][1] - centery) * sizey + transy;
@@ -182,13 +183,13 @@ void GPU_render_text(
 			uv[1][1] = (uv_quad[1][1] - centery) * sizey + transy;
 			uv[2][0] = (uv_quad[2][0] - centerx) * sizex + transx;
 			uv[2][1] = (uv_quad[2][1] - centery) * sizey + transy;
-			
+
 			glBegin(GL_POLYGON);
 			if (glattrib >= 0) glVertexAttrib2fv(glattrib, uv[0]);
 			else glTexCoord2fv(uv[0]);
 			if (col) gpu_mcol(col[0]);
 			glVertex3f(sizex * v1[0] + movex, sizey * v1[1] + movey, v1[2]);
-			
+
 			if (glattrib >= 0) glVertexAttrib2fv(glattrib, uv[1]);
 			else glTexCoord2fv(uv[1]);
 			if (col) gpu_mcol(col[1]);
@@ -232,7 +233,7 @@ static bool is_over_resolution_limit(GLenum textarget, int w, int h)
 	int size = (textarget == GL_TEXTURE_2D) ?
 	        GPU_max_texture_size() : GPU_max_cube_map_size();
 	int reslimit = (U.glreslimit != 0) ?
-		min_ii(U.glreslimit, size) : size;
+	    min_ii(U.glreslimit, size) : size;
 
 	return (w > reslimit || h > reslimit);
 }
@@ -414,20 +415,22 @@ void GPU_clear_tpage(bool force)
 {
 	if (GTS.lasttface == NULL && !force)
 		return;
-	
+
 	GTS.lasttface = NULL;
 	GTS.curtile = 0;
 	GTS.curima = NULL;
 	if (GTS.curtilemode != 0) {
+#if SUPPORT_LEGACY_MATRIX
 		glMatrixMode(GL_TEXTURE);
-		gpuLoadIdentity();
+		glLoadIdentity(); /* TEXTURE */
 		glMatrixMode(GL_MODELVIEW);
+#endif
 	}
 	GTS.curtilemode = 0;
 	GTS.curtileXRep = 0;
 	GTS.curtileYRep = 0;
 	GTS.alphablend = -1;
-	
+
 	glDisable(GL_BLEND);
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_TEXTURE_GEN_S);
@@ -455,7 +458,7 @@ static void gpu_set_alpha_blend(GPUBlendMode alphablend)
 
 		/* for OpenGL render we use the alpha channel, this makes alpha blend correct */
 		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-		
+
 		/* if U.glalphaclip == 1.0, some cards go bonkers...
 		 * turn off alpha test in this case */
 
@@ -603,13 +606,15 @@ int GPU_verify_image(
 	if (GTS.tilemode != GTS.curtilemode || GTS.curtileXRep != GTS.tileXRep ||
 	    GTS.curtileYRep != GTS.tileYRep)
 	{
+#if SUPPORT_LEGACY_MATRIX
 		glMatrixMode(GL_TEXTURE);
-		gpuLoadIdentity();
+		glLoadIdentity(); /* TEXTURE */
 
 		if (ima && (ima->tpageflag & IMA_TILES))
-			gpuScale2f(ima->xrep, ima->yrep);
+			glScalef(ima->xrep, ima->yrep, 0); /* TEXTURE */
 
 		glMatrixMode(GL_MODELVIEW);
+#endif
 	}
 
 	/* check if we have a valid image */
@@ -647,29 +652,29 @@ int GPU_verify_image(
 		GPU_free_image(ima);
 		ima->tpageflag &= ~IMA_TPAGE_REFRESH;
 	}
-	
+
 	if (GTS.tilemode) {
 		/* tiled mode */
 		if (ima->repbind == NULL) gpu_make_repbind(ima);
 		if (GTS.tile >= ima->totbind) GTS.tile = 0;
-		
+
 		/* this happens when you change repeat buttons */
 		if (ima->repbind && textarget == GL_TEXTURE_2D) bind = &ima->repbind[GTS.tile];
 		else bind = gpu_get_image_bindcode(ima, textarget);
-		
+
 		if (*bind == 0) {
 			short texwindx = ibuf->x / ima->xrep;
 			short texwindy = ibuf->y / ima->yrep;
-			
+
 			if (GTS.tile >= ima->xrep * ima->yrep)
 				GTS.tile = ima->xrep * ima->yrep - 1;
-	
+
 			short texwinsy = GTS.tile / ima->xrep;
 			short texwinsx = GTS.tile - texwinsy * ima->xrep;
-	
+
 			texwinsx *= texwindx;
 			texwinsy *= texwindy;
-	
+
 			tpx = texwindx;
 			tpy = texwindy;
 
@@ -743,7 +748,7 @@ int GPU_verify_image(
 
 				memcpy(tilerectrow, rectrow, tpx * sizeof(*rectrow));
 			}
-			
+
 			rect = tilerect;
 		}
 	}
@@ -754,13 +759,13 @@ int GPU_verify_image(
 	else
 #endif
 		GPU_create_gl_tex(bind, rect, frect, rectw, recth, textarget, mipmap, use_high_bit_depth, ima);
-	
+
 	/* mark as non-color data texture */
 	if (*bind) {
 		if (is_data)
-			ima->tpageflag |= IMA_GLBIND_IS_DATA;	
+			ima->tpageflag |= IMA_GLBIND_IS_DATA;
 		else
-			ima->tpageflag &= ~IMA_GLBIND_IS_DATA;	
+			ima->tpageflag &= ~IMA_GLBIND_IS_DATA;
 	}
 
 	/* clean up */
@@ -946,7 +951,7 @@ void GPU_create_gl_tex(
 						if (mip_cube_map) {
 							for (int j = 0; j < 6; j++) {
 								glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, i,
-									informat, mipw, miph, 0, GL_RGBA, type, mip_cube_map[j]);
+								    informat, mipw, miph, 0, GL_RGBA, type, mip_cube_map[j]);
 							}
 						}
 						gpu_del_cube_map(mip_cube_map);
@@ -1027,7 +1032,7 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 		size = ((width + 3) / 4) * ((height + 3) / 4) * blocksize;
 
 		glCompressedTexImage2D(GL_TEXTURE_2D, i, format, width, height,
-			0, size, ibuf->dds_data.data + offset);
+		    0, size, ibuf->dds_data.data + offset);
 
 		offset += size;
 		width >>= 1;
@@ -1101,7 +1106,7 @@ int GPU_set_tpage(MTexPoly *mtexpoly, int mipmap, int alphablend)
 	}
 	else {
 		glDisable(GL_TEXTURE_2D);
-		
+
 		GTS.curtile = 0;
 		GTS.curima = NULL;
 		GTS.curtilemode = 0;
@@ -1110,9 +1115,9 @@ int GPU_set_tpage(MTexPoly *mtexpoly, int mipmap, int alphablend)
 
 		return 0;
 	}
-	
+
 	gpu_verify_repeat(ima);
-	
+
 	/* Did this get lost in the image recode? */
 	/* BKE_image_tag_time(ima);*/
 
@@ -1175,7 +1180,7 @@ void GPU_paint_set_mipmap(bool mipmap)
 
 
 /* check if image has been downscaled and do scaled partial update */
-static bool GPU_check_scaled_image(ImBuf *ibuf, Image *ima, float *frect, int x, int y, int w, int h)
+static bool gpu_check_scaled_image(ImBuf *ibuf, Image *ima, float *frect, int x, int y, int w, int h)
 {
 	if (is_over_resolution_limit(GL_TEXTURE_2D, ibuf->x, ibuf->y)) {
 		int x_limit = smaller_power_of_2_limit(ibuf->x);
@@ -1265,8 +1270,8 @@ void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, i
 			float *buffer = MEM_mallocN(w * h * sizeof(float) * 4, "temp_texpaint_float_buf");
 			bool is_data = (ima->tpageflag & IMA_GLBIND_IS_DATA) != 0;
 			IMB_partial_rect_from_float(ibuf, buffer, x, y, w, h, is_data);
-			
-			if (GPU_check_scaled_image(ibuf, ima, buffer, x, y, w, h)) {
+
+			if (gpu_check_scaled_image(ibuf, ima, buffer, x, y, w, h)) {
 				MEM_freeN(buffer);
 				BKE_image_release_ibuf(ima, ibuf, NULL);
 				return;
@@ -1290,7 +1295,7 @@ void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, i
 			return;
 		}
 
-		if (GPU_check_scaled_image(ibuf, ima, NULL, x, y, w, h)) {
+		if (gpu_check_scaled_image(ibuf, ima, NULL, x, y, w, h)) {
 			BKE_image_release_ibuf(ima, ibuf, NULL);
 			return;
 		}
@@ -1306,7 +1311,7 @@ void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, i
 		glPixelStorei(GL_UNPACK_SKIP_ROWS, y);
 
 		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA,
-			GL_UNSIGNED_BYTE, ibuf->rect);
+		    GL_UNSIGNED_BYTE, ibuf->rect);
 
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, row_length);
 		glPixelStorei(GL_UNPACK_SKIP_PIXELS, skip_pixels);
@@ -1330,9 +1335,9 @@ void GPU_update_images_framechange(void)
 		if (ima->tpageflag & IMA_TWINANIM) {
 			if (ima->twend >= ima->xrep * ima->yrep)
 				ima->twend = ima->xrep * ima->yrep - 1;
-		
+
 			/* check: is bindcode not in the array? free. (to do) */
-			
+
 			ima->lastframe++;
 			if (ima->lastframe > ima->twend)
 				ima->lastframe = ima->twsta;
@@ -1355,9 +1360,9 @@ int GPU_update_image_time(Image *ima, double time)
 
 	if (ima->tpageflag & IMA_TWINANIM) {
 		if (ima->twend >= ima->xrep * ima->yrep) ima->twend = ima->xrep * ima->yrep - 1;
-		
+
 		/* check: is the bindcode not in the array? Then free. (still to do) */
-		
+
 		float diff = (float)((float)time - ima->lastupdate);
 		inc = (int)(diff * (float)ima->animspeed);
 
@@ -1506,7 +1511,7 @@ void GPU_free_image(Image *ima)
 	/* free repeated image binding */
 	if (ima->repbind) {
 		glDeleteTextures(ima->totbind, (GLuint *)ima->repbind);
-	
+
 		MEM_freeN(ima->repbind);
 		ima->repbind = NULL;
 	}
@@ -1579,7 +1584,7 @@ typedef struct GPUMaterialFixed {
 	float spec[3];
 	int hard;
 	float alpha;
-} GPUMaterialFixed; 
+} GPUMaterialFixed;
 
 static struct GPUMaterialState {
 	GPUMaterialFixed (*matbuf);
@@ -1635,12 +1640,12 @@ static void gpu_material_to_fixed(
 		copy_v3_v3(smat->spec, &bmat->specr);
 		smat->alpha = 1.0f;
 		smat->hard = CLAMPIS(bmat->har, 0, 128);
-		
+
 		if (dimdown) {
 			mul_v3_fl(smat->diff, 0.8f);
 			mul_v3_fl(smat->spec, 0.5f);
 		}
-		
+
 		if (gamma) {
 			linearrgb_to_srgb_v3_v3(smat->diff, smat->diff);
 			linearrgb_to_srgb_v3_v3(smat->spec, smat->spec);
@@ -1651,7 +1656,7 @@ static void gpu_material_to_fixed(
 
 		if (bmat->shade_flag & MA_OBCOLOR)
 			mul_v3_v3(smat->diff, ob->col);
-		
+
 		mul_v3_v3fl(smat->spec, &bmat->specr, bmat->spec);
 		smat->hard = CLAMPIS(bmat->har, 1, 128);
 		smat->alpha = 1.0f;
@@ -1769,7 +1774,7 @@ void GPU_begin_object_materials(
 	GMS.is_alpha_pass = (v3d->transp != false);
 	if (GMS.use_alpha_pass)
 		*do_alpha_after = false;
-	
+
 	if (GMS.totmat > FIXEDMAT) {
 		GMS.matbuf = MEM_callocN(sizeof(GPUMaterialFixed) * GMS.totmat, "GMS.matbuf");
 		GMS.gmatbuf = MEM_callocN(sizeof(*GMS.gmatbuf) * GMS.totmat, "GMS.matbuf");
@@ -1788,11 +1793,11 @@ void GPU_begin_object_materials(
 
 		/* do material 1 too, for displists! */
 		memcpy(&GMS.matbuf[1], &GMS.matbuf[0], sizeof(GPUMaterialFixed));
-	
+
 		GMS.alphablend[0] = GPU_BLEND_SOLID;
 	}
 	else {
-	
+
 		/* no materials assigned? */
 		if (ob->totcol == 0) {
 			gpu_material_to_fixed(&GMS.matbuf[0], &defmaterial, 0, ob, new_shading_nodes, true);
@@ -1807,7 +1812,7 @@ void GPU_begin_object_materials(
 
 			GMS.alphablend[0] = GPU_BLEND_SOLID;
 		}
-		
+
 		/* setup materials */
 		for (a = 1; a <= ob->totcol; a++) {
 			/* find a suitable material */
@@ -1851,7 +1856,7 @@ void GPU_begin_object_materials(
 	GPU_object_material_unbind();
 }
 
-static int GPU_get_particle_info(GPUParticleInfo *pi)
+static int gpu_get_particle_info(GPUParticleInfo *pi)
 {
 	DupliObject *dob = GMS.dob;
 	if (dob->particle_system) {
@@ -1878,6 +1883,21 @@ static int GPU_get_particle_info(GPUParticleInfo *pi)
 	}
 	else
 		return 0;
+}
+
+static void GPU_get_object_info(float oi[3], Material *mat)
+{
+	Object *ob = GMS.gob;
+	oi[0] = ob->index;
+	oi[1] = mat->index;
+	unsigned int random;
+	if (GMS.dob) {
+		random = GMS.dob->random_id;
+	}
+	else {
+		random = BLI_hash_int_2d(BLI_hash_string(GMS.gob->id.name + 2), 0);
+	}
+	oi[2] = random * (1.0f/(float)0xFFFFFFFF);
 }
 
 int GPU_object_material_bind(int nr, void *attribs)
@@ -1939,21 +1959,27 @@ int GPU_object_material_bind(int nr, void *attribs)
 			/* bind glsl material and get attributes */
 			Material *mat = GMS.gmatbuf[nr];
 			GPUParticleInfo partile_info;
+			float object_info[3] = {0};
 
 			float auto_bump_scale;
 
 			GPUMaterial *gpumat = GPU_material_from_blender(GMS.gscene, mat, GMS.is_opensubdiv);
 			GPU_material_vertex_attributes(gpumat, gattribs);
 
-			if (GMS.dob)
-				GPU_get_particle_info(&partile_info);
+			if (GMS.dob) {
+				gpu_get_particle_info(&partile_info);
+			}
+			
+			if ((GPU_get_material_builtins(gpumat) & GPU_OBJECT_INFO) != 0) {
+				GPU_get_object_info(object_info, mat);
+			}
 
 			GPU_material_bind(
 			        gpumat, GMS.gob->lay, GMS.glay, 1.0, !(GMS.gob->mode & OB_MODE_TEXTURE_PAINT),
 			        GMS.gviewmat, GMS.gviewinv, GMS.gviewcamtexcofac, GMS.gscenelock);
 
 			auto_bump_scale = GMS.gob->derivedFinal != NULL ? GMS.gob->derivedFinal->auto_bump_scale : 1.0f;
-			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, auto_bump_scale, &partile_info);
+			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, auto_bump_scale, &partile_info, object_info);
 			GMS.gboundmat = mat;
 
 			/* for glsl use alpha blend mode, unless it's set to solid and
@@ -2021,7 +2047,7 @@ void GPU_set_material_alpha_blend(int alphablend)
 {
 	if (GMS.lastalphablend == alphablend)
 		return;
-	
+
 	gpu_set_alpha_blend(alphablend);
 	GMS.lastalphablend = alphablend;
 }
@@ -2095,9 +2121,11 @@ void GPU_end_object_materials(void)
 
 	/* resetting the texture matrix after the scaling needed for tiled textures */
 	if (GTS.tilemode) {
+#if SUPPORT_LEGACY_MATRIX
 		glMatrixMode(GL_TEXTURE);
-		gpuLoadIdentity();
+		glLoadIdentity(); /* TEXTURE */
 		glMatrixMode(GL_MODELVIEW);
+#endif
 	}
 }
 
@@ -2112,13 +2140,13 @@ int GPU_default_lights(void)
 		U.light[0].col[0] = 0.8; U.light[0].col[1] = 0.8; U.light[0].col[2] = 0.8;
 		U.light[0].spec[0] = 0.5; U.light[0].spec[1] = 0.5; U.light[0].spec[2] = 0.5;
 		U.light[0].spec[3] = 1.0;
-		
+
 		U.light[1].flag = 0;
 		U.light[1].vec[0] = 0.5; U.light[1].vec[1] = 0.5; U.light[1].vec[2] = 0.1;
 		U.light[1].col[0] = 0.4; U.light[1].col[1] = 0.4; U.light[1].col[2] = 0.8;
 		U.light[1].spec[0] = 0.3; U.light[1].spec[1] = 0.3; U.light[1].spec[2] = 0.5;
 		U.light[1].spec[3] = 1.0;
-	
+
 		U.light[2].flag = 0;
 		U.light[2].vec[0] = 0.3; U.light[2].vec[1] = -0.3; U.light[2].vec[2] = -0.2;
 		U.light[2].col[0] = 0.8; U.light[2].col[1] = 0.5; U.light[2].col[2] = 0.4;
@@ -2156,7 +2184,7 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 	/* disable all lights */
 	for (int count = 0; count < 8; count++)
 		GPU_basic_shader_light_set(count, NULL);
-	
+
 	/* view direction for specular is not computed correct by default in
 	 * opengl, so we set the settings ourselfs */
 	GPU_basic_shader_light_set_viewer(!ortho);
@@ -2171,11 +2199,11 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 			continue;
 
 		Lamp *la = base->object->data;
-		
+
 		/* setup lamp transform */
 		gpuPushMatrix();
-		gpuLoadMatrix3D(viewmat);
-		
+		gpuLoadMatrix(viewmat);
+
 		/* setup light */
 		GPULightData light = {0};
 
@@ -2194,7 +2222,7 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 			light.constant_attenuation = 1.0f;
 			light.linear_attenuation = la->att1 / la->dist;
 			light.quadratic_attenuation = la->att2 / (la->dist * la->dist);
-			
+
 			if (la->type == LA_SPOT) {
 				light.type = GPU_LIGHT_SPOT;
 				negate_v3_v3(light.direction, base->object->obmat[2]);
@@ -2205,11 +2233,11 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][
 			else
 				light.type = GPU_LIGHT_POINT;
 		}
-		
+
 		GPU_basic_shader_light_set(count, &light);
-		
+
 		gpuPopMatrix();
-		
+
 		count++;
 		if (count == 8)
 			break;
@@ -2263,6 +2291,7 @@ void GPU_state_init(void)
 	/* TODO: remove this when we switch to core profile */
 	glEnable(GL_POINT_SPRITE);
 
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	glDepthFunc(GL_LEQUAL);
 	/* scaling matrices */
@@ -2277,25 +2306,19 @@ void GPU_state_init(void)
 	glDisable(GL_TEXTURE_2D);
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-	/* default disabled, enable should be local per function */
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
 	glDepthRange(0.0, 1.0);
 
+#if SUPPORT_LEGACY_MATRIX
 	glMatrixMode(GL_TEXTURE);
-	gpuLoadIdentity();
+	glLoadIdentity(); /* TEXTURE */
 	glMatrixMode(GL_MODELVIEW);
+#endif
 
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
 	glDisable(GL_CULL_FACE);
 
 	gpu_multisample(false);
-
-	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 }
 
 void GPU_enable_program_point_size(void)
@@ -2461,10 +2484,10 @@ void GPU_select_to_index_array(unsigned int *col, const unsigned int size)
 {
 #define INDEX_BUF_ARRAY(INDEX_FROM_BUF_BITS) \
 	for (i = size; i--; col++) { \
-		if ((c = *col)) { \
-			*col = INDEX_FROM_BUF_BITS(c); \
-		} \
-	} ((void)0)
+	    if ((c = *col)) { \
+	        *col = INDEX_FROM_BUF_BITS(c); \
+        } \
+    } ((void)0)
 
 	if (size > 0) {
 		unsigned int i, c;
@@ -2490,6 +2513,133 @@ void GPU_select_to_index_array(unsigned int *col, const unsigned int size)
 	}
 
 #undef INDEX_BUF_ARRAY
+}
+
+/**
+ * Replacement for glPush/PopAttributes
+ *
+ * We don't need to cover all the options of legacy OpenGL
+ * but simply the ones used by Blender.
+ */
+void gpuSaveState(GPUStateValues *values, eGPUStateMask mask)
+{
+	values->mask = mask;
+
+	if ((mask & GPU_DEPTH_BUFFER_BIT) != 0) {
+		values->is_depth_test = glIsEnabled(GL_DEPTH_TEST);
+		glGetIntegerv(GL_DEPTH_FUNC, &values->depth_func);
+		glGetDoublev(GL_DEPTH_CLEAR_VALUE, &values->depth_clear_value);
+		glGetBooleanv(GL_DEPTH_WRITEMASK, (GLboolean *)&values->depth_write_mask);
+	}
+
+	if ((mask & GPU_ENABLE_BIT) != 0) {
+		values->is_alpha_test = glIsEnabled(GL_ALPHA_TEST);
+		values->is_blend = glIsEnabled(GL_BLEND);
+
+		for (int i = 0; i < 6; i++) {
+			values->is_clip_plane[i] = glIsEnabled(GL_CLIP_PLANE0 + i);
+		}
+
+		values->is_cull_face = glIsEnabled(GL_CULL_FACE);
+		values->is_depth_test = glIsEnabled(GL_DEPTH_TEST);
+		values->is_dither = glIsEnabled(GL_DITHER);
+
+		for (int i = 0; i < 8; i++) {
+			values->is_light[i] = glIsEnabled(GL_LIGHT0 + i);
+		}
+
+		values->is_line_smooth = glIsEnabled(GL_LINE_SMOOTH);
+		values->is_color_logic_op = glIsEnabled(GL_COLOR_LOGIC_OP);
+		values->is_map1_vertex3 = glIsEnabled(GL_MAP1_VERTEX_3);
+		values->is_multisample = glIsEnabled(GL_MULTISAMPLE);
+		values->is_normalize = glIsEnabled(GL_NORMALIZE);
+		values->is_polygon_offset_line = glIsEnabled(GL_POLYGON_OFFSET_LINE);
+		values->is_polygon_offset_fill = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+		values->is_polygon_smooth = glIsEnabled(GL_POLYGON_SMOOTH);
+		values->is_sample_alpha_to_coverage = glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		values->is_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+		values->is_stencil_test = glIsEnabled(GL_STENCIL_TEST);
+		values->is_texture_2d = glIsEnabled(GL_TEXTURE_2D);
+	}
+
+	if ((mask & GPU_SCISSOR_BIT) != 0) {
+		values->is_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+		glGetIntegerv(GL_SCISSOR_BOX, (GLint *)&values->scissor_box);
+	}
+
+	if ((mask & GPU_VIEWPORT_BIT) != 0) {
+		glGetDoublev(GL_DEPTH_RANGE, (GLdouble *)&values->near_far);
+		glGetIntegerv(GL_VIEWPORT, (GLint *)&values->viewport);
+	}
+
+	if ((mask & GPU_BLEND_BIT) != 0) {
+		values->is_blend = glIsEnabled(GL_BLEND);
+	}
+}
+
+static void restore_mask(GLenum cap, const bool value) {
+	if (value) {
+		glEnable(cap);
+	}
+	else {
+		glDisable(cap);
+	}
+}
+
+void gpuRestoreState(GPUStateValues *values)
+{
+	GLint mask = values->mask;
+
+	if ((mask & GPU_DEPTH_BUFFER_BIT) != 0) {
+		restore_mask(GL_DEPTH_TEST, values->is_depth_test);
+		glDepthFunc(values->depth_func);
+		glClearDepth(values->depth_clear_value);
+		glDepthMask(values->depth_write_mask);
+	}
+
+	if ((mask & GPU_ENABLE_BIT) != 0) {
+		restore_mask(GL_ALPHA_TEST, values->is_alpha_test);
+		restore_mask(GL_BLEND, values->is_blend);
+
+		for (int i = 0; i < 6; i++) {
+			restore_mask(GL_CLIP_PLANE0 + i, values->is_clip_plane[i]);
+		}
+
+		restore_mask(GL_CULL_FACE, values->is_cull_face);
+		restore_mask(GL_DEPTH_TEST, values->is_depth_test);
+		restore_mask(GL_DITHER, values->is_dither);
+
+		for (int i = 0; i < 6; i++) {
+			restore_mask(GL_LIGHT0 + i, values->is_light[i]);
+		}
+
+		restore_mask(GL_LINE_SMOOTH, values->is_line_smooth);
+		restore_mask(GL_COLOR_LOGIC_OP, values->is_color_logic_op);
+		restore_mask(GL_MAP1_VERTEX_3, values->is_map1_vertex3);
+		restore_mask(GL_MULTISAMPLE, values->is_multisample);
+		restore_mask(GL_NORMALIZE, values->is_normalize);
+		restore_mask(GL_POLYGON_OFFSET_LINE, values->is_polygon_offset_line);
+		restore_mask(GL_POLYGON_OFFSET_FILL, values->is_polygon_offset_fill);
+		restore_mask(GL_POLYGON_SMOOTH, values->is_polygon_smooth);
+		restore_mask(GL_SAMPLE_ALPHA_TO_COVERAGE, values->is_sample_alpha_to_coverage);
+		restore_mask(GL_SCISSOR_TEST, values->is_scissor_test);
+		restore_mask(GL_STENCIL_TEST, values->is_stencil_test);
+		restore_mask(GL_TEXTURE_2D, values->is_texture_2d);
+	}
+
+	if ((mask & GPU_VIEWPORT_BIT) != 0) {
+		glViewport(values->viewport[0], values->viewport[1], values->viewport[2], values->viewport[3]);
+		glDepthRange(values->near_far[0], values->near_far[1]);
+	}
+
+	if ((mask & GPU_SCISSOR_BIT) != 0) {
+		restore_mask(GL_SCISSOR_TEST, values->is_scissor_test);
+		glScissor(values->scissor_box[0], values->scissor_box[1], values->scissor_box[2], values->scissor_box[3]);
+	}
+
+	if ((mask & GPU_BLEND_BIT) != 0) {
+		restore_mask(GL_BLEND, values->is_blend);
+	}
 }
 
 /** \} */

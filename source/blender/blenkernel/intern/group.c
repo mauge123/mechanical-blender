@@ -45,8 +45,6 @@
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 
-
-#include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_group.h"
 #include "BKE_icons.h"
@@ -314,7 +312,7 @@ static void group_replaces_nla(Object *parent, Object *target, char mode)
  * you can draw everything, leaves tags in objects to signal it needs further updating */
 
 /* note: does not work for derivedmesh and render... it recreates all again in convertblender.c */
-void BKE_group_handle_recalc_and_update(EvaluationContext *eval_ctx, Scene *scene, Object *UNUSED(parent), Group *group)
+void BKE_group_handle_recalc_and_update(struct EvaluationContext *eval_ctx, Scene *scene, Object *UNUSED(parent), Group *group)
 {
 	GroupObject *go;
 	

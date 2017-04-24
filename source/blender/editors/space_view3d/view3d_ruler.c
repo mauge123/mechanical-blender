@@ -44,6 +44,7 @@
 #include "BIF_gl.h"
 
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -282,7 +283,7 @@ static void ruler_state_set(bContext *C, RulerInfo *ruler_info, int state)
 	}
 	else if (state == RULER_STATE_DRAG) {
 		ruler_info->snap_context = ED_transform_snap_object_context_create_view3d(
-		        CTX_data_main(C), CTX_data_scene(C), 0,
+		        CTX_data_main(C), CTX_data_scene(C), CTX_data_scene_layer(C), 0,
 		        ruler_info->ar, CTX_wm_view3d(C));
 	}
 	else {
@@ -459,12 +460,12 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 		glEnable(GL_BLEND);
 
 		if (ruler_item->flag & RULERITEM_USE_ANGLE) {
-			unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 			imm_cpack(is_act ? color_act : color_base);
 
-			immBegin(GL_LINE_STRIP, 3);
+			immBegin(PRIM_LINE_STRIP, 3);
 
 			for (j = 0; j < 3; j++) {
 				immVertex2fv(pos, co_ss[j]);
@@ -475,7 +476,7 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 			imm_cpack(0xaaaaaa);
 			setlinestyle(3);
 
-			immBegin(GL_LINE_STRIP, 3);
+			immBegin(PRIM_LINE_STRIP, 3);
 
 			for (j = 0; j < 3; j++) {
 				immVertex2fv(pos, co_ss[j]);
@@ -515,7 +516,7 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 
 				immUniformColor3ubv(color_wire);
 
-				immBegin(GL_LINE_STRIP, arc_steps + 1);
+				immBegin(PRIM_LINE_STRIP, arc_steps + 1);
 
 				for (j = 0; j <= arc_steps; j++) {
 					madd_v3_v3v3fl(co_tmp, ruler_item->co[1], dir_tmp, px_scale);
@@ -548,7 +549,7 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 
 				immUniformColor3ubv(color_wire);
 
-				immBegin(GL_LINES, 8);
+				immBegin(PRIM_LINES, 8);
 
 				madd_v2_v2v2fl(cap, co_ss[0], rot_90_vec_a, cap_size);
 				immVertex2fv(pos, cap);
@@ -589,7 +590,7 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 
 				/* draw text (bg) */
 				UI_draw_roundbox_corner_set(UI_CNR_ALL);
-				UI_draw_roundbox(
+				UI_draw_roundbox_aa(true,
 				        posit[0] - bg_margin,                  posit[1] - bg_margin,
 				        posit[0] + bg_margin + numstr_size[0], posit[1] + bg_margin + numstr_size[1],
 				        bg_radius, color_back);
@@ -601,12 +602,12 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 			}
 		}
 		else {
-			unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 			imm_cpack(is_act ? color_act : color_base);
 
-			immBegin(GL_LINE_STRIP, 2);
+			immBegin(PRIM_LINE_STRIP, 2);
 
 			for (j = 0; j < 3; j += 2) {
 				immVertex2fv(pos, co_ss[j]);
@@ -617,7 +618,7 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 			imm_cpack(0xaaaaaa);
 			setlinestyle(3);
 
-			immBegin(GL_LINE_STRIP, 2);
+			immBegin(PRIM_LINE_STRIP, 2);
 
 			for (j = 0; j < 3; j += 2) {
 				immVertex2fv(pos, co_ss[j]);
@@ -640,7 +641,7 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 
 				immUniformColor3ubv(color_wire);
 
-				immBegin(GL_LINES, 4);
+				immBegin(PRIM_LINES, 4);
 
 				madd_v2_v2v2fl(cap, co_ss[0], rot_90_vec, cap_size);
 				immVertex2fv(pos, cap);
@@ -678,7 +679,8 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 
 				/* draw text (bg) */
 				UI_draw_roundbox_corner_set(UI_CNR_ALL);
-				UI_draw_roundbox(posit[0] - bg_margin,                  posit[1] - bg_margin,
+				UI_draw_roundbox_aa(true,
+				           posit[0] - bg_margin,                  posit[1] - bg_margin,
 				           posit[0] + bg_margin + numstr_size[0], posit[1] + bg_margin + numstr_size[1],
 				           bg_radius, color_back);
 				/* draw text */
@@ -704,12 +706,12 @@ static void ruler_info_draw_pixel(const struct bContext *C, ARegion *ar, void *a
 			float co_ss[3];
 			ED_view3d_project_float_global(ar, ruler_item->co[ruler_item->co_index], co_ss, V3D_PROJ_TEST_NOP);
 
-			unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 			imm_cpack(color_act);
 
-			imm_draw_lined_circle(pos, co_ss[0], co_ss[1], size * U.pixelsize, 32);
+			imm_draw_circle_wire(pos, co_ss[0], co_ss[1], size * U.pixelsize, 32);
 
 			immUnbindProgram();
 		}

@@ -288,7 +288,7 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
 
 static void createTransTexspace(TransInfo *t)
 {
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	TransData *td;
 	Object *ob;
 	ID *id;
@@ -1802,7 +1802,7 @@ static void createTransParticleVerts(bContext *C, TransInfo *t)
 	Base *base = CTX_data_active_base(C);
 	Object *ob = CTX_data_active_object(C);
 	ParticleEditSettings *pset = PE_settings(t->scene);
-	PTCacheEdit *edit = PE_get_current(t->scene, t->sl, ob);
+	PTCacheEdit *edit = PE_get_current(t->scene, t->scene_layer, ob);
 	ParticleSystem *psys = NULL;
 	ParticleSystemModifierData *psmd = NULL;
 	PTCacheEditPoint *point;
@@ -1919,7 +1919,7 @@ static void createTransParticleVerts(bContext *C, TransInfo *t)
 void flushTransParticles(TransInfo *t)
 {
 	Scene *scene = t->scene;
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	Object *ob = OBACT_NEW;
 	PTCacheEdit *edit = PE_get_current(scene, sl, ob);
 	ParticleSystem *psys = edit->psys;
@@ -5543,7 +5543,7 @@ void set_trans_object_base_flags(TransInfo *t)
 static void set_trans_object_base_flags(TransInfo *t)
 #endif
 {
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 
 	/*
 	 * if Base selected and has parent selected:
@@ -5556,7 +5556,7 @@ static void set_trans_object_base_flags(TransInfo *t)
 		return;
 
 	/* makes sure base flags and object flags are identical */
-	BKE_scene_base_flag_to_objects(t->sl);
+	BKE_scene_base_flag_to_objects(t->scene_layer);
 
 	/* Make sure depsgraph is here. */
 	DAG_scene_relations_update(G.main, t->scene);
@@ -5633,7 +5633,7 @@ static bool mark_children(Object *ob)
 static int count_proportional_objects(TransInfo *t)
 {
 	int total = 0;
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	Base *base;
 
 	/* rotations around local centers are allowed to propagate, so we take all objects */
@@ -5702,7 +5702,7 @@ void clear_trans_object_base_flags(TransInfo *t)
 static void clear_trans_object_base_flags(TransInfo *t)
 #endif
 {
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	Base *base;
 
 	for (base = sl->object_bases.first; base; base = base->next) {
@@ -6497,10 +6497,10 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 	else if (t->options & CTX_PAINT_CURVE) {
 		/* pass */
 	}
-	else if ((t->scene->basact) &&
-	         (ob = t->scene->basact->object) &&
+	else if ((t->scene_layer->basact) &&
+	         (ob = t->scene_layer->basact->object) &&
 	         (ob->mode & OB_MODE_PARTICLE_EDIT) &&
-	         PE_get_current(t->scene, t->sl, ob))
+	         PE_get_current(t->scene, t->scene_layer, ob))
 	{
 		/* do nothing */
 	}
@@ -6541,7 +6541,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 			/* Set autokey if necessary */
 			if (!canceled) {
-				autokeyframe_ob_cb_func(C, t->scene, t->sl, (View3D *)t->view, ob, t->mode);
+				autokeyframe_ob_cb_func(C, t->scene, t->scene_layer, (View3D *)t->view, ob, t->mode);
 			}
 			
 			/* restore rigid body transform */
@@ -6576,8 +6576,6 @@ int special_transform_moving(TransInfo *t)
 
 static void createTransObject(bContext *C, TransInfo *t)
 {
-	Scene *scene = t->scene;
-
 	TransData *td = NULL;
 	TransDataExtension *tx;
 	const bool is_prop_edit = (t->flag & T_PROP_EDIT) != 0;
@@ -6633,15 +6631,16 @@ static void createTransObject(bContext *C, TransInfo *t)
 	CTX_DATA_END;
 	
 	if (is_prop_edit) {
-		View3D *v3d = t->view;
-		BaseLegacy *base;
+		SceneLayer *sl = t->scene_layer;
+		Base *base;
 
-		for (base = scene->base.first; base; base = base->next) {
+		for (base = sl->object_bases.first; base; base = base->next) {
 			Object *ob = base->object;
 
 			/* if base is not selected, not a parent of selection or not a child of selection and it is editable */
-			if ((ob->flag & (SELECT | BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT)) == 0 &&
-			    BASE_EDITABLE_BGMODE(v3d, scene, base))
+			if ((ob->flag & (BA_TRANSFORM_CHILD | BA_TRANSFORM_PARENT)) == 0 &&
+			    (base->flag & BASE_SELECTED) == 0 &&
+			    BASE_EDITABLE_BGMODE_NEW(base))
 			{
 				td->protectflag = ob->protectflag;
 				td->ext = tx;
@@ -8088,7 +8087,7 @@ static void createTransGPencil(bContext *C, TransInfo *t)
 void createTransData(bContext *C, TransInfo *t)
 {
 	Scene *scene = t->scene;
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	Object *ob = OBACT_NEW;
 
 	/* if tests must match recalcData for correct updates */
@@ -8264,7 +8263,7 @@ void createTransData(bContext *C, TransInfo *t)
 		 * lines below just check is also visible */
 		Object *ob_armature = modifiers_isDeformedByArmature(ob);
 		if (ob_armature && ob_armature->mode & OB_MODE_POSE) {
-			Base *base_arm = BKE_scene_layer_base_find(t->sl, ob_armature);
+			Base *base_arm = BKE_scene_layer_base_find(t->scene_layer, ob_armature);
 			if (base_arm) {
 				if (BASE_VISIBLE_NEW(base_arm)) {
 					createTransPose(t, ob_armature);

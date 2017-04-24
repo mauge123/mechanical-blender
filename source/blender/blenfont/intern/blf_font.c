@@ -174,10 +174,10 @@ static void blf_font_ensure_ascii_table(FontBLF *font)
 	}                                                                            \
 } (void)0
 
-static unsigned verts_needed(const FontBLF *font, const char *str, size_t len)
+static unsigned int verts_needed(const FontBLF *font, const char *str, size_t len)
 {
-	unsigned length = (unsigned)((len == INT_MAX) ? strlen(str) : len);
-	unsigned quad_ct = 1;
+	unsigned int length = (unsigned int)((len == INT_MAX) ? strlen(str) : len);
+	unsigned int quad_ct = 1;
 
 	if (font->flags & BLF_SHADOW) {
 		if (font->shadow == 0)
@@ -188,7 +188,7 @@ static unsigned verts_needed(const FontBLF *font, const char *str, size_t len)
 			quad_ct += 25; /* 5x5 kernel */
 	}
 
-	return length * quad_ct * 4;
+	return length * quad_ct * 6;
 }
 
 static void blf_font_draw_ex(
@@ -206,7 +206,7 @@ static void blf_font_draw_ex(
 
 	blf_font_ensure_ascii_table(font);
 
-	immBeginAtMost(GL_QUADS, verts_needed(font, str, len));
+	immBeginAtMost(PRIM_TRIANGLES, verts_needed(font, str, len));
 	/* at most because some glyphs might be clipped & not drawn */
 
 	while ((i < len) && str[i]) {
@@ -253,7 +253,7 @@ static void blf_font_draw_ascii_ex(
 
 	blf_font_ensure_ascii_table(font);
 
-	immBeginAtMost(GL_QUADS, verts_needed(font, str, len));
+	immBeginAtMost(PRIM_TRIANGLES, verts_needed(font, str, len));
 
 	while ((c = *(str++)) && len--) {
 		BLI_assert(c < 128);
@@ -293,7 +293,7 @@ int blf_font_draw_mono(FontBLF *font, const char *str, size_t len, int cwidth)
 
 	blf_font_ensure_ascii_table(font);
 
-	immBeginAtMost(GL_QUADS, verts_needed(font, str, len));
+	immBeginAtMost(PRIM_TRIANGLES, verts_needed(font, str, len));
 
 	while ((i < len) && str[i]) {
 		BLF_UTF8_NEXT_FAST(font, g, str, i, c, glyph_ascii_table);

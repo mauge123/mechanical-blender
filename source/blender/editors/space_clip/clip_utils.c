@@ -71,7 +71,7 @@ void clip_graph_tracking_values_iterate_track(
 	BKE_movieclip_get_size(clip, &sc->user, &width, &height);
 
 	for (coord = 0; coord < 2; coord++) {
-		int i, prevfra = 0;
+		int i, prevfra = track->markers[0].framenr;
 		bool open = false;
 		float prevval = 0.0f;
 
@@ -184,6 +184,7 @@ void clip_delete_track(bContext *C, MovieClip *clip, MovieTrackingTrack *track)
 	ListBase *tracksbase = BKE_tracking_get_active_tracks(tracking);
 	bool has_bundle = false;
 	char track_name_escaped[MAX_NAME], prefix[MAX_NAME * 2];
+	const bool used_for_stabilization = (track->flag & (TRACK_USE_2D_STAB | TRACK_USE_2D_STAB_ROT));
 
 	if (track == act_track)
 		tracking->act_track = NULL;
@@ -205,7 +206,7 @@ void clip_delete_track(bContext *C, MovieClip *clip, MovieTrackingTrack *track)
 
 	WM_event_add_notifier(C, NC_MOVIECLIP | NA_EDITED, clip);
 
-	if (track->flag & (TRACK_USE_2D_STAB | TRACK_USE_2D_STAB_ROT)) {
+	if (used_for_stabilization) {
 		WM_event_add_notifier(C, NC_MOVIECLIP | ND_DISPLAY, clip);
 	}
 
@@ -246,13 +247,13 @@ void clip_draw_cfra(SpaceClip *sc, ARegion *ar, Scene *scene)
 	View2D *v2d = &ar->v2d;
 	float x = (float)(sc->user.framenr * scene->r.framelen);
 
-	unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColor(TH_CFRAME);
 	glLineWidth(2.0f);
 
-	immBegin(GL_LINES, 2);
+	immBegin(PRIM_LINES, 2);
 	immVertex2f(pos, x, v2d->cur.ymin);
 	immVertex2f(pos, x, v2d->cur.ymax);
 	immEnd();
@@ -262,8 +263,8 @@ void clip_draw_cfra(SpaceClip *sc, ARegion *ar, Scene *scene)
 	UI_view2d_view_orthoSpecial(ar, v2d, 1);
 
 	/* because the frame number text is subject to the same scaling as the contents of the view */
-	float xscale, yscale;
-	UI_view2d_scale_get(v2d, &xscale, &yscale);
+	float xscale;
+	UI_view2d_scale_get(v2d, &xscale, NULL);
 	gpuPushMatrix();
 	gpuScale2f(1.0f / xscale, 1.0f);
 
@@ -281,7 +282,7 @@ void clip_draw_sfra_efra(View2D *v2d, Scene *scene)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 
-	unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor4f(0.0f, 0.0f, 0.0f, 0.4f);
@@ -295,7 +296,7 @@ void clip_draw_sfra_efra(View2D *v2d, Scene *scene)
 	/* thin lines where the actual frames are */
 	glLineWidth(1.0f);
 
-	immBegin(GL_LINES, 4);
+	immBegin(PRIM_LINES, 4);
 	immVertex2f(pos, (float)SFRA, v2d->cur.ymin);
 	immVertex2f(pos, (float)SFRA, v2d->cur.ymax);
 	immVertex2f(pos, (float)EFRA, v2d->cur.ymin);

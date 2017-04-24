@@ -55,6 +55,8 @@
 
 #include "GPU_draw.h"
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
+#include "GPU_matrix.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -638,7 +640,7 @@ static void node_draw_preview_background(float tile, rctf *rect)
 	float x, y;
 	
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -704,13 +706,13 @@ static void node_draw_preview(bNodePreview *preview, rctf *prv)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  /* premul graphics */
 	
-	immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-	immDrawPixelsTex(draw_rect.xmin, draw_rect.ymin, preview->xsize, preview->ysize, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, preview->rect,
+	IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+	immDrawPixelsTex(&state, draw_rect.xmin, draw_rect.ymin, preview->xsize, preview->ysize, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, preview->rect,
 	                 scale, scale, NULL);
 	
 	glDisable(GL_BLEND);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColorShadeAlpha(TH_BACK, -15, +100);
 	imm_draw_line_box(pos, draw_rect.xmin, draw_rect.ymin, draw_rect.xmax, draw_rect.ymax);
@@ -740,24 +742,29 @@ void node_draw_shadow(SpaceNode *snode, bNode *node, float radius, float alpha)
 		const float margin = 3.0f;
 		
 		float color[4] = {0.0f, 0.0f, 0.0f, 0.33f};
-		glEnable(GL_BLEND);
-		UI_draw_roundbox(rct->xmin - margin, rct->ymin - margin,
-		                 rct->xmax + margin, rct->ymax + margin, radius + margin, color);
-		glDisable(GL_BLEND);
+		UI_draw_roundbox_aa(true, rct->xmin - margin, rct->ymin - margin,
+		                    rct->xmax + margin, rct->ymax + margin, radius + margin, color);
 	}
 }
 
 void node_draw_sockets(View2D *v2d, const bContext *C, bNodeTree *ntree, bNode *node, bool draw_outputs, bool select_all)
 {
+	const unsigned int total_input_ct = BLI_listbase_count(&node->inputs);
+	const unsigned int total_output_ct = BLI_listbase_count(&node->outputs);
+
+	if (total_input_ct + total_output_ct == 0) {
+		return;
+	}
+
 	PointerRNA node_ptr;
 	RNA_pointer_create((ID *)ntree, &RNA_Node, node, &node_ptr);
 
-	float xscale, yscale;
-	UI_view2d_scale_get(v2d, &xscale, &yscale);
+	float scale;
+	UI_view2d_scale_get(v2d, &scale, NULL);
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned col = add_attrib(format, "color", GL_FLOAT, 4, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int col = VertexFormat_add_attrib(format, "color", COMP_F32, 4, KEEP_FLOAT);
 
 	glEnable(GL_BLEND);
 	GPU_enable_program_point_size();
@@ -765,14 +772,14 @@ void node_draw_sockets(View2D *v2d, const bContext *C, bNodeTree *ntree, bNode *
 	immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_VARYING_COLOR_OUTLINE_AA);
 
 	/* set handle size */
-	immUniform1f("size", 2.0f * NODE_SOCKSIZE * xscale); // 2 * size to have diameter
+	immUniform1f("size", 2.0f * NODE_SOCKSIZE * scale); /* 2 * size to have diameter */
 
 	if (!select_all) {
 		/* outline for unselected sockets */
 		immUniform1f("outlineWidth", 1.0f);
 		immUniform4f("outlineColor", 0.0f, 0.0f, 0.0f, 0.6f);
 
-		immBeginAtMost(GL_POINTS, BLI_listbase_count(&node->inputs) + BLI_listbase_count(&node->outputs));
+		immBeginAtMost(PRIM_POINTS, total_input_ct + total_output_ct);
 	}
 
 	/* socket inputs */
@@ -816,7 +823,7 @@ void node_draw_sockets(View2D *v2d, const bContext *C, bNodeTree *ntree, bNode *
 		immUniform4f("outlineColor", c[0], c[1], c[2], 1.0f);
 		immUniform1f("outlineWidth", 1.5f);
 
-		immBegin(GL_POINTS, selected_input_ct + selected_output_ct);
+		immBegin(PRIM_POINTS, selected_input_ct + selected_output_ct);
 
 		if (selected_input_ct) {
 			/* socket inputs */
@@ -879,17 +886,19 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	/* shadow */
 	node_draw_shadow(snode, node, BASIS_RAD, 1.0f);
 	
-	/* header uses color from backdrop, but we make it opaqie */
-	if (color_id == TH_NODE) {
-		UI_GetThemeColorShade3fv(color_id, -20, color);
-	}
-	else
-		UI_GetThemeColor4fv(color_id, color);
-	
-	if (node->flag & NODE_MUTED)
+	if (node->flag & NODE_MUTED) {
 		UI_GetThemeColorBlendShade4fv(color_id, TH_REDALERT, 0.5f, 0, color);
-
-	
+	}
+	else {
+		/* header uses color from backdrop, but we make it opaque */
+		if (color_id == TH_NODE) {
+			UI_GetThemeColorShade3fv(color_id, -20, color);
+			color[3] = 1.0f;
+		}
+		else {
+			UI_GetThemeColor4fv(color_id, color);
+		}
+	}
 
 #ifdef WITH_COMPOSITOR
 	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
@@ -902,7 +911,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	glLineWidth(1.0f);
 
 	UI_draw_roundbox_corner_set(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
-	UI_draw_roundbox(rct->xmin, rct->ymax - NODE_DY, rct->xmax, rct->ymax, BASIS_RAD, color);
+	UI_draw_roundbox_aa(true, rct->xmin, rct->ymax - NODE_DY, rct->xmax, rct->ymax, BASIS_RAD, color);
 	
 	/* show/hide icons */
 	iconofs = rct->xmax - 0.35f * U.widget_unit;
@@ -972,27 +981,20 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	if (!nodeIsRegistered(node))
 		UI_GetThemeColor4fv(TH_REDALERT, color);	/* use warning color to indicate undefined types */
 	else if (node->flag & NODE_CUSTOM_COLOR) {
-		rgba_float_args_set(color,  node->color[0],  node->color[1],  node->color[2], 1.0f);
+		rgba_float_args_set(color, node->color[0], node->color[1], node->color[2], 1.0f);
 	}
 	else
 		UI_GetThemeColor4fv(TH_NODE, color);
-	glEnable(GL_BLEND);
+
 	UI_draw_roundbox_corner_set(UI_CNR_BOTTOM_LEFT | UI_CNR_BOTTOM_RIGHT);
-	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax - NODE_DY, BASIS_RAD, color);
-	glDisable(GL_BLEND);
+	UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax - NODE_DY, BASIS_RAD, color);
 
 	/* outline active and selected emphasis */
 	if (node->flag & SELECT) {
-		glEnable(GL_BLEND);
-		glEnable(GL_LINE_SMOOTH);
-
 		UI_GetThemeColorShadeAlpha4fv((node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, 0, -40, color);
 
 		UI_draw_roundbox_corner_set(UI_CNR_ALL);
-		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
-
-		glDisable(GL_LINE_SMOOTH);
-		glDisable(GL_BLEND);
+		UI_draw_roundbox_aa(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
 	}
 	
 	/* disable lines */
@@ -1027,9 +1029,9 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	float color[4];
 	char showname[128]; /* 128 is used below */
 	View2D *v2d = &ar->v2d;
-	float xscale, yscale;
+	float scale;
 
-	UI_view2d_scale_get(v2d, &xscale, &yscale);
+	UI_view2d_scale_get(v2d, &scale, NULL);
 	
 	/* shadow */
 	node_draw_shadow(snode, node, hiddenrad, 1.0f);
@@ -1037,6 +1039,8 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	/* body */
 	if (node->flag & NODE_MUTED)
 		UI_GetThemeColorBlendShade4fv(color_id, TH_REDALERT, 0.5f, 0, color);
+	else
+		UI_GetThemeColor4fv(color_id, color);
 
 #ifdef WITH_COMPOSITOR
 	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
@@ -1048,19 +1052,13 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	(void)ntree;
 #endif
 	
-	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
+	UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
 	
 	/* outline active and selected emphasis */
 	if (node->flag & SELECT) {
-		glEnable(GL_BLEND);
-		glEnable(GL_LINE_SMOOTH);
-		
 		UI_GetThemeColorShadeAlpha4fv((node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, 0, -40, color);
 
-		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
-
-		glDisable(GL_LINE_SMOOTH);
-		glDisable(GL_BLEND);
+		UI_draw_roundbox_aa(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
 	}
 
 	/* custom color inline */
@@ -1068,7 +1066,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		glEnable(GL_BLEND);
 		glEnable(GL_LINE_SMOOTH);
 
-		UI_draw_roundbox_gl_mode_3fvAlpha(GL_LINE_LOOP, rct->xmin + 1, rct->ymin + 1, rct->xmax -1, rct->ymax - 1, hiddenrad, node->color, 1.0f);
+		UI_draw_roundbox_3fvAlpha(false, rct->xmin + 1, rct->ymin + 1, rct->xmax -1, rct->ymax - 1, hiddenrad, node->color, 1.0f);
 
 		glDisable(GL_LINE_SMOOTH);
 		glDisable(GL_BLEND);
@@ -1115,7 +1113,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	}
 
 	/* scale widget thing */
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformThemeColorShade(color_id, -10);
@@ -1330,7 +1328,7 @@ static void draw_group_overlay(const bContext *C, ARegion *ar)
 
 	UI_GetThemeColorShadeAlpha4fv(TH_NODE_GROUP, 0, -70, color);
 	UI_draw_roundbox_corner_set(UI_CNR_NONE);
-	UI_draw_roundbox_gl_mode(GL_TRIANGLE_FAN, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 0, color);
+	UI_draw_roundbox_4fv(true, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 0, color);
 	glDisable(GL_BLEND);
 	
 	/* set the block bounds to clip mouse events from underlying nodes */

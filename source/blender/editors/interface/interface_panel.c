@@ -414,7 +414,8 @@ void UI_draw_icon_tri(float x, float y, char dir, const float color[4])
 static void ui_draw_tria_rect(const rctf *rect, char dir)
 {
 	float color[4];
-	UI_GetThemeColor4fv(TH_TITLE, color);
+	UI_GetThemeColor3fv(TH_TITLE, color);
+	color[3] = 1.0f;
 
 	if (dir == 'h') {
 		float half = 0.5f * BLI_rctf_size_y(rect);
@@ -435,7 +436,7 @@ static void ui_draw_anti_x(unsigned int pos, float x1, float y1, float x2, float
 
 	glLineWidth(2.0);
 
-	immBegin(GL_LINES, 4);
+	immBegin(PRIM_LINES, 4);
 
 	immVertex2f(pos, x1, y1);
 	immVertex2f(pos, x2, y2);
@@ -476,7 +477,7 @@ static void ui_draw_panel_scalewidget(unsigned int pos, const rcti *rect)
 	glEnable(GL_BLEND);
 	immUniformColor4ub(255, 255, 255, 50);
 
-	immBegin(GL_LINES, 4);
+	immBegin(PRIM_LINES, 4);
 
 	immVertex2f(pos, xmin, ymin);
 	immVertex2f(pos, xmax, ymax);
@@ -488,7 +489,7 @@ static void ui_draw_panel_scalewidget(unsigned int pos, const rcti *rect)
 	
 	immUniformColor4ub(0, 0, 0, 50);
 
-	immBegin(GL_LINES, 4);
+	immBegin(PRIM_LINES, 4);
 
 	immVertex2f(pos, xmin, ymin + 1);
 	immVertex2f(pos, xmax, ymax + 1);
@@ -553,7 +554,8 @@ static void ui_draw_aligned_panel_header(uiStyle *style, uiBlock *block, const r
 		pnl_icons = (panel->labelofs + PNL_ICON + 5) / block->aspect + 0.001f;
 
 	/* draw text label */
-	UI_GetThemeColor4ubv(TH_TITLE, col_title);
+	UI_GetThemeColor3ubv(TH_TITLE, col_title);
+	col_title[3] = 255;
 
 	hrect = *rect;
 	if (dir == 'h') {
@@ -576,7 +578,6 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 	Panel *panel = block->panel;
 	rcti headrect;
 	rctf itemrect;
-	int ofsx;
 	float color[4];
 	const bool is_closed_x = (panel->flag & PNL_CLOSEDX) ? true : false;
 	const bool is_closed_y = (panel->flag & PNL_CLOSEDY) ? true : false;
@@ -590,7 +591,7 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 	headrect.ymin = headrect.ymax;
 	headrect.ymax = headrect.ymin + floor(PNL_HEADER / block->aspect + 0.001f);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	{
@@ -605,7 +606,7 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 			immUniformThemeColor(TH_PANEL_HEADER);
 			immRectf(pos, minx, headrect.ymin + 1, maxx, y);
 
-			immBegin(GL_LINES, 4);
+			immBegin(PRIM_LINES, 4);
 
 			immVertex2f(pos, minx, y);
 			immVertex2f(pos, maxx, y);
@@ -625,14 +626,14 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 
 			immUniformColor4f(0.0f, 0.0f, 0.0f, 0.5f);
 
-			immBegin(GL_LINES, 2);
+			immBegin(PRIM_LINES, 2);
 			immVertex2f(pos, minx, y);
 			immVertex2f(pos, maxx, y);
 			immEnd();
 
 			immUniformColor4f(1.0f, 1.0f, 1.0f, 0.25f);
 
-			immBegin(GL_LINES, 2);
+			immBegin(PRIM_LINES, 2);
 			immVertex2f(pos, minx, y - 1);
 			immVertex2f(pos, maxx, y - 1);
 			immEnd();
@@ -662,7 +663,7 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 	/* horizontal title */
 	if (is_closed_x == false) {
 		ui_draw_aligned_panel_header(style, block, &headrect, 'h');
-		pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
 		/* itemrect smaller */
 		itemrect.xmax = headrect.xmax - 5.0f / block->aspect;
@@ -685,7 +686,7 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 	else if (is_closed_x) {
 		/* draw vertical title */
 		ui_draw_aligned_panel_header(style, block, &headrect, 'v');
-		pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 	}
 	/* an open panel */
 	else {
@@ -695,7 +696,7 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 			else UI_draw_roundbox_corner_set(UI_CNR_NONE);
 
 			UI_GetThemeColorShade4fv(TH_BACK, -120, color);
-			UI_draw_roundbox_unfilled(0.5f + rect->xmin, 0.5f + rect->ymin, 0.5f + rect->xmax, 0.5f + headrect.ymax + 1, 8, color);
+			UI_draw_roundbox_aa(false, 0.5f + rect->xmin, 0.5f + rect->ymin, 0.5f + rect->xmax, 0.5f + headrect.ymax + 1, 8, color);
 		}
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -716,12 +717,11 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 
 	/* draw optional close icon */
 
-	ofsx = 6;
 	if (panel->control & UI_PNL_CLOSE) {
+		const int ofsx = 6;
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
-		immUniformThemeColor(TH_TITLE);
+		immUniformThemeColor3(TH_TITLE);
 		ui_draw_x_icon(pos, rect->xmin + 2 + ofsx, rect->ymax + 2);
-		ofsx = 22;
 		immUnbindProgram();
 	}
 
@@ -741,9 +741,6 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 		ui_draw_tria_rect(&itemrect, 'h');
 	else
 		ui_draw_tria_rect(&itemrect, 'v');
-
-
-	(void)ofsx;
 }
 
 /************************** panel alignment *************************/
@@ -1556,13 +1553,13 @@ void UI_panel_category_clear_all(ARegion *ar)
 	BLI_freelistN(&ar->panels_category);
 }
 
-/* based on UI_draw_roundbox_gl_mode, check on making a version which allows us to skip some sides */
+/* based on UI_draw_roundbox, check on making a version which allows us to skip some sides */
 static void ui_panel_category_draw_tab(
-        int mode, float minx, float miny, float maxx, float maxy, float rad,
+        bool filled, float minx, float miny, float maxx, float maxy, float rad,
         int roundboxtype,
-        const bool use_highlight, const bool use_shadow,
+        bool use_highlight, bool use_shadow,
         const unsigned char highlight_fade[3],
-		const unsigned char col[3])
+        const unsigned char col[3])
 {
 	float vec[4][2] = {
 	    {0.195, 0.02},
@@ -1572,17 +1569,30 @@ static void ui_panel_category_draw_tab(
 	int a;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 3, NORMALIZE_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 
 	/* mult */
 	for (a = 0; a < 4; a++) {
 		mul_v2_fl(vec[a], rad);
 	}
 
+	unsigned int vert_ct = 0;
+	if (use_highlight) {
+		vert_ct += (roundboxtype & UI_CNR_TOP_RIGHT) ? 6 : 1;
+		vert_ct += (roundboxtype & UI_CNR_TOP_LEFT) ? 6 : 1;
+	}
+	if (use_highlight && !use_shadow) {
+		vert_ct++;
+	}
+	else {
+		vert_ct += (roundboxtype & UI_CNR_BOTTOM_RIGHT) ? 6 : 1;
+		vert_ct += (roundboxtype & UI_CNR_BOTTOM_LEFT) ? 6 : 1;
+	}
+
 	immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
 
-	immBeginAtMost(mode, 24);
+	immBegin(filled ? PRIM_TRIANGLE_FAN : PRIM_LINE_STRIP, vert_ct);
 
 	immAttrib3ubv(color, col);
 
@@ -1635,7 +1645,6 @@ static void ui_panel_category_draw_tab(
 	}
 
 	/* corner right-bottom */
-
 	if (roundboxtype & UI_CNR_BOTTOM_RIGHT) {
 		immVertex2f(pos, maxx - rad, miny);
 		for (a = 0; a < 4; a++) {
@@ -1771,7 +1780,7 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 	/* begin drawing */
 	glEnable(GL_LINE_SMOOTH);
 
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	/* draw the background */
@@ -1813,16 +1822,16 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 		if (is_active)
 #endif
 		{
-			ui_panel_category_draw_tab(GL_TRIANGLE_FAN, rct->xmin, rct->ymin, rct->xmax, rct->ymax,
+			ui_panel_category_draw_tab(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax,
 			                           tab_curve_radius - px, roundboxtype, true, true, NULL,
 			                           is_active ? theme_col_tab_active : theme_col_tab_inactive);
 
 			/* tab outline */
-			ui_panel_category_draw_tab(GL_LINE_STRIP, rct->xmin - px, rct->ymin - px, rct->xmax - px, rct->ymax + px,
+			ui_panel_category_draw_tab(false, rct->xmin - px, rct->ymin - px, rct->xmax - px, rct->ymax + px,
 			                           tab_curve_radius, roundboxtype, true, true, NULL, theme_col_tab_outline);
 
 			/* tab highlight (3d look) */
-			ui_panel_category_draw_tab(GL_LINE_STRIP, rct->xmin, rct->ymin, rct->xmax, rct->ymax,
+			ui_panel_category_draw_tab(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax,
 			                           tab_curve_radius, roundboxtype, true, false,
 			                           is_active ? theme_col_back : theme_col_tab_inactive,
 			                           is_active ? theme_col_tab_highlight : theme_col_tab_highlight_inactive);
@@ -1830,7 +1839,7 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 
 		/* tab blackline */
 		if (!is_active) {
-			pos = add_attrib(immVertexFormat(), "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 			immUniformColor3ubv(theme_col_tab_divider);
@@ -1860,7 +1869,7 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 		glDisable(GL_BLEND);
 
 		/* tab blackline remaining (last tab) */
-		pos = add_attrib(immVertexFormat(), "pos", GL_INT, 2, CONVERT_INT_TO_FLOAT);
+		pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_I32, 2, CONVERT_INT_TO_FLOAT);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		if (pc_dyn->prev == NULL) {
 			immUniformColor3ubv(theme_col_tab_divider);

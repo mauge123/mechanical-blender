@@ -33,8 +33,7 @@
 #include "BKE_global.h"
 
 #include "GPU_batch.h"
-#include "GPU_debug.h"
-#include "GPU_glew.h"
+#include "GPU_draw.h"
 #include "GPU_framebuffer.h"
 #include "GPU_matrix.h"
 #include "GPU_shader.h"
@@ -52,9 +51,10 @@ struct GPUFrameBuffer {
 	GLuint object;
 	GPUTexture *colortex[GPU_FB_MAX_SLOTS];
 	GPUTexture *depthtex;
+	struct GPUStateValues attribs;
 };
 
-static void GPU_print_framebuffer_error(GLenum status, char err_out[256])
+static void gpu_print_framebuffer_error(GLenum status, char err_out[256])
 {
 	const char *format = "GPUFrameBuffer: framebuffer status %s\n";
 	const char *err = "unknown";
@@ -114,7 +114,7 @@ GPUFrameBuffer *GPU_framebuffer_create(void)
 	return fb;
 }
 
-bool GPU_framebuffer_texture_attach(GPUFrameBuffer *fb, GPUTexture *tex, int slot)
+bool GPU_framebuffer_texture_attach(GPUFrameBuffer *fb, GPUTexture *tex, int slot, int mip)
 {
 	GLenum attachment;
 
@@ -143,8 +143,16 @@ bool GPU_framebuffer_texture_attach(GPUFrameBuffer *fb, GPUTexture *tex, int slo
 	else
 		attachment = GL_COLOR_ATTACHMENT0 + slot;
 
-	glFramebufferTexture2D(GL_FRAMEBUFFER, attachment,
-		GPU_texture_target(tex), GPU_texture_opengl_bindcode(tex), 0);
+#if defined(WITH_GL_PROFILE_COMPAT)
+	/* Workaround for Mac & Mesa compatibility profile, remove after we switch to core profile */
+	/* glFramebufferTexture was introduced in 3.2. It is *not* available in the ARB FBO extension */
+	if (GLEW_VERSION_3_2)
+		glFramebufferTexture(GL_FRAMEBUFFER, attachment, GPU_texture_opengl_bindcode(tex), mip); /* normal core call, same as below */
+	else
+		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GPU_texture_target(tex), GPU_texture_opengl_bindcode(tex), mip);
+#else
+	glFramebufferTexture(GL_FRAMEBUFFER, attachment, GPU_texture_opengl_bindcode(tex), mip);
+#endif
 
 	if (GPU_texture_depth(tex))
 		fb->depthtex = tex;
@@ -184,7 +192,16 @@ void GPU_framebuffer_texture_detach(GPUTexture *tex)
 		attachment = GL_COLOR_ATTACHMENT0 + fb_attachment;
 	}
 
-	glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GPU_texture_target(tex), 0, 0);
+#if defined(WITH_GL_PROFILE_COMPAT)
+	/* Workaround for Mac & Mesa compatibility profile, remove after we switch to core profile */
+	/* glFramebufferTexture was introduced in 3.2. It is *not* available in the ARB FBO extension */
+	if (GLEW_VERSION_3_2)
+		glFramebufferTexture(GL_FRAMEBUFFER, attachment, 0, 0); /* normal core call, same as below */
+	else
+		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GPU_texture_target(tex), 0, 0);
+#else
+	glFramebufferTexture(GL_FRAMEBUFFER, attachment, 0, 0);
+#endif
 
 	GPU_texture_framebuffer_set(tex, NULL, -1);
 }
@@ -200,7 +217,7 @@ void GPU_texture_bind_as_framebuffer(GPUTexture *tex)
 	}
 
 	/* push attributes */
-	glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT);
+	gpuSaveState(&fb->attribs, GPU_ENABLE_BIT | GPU_VIEWPORT_BIT);
 	glDisable(GL_SCISSOR_TEST);
 
 	/* bind framebuffer */
@@ -220,14 +237,9 @@ void GPU_texture_bind_as_framebuffer(GPUTexture *tex)
 		glEnable(GL_MULTISAMPLE);
 	}
 
-	/* push matrices and set default viewport and matrix */
+	/* set default viewport */
 	glViewport(0, 0, GPU_texture_width(tex), GPU_texture_height(tex));
 	GG.currentfb = fb->object;
-
-	glMatrixMode(GL_PROJECTION);
-	gpuPushMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	gpuPushMatrix();
 }
 
 void GPU_framebuffer_slots_bind(GPUFrameBuffer *fb, int slot)
@@ -248,7 +260,7 @@ void GPU_framebuffer_slots_bind(GPUFrameBuffer *fb, int slot)
 	}
 	
 	/* push attributes */
-	glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT);
+	gpuSaveState(&fb->attribs, GPU_ENABLE_BIT | GPU_VIEWPORT_BIT);
 	glDisable(GL_SCISSOR_TEST);
 
 	/* bind framebuffer */
@@ -258,14 +270,9 @@ void GPU_framebuffer_slots_bind(GPUFrameBuffer *fb, int slot)
 	glDrawBuffers(numslots, attachments);
 	glReadBuffer(GL_COLOR_ATTACHMENT0 + slot);
 
-	/* push matrices and set default viewport and matrix */
+	/* set default viewport */
 	glViewport(0, 0, GPU_texture_width(fb->colortex[slot]), GPU_texture_height(fb->colortex[slot]));
 	GG.currentfb = fb->object;
-
-	glMatrixMode(GL_PROJECTION);
-	gpuPushMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	gpuPushMatrix();
 }
 
 void GPU_framebuffer_bind(GPUFrameBuffer *fb)
@@ -306,16 +313,10 @@ void GPU_framebuffer_bind(GPUFrameBuffer *fb)
 }
 
 
-void GPU_framebuffer_texture_unbind(GPUFrameBuffer *UNUSED(fb), GPUTexture *UNUSED(tex))
+void GPU_framebuffer_texture_unbind(GPUFrameBuffer *fb, GPUTexture *UNUSED(tex))
 {
-	/* restore matrix */
-	glMatrixMode(GL_PROJECTION);
-	gpuPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	gpuPopMatrix();
-
 	/* restore attributes */
-	glPopAttrib();
+	gpuRestoreState(&fb->attribs);
 }
 
 void GPU_framebuffer_bind_no_save(GPUFrameBuffer *fb, int slot)
@@ -344,7 +345,7 @@ bool GPU_framebuffer_check_valid(GPUFrameBuffer *fb, char err_out[256])
 
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
 		GPU_framebuffer_restore();
-		GPU_print_framebuffer_error(status, err_out);
+		gpu_print_framebuffer_error(status, err_out);
 		return false;
 	}
 
@@ -406,18 +407,20 @@ void GPU_framebuffer_blur(
 	if (format.attrib_ct == 0) {
 		unsigned int i = 0;
 		/* Vertex format */
-		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-		unsigned int uvs = add_attrib(&format, "uvs", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(&format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int uvs = VertexFormat_add_attrib(&format, "uvs", COMP_F32, 2, KEEP_FLOAT);
 
 		/* Vertices */
 		VertexBuffer_init_with_format(&vbo, &format);
 		VertexBuffer_allocate_data(&vbo, 36);
 
 		for (int j = 0; j < 3; ++j) {
-			setAttrib(&vbo, uvs, i, fullscreenuvs[j]); setAttrib(&vbo, pos, i++, fullscreencos[j]);
+			VertexBuffer_set_attrib(&vbo, uvs, i, fullscreenuvs[j]);
+			VertexBuffer_set_attrib(&vbo, pos, i++, fullscreencos[j]);
 		}
 		for (int j = 1; j < 4; ++j) {
-			setAttrib(&vbo, uvs, i, fullscreenuvs[j]); setAttrib(&vbo, pos, i++, fullscreencos[j]);
+			VertexBuffer_set_attrib(&vbo, uvs, i, fullscreenuvs[j]);
+			VertexBuffer_set_attrib(&vbo, pos, i++, fullscreencos[j]);
 		}
 
 		Batch_init(&batch, GL_TRIANGLES, &vbo, NULL);
@@ -425,9 +428,6 @@ void GPU_framebuffer_blur(
 		
 	glDisable(GL_DEPTH_TEST);
 	
-	/* Load fresh matrices */
-	gpuMatrixBegin3D(); /* TODO: finish 2D API */
-
 	/* Blurring horizontally */
 	/* We do the bind ourselves rather than using GPU_framebuffer_texture_bind() to avoid
 	 * pushing unnecessary matrices onto the OpenGL stack. */
@@ -461,8 +461,6 @@ void GPU_framebuffer_blur(
 	Batch_Uniform2f(&batch, "ScaleU", scalev[0], scalev[1]);
 	Batch_Uniform1i(&batch, "textureSource", GL_TEXTURE0);
 	Batch_draw(&batch);
-
-	gpuMatrixEnd();
 }
 
 void GPU_framebuffer_blit(GPUFrameBuffer *fb_read, int read_slot, GPUFrameBuffer *fb_write, int write_slot, bool use_depth)
@@ -483,14 +481,14 @@ void GPU_framebuffer_blit(GPUFrameBuffer *fb_read, int read_slot, GPUFrameBuffer
 	glFramebufferTexture2D(
 	        GL_READ_FRAMEBUFFER, read_attach,
 	        GL_TEXTURE_2D, read_bind, 0);
-	BLI_assert(glCheckFramebufferStatusEXT(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+	BLI_assert(glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 
 	/* write into new single-sample buffer */
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_write->object);
 	glFramebufferTexture2D(
 	        GL_DRAW_FRAMEBUFFER, write_attach,
 	        GL_TEXTURE_2D, write_bind, 0);
-	BLI_assert(glCheckFramebufferStatusEXT(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+	BLI_assert(glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 
 	glBlitFramebuffer(0, 0, read_w, read_h, 0, 0, write_w, write_h, (use_depth) ? GL_DEPTH_BUFFER_BIT : GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
@@ -535,7 +533,7 @@ GPUOffScreen *GPU_offscreen_create(int width, int height, int samples, char err_
 		return NULL;
 	}
 
-	if (!GPU_framebuffer_texture_attach(ofs->fb, ofs->depth, 0)) {
+	if (!GPU_framebuffer_texture_attach(ofs->fb, ofs->depth, 0, 0)) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
@@ -546,7 +544,7 @@ GPUOffScreen *GPU_offscreen_create(int width, int height, int samples, char err_
 		return NULL;
 	}
 
-	if (!GPU_framebuffer_texture_attach(ofs->fb, ofs->color, 0)) {
+	if (!GPU_framebuffer_texture_attach(ofs->fb, ofs->color, 0, 0)) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
@@ -624,7 +622,7 @@ void GPU_offscreen_read_pixels(GPUOffScreen *ofs, int type, void *pixels)
 		glFramebufferTexture2D(
 		        GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + ofs->color->fb_attachment,
 		        GL_TEXTURE_2D_MULTISAMPLE, ofs->color->bindcode, 0);
-		status = glCheckFramebufferStatusEXT(GL_READ_FRAMEBUFFER);
+		status = glCheckFramebufferStatus(GL_READ_FRAMEBUFFER);
 		if (status != GL_FRAMEBUFFER_COMPLETE) {
 			goto finally;
 		}

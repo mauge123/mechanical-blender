@@ -66,7 +66,6 @@
 #include "BKE_customdata.h"
 #include "BKE_colortools.h"
 #include "BKE_displist.h"
-#include "BKE_depsgraph.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
 #include "BKE_key.h"
@@ -81,6 +80,8 @@
 #include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_scene.h"
+
+#include "DEG_depsgraph.h"
 
 #include "PIL_time.h"
 
@@ -5206,7 +5207,7 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 	
 	/* applies changes fully */
 	if ((re->r.scemode & (R_NO_FRAME_UPDATE|R_BUTS_PREVIEW|R_VIEWPORT_PREVIEW))==0) {
-		BKE_scene_update_for_newframe(re->eval_ctx, re->main, re->scene, lay);
+		BKE_scene_update_for_newframe(re->eval_ctx, re->main, re->scene);
 		render_update_anim_renderdata(re, &re->scene->r);
 	}
 	
@@ -5221,7 +5222,7 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 		RE_SetView(re, mat);
 
 		/* force correct matrix for scaled cameras */
-		DAG_id_tag_update_ex(re->main, &camera->id, OB_RECALC_OB);
+		DEG_id_tag_update_ex(re->main, &camera->id, OB_RECALC_OB);
 	}
 	
 	/* store for incremental render, viewmat rotates dbase */
@@ -5376,13 +5377,9 @@ static void database_fromscene_vectors(Render *re, Scene *scene, unsigned int la
 	re->i.totface=re->i.totvert=re->i.totstrand=re->i.totlamp=re->i.tothalo= 0;
 	re->lights.first= re->lights.last= NULL;
 	
-	/* in localview, lamps are using normal layers, objects only local bits */
-	if (re->lay & 0xFF000000)
-		lay &= 0xFF000000;
-	
 	/* applies changes fully */
 	scene->r.cfra += timeoffset;
-	BKE_scene_update_for_newframe(re->eval_ctx, re->main, re->scene, lay);
+	BKE_scene_update_for_newframe(re->eval_ctx, re->main, re->scene);
 	
 	/* if no camera, viewmat should have been set! */
 	if (camera) {

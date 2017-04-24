@@ -13,13 +13,14 @@
 
 #include "vertex_format.h"
 #include "primitive.h"
+#include "shader_interface.h"
 
 #define IMM_BATCH_COMBO 1
 
 
 VertexFormat* immVertexFormat(void); // returns a cleared vertex format, ready for add_attrib
 
-void immBindProgram(GLuint program); // every immBegin must have a program bound first
+void immBindProgram(GLuint program, const ShaderInterface*); // every immBegin must have a program bound first
 void immUnbindProgram(void); // call after your last immEnd, or before binding another program
 
 void immBegin(PrimitiveType, unsigned vertex_ct); // must supply exactly vertex_ct vertices
@@ -79,6 +80,7 @@ void immVertex2iv(unsigned attrib_id, const int data[2]);
 
 // provide uniform values that don't change for the entire draw call
 void immUniform1i(const char* name, int x);
+void immUniform4iv(const char* name, const int data[4]);
 void immUniform1f(const char* name, float x);
 void immUniform2f(const char* name, float x, float y);
 void immUniform2fv(const char* name, const float data[2]);
@@ -101,6 +103,7 @@ void immUniformColor3fvAlpha(const float rgb[3], float a);
 void immUniformColor3ub(unsigned char r, unsigned char g, unsigned char b);
 void immUniformColor4ub(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 void immUniformColor3ubv(const unsigned char rgb[3]);
+void immUniformColor3ubvAlpha(const unsigned char rgb[3], unsigned char a);
 void immUniformColor4ubv(const unsigned char rgba[4]);
 
 

@@ -82,206 +82,6 @@ void set_inverted_drawing(int enable)
 	GL_TOGGLE(GL_DITHER, !enable);
 }
 
-static void imm_draw_circle(PrimitiveType prim_type, unsigned pos, float x, float y, float rad, int nsegments)
-{
-	immBegin(prim_type, nsegments);
-	for (int i = 0; i < nsegments; ++i) {
-		float angle = 2 * M_PI * ((float)i / (float)nsegments);
-		immVertex2f(pos, x + rad * cosf(angle),
-		                 y + rad * sinf(angle));
-	}
-	immEnd();
-}
-
-void imm_draw_lined_circle(unsigned pos, float x, float y, float rad, int nsegments)
-{
-	imm_draw_circle(PRIM_LINE_LOOP, pos, x, y, rad, nsegments);
-}
-
-void imm_draw_filled_circle(unsigned pos, float x, float y, float rad, int nsegments)
-{
-	imm_draw_circle(PRIM_TRIANGLE_FAN, pos, x, y, rad, nsegments);
-}
-
-void imm_draw_lined_circle_3D(unsigned pos, float x, float y, float rad, int nsegments)
-{
-	immBegin(PRIM_LINE_LOOP, nsegments);
-	for (int i = 0; i < nsegments; ++i) {
-		float angle = 2 * M_PI * ((float)i / (float)nsegments);
-		immVertex3f(pos, x + rad * cosf(angle),
-		                 y + rad * sinf(angle), 0.0f);
-	}
-	immEnd();
-}
-
-void imm_draw_line_box(unsigned pos, float x1, float y1, float x2, float y2)
-{
-	immBegin(PRIM_LINE_LOOP, 4);
-	immVertex2f(pos, x1, y1);
-	immVertex2f(pos, x1, y2);
-	immVertex2f(pos, x2, y2);
-	immVertex2f(pos, x2, y1);
-	immEnd();
-}
-
-void imm_draw_line_box_3D(unsigned pos, float x1, float y1, float x2, float y2)
-{
-	/* use this version when VertexFormat has a vec3 position */
-	immBegin(PRIM_LINE_LOOP, 4);
-	immVertex3f(pos, x1, y1, 0.0f);
-	immVertex3f(pos, x1, y2, 0.0f);
-	immVertex3f(pos, x2, y2, 0.0f);
-	immVertex3f(pos, x2, y1, 0.0f);
-	immEnd();
-}
-
-void imm_draw_checker_box(float x1, float y1, float x2, float y2)
-{
-	unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	immBindBuiltinProgram(GPU_SHADER_2D_CHECKER);
-
-	immUniform4f("color1", 0.15f, 0.15f, 0.15f, 1.0f);
-	immUniform4f("color2", 0.2f, 0.2f, 0.2f, 1.0f);
-	immUniform1i("size", 8);
-
-	immRectf(pos, x1, y1, x2, y2);
-
-	immUnbindProgram();
-}
-
-void imm_cpack(unsigned int x)
-{
-	immUniformColor3ub(((x)& 0xFF),
-		(((x) >> 8) & 0xFF),
-		(((x) >> 16) & 0xFF));
-}
-
-void imm_cylinder_nor(unsigned int pos, unsigned int nor, float base, float top, float height, int slices, int stacks)
-{
-	immBegin(GL_TRIANGLES, 6 * slices * stacks);
-	for (int i = 0; i < slices; ++i) {
-		const float angle1 = 2 * M_PI * ((float)i / (float)slices);
-		const float angle2 = 2 * M_PI * ((float)(i+1) / (float)slices);
-		const float cos1 = cosf(angle1);
-		const float sin1 = sinf(angle1);
-		const float cos2 = cosf(angle2);
-		const float sin2 = sinf(angle2);
-
-		for (int j = 0; j < stacks; ++j) {
-			float fac1 = (float)j / (float)stacks;
-			float fac2 = (float)(j+1) / (float)stacks;
-			float r1 = base * (1.f - fac1) + top * fac1;
-			float r2 = base * (1.f - fac2) + top * fac2;
-			float h1 = height * ((float)j / (float)stacks);
-			float h2 = height * ((float)(j+1) / (float)stacks);
-
-			float v1[3] = {r1 * cos2, r1 * sin2, h1};
-			float v2[3] = {r2 * cos2, r2 * sin2, h2};
-			float v3[3] = {r2 * cos1, r2 * sin1, h2};
-			float v4[3] = {r1 * cos1, r1 * sin1, h1};
-			float n1[3], n2[3];
-
-			/* calc normals */
-			sub_v3_v3v3(n1, v2, v1);
-			normalize_v3(n1);
-			n1[0] = cos1; n1[1] = sin1; n1[2] = 1-n1[2];
-
-			sub_v3_v3v3(n2, v3, v4);
-			normalize_v3(n2);
-			n2[0] = cos2; n2[1] = sin2; n2[2] = 1-n2[2];
-
-			/* first tri */
-			immAttrib3fv(nor, n2);
-			immVertex3fv(pos, v1);
-			immVertex3fv(pos, v2);
-			immAttrib3fv(nor, n1);
-			immVertex3fv(pos, v3);
-
-			/* second tri */
-			immVertex3fv(pos, v3);
-			immVertex3fv(pos, v4);
-			immAttrib3fv(nor, n2);
-			immVertex3fv(pos, v1);
-		}
-	}
-	immEnd();
-}
-
-void imm_cylinder_wire(unsigned int pos, float base, float top, float height, int slices, int stacks)
-{
-	immBegin(GL_LINES, 6 * slices * stacks);
-	for (int i = 0; i < slices; ++i) {
-		const float angle1 = 2 * M_PI * ((float)i / (float)slices);
-		const float angle2 = 2 * M_PI * ((float)(i+1) / (float)slices);
-		const float cos1 = cosf(angle1);
-		const float sin1 = sinf(angle1);
-		const float cos2 = cosf(angle2);
-		const float sin2 = sinf(angle2);
-
-		for (int j = 0; j < stacks; ++j) {
-			float fac1 = (float)j / (float)stacks;
-			float fac2 = (float)(j+1) / (float)stacks;
-			float r1 = base * (1.f - fac1) + top * fac1;
-			float r2 = base * (1.f - fac2) + top * fac2;
-			float h1 = height * ((float)j / (float)stacks);
-			float h2 = height * ((float)(j+1) / (float)stacks);
-
-			float v1[3] = {r1 * cos2, r1 * sin2, h1};
-			float v2[3] = {r2 * cos2, r2 * sin2, h2};
-			float v3[3] = {r2 * cos1, r2 * sin1, h2};
-			float v4[3] = {r1 * cos1, r1 * sin1, h1};
-
-			immVertex3fv(pos, v1);
-			immVertex3fv(pos, v2);
-			
-			immVertex3fv(pos, v2);
-			immVertex3fv(pos, v3);
-
-			immVertex3fv(pos, v1);
-			immVertex3fv(pos, v4);
-		}
-	}
-	immEnd();
-}
-
-void imm_cylinder(unsigned int pos, float base, float top, float height, int slices, int stacks)
-{
-	immBegin(GL_TRIANGLES, 6 * slices * stacks);
-	for (int i = 0; i < slices; ++i) {
-		const float angle1 = 2 * M_PI * ((float)i / (float)slices);
-		const float angle2 = 2 * M_PI * ((float)(i + 1) / (float)slices);
-		const float cos1 = cosf(angle1);
-		const float sin1 = sinf(angle1);
-		const float cos2 = cosf(angle2);
-		const float sin2 = sinf(angle2);
-
-		for (int j = 0; j < stacks; ++j) {
-			float fac1 = (float)j / (float)stacks;
-			float fac2 = (float)(j + 1) / (float)stacks;
-			float r1 = base * (1.f - fac1) + top * fac1;
-			float r2 = base * (1.f - fac2) + top * fac2;
-			float h1 = height * ((float)j / (float)stacks);
-			float h2 = height * ((float)(j + 1) / (float)stacks);
-
-			float v1[3] = { r1 * cos2, r1 * sin2, h1 };
-			float v2[3] = { r2 * cos2, r2 * sin2, h2 };
-			float v3[3] = { r2 * cos1, r2 * sin1, h2 };
-			float v4[3] = { r1 * cos1, r1 * sin1, h1 };
-
-			/* first tri */
-			immVertex3fv(pos, v1);
-			immVertex3fv(pos, v2);
-			immVertex3fv(pos, v3);
-
-			/* second tri */
-			immVertex3fv(pos, v3);
-			immVertex3fv(pos, v4);
-			immVertex3fv(pos, v1);
-		}
-	}
-	immEnd();
-}
-
 float glaGetOneFloat(int param)
 {
 	GLfloat v;
@@ -337,19 +137,30 @@ static int get_cached_work_texture(int *r_w, int *r_h)
 	return texid;
 }
 
+static void immDrawPixelsTexSetupAttributes(IMMDrawPixelsTexState *state)
+{
+	VertexFormat *vert_format = immVertexFormat();
+	state->pos = VertexFormat_add_attrib(vert_format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	state->texco = VertexFormat_add_attrib(vert_format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
+}
+
 /* To be used before calling immDrawPixelsTex
  * Default shader is GPU_SHADER_2D_IMAGE_COLOR
  * You can still set uniforms with :
  * GPU_shader_uniform_int(shader, GPU_shader_get_uniform(shader, "name"), 0);
  * */
-GPUShader *immDrawPixelsTexSetup(int builtin)
+IMMDrawPixelsTexState immDrawPixelsTexSetup(int builtin)
 {
-	GPUShader *shader = GPU_shader_get_builtin_shader(builtin);
-	/* Shader will be unbind by immUnbindProgram in immDrawPixelsTexScaled_clipping */
-	GPU_shader_bind(shader);
-	GPU_shader_uniform_int(shader, GPU_shader_get_uniform(shader, "image"), 0);
+	IMMDrawPixelsTexState state;
+	immDrawPixelsTexSetupAttributes(&state);
 
-	return shader;
+	state.shader = GPU_shader_get_builtin_shader(builtin);
+
+	/* Shader will be unbind by immUnbindProgram in immDrawPixelsTexScaled_clipping */
+	immBindBuiltinProgram(builtin);
+	immUniform1i("image", 0);
+
+	return state;
 }
 
 /* Use the currently bound shader.
@@ -365,7 +176,8 @@ GPUShader *immDrawPixelsTexSetup(int builtin)
  * Be also aware that this function unbinds the shader when
  * it's finished.
  * */
-void immDrawPixelsTexScaled_clipping(float x, float y, int img_w, int img_h,
+void immDrawPixelsTexScaled_clipping(IMMDrawPixelsTexState *state,
+                                     float x, float y, int img_w, int img_h,
                                      int format, int type, int zoomfilter, void *rect,
                                      float scaleX, float scaleY,
                                      float clip_min_x, float clip_min_y,
@@ -380,6 +192,9 @@ void immDrawPixelsTexScaled_clipping(float x, float y, int img_w, int img_h,
 	int components;
 	const bool use_clipping = ((clip_min_x < clip_max_x) && (clip_min_y < clip_max_y));
 	float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	GLint unpack_row_length;
+	glGetIntegerv(GL_UNPACK_ROW_LENGTH, &unpack_row_length);
 
 	glPixelStorei(GL_UNPACK_ROW_LENGTH, img_w);
 	glBindTexture(GL_TEXTURE_2D, texid);
@@ -426,25 +241,15 @@ void immDrawPixelsTexScaled_clipping(float x, float y, int img_w, int img_h,
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex_w, tex_h, 0, format, GL_UNSIGNED_BYTE, NULL);
 	}
 
-	VertexFormat *vert_format = immVertexFormat();
-	unsigned int pos = add_attrib(vert_format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-	unsigned int texco = add_attrib(vert_format, "texCoord", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = 0, texco = 1;
 
-	unsigned int program = glaGetOneInt(GL_CURRENT_PROGRAM);
-
-	/* This is needed for the OCIO case.
-	 * Shader program is set outside of blender and
-	 * we need it in imm module to do all attrib /
-	 * uniform bindings. */
-
-	/* A program is already bound.
-	 * set it in imm.bound_program to be able to use imm functions */
-	BLI_assert(program);
-	immBindProgram(program);
-
-	/* optionnal */
-	if (glGetUniformLocation(program, "color") != -1)
-		immUniform4fv("color", (color) ? color : white);
+	/* optional */
+	/* NOTE: Shader could be null for GLSL OCIO drawing, it is fine, since
+	 * it does not need color.
+	 */
+	if (state->shader != NULL && GPU_shader_get_uniform(state->shader, "color") != -1) {
+		immUniformColor4fv((color) ? color : white);
+	}
 
 	for (subpart_y = 0; subpart_y < nsubparts_y; subpart_y++) {
 		for (subpart_x = 0; subpart_x < nsubparts_x; subpart_x++) {
@@ -497,7 +302,7 @@ void immDrawPixelsTexScaled_clipping(float x, float y, int img_w, int img_h,
 					glTexSubImage2D(GL_TEXTURE_2D, 0, subpart_w, subpart_h, 1, 1, format, GL_UNSIGNED_BYTE, &uc_rect[(((size_t)subpart_y) * offset_y + subpart_h - 1) * img_w * components + (subpart_x * offset_x + subpart_w - 1) * components]);
 			}
 
-			immBegin(GL_TRIANGLE_FAN, 4);
+			immBegin(PRIM_TRIANGLE_FAN, 4);
 			immAttrib2f(texco, (float)(0 + offset_left) / tex_w, (float)(0 + offset_bot) / tex_h);
 			immVertex2f(pos, rast_x + (float)offset_left * xzoom, rast_y + (float)offset_bot * yzoom);
 
@@ -516,30 +321,33 @@ void immDrawPixelsTexScaled_clipping(float x, float y, int img_w, int img_h,
 	immUnbindProgram();
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, unpack_row_length);
 }
 
-void immDrawPixelsTexScaled(float x, float y, int img_w, int img_h,
+void immDrawPixelsTexScaled(IMMDrawPixelsTexState *state,
+                            float x, float y, int img_w, int img_h,
                             int format, int type, int zoomfilter, void *rect,
                             float scaleX, float scaleY, float xzoom, float yzoom, float color[4])
 {
-	immDrawPixelsTexScaled_clipping(x, y, img_w, img_h, format, type, zoomfilter, rect,
+	immDrawPixelsTexScaled_clipping(state, x, y, img_w, img_h, format, type, zoomfilter, rect,
 	                                scaleX, scaleY, 0.0f, 0.0f, 0.0f, 0.0f, xzoom, yzoom, color);
 }
 
-void immDrawPixelsTex(float x, float y, int img_w, int img_h, int format, int type, int zoomfilter, void *rect,
+void immDrawPixelsTex(IMMDrawPixelsTexState *state,
+                      float x, float y, int img_w, int img_h, int format, int type, int zoomfilter, void *rect,
                       float xzoom, float yzoom, float color[4])
 {
-	immDrawPixelsTexScaled_clipping(x, y, img_w, img_h, format, type, zoomfilter, rect, 1.0f, 1.0f,
+	immDrawPixelsTexScaled_clipping(state, x, y, img_w, img_h, format, type, zoomfilter, rect, 1.0f, 1.0f,
 	                                0.0f, 0.0f, 0.0f, 0.0f, xzoom, yzoom, color);
 }
 
-void immDrawPixelsTex_clipping(float x, float y, int img_w, int img_h,
+void immDrawPixelsTex_clipping(IMMDrawPixelsTexState *state,
+                               float x, float y, int img_w, int img_h,
                                int format, int type, int zoomfilter, void *rect,
                                float clip_min_x, float clip_min_y, float clip_max_x, float clip_max_y,
                                float xzoom, float yzoom, float color[4])
 {
-	immDrawPixelsTexScaled_clipping(x, y, img_w, img_h, format, type, zoomfilter, rect, 1.0f, 1.0f,
+	immDrawPixelsTexScaled_clipping(state, x, y, img_w, img_h, format, type, zoomfilter, rect, 1.0f, 1.0f,
 	                                clip_min_x, clip_min_y, clip_max_x, clip_max_y, xzoom, yzoom, color);
 }
 
@@ -559,12 +367,7 @@ void glaDefine2DArea(rcti *screen_rect)
 	 * Programming Guide, Appendix H, Correctness Tips.
 	 */
 
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadIdentity();
-	glOrtho(0.0, sc_w, 0.0, sc_h, -1, 1);
-	gpuTranslate2f(GLA_PIXEL_OFS, GLA_PIXEL_OFS);
-
-	glMatrixMode(GL_MODELVIEW);
+	gpuOrtho2D(GLA_PIXEL_OFS, sc_w + GLA_PIXEL_OFS, GLA_PIXEL_OFS, sc_h + GLA_PIXEL_OFS);
 	gpuLoadIdentity();
 }
 
@@ -623,8 +426,8 @@ gla2DDrawInfo *glaBegin2DDraw(rcti *screen_rect, rctf *world_rect)
 
 	glGetIntegerv(GL_VIEWPORT, (GLint *)di->orig_vp);
 	glGetIntegerv(GL_SCISSOR_BOX, (GLint *)di->orig_sc);
-	gpuGetProjectionMatrix3D(di->orig_projmat);
-	gpuGetModelViewMatrix3D(di->orig_viewmat);
+	gpuGetProjectionMatrix(di->orig_projmat);
+	gpuGetModelViewMatrix(di->orig_viewmat);
 
 	di->screen_rect = *screen_rect;
 	if (world_rect) {
@@ -675,10 +478,8 @@ void glaEnd2DDraw(gla2DDrawInfo *di)
 {
 	glViewport(di->orig_vp[0], di->orig_vp[1], di->orig_vp[2], di->orig_vp[3]);
 	glScissor(di->orig_vp[0], di->orig_vp[1], di->orig_vp[2], di->orig_vp[3]);
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadMatrix3D(di->orig_projmat);
-	glMatrixMode(GL_MODELVIEW);
-	gpuLoadMatrix3D(di->orig_viewmat);
+	gpuLoadProjectionMatrix(di->orig_projmat);
+	gpuLoadMatrix(di->orig_viewmat);
 
 	MEM_freeN(di);
 }
@@ -702,8 +503,7 @@ void bglPolygonOffset(float viewdist, float dist)
 		// glPolygonOffset(-1.0, -1.0);
 
 		/* hack below is to mimic polygon offset */
-		glMatrixMode(GL_PROJECTION);
-		gpuGetProjectionMatrix3D(winmat);
+		gpuGetProjectionMatrix(winmat);
 		
 		/* dist is from camera to center point */
 		
@@ -734,17 +534,13 @@ void bglPolygonOffset(float viewdist, float dist)
 		
 		winmat[14] -= offs;
 		offset += offs;
-		
-		gpuLoadMatrix3D(winmat);
-		glMatrixMode(GL_MODELVIEW);
 	}
 	else {
-		glMatrixMode(GL_PROJECTION);
 		winmat[14] += offset;
 		offset = 0.0;
-		gpuLoadMatrix3D(winmat);
-		glMatrixMode(GL_MODELVIEW);
 	}
+
+	gpuLoadProjectionMatrix(winmat);
 }
 
 /* **** Color management helper functions for GLSL display/transform ***** */
@@ -773,6 +569,9 @@ void glaDrawImBuf_glsl_clipping(ImBuf *ibuf, float x, float y, int zoomfilter,
 	/* Try to draw buffer using GLSL display transform */
 	if (force_fallback == false) {
 		int ok;
+
+		IMMDrawPixelsTexState state = {0};
+		immDrawPixelsTexSetupAttributes(&state);
 
 		if (ibuf->rect_float) {
 			if (ibuf->float_colorspace) {
@@ -803,7 +602,8 @@ void glaDrawImBuf_glsl_clipping(ImBuf *ibuf, float x, float y, int zoomfilter,
 					BLI_assert(!"Incompatible number of channels for GLSL display");
 
 				if (format != 0) {
-					immDrawPixelsTex_clipping(x, y, ibuf->x, ibuf->y, format, GL_FLOAT,
+					immDrawPixelsTex_clipping(&state,
+					                          x, y, ibuf->x, ibuf->y, format, GL_FLOAT,
 					                          zoomfilter, ibuf->rect_float,
 					                          clip_min_x, clip_min_y, clip_max_x, clip_max_y,
 					                          zoom_x, zoom_y, NULL);
@@ -811,7 +611,8 @@ void glaDrawImBuf_glsl_clipping(ImBuf *ibuf, float x, float y, int zoomfilter,
 			}
 			else if (ibuf->rect) {
 				/* ibuf->rect is always RGBA */
-				immDrawPixelsTex_clipping(x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE,
+				immDrawPixelsTex_clipping(&state,
+				                          x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE,
 				                          zoomfilter, ibuf->rect,
 				                          clip_min_x, clip_min_y, clip_max_x, clip_max_y,
 				                          zoom_x, zoom_y, NULL);
@@ -831,8 +632,9 @@ void glaDrawImBuf_glsl_clipping(ImBuf *ibuf, float x, float y, int zoomfilter,
 		display_buffer = IMB_display_buffer_acquire(ibuf, view_settings, display_settings, &cache_handle);
 
 		if (display_buffer) {
-			immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-			immDrawPixelsTex_clipping(x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE,
+			IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
+			immDrawPixelsTex_clipping(&state,
+			                          x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE,
 			                          zoomfilter, display_buffer,
 			                          clip_min_x, clip_min_y, clip_max_x, clip_max_y,
 			                          zoom_x, zoom_y, NULL);
@@ -883,6 +685,8 @@ void cpack(unsigned int x)
 	           (((x) >> 16) & 0xFF));
 }
 
+/* don't move to GPU_immediate_util.h because this uses user-prefs
+ * and isn't very low level */
 void immDrawBorderCorners(unsigned int pos, const rcti *border, float zoomx, float zoomy)
 {
 	float delta_x = 4.0f * UI_DPI_FAC / zoomx;
@@ -892,28 +696,28 @@ void immDrawBorderCorners(unsigned int pos, const rcti *border, float zoomx, flo
 	delta_y = min_ff(delta_y, border->ymax - border->ymin);
 
 	/* left bottom corner */
-	immBegin(GL_LINE_STRIP, 3);
+	immBegin(PRIM_LINE_STRIP, 3);
 	immVertex2f(pos, border->xmin, border->ymin + delta_y);
 	immVertex2f(pos, border->xmin, border->ymin);
 	immVertex2f(pos, border->xmin + delta_x, border->ymin);
 	immEnd();
 
 	/* left top corner */
-	immBegin(GL_LINE_STRIP, 3);
+	immBegin(PRIM_LINE_STRIP, 3);
 	immVertex2f(pos, border->xmin, border->ymax - delta_y);
 	immVertex2f(pos, border->xmin, border->ymax);
 	immVertex2f(pos, border->xmin + delta_x, border->ymax);
 	immEnd();
 
 	/* right bottom corner */
-	immBegin(GL_LINE_STRIP, 3);
+	immBegin(PRIM_LINE_STRIP, 3);
 	immVertex2f(pos, border->xmax - delta_x, border->ymin);
 	immVertex2f(pos, border->xmax, border->ymin);
 	immVertex2f(pos, border->xmax, border->ymin + delta_y);
 	immEnd();
 
 	/* right top corner */
-	immBegin(GL_LINE_STRIP, 3);
+	immBegin(PRIM_LINE_STRIP, 3);
 	immVertex2f(pos, border->xmax - delta_x, border->ymax);
 	immVertex2f(pos, border->xmax, border->ymax);
 	immVertex2f(pos, border->xmax, border->ymax - delta_y);

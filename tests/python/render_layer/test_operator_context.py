@@ -1,13 +1,10 @@
-# ./blender.bin --background -noaudio --python tests/python/render_layer/test_scene_copy.py -- --testdir="/data/lib/tests/"
-
 # ############################################################
 # Importing - Same For All Render Layer Tests
 # ############################################################
 
 import unittest
-
-import os, sys
-sys.path.append(os.path.dirname(__file__))
+import os
+import sys
 
 from render_layer_common import *
 
@@ -105,18 +102,20 @@ class UnitTesting(RenderLayerTesting):
         override = bpy.context.copy()
         override["render_layer"] = layer
         override["scene_collection"] = subzero
-        self.assertEqual(bpy.ops.testing.sample(override,
+        self.assertEqual(bpy.ops.testing.sample(
+            override,
             render_layer=layer.name,
-            scene_collection=subzero.name, # 'sub-zero'
+            scene_collection=subzero.name,  # 'sub-zero'
             use_verbose=True), {'FINISHED'})
 
         # set only render layer
         override = bpy.context.copy()
         override["render_layer"] = layer
 
-        self.assertEqual(bpy.ops.testing.sample(override,
+        self.assertEqual(bpy.ops.testing.sample(
+            override,
             render_layer=layer.name,
-            scene_collection=layer.collections.active.name, # 'scorpion'
+            scene_collection=layer.collections.active.name,  # 'scorpion'
             use_verbose=True), {'FINISHED'})
 
 

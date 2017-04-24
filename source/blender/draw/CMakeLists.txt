@@ -30,6 +30,7 @@ set(INC
 	engines/eevee
 	modes
 
+	../blenfont
 	../blenkernel
 	../blenlib
 	../blentranslation
@@ -42,6 +43,7 @@ set(INC
 	../editors/space_view3d
 	../render/extern/include
 	../render/intern/include
+	../windowmanager
 
 	../../../intern/glew-mx
 	../../../intern/guardedalloc
@@ -63,6 +65,7 @@ set(SRC
 
 	engines/eevee/eevee.c
 	engines/eevee/eevee_lights.c
+	engines/eevee/eevee_probes.c
 	engines/eevee/eevee.h
 	engines/eevee/eevee_private.h
 
@@ -101,23 +104,43 @@ data_to_c_simple(engines/clay/shaders/ssao_groundtruth.glsl SRC)
 
 data_to_c_simple(engines/eevee/shaders/lit_surface_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/lit_surface_vert.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/probe_filter_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/probe_sh_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/probe_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/probe_geom.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/probe_vert.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/shadow_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/shadow_geom.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/shadow_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/tonemap_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/bsdf_lut_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/bsdf_direct_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/bsdf_common_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/bsdf_sampling_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/ltc_lib.glsl SRC)
 
-data_to_c_simple(modes/shaders/edit_overlay_frag.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_vert.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_geom_tri.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_geom_edge.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_loosevert_vert.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_facedot_frag.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_facedot_vert.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_mix_frag.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_facefill_vert.glsl SRC)
-data_to_c_simple(modes/shaders/edit_overlay_facefill_frag.glsl SRC)
+data_to_c_simple(modes/shaders/common_globals_lib.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_frag.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_vert.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_geom_tri.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_geom_edge.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_loosevert_vert.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_facedot_frag.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_facedot_vert.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_mix_frag.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_facefill_vert.glsl SRC)
+data_to_c_simple(modes/shaders/edit_mesh_overlay_facefill_frag.glsl SRC)
+data_to_c_simple(modes/shaders/edit_curve_overlay_frag.glsl SRC)
+data_to_c_simple(modes/shaders/edit_curve_overlay_loosevert_vert.glsl SRC)
+data_to_c_simple(modes/shaders/edit_lattice_overlay_frag.glsl SRC)
+data_to_c_simple(modes/shaders/edit_lattice_overlay_loosevert_vert.glsl SRC)
 data_to_c_simple(modes/shaders/edit_normals_vert.glsl SRC)
 data_to_c_simple(modes/shaders/edit_normals_geom.glsl SRC)
 data_to_c_simple(modes/shaders/object_outline_resolve_frag.glsl SRC)
 data_to_c_simple(modes/shaders/object_outline_expand_frag.glsl SRC)
 data_to_c_simple(modes/shaders/object_outline_detect_frag.glsl SRC)
+data_to_c_simple(modes/shaders/object_grid_frag.glsl SRC)
+data_to_c_simple(modes/shaders/object_grid_vert.glsl SRC)
 
 list(APPEND INC
 )

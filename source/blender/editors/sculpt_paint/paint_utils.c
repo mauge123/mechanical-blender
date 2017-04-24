@@ -284,8 +284,8 @@ static void imapaint_pick_uv(Scene *scene, Object *ob, unsigned int faceindex, c
 
 	/* get the needed opengl matrices */
 	glGetIntegerv(GL_VIEWPORT, view);
-	gpuGetModelViewMatrix3D(matrix);
-	gpuGetProjectionMatrix3D(proj);
+	gpuGetModelViewMatrix(matrix);
+	gpuGetProjectionMatrix(proj);
 	view[0] = view[1] = 0;
 	mul_m4_m4m4(matrix, matrix, ob->obmat);
 	mul_m4_m4m4(matrix, proj, matrix);
@@ -556,8 +556,9 @@ static int brush_curve_preset_exec(bContext *C, wmOperator *op)
 
 	if (br) {
 		Scene *scene = CTX_data_scene(C);
+		SceneLayer *sl = CTX_data_scene_layer(C);
 		BKE_brush_curve_preset(br, RNA_enum_get(op->ptr, "shape"));
-		BKE_paint_invalidate_cursor_overlay(scene, br->curve);
+		BKE_paint_invalidate_cursor_overlay(scene, sl, br->curve);
 	}
 
 	return OPERATOR_FINISHED;

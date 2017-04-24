@@ -4,6 +4,7 @@ import unittest
 # Layer Collection Crawler
 # ############################################################
 
+
 def listbase_iter(data, struct, listbase):
     element = data.get_pointer((struct, listbase, b'first'))
     while element is not None:
@@ -22,9 +23,9 @@ def get_layer_collection(layer_collection):
     data = {}
     flag = layer_collection.get(b'flag')
 
-    data['is_visible']    = (flag & (1 << 0)) != 0;
-    data['is_selectable'] = (flag & (1 << 1)) != 0;
-    data['is_folded']     = (flag & (1 << 2)) != 0;
+    data['is_visible'] = (flag & (1 << 0)) != 0
+    data['is_selectable'] = (flag & (1 << 1)) != 0
+    data['is_folded'] = True
 
     scene_collection = layer_collection.get_pointer(b'scene_collection')
     if scene_collection is None:
@@ -86,7 +87,7 @@ def get_scene_collection_objects(collection, listbase):
     for link in linkdata_iter(collection, listbase):
         ob = link.get_pointer(b'data')
         if ob is None:
-            name  = 'Fail!'
+            name = 'Fail!'
         else:
             name = ob.get((b'id', b'name'))[2:]
         objects.append(name)
@@ -121,35 +122,20 @@ def get_scene_collections(scene):
 
 def query_scene(filepath, name, callbacks):
     """Return the equivalent to bpy.context.scene"""
-    import blendfile
+    from io_blend_utils.blend import blendfile
+
     with blendfile.open_blend(filepath) as blend:
         scenes = [block for block in blend.blocks if block.code == b'SC']
         for scene in scenes:
-            if scene.get((b'id', b'name'))[2:] == name:
-                output = []
-                for callback in callbacks:
-                    output.append(callback(scene))
-                return output
+            if scene.get((b'id', b'name'))[2:] != name:
+                continue
+
+            return [callback(scene) for callback in callbacks]
 
 
 # ############################################################
 # Utils
 # ############################################################
-
-def import_blendfile():
-    import bpy
-    import os, sys
-    path = os.path.join(
-            bpy.utils.resource_path('LOCAL'),
-            'scripts',
-            'addons',
-            'io_blend_utils',
-            'blend',
-            )
-
-    if path not in sys.path:
-        sys.path.append(path)
-
 
 def dump(data):
     import json
@@ -168,12 +154,13 @@ def dump(data):
 PDB = False
 DUMP_DIFF = True
 
+
 def compare_files(file_a, file_b):
     import filecmp
 
     if not filecmp.cmp(
-        file_a,
-        file_b):
+            file_a,
+            file_b):
 
         if DUMP_DIFF:
             import subprocess
@@ -196,7 +183,6 @@ class RenderLayerTesting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Runs once"""
-        cls.pretest_import_blendfile()
         cls.pretest_parsing()
 
     @classmethod
@@ -221,15 +207,6 @@ class RenderLayerTesting(unittest.TestCase):
         """
         root = cls.get_root()
         cls.assertTrue(root, "Testdir not set")
-
-    @staticmethod
-    def pretest_import_blendfile():
-        """
-        Make sure blendfile imports with no problems
-        name has extra _ because we need this test to run first
-        """
-        import_blendfile()
-        import blendfile
 
     def setUp(self):
         """Runs once per test"""
@@ -283,13 +260,13 @@ class RenderLayerTesting(unittest.TestCase):
 
             # add new objects
             if add_mode == 'EMPTY':
-                bpy.ops.object.add(override) # 'Empty'
+                bpy.ops.object.add(override)  # 'Empty'
 
             elif add_mode == 'CYLINDER':
-                bpy.ops.mesh.primitive_cylinder_add(override) # 'Cylinder'
+                bpy.ops.mesh.primitive_cylinder_add(override)  # 'Cylinder'
 
             elif add_mode == 'TORUS':
-                bpy.ops.mesh.primitive_torus_add(override) # 'Torus'
+                bpy.ops.mesh.primitive_torus_add(override)  # 'Torus'
 
             # save file
             filepath_objects = os.path.join(dirpath, 'objects.blend')
@@ -325,13 +302,13 @@ class RenderLayerTesting(unittest.TestCase):
 
         # add new objects
         if add_mode == 'EMPTY':
-            bpy.ops.object.add() # 'Empty'
+            bpy.ops.object.add()  # 'Empty'
 
         elif add_mode == 'CYLINDER':
-            bpy.ops.mesh.primitive_cylinder_add() # 'Cylinder'
+            bpy.ops.mesh.primitive_cylinder_add()  # 'Cylinder'
 
         elif add_mode == 'TORUS':
-            bpy.ops.mesh.primitive_torus_add() # 'Torus'
+            bpy.ops.mesh.primitive_torus_add()  # 'Torus'
 
         self.assertEqual(len(layer.collections), 1, "New collection not created")
         collection = layer.collections[0]
@@ -342,6 +319,139 @@ class RenderLayerTesting(unittest.TestCase):
         self.assertEqual(master_collection.name, "Master Collection")
         self.assertEqual(master_collection, bpy.context.scene.master_collection)
         master_collection.objects.link(bpy.data.objects.new('object', None))
+
+    def do_scene_copy(self, filepath_json_reference, copy_mode, data_callbacks):
+        import bpy
+        import os
+        import tempfile
+        import filecmp
+
+        ROOT = self.get_root()
+        with tempfile.TemporaryDirectory() as dirpath:
+            filepath_layers = os.path.join(ROOT, 'layers.blend')
+
+            (self.path_exists(f) for f in (
+                filepath_layers,
+                filepath_json_reference,
+                ))
+
+            filepath_saved = os.path.join(dirpath, '{0}.blend'.format(copy_mode))
+            filepath_json = os.path.join(dirpath, "{0}.json".format(copy_mode))
+
+            bpy.ops.wm.open_mainfile('EXEC_DEFAULT', filepath=filepath_layers)
+            self.rename_collections()
+            bpy.ops.scene.new(type=copy_mode)
+            bpy.ops.wm.save_mainfile('EXEC_DEFAULT', filepath=filepath_saved)
+
+            datas = query_scene(filepath_saved, 'Main.001', data_callbacks)
+            self.assertTrue(datas, "Data is not valid")
+
+            with open(filepath_json, "w") as f:
+                for data in datas:
+                    f.write(dump(data))
+
+            self.assertTrue(compare_files(
+                filepath_json,
+                filepath_json_reference,
+                ),
+                "Scene copy \"{0}\" test failed".format(copy_mode.title()))
+
+    def do_object_delete(self, del_mode):
+        import bpy
+        import os
+        import tempfile
+        import filecmp
+
+        ROOT = self.get_root()
+        with tempfile.TemporaryDirectory() as dirpath:
+            filepath_layers = os.path.join(ROOT, 'layers.blend')
+            filepath_reference_json = os.path.join(ROOT, 'layers_object_delete.json')
+
+            # open file
+            bpy.ops.wm.open_mainfile('EXEC_DEFAULT', filepath=filepath_layers)
+            self.rename_collections()
+
+            # create sub-collections
+            three_b = bpy.data.objects.get('T.3b')
+            three_d = bpy.data.objects.get('T.3d')
+
+            scene = bpy.context.scene
+
+            # mangle the file a bit with some objects linked across collections
+            subzero = scene.master_collection.collections['1'].collections.new('sub-zero')
+            scorpion = subzero.collections.new('scorpion')
+            subzero.objects.link(three_d)
+            scorpion.objects.link(three_b)
+            scorpion.objects.link(three_d)
+
+            # object to delete
+            ob = three_d
+
+            # delete object
+            if del_mode == 'DATA':
+                bpy.data.objects.remove(ob, do_unlink=True)
+
+            elif del_mode == 'OPERATOR':
+                bpy.context.scene.update()  # update depsgraph
+                bpy.ops.object.select_all(action='DESELECT')
+                ob.select_set(action='SELECT')
+                self.assertTrue(ob.select_get())
+                bpy.ops.object.delete()
+
+            # save file
+            filepath_generated = os.path.join(dirpath, 'generated.blend')
+            bpy.ops.wm.save_mainfile('EXEC_DEFAULT', filepath=filepath_generated)
+
+            # get the generated json
+            datas = query_scene(filepath_generated, 'Main', (get_scene_collections, get_layers))
+            self.assertTrue(datas, "Data is not valid")
+
+            filepath_generated_json = os.path.join(dirpath, "generated.json")
+            with open(filepath_generated_json, "w") as f:
+                for data in datas:
+                    f.write(dump(data))
+
+            self.assertTrue(compare_files(
+                filepath_generated_json,
+                filepath_reference_json,
+                ),
+                "Scene dump files differ")
+
+    def do_visibility_object_add(self, add_mode):
+        import bpy
+
+        scene = bpy.context.scene
+
+        # delete all objects of the file
+        for ob in bpy.data.objects:
+            bpy.data.objects.remove(ob, do_unlink=True)
+
+        # real test
+        layer = scene.render_layers.new('Visibility Test')
+        layer.collections.unlink(layer.collections[0])
+        scene.render_layers.active = layer
+
+        scene_collection = scene.master_collection.collections.new("Collection")
+        layer.collections.link(scene_collection)
+
+        bpy.context.scene.update()  # update depsgraph
+
+        self.assertEqual(len(bpy.data.objects), 0)
+
+        # add new objects
+        if add_mode == 'EMPTY':
+            bpy.ops.object.add()  # 'Empty'
+
+        elif add_mode == 'CYLINDER':
+            bpy.ops.mesh.primitive_cylinder_add()  # 'Cylinder'
+
+        elif add_mode == 'TORUS':
+            bpy.ops.mesh.primitive_torus_add()  # 'Torus'
+
+        self.assertEqual(len(bpy.data.objects), 1)
+
+        new_ob = bpy.data.objects[0]
+        self.assertTrue(new_ob.visible_get(), "Object should be visible")
 
     def cleanup_tree(self):
         """
@@ -432,7 +542,9 @@ class MoveSceneCollectionTesting(RenderLayerTesting):
         Cleanup file, and populate it with class scene tree map
         """
         self.cleanup_tree()
-        self.assertTrue(hasattr(self, "get_initial_scene_tree_map"), "Test class has no get_initial_scene_tree_map method implemented")
+        self.assertTrue(
+                hasattr(self, "get_initial_scene_tree_map"),
+                "Test class has no get_initial_scene_tree_map method implemented")
 
         return self.build_scene_tree(self.get_initial_scene_tree_map())
 
@@ -499,7 +611,10 @@ class MoveSceneCollectionSyncTesting(MoveSceneCollectionTesting):
         import bpy
         scene = bpy.context.scene
 
-        self.assertTrue(hasattr(self, "get_initial_layers_tree_map"), "Test class has no get_initial_layers_tree_map method implemented")
+        self.assertTrue(
+                hasattr(self, "get_initial_layers_tree_map"),
+                "Test class has no get_initial_layers_tree_map method implemented")
+
         layers_map = self.get_initial_layers_tree_map()
 
         for layer_name, collections_names in layers_map:
@@ -579,3 +694,92 @@ class MoveLayerCollectionTesting(MoveSceneCollectionSyncTesting):
         layer_collection_dst = self.parse_move(dst)
         return layer_collection_src.move_below(layer_collection_dst)
 
+
+class Clay:
+    def __init__(self, extra_kid_layer=False):
+        import bpy
+
+        self._scene = bpy.context.scene
+        self._layer = self._fresh_layer()
+        self._object = bpy.data.objects.new('guinea pig', bpy.data.meshes.new('mesh'))
+
+        # update depsgraph
+        self._scene.update()
+
+        scene_collection_grandma = self._scene.master_collection.collections.new("Grandma")
+        scene_collection_mom = scene_collection_grandma.collections.new("Mom")
+        scene_collection_kid = scene_collection_mom.collections.new("Kid")
+        scene_collection_kid.objects.link(self._object)
+
+        layer_collection_grandma = self._layer.collections.link(scene_collection_grandma)
+        layer_collection_mom = layer_collection_grandma.collections[0]
+        layer_collection_kid = layer_collection_mom.collections[0]
+
+        # store the variables
+        self._scene_collections = {
+                'grandma': scene_collection_grandma,
+                'mom': scene_collection_mom,
+                'kid': scene_collection_kid,
+                }
+        self._layer_collections = {
+                'grandma': layer_collection_grandma,
+                'mom': layer_collection_mom,
+                'kid': layer_collection_kid,
+                }
+
+        if extra_kid_layer:
+            layer_collection_extra = self._layer.collections.link(scene_collection_kid)
+            self._layer_collections['extra'] = layer_collection_extra
+
+        self._update()
+
+    def _fresh_layer(self):
+        import bpy
+
+        # remove all other objects
+        while bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[0])
+
+        # remove all the other collections
+        while self._scene.master_collection.collections:
+            self._scene.master_collection.collections.remove(
+                    self._scene.master_collection.collections[0])
+
+        layer = self._scene.render_layers.new('Evaluation Test')
+        layer.collections.unlink(layer.collections[0])
+        self._scene.render_layers.active = layer
+
+        # remove all other layers
+        for layer_iter in self._scene.render_layers:
+            if layer_iter != layer:
+                self._scene.render_layers.remove(layer_iter)
+
+        return layer
+
+    def _update(self):
+        """
+        Force depsgrpah evaluation
+        and update pointers to IDProperty collections
+        """
+        ENGINE = 'BLENDER_CLAY'
+
+        self._scene.update()  # update depsgraph
+        self._layer.update()  # flush depsgraph evaluation
+
+        # change scene settings
+        self._properties = {
+                'scene': self._scene.collection_properties[ENGINE],
+                'object': self._object.collection_properties[ENGINE],
+                }
+
+        for key, value in self._layer_collections.items():
+            self._properties[key] = self._layer_collections[key].engine_overrides[ENGINE]
+
+    def get(self, name, data_path):
+        self._update()
+        return getattr(self._properties[name], data_path)
+
+    def set(self, name, data_path, value):
+        self._update()
+        self._properties[name].use(data_path)
+        setattr(self._properties[name], data_path, value)

@@ -612,7 +612,7 @@ void WORLD_OT_new(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "New World";
 	ot->idname = "WORLD_OT_new";
-	ot->description = "Add a new world";
+	ot->description = "Create a new world Data-Block";
 	
 	/* api callbacks */
 	ot->exec = new_world_exec;
@@ -631,6 +631,7 @@ static int render_layer_add_exec(bContext *C, wmOperator *UNUSED(op))
 	scene->active_layer = BLI_listbase_count(&scene->render_layers) - 1;
 
 	DAG_id_tag_update(&scene->id, 0);
+	DAG_relations_tag_update(CTX_data_main(C));
 	WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
 	
 	return OPERATOR_FINISHED;
@@ -660,6 +661,7 @@ static int render_layer_remove_exec(bContext *C, wmOperator *UNUSED(op))
 	}
 
 	DAG_id_tag_update(&scene->id, 0);
+	DAG_relations_tag_update(CTX_data_main(C));
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
 	
 	return OPERATOR_FINISHED;

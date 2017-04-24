@@ -450,29 +450,20 @@ static void node_draw_frame(const bContext *C, ARegion *ar, SpaceNode *snode,
 	}
 	else
 		UI_GetThemeColor4fv(TH_NODE_FRAME, color);
-	glEnable(GL_BLEND);
+
 	UI_draw_roundbox_corner_set(UI_CNR_ALL);
-	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
-	glDisable(GL_BLEND);
+	UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
 
 	/* outline active and selected emphasis */
 	if (node->flag & SELECT) {
-		glEnable(GL_BLEND);
-		glEnable(GL_LINE_SMOOTH);
-				
 		if (node->flag & NODE_ACTIVE)
 			UI_GetThemeColorShadeAlpha4fv(TH_ACTIVE, 0, -40, color);
 		else
 			UI_GetThemeColorShadeAlpha4fv(TH_SELECT, 0, -40, color);
 
-		UI_draw_roundbox_corner_set(UI_CNR_ALL);
-		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
-
-
-		glDisable(GL_LINE_SMOOTH);
-		glDisable(GL_BLEND);
+		UI_draw_roundbox_aa(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
 	}
-	
+
 	/* label */
 	node_draw_frame_label(ntree, node, snode->aspect);
 	
@@ -566,9 +557,7 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 	float debug_color[4];
 	UI_draw_roundbox_corner_set(UI_CNR_ALL);
 	UI_GetThemeColor4fv(TH_NODE, debug_color);
-	glEnable(GL_BLEND);
-	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, size, debug_color);
-	glDisable(GL_BLEND);
+	UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax, size, debug_color);
 
 	/* outline active and selected emphasis */
 	if (node->flag & SELECT) {
@@ -581,7 +570,7 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 		else {
 			UI_GetThemeColorShadeAlpha4fv(TH_TEXT_HI, -20, -120, debug_color);
 		}
-		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, size, debug_color);
+		UI_draw_roundbox_4fv(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, size, debug_color);
 
 		glDisable(GL_LINE_SMOOTH);
 		glDisable(GL_BLEND);
@@ -1195,6 +1184,7 @@ static void node_shader_set_butfunc(bNodeType *ntype)
 		case SH_NODE_BSDF_GLOSSY:
 		case SH_NODE_BSDF_GLASS:
 		case SH_NODE_BSDF_REFRACTION:
+		case SH_NODE_BSDF_PRINCIPLED:
 			ntype->draw_buttons = node_shader_buts_glossy;
 			break;
 		case SH_NODE_BSDF_ANISOTROPIC:
@@ -1281,9 +1271,6 @@ static void node_composit_buts_renderlayers(uiLayout *layout, bContext *C, Point
 	PropertyRNA *prop;
 	const char *layer_name;
 	char scene_name[MAX_ID_NAME - 2];
-	wmOperatorType *ot = WM_operatortype_find("RENDER_OT_render", 1);
-
-	BLI_assert(ot != 0);
 
 	uiTemplateID(layout, C, ptr, "scene", NULL, NULL, NULL);
 	
@@ -1300,11 +1287,9 @@ static void node_composit_buts_renderlayers(uiLayout *layout, bContext *C, Point
 	scn_ptr = RNA_pointer_get(ptr, "scene");
 	RNA_string_get(&scn_ptr, "name", scene_name);
 
-	WM_operator_properties_create_ptr(&op_ptr, ot);
+	op_ptr = uiItemFullO(row, "RENDER_OT_render", "", ICON_RENDER_STILL, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_string_set(&op_ptr, "layer", layer_name);
 	RNA_string_set(&op_ptr, "scene", scene_name);
-	uiItemFullO_ptr(row, ot, "", ICON_RENDER_STILL, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
-
 }
 
 
@@ -1753,6 +1738,7 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
 	Scene *scene = CTX_data_scene(C);
 	PointerRNA imfptr = RNA_pointer_get(ptr, "format");
 	PointerRNA active_input_ptr, op_ptr;
+	wmOperatorType *ot;
 	uiLayout *row, *col;
 	int active_index;
 	const bool multilayer = RNA_enum_get(&imfptr, "file_format") == R_IMF_IMTYPE_MULTILAYER;
@@ -1791,11 +1777,10 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
 	active_input_ptr.id.data = ptr->id.data;
 	
 	col = uiLayoutColumn(row, true);
-	op_ptr = uiItemFullO(col, "NODE_OT_output_file_move_active_socket", "",
-	                     ICON_TRIA_UP, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+	ot = WM_operatortype_find("NODE_OT_output_file_move_active_socket", false);
+	op_ptr = uiItemFullO_ptr(col, ot, "", ICON_TRIA_UP, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_enum_set(&op_ptr, "direction", 1);
-	op_ptr = uiItemFullO(col, "NODE_OT_output_file_move_active_socket", "",
-	                     ICON_TRIA_DOWN, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+	op_ptr = uiItemFullO_ptr(col, ot, "", ICON_TRIA_DOWN, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_enum_set(&op_ptr, "direction", 2);
 	
 	if (active_input_ptr.data) {
@@ -2127,14 +2112,7 @@ static void node_composit_buts_switch(uiLayout *layout, bContext *UNUSED(C), Poi
 
 static void node_composit_buts_switch_view_ex(uiLayout *layout, bContext *UNUSED(C), PointerRNA *UNUSED(ptr))
 {
-	PointerRNA op_ptr;
-	wmOperatorType *ot = WM_operatortype_find("NODE_OT_switch_view_update", 1);
-
-	BLI_assert(ot != 0);
-
-	WM_operator_properties_create_ptr(&op_ptr, ot);
-
-	uiItemFullO_ptr(layout, ot, "Update Views", ICON_FILE_REFRESH, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
+	uiItemFullO(layout, "NODE_OT_switch_view_update", "Update Views", ICON_FILE_REFRESH, NULL, WM_OP_INVOKE_DEFAULT, 0);
 }
 
 static void node_composit_buts_boxmask(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -2180,13 +2158,13 @@ static void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNo
 		const float cy = y + snode->zoom * backdropHeight * node->custom4;
 
 		VertexFormat *format = immVertexFormat();
-		unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		immUniformColor3f(1.0f, 1.0f, 1.0f);
 
-		immBegin(GL_LINES, 4);
+		immBegin(PRIM_LINES, 4);
 		immVertex2f(pos, cx - 25, cy - 25);
 		immVertex2f(pos, cx + 25, cy + 25);
 		immVertex2f(pos, cx + 25, cy - 25);
@@ -2225,13 +2203,13 @@ static void node_composit_backdrop_boxmask(SpaceNode *snode, ImBuf *backdrop, bN
 	y4 = cy - (-sine * halveBoxWidth + cosine * -halveBoxHeight) * snode->zoom;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor3f(1.0f, 1.0f, 1.0f);
 
-	immBegin(GL_LINE_LOOP, 4);
+	immBegin(PRIM_LINE_LOOP, 4);
 	immVertex2f(pos, x1, y1);
 	immVertex2f(pos, x2, y2);
 	immVertex2f(pos, x3, y3);
@@ -2269,13 +2247,13 @@ static void node_composit_backdrop_ellipsemask(SpaceNode *snode, ImBuf *backdrop
 	y4 = cy - (-sine * halveBoxWidth + cosine * -halveBoxHeight) * snode->zoom;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor3f(1.0f, 1.0f, 1.0f);
 
-	immBegin(GL_LINE_LOOP, 4);
+	immBegin(PRIM_LINE_LOOP, 4);
 	immVertex2f(pos, x1, y1);
 	immVertex2f(pos, x2, y2);
 	immVertex2f(pos, x3, y3);
@@ -3196,12 +3174,10 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 	if (ibuf) {
 		float x, y; 
-		
-		glMatrixMode(GL_PROJECTION);
+
+		gpuPushProjectionMatrix();
 		gpuPushMatrix();
-		glMatrixMode(GL_MODELVIEW);
-		gpuPushMatrix();
-		
+
 		/* somehow the offset has to be calculated inverse */
 		
 		glaDefine2DArea(&ar->winrct);
@@ -3227,10 +3203,10 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 				else
 					shuffle[3] = 1.0f;
 
-				GPUShader *shader = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
-				GPU_shader_uniform_vector(shader, GPU_shader_get_uniform(shader, "shuffle"), 4, 1, shuffle);
+				IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
+				GPU_shader_uniform_vector(state.shader, GPU_shader_get_uniform(state.shader, "shuffle"), 4, 1, shuffle);
 
-				immDrawPixelsTex(x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST,
+				immDrawPixelsTex(&state, x, y, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST,
 				                 display_buffer, snode->zoom, snode->zoom, NULL);
 
 				GPU_shader_unbind();
@@ -3275,7 +3251,7 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 				              y + snode->zoom * viewer_border->ymin * ibuf->y,
 				              y + snode->zoom * viewer_border->ymax * ibuf->y);
 
-				unsigned int pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+				unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 				immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 				immUniformThemeColor(TH_ACTIVE);
 
@@ -3284,10 +3260,8 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 				immUnbindProgram();
 			}
 		}
-		
-		glMatrixMode(GL_PROJECTION);
-		gpuPopMatrix();
-		glMatrixMode(GL_MODELVIEW);
+
+		gpuPopProjectionMatrix();
 		gpuPopMatrix();
 	}
 	
@@ -3399,7 +3373,6 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		/* store current linewidth */
 		float linew;
 		float arrow[2], arrow1[2], arrow2[2];
-		const float px_fac = UI_DPI_WINDOW_FAC;
 		glGetFloatv(GL_LINE_WIDTH, &linew);
 		unsigned int pos;
 		
@@ -3427,15 +3400,15 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		}
 
 		if (do_triple || drawarrow || (!do_shaded)) {
-			pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 2, KEEP_FLOAT);
+			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		}
 
 		if (do_triple) {
 			immUniformThemeColorShadeAlpha(th_col3, -80, -120);
-			glLineWidth(4.0f * px_fac);
+			glLineWidth(4.0f);
 
-			immBegin(GL_LINE_STRIP, (LINK_RESOL + 1));
+			immBegin(PRIM_LINE_STRIP, (LINK_RESOL + 1));
 
 			for (i = 0; i <= LINK_RESOL; i++) {
 				immVertex2fv(pos, coord_array[i]);
@@ -3444,7 +3417,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 			immEnd();
 
 			if (drawarrow) {
-				immBegin(GL_LINE_STRIP, 3);
+				immBegin(PRIM_LINE_STRIP, 3);
 				immVertex2fv(pos, arrow1);
 				immVertex2fv(pos, arrow);
 				immVertex2fv(pos, arrow2);
@@ -3452,12 +3425,12 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 			}
 		}
 
-		glLineWidth(1.5f * px_fac);
+		glLineWidth(1.5f);
 
 		if (drawarrow) {
 			immUniformThemeColorBlend(th_col1, th_col2, 0.5f);
 
-			immBegin(GL_LINE_STRIP, 3);
+			immBegin(PRIM_LINE_STRIP, 3);
 			immVertex2fv(pos, arrow1);
 			immVertex2fv(pos, arrow);
 			immVertex2fv(pos, arrow2);
@@ -3467,7 +3440,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		if (!do_shaded) {
 			immUniformThemeColor(th_col1);
 
-			immBegin(GL_LINE_STRIP, (LINK_RESOL + 1));
+			immBegin(PRIM_LINE_STRIP, (LINK_RESOL + 1));
 
 			for (i = 0; i <= LINK_RESOL; i++) {
 				immVertex2fv(pos, coord_array[i]);
@@ -3484,12 +3457,12 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 			unsigned char col[3];
 
 			VertexFormat *format = immVertexFormat();
-			pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
-			unsigned int color = add_attrib(format, "color", GL_UNSIGNED_BYTE, 3, NORMALIZE_INT_TO_FLOAT);
+			pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+			unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
 
-			immBegin(GL_LINE_STRIP, (LINK_RESOL + 1));
+			immBegin(PRIM_LINE_STRIP, (LINK_RESOL + 1));
 
 			for (i = 0; i <= LINK_RESOL; i++) {
 				UI_GetThemeColorBlend3ubv(th_col1, th_col2, spline_step, col);
@@ -3557,7 +3530,7 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 
 void ED_node_draw_snap(View2D *v2d, const float cent[2], float size, NodeBorder border, unsigned pos)
 {
-	immBegin(GL_LINES, 4);
+	immBegin(PRIM_LINES, 4);
 	
 	if (border & (NODE_LEFT | NODE_RIGHT)) {
 		immVertex2f(pos, cent[0], v2d->cur.ymin);

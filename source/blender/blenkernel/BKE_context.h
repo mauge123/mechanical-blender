@@ -40,6 +40,7 @@ extern "C" {
 struct ARegion;
 struct bScreen;
 struct CacheFile;
+struct Depsgraph;
 struct LayerCollection;
 struct ListBase;
 struct Main;
@@ -311,6 +312,7 @@ int CTX_data_visible_gpencil_layers(const bContext *C, ListBase *list);
 int CTX_data_editable_gpencil_layers(const bContext *C, ListBase *list);
 int CTX_data_editable_gpencil_strokes(const bContext *C, ListBase *list);
 
+struct Depsgraph *CTX_data_depsgraph(const bContext *C);
 
 #ifdef __cplusplus
 }

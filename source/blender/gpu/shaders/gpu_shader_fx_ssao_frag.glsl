@@ -18,6 +18,8 @@ uniform sampler2D depthbuffer;
 #else
 	in vec4 uvcoordsvar;
 	out vec4 FragColor;
+	#define texture1D texture
+	#define texture2D texture
 #endif
 
 /* ssao_params.x : pixel scale for the ssao radious */
@@ -83,7 +85,7 @@ float calculate_ssao_factor(float depth)
 			float f = dot(dir, normal);
 
 			/* use minor bias here to avoid self shadowing */
-			if (f > 0.05 * len + 0.0001)
+			if (f > 0.05 * len)
 				factor += f * 1.0 / (len * (1.0 + len * len * ssao_params.z));
 		}
 	}

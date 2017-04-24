@@ -75,9 +75,8 @@
 #include "ED_screen.h"
 #include "ED_view3d.h"
 
-#include "BIF_glutil.h"
-
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 
 #include "gpencil_intern.h"
 
@@ -962,7 +961,7 @@ static void gp_brush_drawcursor(bContext *C, int x, int y, void *UNUSED(customda
 
 	if (brush) {
 		VertexFormat *format = immVertexFormat();
-		unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		glEnable(GL_LINE_SMOOTH);
@@ -971,11 +970,11 @@ static void gp_brush_drawcursor(bContext *C, int x, int y, void *UNUSED(customda
 		/* Inner Ring: Light color for action of the brush */
 		/* TODO: toggle between add and remove? */
 		immUniformColor4ub(255, 255, 255, 200);
-		imm_draw_lined_circle(pos, x, y, brush->size, 40);
+		imm_draw_circle_wire(pos, x, y, brush->size, 40);
 
 		/* Outer Ring: Dark color for contrast on light backgrounds (e.g. gray on white) */
 		immUniformColor3ub(30, 30, 30);
-		imm_draw_lined_circle(pos, x, y, brush->size + 1, 40);
+		imm_draw_circle_wire(pos, x, y, brush->size + 1, 40);
 
 		immUnbindProgram();
 

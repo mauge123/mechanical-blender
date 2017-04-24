@@ -88,7 +88,8 @@ void ED_editors_init(bContext *C)
 	wmWindowManager *wm = CTX_wm_manager(C);
 	Main *bmain = CTX_data_main(C);
 	Scene *sce = CTX_data_scene(C);
-	Object *ob, *obact = (sce && sce->basact) ? sce->basact->object : NULL;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *ob, *obact = (sl && sl->basact) ? sl->basact->object : NULL;
 	ID *data;
 
 	/* This is called during initialization, so we don't want to store any reports */
@@ -320,12 +321,12 @@ void ED_region_draw_mouse_line_cb(const bContext *C, ARegion *ar, void *arg_info
 	setlinestyle(3);
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColor(TH_VIEW_OVERLAY);
 
-	immBegin(GL_LINES, 2);
+	immBegin(PRIM_LINES, 2);
 	immVertex2fv(pos, mval_dst);
 	immVertex2fv(pos, mval_src);
 	immEnd();

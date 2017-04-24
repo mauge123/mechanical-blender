@@ -58,6 +58,8 @@
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_idcode.h"
+#include "BKE_idprop.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_linestyle.h"
 #include "BKE_main.h"
@@ -467,6 +469,11 @@ static void template_ID(
 		but = uiDefButR(block, UI_BTYPE_TEXT, 0, name, 0, 0, UI_UNIT_X * 6, UI_UNIT_Y,
 		                &idptr, "name", -1, 0, 0, -1, -1, RNA_struct_ui_description(type));
 		UI_but_funcN_set(but, template_id_cb, MEM_dupallocN(template), SET_INT_IN_POINTER(UI_ID_RENAME));
+
+		but->search_func = id_search_cb;
+		but->search_arg = template;
+		ui_but_search_refresh(but, true);
+
 		if (user_alert) UI_but_flag_enable(but, UI_BUT_REDALERT);
 
 		if (id->lib) {
@@ -3737,6 +3744,7 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
 	if (propptr.data) {
 		uiBut *but = uiLayoutGetBlock(layout)->buttons.last;
 
+		WM_operator_properties_sanitize(&propptr, false);
 		template_keymap_item_properties(layout, NULL, &propptr);
 
 		/* attach callbacks to compensate for missing properties update,
@@ -3751,6 +3759,60 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
 			}
 		}
 	}
+}
+
+/********************************* Overrides *************************************/
+
+void uiTemplateOverrideProperty(uiLayout *layout, struct PointerRNA *collection_props_ptr, struct PointerRNA *scene_props_ptr, const char *name, const char *custom_template)
+{
+	bool is_set = false;
+	uiLayout *row, *col;
+
+	PointerRNA *ptr;
+	PropertyRNA *prop;
+
+	IDProperty *collection_props = collection_props_ptr->data;
+
+	if (IDP_GetPropertyFromGroup(collection_props, name)) {
+		prop = RNA_struct_find_property(collection_props_ptr, name);
+		ptr = collection_props_ptr;
+		is_set = RNA_property_is_set(ptr, prop);
+	}
+	else {
+		/* property doesn't exist yet */
+		prop = RNA_struct_find_property(scene_props_ptr, name);
+		ptr = scene_props_ptr;
+	}
+
+	row = uiLayoutRow(layout, false);
+	col = uiLayoutColumn(row, false);
+
+	uiLayoutSetEnabled(col, is_set);
+
+	if (custom_template && STREQ(custom_template, "icon_view")) {
+		uiTemplateIconView(col, ptr, name, false, 5.0f);
+	}
+	else {
+		uiItemFullR(col, ptr, prop, -1, 0, 0, NULL, ICON_NONE);
+	}
+
+	col = uiLayoutColumn(row, false);
+	uiBut *but;
+	uiBlock *block = uiLayoutGetBlock(col);
+	UI_block_emboss_set(block, UI_EMBOSS_NONE);
+
+	if (is_set) {
+		but = uiDefIconButO(block, UI_BTYPE_BUT, "UI_OT_unuse_property_button", WM_OP_EXEC_DEFAULT, ICON_X, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL);
+	}
+	else {
+		but = uiDefIconButO(block, UI_BTYPE_BUT, "UI_OT_use_property_button", WM_OP_EXEC_DEFAULT, ICON_ZOOMIN, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL);
+		/* XXX - Using existing data struct to pass another RNAPointer */
+		but->rnasearchpoin = *scene_props_ptr;
+	}
+
+	but->rnapoin = *collection_props_ptr;
+	but->rnaprop = prop;
+	UI_block_emboss_set(block, UI_EMBOSS);
 }
 
 /********************************* Color management *************************************/

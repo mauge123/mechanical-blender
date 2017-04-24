@@ -73,6 +73,7 @@
 #include "BKE_global.h"
 #include "BKE_group.h"
 #include "BKE_fcurve.h"
+#include "BKE_idprop.h"
 #include "BKE_lamp.h"
 #include "BKE_lattice.h"
 #include "BKE_layer.h"
@@ -123,6 +124,7 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *obedit = CTX_data_edit_object(C);
 	BMVert *eve;
 	BMIter iter;
@@ -239,7 +241,7 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
 			else {
 				Object workob;
 
-				ob->parent = BASACT->object;
+				ob->parent = BASACT_NEW->object;
 				if (v3) {
 					ob->partype = PARVERT3;
 					ob->par1 = v1 - 1;
@@ -346,7 +348,7 @@ static int make_proxy_exec(bContext *C, wmOperator *op)
 
 	if (ob) {
 		Object *newob;
-		BaseLegacy *newbase, *oldbase = BASACT;
+		BaseLegacy *newbase, *oldbase = BASACT_NEW;
 		char name[MAX_ID_NAME + 4];
 
 		BLI_snprintf(name, sizeof(name), "%s_proxy", ((ID *)(gob ? gob : ob))->name + 2);
@@ -355,7 +357,7 @@ static int make_proxy_exec(bContext *C, wmOperator *op)
 		newob = BKE_object_add(bmain, scene, sl, OB_EMPTY, name);
 
 		/* set layers OK */
-		newbase = BASACT;    /* BKE_object_add sets active... */
+		newbase = BASACT_NEW;    /* BKE_object_add sets active... */
 		newbase->lay = oldbase->lay;
 		newob->lay = newbase->lay;
 
@@ -1762,23 +1764,19 @@ static void new_id_matar(Main *bmain, Material **matar, const int totcol)
 	}
 }
 
-static void single_obdata_users(Main *bmain, Scene *scene, const int flag)
+static void single_obdata_users(Main *bmain, Scene *scene, SceneLayer *sl, const int flag)
 {
-	Object *ob;
 	Lamp *la;
 	Curve *cu;
 	/* Camera *cam; */
-	BaseLegacy *base;
 	Mesh *me;
 	Lattice *lat;
 	ID *id;
 	int a;
 
-	TODO_LAYER; /* need to use scene->collection base instead of scene->bases */
-
-	for (base = FIRSTBASE; base; base = base->next) {
-		ob = base->object;
-		if (!ID_IS_LINKED_DATABLOCK(ob) && (base->flag_legacy & flag) == flag) {
+	FOREACH_OBJECT_FLAG(scene, sl, flag, ob)
+	{
+		if (!ID_IS_LINKED_DATABLOCK(ob)) {
 			id = ob->data;
 
 			if (id && id->us > 1 && !ID_IS_LINKED_DATABLOCK(id)) {
@@ -1844,6 +1842,7 @@ static void single_obdata_users(Main *bmain, Scene *scene, const int flag)
 			}
 		}
 	}
+	FOREACH_OBJECT_FLAG_END
 
 	me = bmain->mesh.first;
 	while (me) {
@@ -1855,7 +1854,7 @@ static void single_obdata_users(Main *bmain, Scene *scene, const int flag)
 static void single_object_action_users(Scene *scene, SceneLayer *sl, const int flag)
 {
 	FOREACH_OBJECT_FLAG(scene, sl, flag, ob)
-	    if (!ID_IS_LINKED_DATABLOCK(ob)) {
+		if (!ID_IS_LINKED_DATABLOCK(ob)) {
 			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 			BKE_animdata_copy_id_action(&ob->id, false);
 		}
@@ -1869,7 +1868,7 @@ static void single_mat_users(Main *bmain, Scene *scene, SceneLayer *sl, const in
 	int a, b;
 
 	FOREACH_OBJECT_FLAG(scene, sl, flag, ob)
-	    if (!ID_IS_LINKED_DATABLOCK(ob)) {
+		if (!ID_IS_LINKED_DATABLOCK(ob)) {
 			for (a = 1; a <= ob->totcol; a++) {
 				ma = give_current_material(ob, a);
 				if (ma) {
@@ -2001,12 +2000,40 @@ void ED_object_single_users(Main *bmain, Scene *scene, const bool full, const bo
 	single_object_users(bmain, scene, NULL, 0, copy_groups);
 
 	if (full) {
-		single_obdata_users(bmain, scene, 0);
+		single_obdata_users(bmain, scene, NULL, 0);
 		single_object_action_users(scene, NULL, 0);
 		single_mat_users_expand(bmain);
 		single_tex_users_expand(bmain);
 	}
 
+	/* Relink datablock pointer properties */
+	{
+		IDP_RelinkProperty(scene->id.properties);
+
+		for (Base *base = scene->base.first; base; base = base->next) {
+			Object *ob = base->object;
+			if (!ID_IS_LINKED_DATABLOCK(ob)) {
+					IDP_RelinkProperty(ob->id.properties);
+			}
+		}
+
+		if (scene->nodetree) {
+			IDP_RelinkProperty(scene->nodetree->id.properties);
+			for (bNode *node = scene->nodetree->nodes.first; node; node = node->next) {
+				IDP_RelinkProperty(node->prop);
+			}
+		}
+
+		if (scene->gpd) {
+			IDP_RelinkProperty(scene->gpd->id.properties);
+		}
+
+		IDP_RelinkProperty(scene->world->id.properties);
+
+		if (scene->clip) {
+			IDP_RelinkProperty(scene->clip->id.properties);
+		}
+	}
 	BKE_main_id_clear_newpoins(bmain);
 	DAG_relations_tag_update(bmain);
 }
@@ -2292,7 +2319,7 @@ static int make_single_user_exec(bContext *C, wmOperator *op)
 	}
 
 	if (RNA_boolean_get(op->ptr, "obdata")) {
-		single_obdata_users(bmain, scene, flag);
+		single_obdata_users(bmain, scene, sl, flag);
 	}
 
 	if (RNA_boolean_get(op->ptr, "material")) {

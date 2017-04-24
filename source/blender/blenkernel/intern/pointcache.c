@@ -3618,9 +3618,7 @@ void BKE_ptcache_bake(PTCacheBaker *baker)
 						psys_get_pointcache_start_end(scene, pid->calldata, &cache->startframe, &cache->endframe);
 					}
 
-					if ((cache->flag & PTCACHE_REDO_NEEDED || (cache->flag & PTCACHE_SIMULATION_VALID)==0) &&
-					    (render || bake))
-					{
+					if (((cache->flag & PTCACHE_BAKED) == 0) && (render || bake)) {
 						BKE_ptcache_id_clear(pid, PTCACHE_CLEAR_ALL, 0);
 					}
 
@@ -3654,7 +3652,7 @@ void BKE_ptcache_bake(PTCacheBaker *baker)
 	stime = ptime = PIL_check_seconds_timer();
 
 	for (int fr = CFRA; fr <= endframe; fr += baker->quick_step, CFRA = fr) {
-		BKE_scene_update_for_newframe(G.main->eval_ctx, bmain, scene, scene->lay);
+		BKE_scene_update_for_newframe(G.main->eval_ctx, bmain, scene);
 
 		if (baker->update_progress) {
 			float progress = ((float)(CFRA - startframe)/(float)(endframe - startframe));
@@ -3740,7 +3738,7 @@ void BKE_ptcache_bake(PTCacheBaker *baker)
 	CFRA = cfrao;
 	
 	if (bake) { /* already on cfra unless baking */
-		BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene, scene->lay);
+		BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene);
 	}
 
 	/* TODO: call redraw all windows somehow */

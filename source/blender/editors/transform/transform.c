@@ -69,6 +69,7 @@
 #include "BIF_glutil.h"
 
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_matrix.h"
 
 #include "ED_image.h"
@@ -2039,7 +2040,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 {
 	TransInfo *t = (TransInfo *)customdata;
 
-	if (t->helpline != HLP_NONE && !(t->flag & T_USES_MANIPULATOR)) {
+	if (t->helpline != HLP_NONE) {
 		float vecrot[3], cent[2];
 		float mval[3] = { x, y, 0.0f };
 
@@ -2055,9 +2056,9 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 		projectFloatViewEx(t, vecrot, cent, V3D_PROJ_TEST_CLIP_ZERO);
 
-		gpuMatrixBegin3D_legacy(); /* TODO(merwin): finish the 2D matrix API & use here */
+		gpuPushMatrix();
 
-		unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 		UNUSED_VARS(pos); /* silence warning */
 		BLI_assert(pos == POS_INDEX);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -2194,7 +2195,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 		}
 
 		immUnbindProgram();
-		gpuMatrixEnd();
+		gpuPopMatrix();
 	}
 }
 
@@ -2261,7 +2262,7 @@ static void drawTransformPixel(const struct bContext *UNUSED(C), ARegion *ar, vo
 {
 	TransInfo *t = arg;
 	Scene *scene = t->scene;
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	Object *ob = OBACT_NEW;
 	
 	/* draw autokeyframing hint in the corner 
@@ -3930,7 +3931,7 @@ static void ElementResize(TransInfo *t, TransData *td, float mat[3][3])
 	constraintTransLim(t, td);
 }
 
-static void applyResize(TransInfo *t, const int mval[2])
+static void applyResize(TransInfo *t, const int UNUSED(mval[2]))
 {
 	TransData *td;
 	float mat[3][3];
@@ -3941,15 +3942,7 @@ static void applyResize(TransInfo *t, const int mval[2])
 		copy_v3_v3(t->values, t->auto_values);
 	}
 	else {
-		float ratio;
-
-		/* for manipulator, center handle, the scaling can't be done relative to center */
-		if ((t->flag & T_USES_MANIPULATOR) && t->con.mode == 0) {
-			ratio = 1.0f - ((t->mouse.imval[0] - mval[0]) + (t->mouse.imval[1] - mval[1])) / 100.0f;
-		}
-		else {
-			ratio = t->values[0];
-		}
+		float ratio = t->values[0];
 
 		copy_v3_fl(t->values, ratio);
 
@@ -5773,22 +5766,13 @@ static void ElementBoneSize(TransInfo *t, TransData *td, float mat[3][3])
 	td->loc[1] = oldy;
 }
 
-static void applyBoneSize(TransInfo *t, const int mval[2])
+static void applyBoneSize(TransInfo *t, const int UNUSED(mval[2]))
 {
 	TransData *td = t->data;
 	float size[3], mat[3][3];
-	float ratio;
+	float ratio = t->values[0];
 	int i;
 	char str[UI_MAX_DRAW_STR];
-
-	// TRANSFORM_FIX_ME MOVE TO MOUSE INPUT
-	/* for manipulator, center handle, the scaling can't be done relative to center */
-	if ((t->flag & T_USES_MANIPULATOR) && t->con.mode == 0) {
-		ratio = 1.0f - ((t->mouse.imval[0] - mval[0]) + (t->mouse.imval[1] - mval[1])) / 100.0f;
-	}
-	else {
-		ratio = t->values[0];
-	}
 
 	copy_v3_fl(size, ratio);
 
@@ -7381,11 +7365,10 @@ static void drawEdgeSlide(TransInfo *t)
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			gpuMatrixBegin3D_legacy();
+			gpuPushMatrix();
+			gpuMultMatrix(t->obedit->obmat);
 
-			gpuMultMatrix3D(t->obedit->obmat);
-
-			unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
@@ -7470,7 +7453,7 @@ static void drawEdgeSlide(TransInfo *t)
 
 			immUnbindProgram();
 
-			gpuMatrixEnd();
+			gpuPopMatrix();
 
 			glDisable(GL_BLEND);
 
@@ -7994,13 +7977,12 @@ static void drawVertSlide(TransInfo *t)
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			gpuMatrixBegin3D_legacy();
-
-			gpuMultMatrix3D(t->obedit->obmat);
+			gpuPushMatrix();
+			gpuMultMatrix(t->obedit->obmat);
 
 			glLineWidth(line_size);
 
-			unsigned pos = add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 			 
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 			immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
@@ -8074,7 +8056,7 @@ static void drawVertSlide(TransInfo *t)
 
 			immUnbindProgram();
 
-			gpuMatrixEnd();
+			gpuPopMatrix();
 
 			if (v3d && v3d->zbuf)
 				glEnable(GL_DEPTH_TEST);

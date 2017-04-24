@@ -184,9 +184,6 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
             sub.label(text="AA Samples:")
             sub.prop(cscene, "aa_samples", text="Render")
             sub.prop(cscene, "preview_aa_samples", text="Preview")
-            sub.separator()
-            sub.prop(cscene, "sample_all_lights_direct")
-            sub.prop(cscene, "sample_all_lights_indirect")
 
             col = split.column()
             sub = col.column(align=True)
@@ -202,6 +199,10 @@ class CyclesRender_PT_sampling(CyclesButtonsPanel, Panel):
 
             sub.prop(cscene, "subsurface_samples", text="Subsurface")
             sub.prop(cscene, "volume_samples", text="Volume")
+
+            col = layout.column(align=True)
+            col.prop(cscene, "sample_all_lights_direct")
+            col.prop(cscene, "sample_all_lights_indirect")
 
         if not (use_opencl(context) and cscene.feature_set != 'EXPERIMENTAL'):
             layout.row().prop(cscene, "sampling_pattern", text="Pattern")
@@ -268,7 +269,7 @@ class CyclesRender_PT_geometry(CyclesButtonsPanel, Panel):
 
         row = col.row()
         row.prop(ccscene, "minimum_width", text="Min Pixels")
-        row.prop(ccscene, "maximum_width", text="Max Ext.")
+        row.prop(ccscene, "maximum_width", text="Max Extension")
 
 
 class CyclesRender_PT_light_paths(CyclesButtonsPanel, Panel):
@@ -785,6 +786,8 @@ class CyclesObject_PT_cycles_settings(CyclesButtonsPanel, Panel):
 
         if ob.type != 'LAMP':
             flow.prop(visibility, "shadow")
+
+        layout.prop(cob, "is_shadow_catcher")
 
         col = layout.column()
         col.label(text="Performance:")

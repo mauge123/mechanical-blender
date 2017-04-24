@@ -55,15 +55,13 @@ GPUShader *GPU_shader_create(
         const char *fragcode,
         const char *geocode,
         const char *libcode,
-        const char *defines,
-        int input, int output, int number);
+        const char *defines);
 GPUShader *GPU_shader_create_ex(
         const char *vertexcode,
         const char *fragcode,
         const char *geocode,
         const char *libcode,
         const char *defines,
-        int input, int output, int number,
         const int flags);
 void GPU_shader_free(GPUShader *shader);
 
@@ -113,6 +111,7 @@ typedef enum GPUBuiltinShader {
 	GPU_SHADER_2D_FLAT_COLOR,
 	GPU_SHADER_2D_SMOOTH_COLOR,
 	GPU_SHADER_2D_IMAGE_COLOR,
+	GPU_SHADER_2D_IMAGE_ALPHA_COLOR,
 	GPU_SHADER_2D_CHECKER,
 	GPU_SHADER_2D_DIAG_STRIPES,
 	/* for simple 3D drawing */
@@ -121,6 +120,7 @@ typedef enum GPUBuiltinShader {
 	GPU_SHADER_3D_FLAT_COLOR,
 	GPU_SHADER_3D_SMOOTH_COLOR,
 	GPU_SHADER_3D_DEPTH_ONLY,
+	GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR,
 	/* basic image drawing */
 	GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR,
 	GPU_SHADER_2D_IMAGE_MASK_UNIFORM_COLOR,
@@ -156,9 +156,11 @@ typedef enum GPUBuiltinShader {
 	GPU_SHADER_DISTANCE_LINES,
 	/* axis name */
 	GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED_AXIS,
+	GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED,
 	/* instance */
 	GPU_SHADER_INSTANCE_UNIFORM_COLOR,
-	GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE,
+	GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE, /* Uniformly scaled */
+	GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SCALE,
 	GPU_SHADER_INSTANCE_EDGES_VARIYING_COLOR,
 
 	GPU_NUM_BUILTIN_SHADERS /* (not an actual shader) */

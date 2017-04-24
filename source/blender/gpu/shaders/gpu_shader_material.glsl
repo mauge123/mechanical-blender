@@ -1,3 +1,18 @@
+
+uniform mat4 ModelViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 ModelViewMatrixInverse;
+uniform mat4 ProjectionMatrixInverse;
+uniform mat3 NormalMatrix;
+
+#if __VERSION__ == 120
+  #define fragColor gl_FragColor
+#else
+  out vec4 fragColor;
+  #define texture2D texture
+  #define textureCube texture
+#endif
+
 /* Converters */
 
 float convert_rgba_to_float(vec4 color)
@@ -177,7 +192,7 @@ void geom(
         out vec3 normal, out vec4 vcol, out float vcol_alpha, out float frontback)
 {
 	local = co;
-	view = (gl_ProjectionMatrix[3][3] == 0.0) ? normalize(local) : vec3(0.0, 0.0, -1.0);
+	view = (ProjectionMatrix[3][3] == 0.0) ? normalize(local) : vec3(0.0, 0.0, -1.0);
 	global = (viewinvmat * vec4(local, 1.0)).xyz;
 	orco = attorco;
 	uv_attribute(attuv, uv);
@@ -1413,8 +1428,8 @@ void mtex_bump_init_objspace(
         out float fPrevMagnitude_out, out vec3 vNacc_out,
         out vec3 vR1, out vec3 vR2, out float fDet)
 {
-	mat3 obj2view = to_mat3(gl_ModelViewMatrix);
-	mat3 view2obj = to_mat3(gl_ModelViewMatrixInverse);
+	mat3 obj2view = to_mat3(ModelViewMatrix);
+	mat3 view2obj = to_mat3(ModelViewMatrixInverse);
 
 	vec3 vSigmaS = view2obj * dFdx(surf_pos);
 	vec3 vSigmaT = view2obj * dFdy(surf_pos);
@@ -1670,7 +1685,7 @@ void mtex_nspace_world(mat4 viewmat, vec3 texnormal, out vec3 outnormal)
 
 void mtex_nspace_object(vec3 texnormal, out vec3 outnormal)
 {
-	outnormal = normalize(gl_NormalMatrix * texnormal);
+	outnormal = normalize(NormalMatrix * texnormal);
 }
 
 void mtex_blend_normal(float norfac, vec3 normal, vec3 newnormal, out vec3 outnormal)
@@ -1794,7 +1809,7 @@ void lamp_visibility_clamp(float visifac, out float outvisifac)
 void world_paper_view(vec3 vec, out vec3 outvec)
 {
 	vec3 nvec = normalize(vec);
-	outvec = (gl_ProjectionMatrix[3][3] == 0.0) ? vec3(nvec.x, 0.0, nvec.y) : vec3(0.0, 0.0, -1.0);
+	outvec = (ProjectionMatrix[3][3] == 0.0) ? vec3(nvec.x, 0.0, nvec.y) : vec3(0.0, 0.0, -1.0);
 }
 
 void world_zen_mapping(vec3 view, float zenup, float zendown, out float zenfac)
@@ -1828,7 +1843,7 @@ void world_blend(vec3 vec, out float blend)
 void shade_view(vec3 co, out vec3 view)
 {
 	/* handle perspective/orthographic */
-	view = (gl_ProjectionMatrix[3][3] == 0.0) ? normalize(co) : vec3(0.0, 0.0, -1.0);
+	view = (ProjectionMatrix[3][3] == 0.0) ? normalize(co) : vec3(0.0, 0.0, -1.0);
 }
 
 void shade_tangent_v(vec3 lv, vec3 tang, out vec3 vn)
@@ -2346,7 +2361,7 @@ void shade_mist_factor(
 	if (enable == 1.0) {
 		float fac, zcor;
 
-		zcor = (gl_ProjectionMatrix[3][3] == 0.0) ? length(co) : -co[2];
+		zcor = (ProjectionMatrix[3][3] == 0.0) ? length(co) : -co[2];
 
 		fac = clamp((zcor - miststa) / mistdist, 0.0, 1.0);
 		if (misttype == 0.0) fac *= fac;
@@ -2378,11 +2393,19 @@ void shade_alpha_obcolor(vec4 col, vec4 obcol, out vec4 outcol)
 
 /*********** NEW SHADER UTILITIES **************/
 
-float fresnel_dielectric(vec3 Incoming, vec3 Normal, float eta)
+float fresnel_dielectric_0(float eta)
+{
+	/* compute fresnel reflactance at normal incidence => cosi = 1.0 */
+	float A = (eta - 1.0) / (eta + 1.0);
+
+	return A * A;
+}
+
+float fresnel_dielectric_cos(float cosi, float eta)
 {
 	/* compute fresnel reflectance without explicitly computing
 	 * the refracted direction */
-	float c = abs(dot(Incoming, Normal));
+	float c = abs(cosi);
 	float g = eta * eta - 1.0 + c * c;
 	float result;
 
@@ -2397,6 +2420,13 @@ float fresnel_dielectric(vec3 Incoming, vec3 Normal, float eta)
 	}
 
 	return result;
+}
+
+float fresnel_dielectric(vec3 Incoming, vec3 Normal, float eta)
+{
+	/* compute fresnel reflectance without explicitly computing
+	 * the refracted direction */
+	return fresnel_dielectric_cos(dot(Incoming, Normal), eta);
 }
 
 float hypot(float x, float y)
@@ -2492,6 +2522,57 @@ float floorfrac(float x, out int i)
 	return x - i;
 }
 
+
+/* Principled BSDF operations */
+
+float sqr(float a)
+{
+	return a*a;
+}
+
+float schlick_fresnel(float u)
+{
+	float m = clamp(1.0 - u, 0.0, 1.0);
+	float m2 = m * m;
+	return m2 * m2 * m; // pow(m,5)
+}
+
+float GTR1(float NdotH, float a)
+{
+	if (a >= 1.0) return M_1_PI;
+	float a2 = a*a;
+	float t = 1.0 + (a2 - 1.0) * NdotH*NdotH;
+	return (a2 - 1.0) / (M_PI * log(a2) * t);
+}
+
+float GTR2(float NdotH, float a)
+{
+	float a2 = a*a;
+	float t = 1.0 + (a2 - 1.0) * NdotH*NdotH;
+	return a2 / (M_PI * t*t);
+}
+
+float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay)
+{
+	return 1.0 / (M_PI * ax*ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + NdotH*NdotH));
+}
+
+float smithG_GGX(float NdotV, float alphaG)
+{
+	float a = alphaG*alphaG;
+	float b = NdotV*NdotV;
+	return 1.0 / (NdotV + sqrt(a + b - a * b));
+}
+
+vec3 rotate_vector(vec3 p, vec3 n, float theta) {
+	return (
+	           p * cos(theta) + cross(n, p) *
+	           sin(theta) + n * dot(p, n) *
+	           (1.0 - cos(theta))
+	       );
+}
+
+
 /*********** NEW SHADER NODES ***************/
 
 #define NUM_LIGHTS 3
@@ -2553,6 +2634,126 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, out vec4 resu
 	node_bsdf_diffuse(color, 0.0, N, result);
 }
 
+void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
+	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
+	float clearcoat_gloss, float ior, float transparency, float refraction_roughness, vec3 N, vec3 CN, vec3 T, vec3 I, out vec4 result)
+{
+	/* ambient light */
+	// TODO: set ambient light to an appropriate value
+	vec3 L = vec3(mix(0.1, 0.03, metallic)) * base_color.rgb;
+
+	float eta = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;
+
+	/* set the viewing vector */
+	vec3 V = -normalize(I);
+
+	/* get the tangent */
+	vec3 Tangent = T;
+	if (T == vec3(0.0)) {
+		// if no tangent is set, use a default tangent
+		Tangent = vec3(1.0, 0.0, 0.0);
+		if (N.x != 0.0 || N.y != 0.0) {
+			vec3 N_xz = normalize(vec3(N.x, 0.0, N.z));
+
+			vec3 axis = normalize(cross(vec3(0.0, 0.0, 1.0), N_xz));
+			float angle = acos(dot(vec3(0.0, 0.0, 1.0), N_xz));
+
+			Tangent = normalize(rotate_vector(vec3(1.0, 0.0, 0.0), axis, angle));
+		}
+	}
+
+	/* rotate tangent */
+	if (anisotropic_rotation != 0.0) {
+		Tangent = rotate_vector(Tangent, N, anisotropic_rotation * 2.0 * M_PI);
+	}
+
+	/* calculate the tangent and bitangent */
+	vec3 Y = normalize(cross(N, Tangent));
+	vec3 X = cross(Y, N);
+
+	/* fresnel normalization parameters */
+	float F0 = fresnel_dielectric_0(eta);
+	float F0_norm = 1.0 / (1.0 - F0);
+
+	/* directional lights */
+	for (int i = 0; i < NUM_LIGHTS; i++) {
+		vec3 light_position_world = gl_LightSource[i].position.xyz;
+		vec3 light_position = normalize(gl_NormalMatrix * light_position_world);
+
+		vec3 H = normalize(light_position + V);
+
+		vec3 light_specular = gl_LightSource[i].specular.rgb;
+
+		float NdotL = dot(N, light_position);
+		float NdotV = dot(N, V);
+		float LdotH = dot(light_position, H);
+
+		vec3 diffuse_and_specular_bsdf = vec3(0.0);
+		if (NdotL >= 0.0 && NdotV >= 0.0) {
+			float NdotH = dot(N, H);
+
+			float Cdlum = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b; // luminance approx.
+
+			vec3 Ctint = Cdlum > 0 ? base_color.rgb / Cdlum : vec3(1.0); // normalize lum. to isolate hue+sat
+			vec3 Cspec0 = mix(specular * 0.08 * mix(vec3(1.0), Ctint, specular_tint), base_color.rgb, metallic);
+			vec3 Csheen = mix(vec3(1.0), Ctint, sheen_tint);
+
+			// Diffuse fresnel - go from 1 at normal incidence to .5 at grazing
+			// and mix in diffuse retro-reflection based on roughness
+
+			float FL = schlick_fresnel(NdotL), FV = schlick_fresnel(NdotV);
+			float Fd90 = 0.5 + 2.0 * LdotH*LdotH * roughness;
+			float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
+
+			// Based on Hanrahan-Krueger brdf approximation of isotropic bssrdf
+			// 1.25 scale is used to (roughly) preserve albedo
+			// Fss90 used to "flatten" retroreflection based on roughness
+			float Fss90 = LdotH*LdotH * roughness;
+			float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
+			float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
+
+			// specular
+			float aspect = sqrt(1.0 - anisotropic * 0.9);
+			float a = sqr(roughness);
+			float ax = max(0.001, a / aspect);
+			float ay = max(0.001, a * aspect);
+			float Ds = GTR2_aniso(NdotH, dot(H, X), dot(H, Y), ax, ay); //GTR2(NdotH, a);
+			float FH = (fresnel_dielectric_cos(LdotH, eta) - F0) * F0_norm;
+			vec3 Fs = mix(Cspec0, vec3(1.0), FH);
+			float roughg = sqr(roughness * 0.5 + 0.5);
+			float Gs = smithG_GGX(NdotL, roughg) * smithG_GGX(NdotV, roughg);
+
+			// sheen
+			vec3 Fsheen = schlick_fresnel(LdotH) * sheen * Csheen;
+
+			diffuse_and_specular_bsdf = (M_1_PI * mix(Fd, ss, subsurface) * base_color.rgb + Fsheen)
+			                            * (1.0 - metallic) + Gs * Fs * Ds;
+		}
+		diffuse_and_specular_bsdf *= max(NdotL, 0.0);
+
+		float CNdotL = dot(CN, light_position);
+		float CNdotV = dot(CN, V);
+
+		vec3 clearcoat_bsdf = vec3(0.0);
+		if (CNdotL >= 0.0 && CNdotV >= 0.0 && clearcoat > 0.0) {
+			float CNdotH = dot(CN, H);
+			//float FH = schlick_fresnel(LdotH);
+
+			// clearcoat (ior = 1.5 -> F0 = 0.04)
+			float Dr = GTR1(CNdotH, mix(0.1, 0.001, clearcoat_gloss));
+			float Fr = fresnel_dielectric_cos(LdotH, 1.5); //mix(0.04, 1.0, FH);
+			float Gr = smithG_GGX(CNdotL, 0.25) * smithG_GGX(CNdotV, 0.25);
+
+			clearcoat_bsdf = clearcoat * Gr * Fr * Dr * vec3(0.25);
+		}
+		clearcoat_bsdf *= max(CNdotL, 0.0);
+
+		L += light_specular * (diffuse_and_specular_bsdf + clearcoat_bsdf);
+	}
+
+	result = vec4(L, 1.0);
+}
+
 void node_bsdf_translucent(vec4 color, vec3 N, out vec4 result)
 {
 	node_bsdf_diffuse(color, 0.0, N, result);
@@ -2605,11 +2806,11 @@ void node_emission(vec4 color, float strength, vec3 N, out vec4 result)
 
 void background_transform_to_world(vec3 viewvec, out vec3 worldvec)
 {
-	vec4 v = (gl_ProjectionMatrix[3][3] == 0.0) ? vec4(viewvec, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
-	vec4 co_homogenous = (gl_ProjectionMatrixInverse * v);
+	vec4 v = (ProjectionMatrix[3][3] == 0.0) ? vec4(viewvec, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
+	vec4 co_homogenous = (ProjectionMatrixInverse * v);
 
 	vec4 co = vec4(co_homogenous.xyz / co_homogenous.w, 0.0);
-	worldvec = (gl_ModelViewMatrixInverse * co).xyz;
+	worldvec = (ModelViewMatrixInverse * co).xyz;
 }
 
 void node_background(vec4 color, float strength, vec3 N, out vec4 result)
@@ -2634,7 +2835,7 @@ void node_add_shader(vec4 shader1, vec4 shader2, out vec4 shader)
 void node_fresnel(float ior, vec3 N, vec3 I, out float result)
 {
 	/* handle perspective/orthographic */
-	vec3 I_view = (gl_ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
+	vec3 I_view = (ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
 
 	float eta = max(ior, 0.00001);
 	result = fresnel_dielectric(I_view, N, (gl_FrontFacing) ? eta : 1.0 / eta);
@@ -2646,7 +2847,7 @@ void node_layer_weight(float blend, vec3 N, vec3 I, out float fresnel, out float
 {
 	/* fresnel */
 	float eta = max(1.0 - blend, 0.00001);
-	vec3 I_view = (gl_ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
+	vec3 I_view = (ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
 
 	fresnel = fresnel_dielectric(I_view, N, (gl_FrontFacing) ? 1.0 / eta : eta);
 
@@ -2700,7 +2901,7 @@ void node_geometry(
 	true_normal = normal;
 
 	/* handle perspective/orthographic */
-	vec3 I_view = (gl_ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
+	vec3 I_view = (ProjectionMatrix[3][3] == 0.0) ? normalize(I) : vec3(0.0, 0.0, -1.0);
 	incoming = -(toworld * vec4(I_view, 0.0)).xyz;
 
 	parametric = vec3(0.0);
@@ -2719,7 +2920,7 @@ void node_tex_coord(
 	uv = attr_uv;
 	object = (obinvmat * (viewinvmat * vec4(I, 1.0))).xyz;
 	camera = vec3(I.xy, -I.z);
-	vec4 projvec = gl_ProjectionMatrix * vec4(I, 1.0);
+	vec4 projvec = ProjectionMatrix * vec4(I, 1.0);
 	window = vec3(mtex_2d_mapping(projvec.xyz / projvec.w).xy * camerafac.xy + camerafac.zw, 0.0);
 
 	vec3 shade_I;
@@ -2734,13 +2935,13 @@ void node_tex_coord_background(
         out vec3 generated, out vec3 normal, out vec3 uv, out vec3 object,
         out vec3 camera, out vec3 window, out vec3 reflection)
 {
-	vec4 v = (gl_ProjectionMatrix[3][3] == 0.0) ? vec4(I, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
-	vec4 co_homogenous = (gl_ProjectionMatrixInverse * v);
+	vec4 v = (ProjectionMatrix[3][3] == 0.0) ? vec4(I, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
+	vec4 co_homogenous = (ProjectionMatrixInverse * v);
 
 	vec4 co = vec4(co_homogenous.xyz / co_homogenous.w, 0.0);
 
 	co = normalize(co);
-	vec3 coords = (gl_ModelViewMatrixInverse * co).xyz;
+	vec3 coords = (ModelViewMatrixInverse * co).xyz;
 
 	generated = coords;
 	normal = -coords;
@@ -2748,7 +2949,7 @@ void node_tex_coord_background(
 	object = coords;
 
 	camera = vec3(co.xy, -co.z);
-	window = (gl_ProjectionMatrix[3][3] == 0.0) ?
+	window = (ProjectionMatrix[3][3] == 0.0) ?
 	         vec3(mtex_2d_mapping(I).xy * camerafac.xy + camerafac.zw, 0.0) :
 	         vec3(vec2(0.5) * camerafac.xy + camerafac.zw, 0.0);
 
@@ -3563,12 +3764,12 @@ void node_light_falloff(float strength, float tsmooth, out float quadratic, out 
 	constant = strength;
 }
 
-void node_object_info(out vec3 location, out float object_index, out float material_index, out float random)
+void node_object_info(mat4 obmat, vec3 info, out vec3 location, out float object_index, out float material_index, out float random)
 {
-	location = vec3(0.0);
-	object_index = 0.0;
-	material_index = 0.0;
-	random = 0.0;
+	location = obmat[3].xyz;
+	object_index = info.x;
+	material_index = info.y;
+	random = info.z;
 }
 
 void node_normal_map(vec4 tangent, vec3 normal, vec3 texnormal, out vec3 outnormal)

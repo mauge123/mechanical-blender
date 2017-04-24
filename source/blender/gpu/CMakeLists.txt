@@ -60,7 +60,9 @@ set(SRC
 	intern/gpu_extensions.c
 	intern/gpu_framebuffer.c
 	intern/gpu_immediate.c
+	intern/gpu_immediate_util.c
 	intern/gpu_init_exit.c
+	intern/gpu_lamp.c
 	intern/gpu_material.c
 	intern/gpu_matrix.c
 	intern/gpu_select.c
@@ -103,7 +105,9 @@ set(SRC
 	GPU_framebuffer.h
 	GPU_glew.h
 	GPU_immediate.h
+	GPU_immediate_util.h
 	GPU_init_exit.h
+	GPU_legacy_stubs.h
 	GPU_material.h
 	GPU_matrix.h
 	GPU_select.h
@@ -114,6 +118,7 @@ set(SRC
 
 	intern/gpu_codegen.h
 	intern/gpu_private.h
+	intern/gpu_lamp_private.h
 	intern/gpu_select_private.h
 	intern/gpu_shader_private.h
 )
@@ -136,22 +141,26 @@ data_to_c_simple(shaders/gpu_shader_2D_image_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_shuffle_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_mask_uniform_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_modulate_alpha_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_image_alpha_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_rect_modulate_alpha_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_depth_linear_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_interlace_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_image_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_normal_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_flat_color_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_smooth_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_normal_smooth_color_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_smooth_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_passthrough_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_3D_clipped_uniform_color_vert.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_instance_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_variying_size_variying_color_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_objectspace_variying_color_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_screenspace_variying_color_vert.glsl SRC)
-data_to_c_simple(shaders/gpu_shader_instance_screen_aligned_axis_name_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_instance_screen_aligned_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_camera_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_distance_line_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_edges_variying_color_geom.glsl SRC)

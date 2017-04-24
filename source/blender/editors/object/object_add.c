@@ -115,7 +115,7 @@
 
 #include "UI_resources.h"
 
-#include "GPU_material.h"
+#include "GPU_lamp.h"
 
 #include "object_intern.h"
 
@@ -464,6 +464,9 @@ Object *ED_object_add_type(
 		ED_object_editmode_enter(C, EM_IGNORE_LAYER);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+
+	/* TODO(sergey): Use proper flag for tagging here. */
+	DAG_id_tag_update(&scene->id, 0);
 
 	return ob;
 }
@@ -1175,7 +1178,21 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 			        ob->id.name + 2, scene->id.name + 2);
 			continue;
 		}
+
+		/* This is sort of a quick hack to address T51243 - Proper thing to do here would be to nuke most of all this
+		 * custom scene/object/base handling, and use generic lib remap/query for that.
+		 * But this is for later (aka 2.8, once layers & co are settled and working).
+		 */
+		if (use_global && ob->id.lib == NULL) {
+			/* We want to nuke the object, let's nuke it the easy way (not for linked data though)... */
+			BKE_libblock_delete(bmain, &ob->id);
+			changed = true;
+			continue;
+		}
+
 		/* remove from Grease Pencil parent */
+		/* XXX This is likely not correct? Will also remove parent from grease pencil from other scenes,
+		 *     even when use_global is false... */
 		for (bGPdata *gpd = bmain->gpencil.first; gpd; gpd = gpd->id.next) {
 			for (bGPDlayer *gpl = gpd->layers.first; gpl; gpl = gpl->next) {
 				if (gpl->parent != NULL) {

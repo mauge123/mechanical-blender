@@ -25,6 +25,7 @@
 
 #include <stdio.h>
 
+#include "BLI_dynstr.h"
 #include "BLI_listbase.h"
 #include "BLI_rect.h"
 #include "BLI_string.h"
@@ -34,6 +35,7 @@
 #include "BKE_global.h"
 
 #include "BLT_translation.h"
+#include "BLF_api.h"
 
 #include "DRW_engine.h"
 #include "DRW_render.h"
@@ -42,16 +44,20 @@
 #include "DNA_screen_types.h"
 
 #include "ED_space_api.h"
+#include "ED_screen.h"
 
 #include "GPU_batch.h"
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
 #include "GPU_framebuffer.h"
+#include "GPU_lamp.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 #include "GPU_uniformbuffer.h"
 #include "GPU_viewport.h"
 #include "GPU_matrix.h"
+
+#include "PIL_time.h"
 
 #include "RE_engine.h"
 
@@ -61,7 +67,11 @@
 #include "clay.h"
 #include "eevee.h"
 
+#include "DEG_depsgraph.h"
+#include "DEG_depsgraph_query.h"
+
 #define MAX_ATTRIB_NAME 32
+#define MAX_PASS_NAME 32
 
 extern char datatoc_gpu_shader_2D_vert_glsl[];
 extern char datatoc_gpu_shader_3D_vert_glsl[];
@@ -129,7 +139,13 @@ struct DRWInterface {
 struct DRWPass {
 	ListBase shgroups; /* DRWShadingGroup */
 	DRWState state;
-	float state_param; /* Line / Point width */
+	char name[MAX_PASS_NAME];
+	/* use two query to not stall the cpu waiting for queries to complete */
+	unsigned int timer_queries[2];
+	/* alternate between front and back query */
+	unsigned int front_idx;
+	unsigned int back_idx;
+	bool wasdrawn; /* if it was drawn during this frame */
 };
 
 typedef struct DRWCall {
@@ -146,8 +162,8 @@ typedef struct DRWDynamicCall {
 struct DRWShadingGroup {
 	struct DRWShadingGroup *next, *prev;
 
-	struct GPUShader *shader;        /* Shader to bind */
-	struct DRWInterface *interface;  /* Uniforms pointers */
+	GPUShader *shader;               /* Shader to bind */
+	DRWInterface *interface;         /* Uniforms pointers */
 	ListBase calls;                  /* DRWCall or DRWDynamicCall depending of type*/
 	DRWState state;                  /* State changes for this batch only */
 	int type;
@@ -197,16 +213,16 @@ static void drw_texture_get_format(DRWTextureFormat format, GPUTextureFormat *da
 	switch (format) {
 		case DRW_TEX_RGBA_8: *data_type = GPU_RGBA8; break;
 		case DRW_TEX_RGBA_16: *data_type = GPU_RGBA16F; break;
+		case DRW_TEX_RGB_16: *data_type = GPU_RGB16F; break;
 		case DRW_TEX_RG_16: *data_type = GPU_RG16F; break;
 		case DRW_TEX_RG_32: *data_type = GPU_RG32F; break;
 		case DRW_TEX_R_8: *data_type = GPU_R8; break;
+		case DRW_TEX_R_16: *data_type = GPU_R16F; break;
 #if 0
 		case DRW_TEX_RGBA_32: *data_type = GPU_RGBA32F; break;
 		case DRW_TEX_RGB_8: *data_type = GPU_RGB8; break;
-		case DRW_TEX_RGB_16: *data_type = GPU_RGB16F; break;
 		case DRW_TEX_RGB_32: *data_type = GPU_RGB32F; break;
 		case DRW_TEX_RG_8: *data_type = GPU_RG8; break;
-		case DRW_TEX_R_16: *data_type = GPU_R16F; break;
 		case DRW_TEX_R_32: *data_type = GPU_R32F; break;
 #endif
 		case DRW_TEX_DEPTH_16: *data_type = GPU_DEPTH_COMPONENT16; break;
@@ -244,6 +260,10 @@ static void drw_texture_set_parameters(GPUTexture *tex, DRWTextureFlag flags)
 {
 	GPU_texture_bind(tex, 0);
 	GPU_texture_filter_mode(tex, flags & DRW_TEX_FILTER);
+	if (flags & DRW_TEX_MIPMAP) {
+		GPU_texture_mipmap_mode(tex, true);
+		DRW_texture_generate_mipmaps(tex);
+	}
 	GPU_texture_wrap_mode(tex, flags & DRW_TEX_WRAP);
 	GPU_texture_compare_mode(tex, flags & DRW_TEX_COMPARE);
 	GPU_texture_unbind(tex);
@@ -275,15 +295,37 @@ GPUTexture *DRW_texture_create_2D(int w, int h, DRWTextureFormat format, DRWText
 	return tex;
 }
 
-/* TODO make use of format */
-GPUTexture *DRW_texture_create_2D_array(int w, int h, int d, DRWTextureFormat UNUSED(format), DRWTextureFlag flags, const float *fpixels)
+GPUTexture *DRW_texture_create_2D_array(int w, int h, int d, DRWTextureFormat format, DRWTextureFlag flags, const float *fpixels)
 {
 	GPUTexture *tex;
+	GPUTextureFormat data_type;
+	int channels;
 
-	tex = GPU_texture_create_2D_array(w, h, d, fpixels, NULL);
+	drw_texture_get_format(format, &data_type, &channels);
+	tex = GPU_texture_create_2D_array_custom(w, h, d, channels, data_type, fpixels, NULL);
 	drw_texture_set_parameters(tex, flags);
 
 	return tex;
+}
+
+GPUTexture *DRW_texture_create_cube(int w, DRWTextureFormat format, DRWTextureFlag flags, const float *fpixels)
+{
+	GPUTexture *tex;
+	GPUTextureFormat data_type;
+	int channels;
+
+	drw_texture_get_format(format, &data_type, &channels);
+	tex = GPU_texture_create_cube_custom(w, channels, data_type, fpixels, NULL);
+	drw_texture_set_parameters(tex, flags);
+
+	return tex;
+}
+
+void DRW_texture_generate_mipmaps(GPUTexture *tex)
+{
+	GPU_texture_bind(tex, 0);
+	GPU_texture_generate_mipmap(tex);
+	GPU_texture_unbind(tex);
 }
 
 void DRW_texture_free(GPUTexture *tex)
@@ -313,22 +355,60 @@ void DRW_uniformbuffer_free(GPUUniformBuffer *ubo)
 
 GPUShader *DRW_shader_create(const char *vert, const char *geom, const char *frag, const char *defines)
 {
-	return GPU_shader_create(vert, frag, geom, NULL, defines, 0, 0, 0);
+	return GPU_shader_create(vert, frag, geom, NULL, defines);
+}
+
+GPUShader *DRW_shader_create_with_lib(const char *vert, const char *geom, const char *frag, const char *lib, const char *defines)
+{
+	GPUShader *sh;
+	char *vert_with_lib = NULL;
+	char *frag_with_lib = NULL;
+	char *geom_with_lib = NULL;
+
+	DynStr *ds_vert = BLI_dynstr_new();
+	BLI_dynstr_append(ds_vert, lib);
+	BLI_dynstr_append(ds_vert, vert);
+	vert_with_lib = BLI_dynstr_get_cstring(ds_vert);
+	BLI_dynstr_free(ds_vert);
+
+	DynStr *ds_frag = BLI_dynstr_new();
+	BLI_dynstr_append(ds_frag, lib);
+	BLI_dynstr_append(ds_frag, frag);
+	frag_with_lib = BLI_dynstr_get_cstring(ds_frag);
+	BLI_dynstr_free(ds_frag);
+
+	if (geom) {
+		DynStr *ds_geom = BLI_dynstr_new();
+		BLI_dynstr_append(ds_geom, lib);
+		BLI_dynstr_append(ds_geom, geom);
+		geom_with_lib = BLI_dynstr_get_cstring(ds_geom);
+		BLI_dynstr_free(ds_geom);
+	}
+
+	sh = GPU_shader_create(vert_with_lib, frag_with_lib, geom_with_lib, NULL, defines);
+
+	MEM_freeN(vert_with_lib);
+	MEM_freeN(frag_with_lib);
+	if (geom) {
+		MEM_freeN(geom_with_lib);
+	}
+
+	return sh;
 }
 
 GPUShader *DRW_shader_create_2D(const char *frag, const char *defines)
 {
-	return GPU_shader_create(datatoc_gpu_shader_2D_vert_glsl, frag, NULL, NULL, defines, 0, 0, 0);
+	return GPU_shader_create(datatoc_gpu_shader_2D_vert_glsl, frag, NULL, NULL, defines);
 }
 
 GPUShader *DRW_shader_create_3D(const char *frag, const char *defines)
 {
-	return GPU_shader_create(datatoc_gpu_shader_3D_vert_glsl, frag, NULL, NULL, defines, 0, 0, 0);
+	return GPU_shader_create(datatoc_gpu_shader_3D_vert_glsl, frag, NULL, NULL, defines);
 }
 
 GPUShader *DRW_shader_create_fullscreen(const char *frag, const char *defines)
 {
-	return GPU_shader_create(datatoc_gpu_shader_fullscreen_vert_glsl, frag, NULL, NULL, defines, 0, 0, 0);
+	return GPU_shader_create(datatoc_gpu_shader_fullscreen_vert_glsl, frag, NULL, NULL, defines);
 }
 
 GPUShader *DRW_shader_create_3D_depth_only(void)
@@ -489,9 +569,7 @@ void DRW_shgroup_free(struct DRWShadingGroup *shgroup)
 
 	MEM_freeN(shgroup->interface);
 
-	if (shgroup->batch_geom) {
-		Batch_discard_all(shgroup->batch_geom);
-	}
+	BATCH_DISCARD_ALL_SAFE(shgroup->batch_geom);
 }
 
 void DRW_shgroup_call_add(DRWShadingGroup *shgroup, Batch *geom, float (*obmat)[4])
@@ -506,20 +584,17 @@ void DRW_shgroup_call_add(DRWShadingGroup *shgroup, Batch *geom, float (*obmat)[
 	BLI_addtail(&shgroup->calls, call);
 }
 
-void DRW_shgroup_dynamic_call_add(DRWShadingGroup *shgroup, ...)
+void DRW_shgroup_dynamic_call_add_array(DRWShadingGroup *shgroup, const void *attr[], unsigned int attr_len)
 {
-	va_list params;
-	int i;
 	DRWInterface *interface = shgroup->interface;
-	int size = sizeof(ListBase) + sizeof(void *) * interface->attribs_count;
+	unsigned int data_size = sizeof(void *) * interface->attribs_count;
+	int size = sizeof(ListBase) + data_size;
 
 	DRWDynamicCall *call = MEM_callocN(size, "DRWDynamicCall");
 
-	va_start(params, shgroup);
-	for (i = 0; i < interface->attribs_count; ++i) {
-		call->data[i] = va_arg(params, void *);
-	}
-	va_end(params);
+	BLI_assert(attr_len == interface->attribs_count);
+
+	memcpy((void *)call->data, attr, data_size);
 
 	interface->instance_count += 1;
 
@@ -603,13 +678,15 @@ void DRW_shgroup_uniform_mat4(DRWShadingGroup *shgroup, const char *name, const 
 	DRW_interface_uniform(shgroup, name, DRW_UNIFORM_MAT4, value, 16, 1, 0);
 }
 
+#ifdef WITH_CLAY_ENGINE
+
 /* Creates a VBO containing OGL primitives for all DRWDynamicCall */
 static void shgroup_dynamic_batch(DRWShadingGroup *shgroup)
 {
 	DRWInterface *interface = shgroup->interface;
 	int nbr = interface->instance_count;
 
-	GLenum type = (shgroup->type == DRW_SHG_POINT_BATCH) ? GL_POINTS : GL_LINES;
+	PrimitiveType type = (shgroup->type == DRW_SHG_POINT_BATCH) ? PRIM_POINTS : PRIM_LINES;
 
 	if (nbr == 0)
 		return;
@@ -619,10 +696,10 @@ static void shgroup_dynamic_batch(DRWShadingGroup *shgroup)
 		for (DRWAttrib *attrib = interface->attribs.first; attrib; attrib = attrib->next) {
 			BLI_assert(attrib->size <= 4); /* matrices have no place here for now */
 			if (attrib->type == DRW_ATTRIB_FLOAT) {
-				attrib->format_id = add_attrib(&interface->vbo_format, attrib->name, GL_FLOAT, attrib->size, KEEP_FLOAT);
+				attrib->format_id = VertexFormat_add_attrib(&interface->vbo_format, attrib->name, COMP_F32, attrib->size, KEEP_FLOAT);
 			}
 			else if (attrib->type == DRW_ATTRIB_INT) {
-				attrib->format_id = add_attrib(&interface->vbo_format, attrib->name, GL_BYTE, attrib->size, KEEP_INT);
+				attrib->format_id = VertexFormat_add_attrib(&interface->vbo_format, attrib->name, COMP_I8, attrib->size, KEEP_INT);
 			}
 			else {
 				BLI_assert(false);
@@ -637,7 +714,7 @@ static void shgroup_dynamic_batch(DRWShadingGroup *shgroup)
 	for (DRWDynamicCall *call = shgroup->calls.first; call; call = call->next, j++) {
 		int i = 0;
 		for (DRWAttrib *attrib = interface->attribs.first; attrib; attrib = attrib->next, i++) {
-			setAttrib(vbo, attrib->format_id, j, call->data[i]);
+			VertexBuffer_set_attrib(vbo, attrib->format_id, j, call->data[i]);
 		}
 	}
 
@@ -713,6 +790,7 @@ static void shgroup_dynamic_batch_from_calls(DRWShadingGroup *shgroup)
 		shgroup_dynamic_batch(shgroup);
 	}
 }
+#endif  /* WITH_CLAY_ENGINE */
 
 /* ***************************************** PASSES ******************************************/
 
@@ -720,6 +798,7 @@ DRWPass *DRW_pass_create(const char *name, DRWState state)
 {
 	DRWPass *pass = MEM_callocN(sizeof(DRWPass), name);
 	pass->state = state;
+	BLI_strncpy(pass->name, name, MAX_PASS_NAME);
 
 	BLI_listbase_clear(&pass->shgroups);
 
@@ -731,6 +810,8 @@ void DRW_pass_free(DRWPass *pass)
 	for (DRWShadingGroup *shgroup = pass->shgroups.first; shgroup; shgroup = shgroup->next) {
 		DRW_shgroup_free(shgroup);
 	}
+
+	glDeleteQueries(2, pass->timer_queries);
 	BLI_freelistN(&pass->shgroups);
 }
 
@@ -870,7 +951,7 @@ static void draw_geometry(DRWShadingGroup *shgroup, Batch *geom, const float (*o
 {
 	RegionView3D *rv3d = CTX_wm_region_view3d(DST.context);
 	DRWInterface *interface = shgroup->interface;
-	
+
 	float mvp[4][4], mv[4][4], n[3][3], wn[3][3];
 	float eye[3] = { 0.0f, 0.0f, 1.0f }; /* looking into the screen */
 
@@ -935,7 +1016,7 @@ static void draw_geometry(DRWShadingGroup *shgroup, Batch *geom, const float (*o
 	}
 
 	/* step 2 : bind vertex array & draw */
-	Batch_set_program(geom, GPU_shader_get_program(shgroup->shader));
+	Batch_set_program(geom, GPU_shader_get_program(shgroup->shader), GPU_shader_get_interface(shgroup->shader));
 	if (interface->instance_vbo) {
 		Batch_draw_stupid_instanced(geom, interface->instance_vbo, interface->instance_count, interface->attribs_count,
 		                            interface->attribs_stride, interface->attribs_size, interface->attribs_loc);
@@ -997,7 +1078,7 @@ static void draw_shgroup(DRWShadingGroup *shgroup)
 				GPU_texture_bind(tex, uni->bindloc);
 				GPU_texture_compare_mode(tex, false);
 				GPU_texture_filter_mode(tex, false);
-				
+
 				bound_tex = MEM_callocN(sizeof(DRWBoundTexture), "DRWBoundTexture");
 				bound_tex->tex = tex;
 				BLI_addtail(&DST.bound_texs, bound_tex);
@@ -1043,6 +1124,29 @@ void DRW_draw_pass(DRWPass *pass)
 	set_state(pass->state, true);
 	BLI_listbase_clear(&DST.bound_texs);
 
+	pass->wasdrawn = true;
+
+	/* Init Timer queries */
+	if (pass->timer_queries[0] == 0) {
+		pass->front_idx = 0;
+		pass->back_idx = 1;
+
+		glGenQueries(2, pass->timer_queries);
+
+		/* dummy query, avoid gl error */
+		glBeginQuery(GL_TIME_ELAPSED, pass->timer_queries[pass->front_idx]);
+		glEndQuery(GL_TIME_ELAPSED);
+	}
+	else {
+		/* swap indices */
+		unsigned int tmp = pass->back_idx;
+		pass->back_idx = pass->front_idx;
+		pass->front_idx = tmp;
+	}
+
+	/* issue query for the next frame */
+	glBeginQuery(GL_TIME_ELAPSED, pass->timer_queries[pass->back_idx]);
+
 	for (DRWShadingGroup *shgroup = pass->shgroups.first; shgroup; shgroup = shgroup->next) {
 		draw_shgroup(shgroup);
 	}
@@ -1058,6 +1162,8 @@ void DRW_draw_pass(DRWPass *pass)
 		GPU_shader_unbind();
 		DST.shader = NULL;
 	}
+
+	glEndQuery(GL_TIME_ELAPSED);
 }
 
 void DRW_draw_callbacks_pre_scene(void)
@@ -1065,12 +1171,8 @@ void DRW_draw_callbacks_pre_scene(void)
 	struct ARegion *ar = CTX_wm_region(DST.context);
 	RegionView3D *rv3d = CTX_wm_region_view3d(DST.context);
 
-	/* This is temporary
-	 * waiting for the full matrix switch */
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadMatrix3D(rv3d->winmat);
-	glMatrixMode(GL_MODELVIEW);
-	gpuLoadMatrix3D(rv3d->viewmat);
+	gpuLoadProjectionMatrix(rv3d->winmat);
+	gpuLoadMatrix(rv3d->viewmat);
 
 	ED_region_draw_cb_draw(DST.context, ar, REGION_DRAW_PRE_VIEW);
 }
@@ -1080,12 +1182,8 @@ void DRW_draw_callbacks_post_scene(void)
 	struct ARegion *ar = CTX_wm_region(DST.context);
 	RegionView3D *rv3d = CTX_wm_region_view3d(DST.context);
 
-	/* This is temporary
-	 * waiting for the full matrix switch */
-	glMatrixMode(GL_PROJECTION);
-	gpuLoadMatrix3D(rv3d->winmat);
-	glMatrixMode(GL_MODELVIEW);
-	gpuLoadMatrix3D(rv3d->viewmat);
+	gpuLoadProjectionMatrix(rv3d->winmat);
+	gpuLoadMatrix(rv3d->viewmat);
 
 	ED_region_draw_cb_draw(DST.context, ar, REGION_DRAW_POST_VIEW);
 }
@@ -1100,12 +1198,15 @@ void DRW_state_reset(void)
 	set_state(state, true);
 }
 
-#else
-void DRW_draw_pass(DRWPass *UNUSED(pass))
-{
-}
+#else  /* !WITH_CLAY_ENGINE */
 
-#endif
+void DRW_draw_pass(DRWPass *UNUSED(pass)) {}
+void DRW_draw_callbacks_pre_scene(void) {}
+void DRW_draw_callbacks_post_scene(void) {}
+void DRW_state_reset(void) {}
+
+#endif  /* WITH_CLAY_ENGINE */
+
 
 /* ****************************************** Settings ******************************************/
 
@@ -1116,8 +1217,8 @@ bool DRW_is_object_renderable(Object *ob)
 
 	if (ob->type == OB_MESH) {
 		if (ob == obedit) {
-			CollectionEngineSettings *ces_mode_ed = BKE_object_collection_engine_get(ob, COLLECTION_MODE_EDIT, "");
-			bool do_occlude_wire = BKE_collection_engine_property_value_get_bool(ces_mode_ed, "show_occlude_wire");
+			IDProperty *props = BKE_object_collection_engine_get(ob, COLLECTION_MODE_EDIT, "");
+			bool do_occlude_wire = BKE_collection_engine_property_value_get_bool(props, "show_occlude_wire");
 
 			if (do_occlude_wire)
 				return false;
@@ -1127,73 +1228,23 @@ bool DRW_is_object_renderable(Object *ob)
 	return true;
 }
 
-void *DRW_material_settings_get(Material *ma, const char *engine_name)
-{
-	MaterialEngineSettings *ms = NULL;
-
-	ms = BLI_findstring(&ma->engines_settings, engine_name, offsetof(MaterialEngineSettings, name));
-
-#ifdef WITH_CLAY_ENGINE
-	/* If the settings does not exists yet, create it */
-	if (ms == NULL) {
-		ms = MEM_callocN(sizeof(RenderEngineSettings), "RenderEngineSettings");
-
-		BLI_strncpy(ms->name, engine_name, 32);
-
-		/* TODO make render_settings_create a polymorphic function */
-		if (STREQ(engine_name, RE_engine_id_BLENDER_CLAY)) {
-			/* No material support */
-			BLI_assert(false);
-		}
-		else {
-			/* No engine matched */
-			BLI_assert(false);
-		}
-
-		BLI_addtail(&ma->engines_settings, ms);
-	}
-#else
-	return NULL;
-#endif
-
-	return ms->data;
-}
-
-/* If scene is NULL, use context scene */
-void *DRW_render_settings_get(Scene *scene, const char *engine_name)
-{
-	RenderEngineSettings *rs = NULL;
-
-	if (scene == NULL)
-		scene = CTX_data_scene(DST.context);
-
-	rs = BLI_findstring(&scene->engines_settings, engine_name, offsetof(RenderEngineSettings, name));
-
-#ifdef WITH_CLAY_ENGINE
-	/* If the settings does not exists yet, create it */
-	if (rs == NULL) {
-		rs = MEM_callocN(sizeof(RenderEngineSettings), "RenderEngineSettings");
-
-		BLI_strncpy(rs->name, engine_name, 32);
-
-		/* TODO make render_settings_create a polymorphic function */
-		if (STREQ(engine_name, RE_engine_id_BLENDER_CLAY)) {
-			rs->data = CLAY_render_settings_create();
-		}
-		else {
-			/* No engine matched */
-			BLI_assert(false);
-		}
-
-		BLI_addtail(&scene->engines_settings, rs);
-	}
-#else
-	return NULL;
-#endif
-
-	return rs->data;
-}
 /* ****************************************** Framebuffers ******************************************/
+
+static GPUTextureFormat convert_tex_format(int fbo_format, int *channels, bool *is_depth)
+{
+	*is_depth = ((fbo_format == DRW_BUF_DEPTH_16) ||
+	             (fbo_format == DRW_BUF_DEPTH_24));
+
+	switch (fbo_format) {
+		case DRW_BUF_RG_16:    *channels = 2; return GPU_RG16F;
+		case DRW_BUF_RGBA_8:   *channels = 4; return GPU_RGBA8;
+		case DRW_BUF_RGBA_16:  *channels = 4; return GPU_RGBA16F;
+		case DRW_BUF_DEPTH_24: *channels = 1; return GPU_DEPTH_COMPONENT24;
+		default:
+			BLI_assert(false);
+			*channels = 4; return GPU_RGBA8;
+	}
+}
 
 void DRW_framebuffer_init(struct GPUFrameBuffer **fb, int width, int height, DRWFboTexture textures[MAX_FBO_TEX],
                           int texnbr)
@@ -1205,24 +1256,22 @@ void DRW_framebuffer_init(struct GPUFrameBuffer **fb, int width, int height, DRW
 		*fb = GPU_framebuffer_create();
 
 		for (int i = 0; i < texnbr; ++i) {
+			int channels;
+			bool is_depth;
+
 			DRWFboTexture fbotex = textures[i];
-			
+			GPUTextureFormat gpu_format = convert_tex_format(fbotex.format, &channels, &is_depth);
+
 			if (!*fbotex.tex) {
-				/* TODO refine to opengl formats */
-				if (fbotex.format == DRW_BUF_DEPTH_16 ||
-				    fbotex.format == DRW_BUF_DEPTH_24)
-				{
-					*fbotex.tex = GPU_texture_create_depth(width, height, NULL);
-					GPU_texture_compare_mode(*fbotex.tex, false);
-					GPU_texture_filter_mode(*fbotex.tex, false);
-				}
-				else {
-					*fbotex.tex = GPU_texture_create_2D(width, height, NULL, NULL);
-					++color_attachment;
-				}
+				*fbotex.tex = GPU_texture_create_2D_custom(width, height, channels, gpu_format, NULL, NULL);
+				drw_texture_set_parameters(*fbotex.tex, fbotex.flag);
 			}
-			
-			GPU_framebuffer_texture_attach(*fb, *fbotex.tex, color_attachment);
+
+			if (!is_depth) {
+				++color_attachment;
+			}
+
+			GPU_framebuffer_texture_attach(*fb, *fbotex.tex, color_attachment, 0);
 		}
 
 		if (!GPU_framebuffer_check_valid(*fb, NULL)) {
@@ -1256,9 +1305,24 @@ void DRW_framebuffer_clear(bool color, bool depth, bool stencil, float clear_col
 	        ((stencil) ? GL_STENCIL_BUFFER_BIT : 0));
 }
 
-void DRW_framebuffer_texture_attach(struct GPUFrameBuffer *fb, GPUTexture *tex, int slot)
+void DRW_framebuffer_read_data(int x, int y, int w, int h, int channels, int slot, float *data)
 {
-	GPU_framebuffer_texture_attach(fb, tex, slot);
+	GLenum type;
+	switch (channels) {
+		case 1: type = GL_RED; break;
+		case 2: type = GL_RG; break;
+		case 3: type = GL_RGB; break;
+		case 4: type = GL_RGBA;	break;
+		default:
+			BLI_assert(false && "wrong number of read channels");
+	}
+	glReadBuffer(GL_COLOR_ATTACHMENT0 + slot);
+	glReadPixels(x, y, w, h, type, GL_FLOAT, data);
+}
+
+void DRW_framebuffer_texture_attach(struct GPUFrameBuffer *fb, GPUTexture *tex, int slot, int mip)
+{
+	GPU_framebuffer_texture_attach(fb, tex, slot, mip);
 }
 
 void DRW_framebuffer_texture_detach(GPUTexture *tex)
@@ -1271,28 +1335,54 @@ void DRW_framebuffer_blit(struct GPUFrameBuffer *fb_read, struct GPUFrameBuffer 
 	GPU_framebuffer_blit(fb_read, 0, fb_write, 0, depth);
 }
 
-/* ****************************************** Viewport ******************************************/
-void *DRW_viewport_engine_data_get(const char *engine_name)
+void DRW_framebuffer_viewport_size(struct GPUFrameBuffer *UNUSED(fb_read), int w, int h)
 {
-	void *data = GPU_viewport_engine_data_get(DST.viewport, engine_name);
+	glViewport(0, 0, w, h);
+}
+
+/* ****************************************** Viewport ******************************************/
+
+static void *DRW_viewport_engine_data_get(void *engine_type)
+{
+	void *data = GPU_viewport_engine_data_get(DST.viewport, engine_type);
 
 	if (data == NULL) {
-		data = GPU_viewport_engine_data_create(DST.viewport, engine_name);
+		data = GPU_viewport_engine_data_create(DST.viewport, engine_type);
 	}
 	return data;
 }
 
-float *DRW_viewport_size_get(void)
+void DRW_engine_viewport_data_size_get(
+        const void *engine_type_v,
+        int *r_fbl_len, int *r_txl_len, int *r_psl_len, int *r_stl_len)
+{
+	const DrawEngineType *engine_type = engine_type_v;
+
+	if (r_fbl_len) {
+		*r_fbl_len = engine_type->vedata_size->fbl_len;
+	}
+	if (r_txl_len) {
+		*r_txl_len = engine_type->vedata_size->txl_len;
+	}
+	if (r_psl_len) {
+		*r_psl_len = engine_type->vedata_size->psl_len;
+	}
+	if (r_stl_len) {
+		*r_stl_len = engine_type->vedata_size->stl_len;
+	}
+}
+
+const float *DRW_viewport_size_get(void)
 {
 	return &DST.size[0];
 }
 
-float *DRW_viewport_screenvecs_get(void)
+const float *DRW_viewport_screenvecs_get(void)
 {
 	return &DST.screenvecs[0][0];
 }
 
-float *DRW_viewport_pixelsize_get(void)
+const float *DRW_viewport_pixelsize_get(void)
 {
 	return &DST.pixsize;
 }
@@ -1333,8 +1423,10 @@ void DRW_viewport_matrix_get(float mat[4][4], DRWViewportMatrixType type)
 
 	if (type == DRW_MAT_PERS)
 		copy_m4_m4(mat, rv3d->persmat);
-	else if (type == DRW_MAT_WIEW)
+	else if (type == DRW_MAT_VIEW)
 		copy_m4_m4(mat, rv3d->viewmat);
+	else if (type == DRW_MAT_VIEWINV)
+		copy_m4_m4(mat, rv3d->viewinv);
 	else if (type == DRW_MAT_WIN)
 		copy_m4_m4(mat, rv3d->winmat);
 }
@@ -1355,15 +1447,74 @@ DefaultTextureList *DRW_viewport_texture_list_get(void)
 	return GPU_viewport_texture_list_get(DST.viewport);
 }
 
+/* **************************************** OBJECTS *************************************** */
+
+typedef struct ObjectEngineData {
+	struct ObjectEngineData *next, *prev;
+	DrawEngineType *engine_type;
+	void *storage;
+} ObjectEngineData;
+
+void **DRW_object_engine_data_get(Object *ob, DrawEngineType *engine_type)
+{
+	ObjectEngineData *oed;
+
+	for (oed = ob->drawdata.first; oed; oed = oed->next) {
+		if (oed->engine_type == engine_type) {
+			return &oed->storage;
+		}
+	}
+
+	oed = MEM_callocN(sizeof(ObjectEngineData), "ObjectEngineData");
+	oed->engine_type = engine_type;
+	BLI_addtail(&ob->drawdata, oed);
+
+	return &oed->storage;
+}
+
+void DRW_object_engine_data_free(Object *ob)
+{
+	for (ObjectEngineData *oed = ob->drawdata.first; oed; oed = oed->next) {
+		if (oed->storage) {
+			MEM_freeN(oed->storage);
+		}
+	}
+
+	BLI_freelistN(&ob->drawdata);
+}
+
+LampEngineData *DRW_lamp_engine_data_get(Object *ob, RenderEngineType *engine_type)
+{
+	BLI_assert(ob->type == OB_LAMP);
+
+	Scene *scene = CTX_data_scene(DST.context);
+
+	/* TODO Dupliobjects */
+	return GPU_lamp_engine_data_get(scene, ob, NULL, engine_type);
+}
+
+void DRW_lamp_engine_data_free(LampEngineData *led)
+{
+	GPU_lamp_engine_data_free(led);
+}
+
 /* **************************************** RENDERING ************************************** */
+
+#define TIMER_FALLOFF 0.1f
 
 static void DRW_engines_init(void)
 {
 	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
 		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		double stime = PIL_check_seconds_timer();
+
 		if (engine->engine_init) {
-			engine->engine_init();
+			engine->engine_init(data);
 		}
+
+		double ftime = (PIL_check_seconds_timer() - stime) * 1e3;
+		data->init_time = data->init_time * (1.0f - TIMER_FALLOFF) + ftime * TIMER_FALLOFF; /* exp average */
 	}
 }
 
@@ -1371,9 +1522,15 @@ static void DRW_engines_cache_init(void)
 {
 	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
 		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		double stime = PIL_check_seconds_timer();
+		data->cache_time = 0.0;
+
 		if (engine->cache_init) {
-			engine->cache_init();
+			engine->cache_init(data);
 		}
+
+		data->cache_time += (PIL_check_seconds_timer() - stime) * 1e3;
 	}
 }
 
@@ -1381,9 +1538,14 @@ static void DRW_engines_cache_populate(Object *ob)
 {
 	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
 		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		double stime = PIL_check_seconds_timer();
+
 		if (engine->cache_populate) {
-			engine->cache_populate(ob);
+			engine->cache_populate(data, ob);
 		}
+
+		data->cache_time += (PIL_check_seconds_timer() - stime) * 1e3;
 	}
 }
 
@@ -1391,9 +1553,14 @@ static void DRW_engines_cache_finish(void)
 {
 	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
 		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		double stime = PIL_check_seconds_timer();
+
 		if (engine->cache_finish) {
-			engine->cache_finish();
+			engine->cache_finish(data);
 		}
+
+		data->cache_time += (PIL_check_seconds_timer() - stime) * 1e3;
 	}
 }
 
@@ -1401,10 +1568,16 @@ static void DRW_engines_draw_background(void)
 {
 	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
 		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		double stime = PIL_check_seconds_timer();
+
 		if (engine->draw_background) {
-			engine->draw_background();
+			engine->draw_background(data);
 			return;
 		}
+
+		double ftime = (PIL_check_seconds_timer() - stime) * 1e3;
+		data->background_time = data->background_time * (1.0f - TIMER_FALLOFF) + ftime * TIMER_FALLOFF; /* exp average */
 	}
 
 	/* No draw_background found, doing default background */
@@ -1415,9 +1588,15 @@ static void DRW_engines_draw_scene(void)
 {
 	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
 		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		double stime = PIL_check_seconds_timer();
+
 		if (engine->draw_scene) {
-			engine->draw_scene();
+			engine->draw_scene(data);
 		}
+
+		double ftime = (PIL_check_seconds_timer() - stime) * 1e3;
+		data->render_time = data->render_time * (1.0f - TIMER_FALLOFF) + ftime * TIMER_FALLOFF; /* exp average */
 	}
 }
 
@@ -1493,7 +1672,7 @@ static void DRW_engines_disable(void)
 	BLI_freelistN(&DST.enabled_engines);
 }
 
-static int DRW_engines_get_hash(void)
+static unsigned int DRW_engines_get_hash(void)
 {
 	unsigned int hash = 0;
 	/* The cache depends on enabled engines */
@@ -1504,6 +1683,144 @@ static int DRW_engines_get_hash(void)
 	}
 
 	return hash;
+}
+
+static void draw_stat(rcti *rect, int u, int v, const char *txt, const int size)
+{
+	BLF_draw_default_ascii(rect->xmin + (1 + u * 5) * U.widget_unit,
+	                       rect->ymax - (3 + v++) * U.widget_unit, 0.0f,
+	                       txt, size);
+}
+
+/* CPU stats */
+static void DRW_debug_cpu_stats(void)
+{
+	int u, v;
+	double cache_tot_time = 0.0, init_tot_time = 0.0, background_tot_time = 0.0, render_tot_time = 0.0, tot_time = 0.0;
+	/* local coordinate visible rect inside region, to accomodate overlapping ui */
+	rcti rect;
+	struct ARegion *ar = CTX_wm_region(DST.context);
+	ED_region_visible_rect(ar, &rect);
+
+	UI_FontThemeColor(BLF_default(), TH_TEXT_HI);
+
+	/* row by row */
+	v = 0; u = 0;
+	/* Label row */
+	char col_label[32];
+	sprintf(col_label, "Engine");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	sprintf(col_label, "Cache");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	sprintf(col_label, "Init");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	sprintf(col_label, "Background");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	sprintf(col_label, "Render");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	sprintf(col_label, "Total (w/o cache)");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	v++;
+
+	/* Engines rows */
+	char time_to_txt[16];
+	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
+		u = 0;
+		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+
+		draw_stat(&rect, u++, v, engine->idname, sizeof(engine->idname));
+
+		cache_tot_time += data->cache_time;
+		sprintf(time_to_txt, "%.2fms", data->cache_time);
+		draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+
+		init_tot_time += data->init_time;
+		sprintf(time_to_txt, "%.2fms", data->init_time);
+		draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+
+		background_tot_time += data->background_time;
+		sprintf(time_to_txt, "%.2fms", data->background_time);
+		draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+
+		render_tot_time += data->render_time;
+		sprintf(time_to_txt, "%.2fms", data->render_time);
+		draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+
+		tot_time += data->init_time + data->background_time + data->render_time;
+		sprintf(time_to_txt, "%.2fms", data->init_time + data->background_time + data->render_time);
+		draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+		v++;
+	}
+
+	/* Totals row */
+	u = 0;
+	sprintf(col_label, "Sub Total");
+	draw_stat(&rect, u++, v, col_label, sizeof(col_label));
+	sprintf(time_to_txt, "%.2fms", cache_tot_time);
+	draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+	sprintf(time_to_txt, "%.2fms", init_tot_time);
+	draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+	sprintf(time_to_txt, "%.2fms", background_tot_time);
+	draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+	sprintf(time_to_txt, "%.2fms", render_tot_time);
+	draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+	sprintf(time_to_txt, "%.2fms", tot_time);
+	draw_stat(&rect, u++, v, time_to_txt, sizeof(time_to_txt));
+}
+
+/* Display GPU time for each passes */
+static void DRW_debug_gpu_stats(void)
+{
+	/* local coordinate visible rect inside region, to accomodate overlapping ui */
+	rcti rect;
+	struct ARegion *ar = CTX_wm_region(DST.context);
+	ED_region_visible_rect(ar, &rect);
+
+	UI_FontThemeColor(BLF_default(), TH_TEXT_HI);
+
+	char time_to_txt[16];
+	char pass_name[MAX_PASS_NAME + 8];
+	int v = BLI_listbase_count(&DST.enabled_engines) + 3;
+	GLuint64 tot_time = 0;
+
+	for (LinkData *link = DST.enabled_engines.first; link; link = link->next) {
+		GLuint64 engine_time = 0;
+		DrawEngineType *engine = link->data;
+		ViewportEngineData *data = DRW_viewport_engine_data_get(engine);
+		int vsta = v;
+
+		draw_stat(&rect, 0, v, engine->idname, sizeof(engine->idname));
+		v++;
+
+		for (int i = 0; i < engine->vedata_size->psl_len; ++i) {
+			DRWPass *pass = data->psl->passes[i];
+			if (pass != NULL) {
+				GLuint64 time;
+				glGetQueryObjectui64v(pass->timer_queries[pass->front_idx], GL_QUERY_RESULT, &time);
+				tot_time += time;
+				engine_time += time;
+
+				sprintf(pass_name, "   |--> %s", pass->name);
+				draw_stat(&rect, 0, v, pass_name, sizeof(pass_name));
+
+				if (pass->wasdrawn)
+					sprintf(time_to_txt, "%.2fms", time / 1000000.0);
+				else
+					sprintf(time_to_txt, "Not drawn");
+				draw_stat(&rect, 2, v++, time_to_txt, sizeof(time_to_txt));
+
+				pass->wasdrawn = false;
+			}
+		}
+		/* engine total time */
+		sprintf(time_to_txt, "%.2fms", engine_time / 1000000.0);
+		draw_stat(&rect, 2, vsta, time_to_txt, sizeof(time_to_txt));
+		v++;
+	}
+
+	sprintf(pass_name, "Total GPU time %.2fms (%.1f fps)", tot_time / 1000000.0, 1000000000.0 / tot_time);
+	draw_stat(&rect, 0, v, pass_name, sizeof(pass_name));
 }
 
 /* Everything starts here.
@@ -1534,14 +1851,15 @@ void DRW_draw_view(const bContext *C)
 	/* ideally only refresh when objects are added/removed */
 	/* or render properties / materials change */
 	if (cache_is_dirty) {
-		SceneLayer *sl = CTX_data_scene_layer(C);
-
 		DRW_engines_cache_init();
-		DEG_OBJECT_ITER(sl, ob);
+
+		Depsgraph *depsgraph = CTX_data_depsgraph(C);
+		DEG_OBJECT_ITER(depsgraph, ob);
 		{
 			DRW_engines_cache_populate(ob);
 		}
 		DEG_OBJECT_ITER_END
+
 		DRW_engines_cache_finish();
 	}
 
@@ -1549,11 +1867,17 @@ void DRW_draw_view(const bContext *C)
 	DRW_engines_draw_background();
 
 	DRW_draw_callbacks_pre_scene();
-	DRW_draw_grid();
 	DRW_engines_draw_scene();
 	DRW_draw_callbacks_post_scene();
 
+	DRW_draw_manipulator();
+
 	DRW_draw_region_info();
+
+	if (G.debug_value > 20) {
+		DRW_debug_cpu_stats();
+		DRW_debug_gpu_stats();
+	}
 
 	DRW_state_reset();
 	DRW_engines_disable();

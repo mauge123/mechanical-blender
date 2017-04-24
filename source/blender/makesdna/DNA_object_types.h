@@ -46,7 +46,6 @@ struct Object;
 struct AnimData;
 struct Ipo;
 struct BoundBox;
-struct CollectionEngineSettings;
 struct Path;
 struct Material;
 struct PartDeflect;
@@ -304,11 +303,15 @@ typedef struct Object {
 
 	struct PreviewImage *preview;
 
-	ListBase collection_settings; /* used by depsgraph, flushed from collection-tree */
+	struct IDProperty *base_collection_properties; /* used by depsgraph, flushed from base */
+
+	ListBase drawdata;		/* runtime, for draw engine datas */
+
 
 // WITH_MECHANICAL_GEOMETRY
 	int geom_enabled;
 	char pad3[4];
+
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -345,6 +348,8 @@ typedef struct DupliObject {
 
 	/* particle this dupli was generated from */
 	struct ParticleSystem *particle_system;
+	unsigned int random_id;
+	unsigned int pad;
 } DupliObject;
 
 /* **************** OBJECT ********************* */

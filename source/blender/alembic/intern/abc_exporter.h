@@ -28,6 +28,8 @@
 #include <set>
 #include <vector>
 
+#include "abc_util.h"
+
 class AbcObjectWriter;
 class AbcTransformWriter;
 class ArchiveWriter;
@@ -44,6 +46,7 @@ struct ExportSettings {
 
 	Scene *scene;
 	SceneLayer *sl;  // Scene layer to export; all its objects will be exported, unless selected_only=true
+	SimpleLogger logger;
 
 	bool selected_only;
 	bool visible_layers_only;
@@ -63,6 +66,8 @@ struct ExportSettings {
 	bool export_vcols;
 	bool export_face_sets;
 	bool export_vweigths;
+	bool export_hair;
+	bool export_particles;
 
 	bool apply_subdiv;
 	bool use_subdiv_schema;
@@ -89,7 +94,10 @@ class AbcExporter {
 
 	ArchiveWriter *m_writer;
 
-	std::map<std::string, AbcTransformWriter *> m_xforms;
+	/* mapping from name to transform writer */
+	typedef std::map<std::string, AbcTransformWriter *> m_xforms_type;
+	m_xforms_type m_xforms;
+
 	std::vector<AbcObjectWriter *> m_shapes;
 
 public:
@@ -106,12 +114,12 @@ private:
 	void getFrameSet(double step, std::set<double> &frames);
 
 	void createTransformWritersHierarchy(EvaluationContext *eval_ctx);
-	void createTransformWritersFlat();
-	void createTransformWriter(Object *ob,  Object *parent, Object *dupliObParent);
+	AbcTransformWriter * createTransformWriter(Object *ob,  Object *parent, Object *dupliObParent);
 	void exploreTransform(EvaluationContext *eval_ctx, Base *ob_base, Object *parent, Object *dupliObParent);
 	void exploreObject(EvaluationContext *eval_ctx, Base *ob_base, Object *dupliObParent);
 	void createShapeWriters(EvaluationContext *eval_ctx);
 	void createShapeWriter(Base *ob_base, Object *dupliObParent);
+	void createParticleSystemsWriters(Object *ob, AbcTransformWriter *xform);
 
 	AbcTransformWriter *getXForm(const std::string &name);
 

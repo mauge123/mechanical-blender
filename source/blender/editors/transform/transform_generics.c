@@ -315,7 +315,7 @@ static bool fcu_test_selected(FCurve *fcu)
 /* helper for recalcData() - for Action Editor transforms */
 static void recalcData_actedit(TransInfo *t)
 {
-	SceneLayer *sl= t->sl;
+	SceneLayer *sl= t->scene_layer;
 	SpaceAction *saction = (SpaceAction *)t->sa->spacedata.first;
 	
 	bAnimContext ac = {NULL};
@@ -326,7 +326,7 @@ static void recalcData_actedit(TransInfo *t)
 	/* initialize relevant anim-context 'context' data from TransInfo data */
 	/* NOTE: sync this with the code in ANIM_animdata_get_context() */
 	ac.scene = t->scene;
-	ac.scene_layer = t->sl;
+	ac.scene_layer = t->scene_layer;
 	ac.obact = OBACT_NEW;
 	ac.sa = t->sa;
 	ac.ar = t->ar;
@@ -364,7 +364,7 @@ static void recalcData_actedit(TransInfo *t)
 static void recalcData_graphedit(TransInfo *t)
 {
 	SpaceIpo *sipo = (SpaceIpo *)t->sa->spacedata.first;
-	SceneLayer *sl = t->sl;
+	SceneLayer *sl = t->scene_layer;
 	
 	ListBase anim_data = {NULL, NULL};
 	bAnimContext ac = {NULL};
@@ -376,7 +376,7 @@ static void recalcData_graphedit(TransInfo *t)
 	/* initialize relevant anim-context 'context' data from TransInfo data */
 	/* NOTE: sync this with the code in ANIM_animdata_get_context() */
 	ac.scene = t->scene;
-	ac.scene_layer = t->sl;
+	ac.scene_layer = t->scene_layer;
 	ac.obact = OBACT_NEW;
 	ac.sa = t->sa;
 	ac.ar = t->ar;
@@ -711,7 +711,7 @@ static void recalcData_spaceclip(TransInfo *t)
 /* helper for recalcData() - for object transforms, typically in the 3D view */
 static void recalcData_objects(TransInfo *t)
 {
-	BaseLegacy *base = t->scene->basact;
+	Base *base = t->scene_layer->basact;
 
 	if (t->obedit) {
 		if (ELEM(t->obedit->type, OB_CURVE, OB_SURF)) {
@@ -898,7 +898,7 @@ static void recalcData_objects(TransInfo *t)
 		else
 			BKE_pose_where_is(t->scene, ob);
 	}
-	else if (base && (base->object->mode & OB_MODE_PARTICLE_EDIT) && PE_get_current(t->scene, t->sl, base->object)) {
+	else if (base && (base->object->mode & OB_MODE_PARTICLE_EDIT) && PE_get_current(t->scene, t->scene_layer, base->object)) {
 		if (t->state != TRANS_CANCEL) {
 			applyProject(t);
 		}
@@ -928,7 +928,7 @@ static void recalcData_objects(TransInfo *t)
 			// TODO: autokeyframe calls need some setting to specify to add samples (FPoints) instead of keyframes?
 			if ((t->animtimer) && IS_AUTOKEY_ON(t->scene)) {
 				animrecord_check_state(t->scene, &ob->id, t->animtimer);
-				autokeyframe_ob_cb_func(t->context, t->scene, t->sl, (View3D *)t->view, ob, t->mode);
+				autokeyframe_ob_cb_func(t->context, t->scene, t->scene_layer, (View3D *)t->view, ob, t->mode);
 			}
 			
 			/* sets recalc flags fully, instead of flushing existing ones 
@@ -1036,7 +1036,7 @@ void drawLine(TransInfo *t, const float center[3], const float dir[3], char axis
 		
 		gpuPushMatrix();
 
-		// if (t->obedit) gpuLoadMatrix3D(t->obedit->obmat); // sets opengl viewing
+		// if (t->obedit) gpuLoadMatrix(t->obedit->obmat); // sets opengl viewing
 
 		copy_v3_v3(v3, dir);
 		mul_v3_fl(v3, v3d->far);
@@ -1052,12 +1052,12 @@ void drawLine(TransInfo *t, const float center[3], const float dir[3], char axis
 		}
 		UI_make_axis_color(col, col2, axis);
 
-		unsigned pos = add_attrib(immVertexFormat(), "pos", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 		immUniformColor3ubv(col2);
 
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immVertex3fv(pos, v1);
 		immVertex3fv(pos, v2);
 		immEnd();
@@ -1120,7 +1120,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 	PropertyRNA *prop;
 	
 	t->scene = sce;
-	t->sl = sl;
+	t->scene_layer = sl;
 	t->sa = sa;
 	t->ar = ar;
 	t->obedit = obedit;
@@ -1228,7 +1228,6 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 		t->animtimer = (animscreen) ? animscreen->animtimer : NULL;
 		
 		/* turn manipulator off during transform */
-		// FIXME: but don't do this when USING the manipulator...
 		if (t->flag & T_MODAL) {
 			t->twtype = v3d->twtype;
 			v3d->twtype = 0;
@@ -1439,13 +1438,6 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 #if 0
 	if (t->flag & T_PROP_EDIT) {
 		t->flag &= ~T_MIRROR;
-	}
-#endif
-
-#ifdef WITH_MECHANICAL_GRAB_W_BASE_POINT
-	// Operator may be NULL when usign transform code from other parts or code
-	if (op && RNA_boolean_get(op->ptr,"uses_manipulator")) {
-		t->flag |= T_USES_MANIPULATOR;
 	}
 #endif
 
@@ -1782,7 +1774,7 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
 		}
 	}
 	else if (t->flag & T_POSE) {
-		SceneLayer *sl = t->sl;
+		SceneLayer *sl = t->scene_layer;
 		Object *ob = OBACT_NEW;
 		if (ob) {
 			bPoseChannel *pchan = BKE_pose_channel_active(ob);
@@ -1793,7 +1785,7 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
 		}
 	}
 	else if (t->options & CTX_PAINT_CURVE) {
-		Paint *p = BKE_paint_get_active(t->scene);
+		Paint *p = BKE_paint_get_active(t->scene, t->scene_layer);
 		Brush *br = p->brush;
 		PaintCurve *pc = br->paint_curve;
 		copy_v3_v3(r_center, pc->points[pc->add_index - 1].bez.vec[1]);
@@ -1802,7 +1794,7 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
 	}
 	else {
 		/* object mode */
-		SceneLayer *sl = t->sl;
+		SceneLayer *sl = t->scene_layer;
 		Object *ob = OBACT_NEW;
 		Base *base = BASACT_NEW;
 		if (ob && ((!select_only) || ((base->flag & BASE_SELECTED) != 0))) {
@@ -1818,15 +1810,13 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3])
 void change_transform_step (TransInfo *t, int state)
 {
 	bool ok = false;
-	if ((t->flag & T_USES_MANIPULATOR) == 0) {
-		switch (state) {
-			case TRANS_BASE_POINT:
-				ok = (ELEM (t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE, TFM_MATCH));
-				break;
-			case TRANS_SELECT_CENTER:
-				ok = (ELEM (t->mode, TFM_ROTATION, TFM_RESIZE, TFM_MATCH));
-				break;
-		}
+	switch (state) {
+		case TRANS_BASE_POINT:
+			ok = (ELEM (t->mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE, TFM_MATCH));
+			break;
+		case TRANS_SELECT_CENTER:
+			ok = (ELEM (t->mode, TFM_ROTATION, TFM_RESIZE, TFM_MATCH));
+			break;
 	}
 	if (ok) {
 		t->state = state;

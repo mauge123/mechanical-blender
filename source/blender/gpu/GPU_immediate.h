@@ -28,7 +28,8 @@
  * This file contains any additions or modifications specific to Blender.
  */
 
-#pragma once
+#ifndef __GPU_IMMEDIATE_H__
+#define __GPU_IMMEDIATE_H__
 
 #include "../../../intern/gawain/gawain/immediate.h"
 #include "../../../intern/gawain/gawain/imm_util.h"
@@ -47,9 +48,11 @@ void immBindBuiltinProgram(GPUBuiltinShader shader_id);
  * Extend immUniformColor to take Blender's themes
  */
 void immUniformThemeColor(int color_id);
+void immUniformThemeColor3(int color_id);
 void immUniformThemeColorShade(int color_id, int offset);
 void immUniformThemeColorShadeAlpha(int color_id, int color_offset, int alpha_offset);
 void immUniformThemeColorBlendShade(int color_id1, int color_id2, float fac, int offset);
 void immUniformThemeColorBlend(int color_id1, int color_id2, float fac);
 void immThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset);
 
+#endif  /* __GPU_IMMEDIATE_H__ */

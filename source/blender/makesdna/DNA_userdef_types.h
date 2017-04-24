@@ -475,13 +475,18 @@ typedef struct UserDef {
 	int audioformat;
 	int audiochannels;
 
-	int scrollback; /* console scrollback limit */
-	int dpi;		/* range 48-128? */
-	char node_margin; /* node insert offset (aka auto-offset) margin, but might be useful for later stuff as well */
+	int scrollback;     /* console scrollback limit */
+	int dpi;            /* range 48-128? */
+	float ui_scale;     /* interface scale */
+	int pad1;
+	char node_margin;   /* node insert offset (aka auto-offset) margin, but might be useful for later stuff as well */
 	char pad2;
 	short transopts;
 	short menuthreshold1, menuthreshold2;
-	
+
+	/* startup template */
+	char app_template[64];
+
 	struct ListBase themes;
 	struct ListBase uifonts;
 	struct ListBase uistyles;
@@ -498,7 +503,8 @@ typedef struct UserDef {
 	short tb_leftmouse, tb_rightmouse;
 	struct SolidLight light[3];
 	short tw_hotspot, tw_flag, tw_handlesize, tw_size;
-	short manipulator_scale, pad3[3];
+	short manipulator_flag, manipulator_scale;
+	int pad3;
 	short textimeout, texcollectrate;
 	short wmdrawmethod; /* removed wmpad */
 	short dragthreshold;

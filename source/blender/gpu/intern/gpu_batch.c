@@ -31,10 +31,10 @@
 #include "GPU_batch.h"
 #include "gpu_shader_private.h"
 
-void Batch_set_builtin_program(Batch* batch, GPUBuiltinShader shader_id)
+void Batch_set_builtin_program(Batch *batch, GPUBuiltinShader shader_id)
 {
 	GPUShader *shader = GPU_shader_get_builtin_shader(shader_id);
-	Batch_set_program(batch, shader->program);
+	Batch_set_program(batch, shader->program, shader->interface);
 }
 
 static Batch *sphere_high = NULL;
@@ -55,8 +55,8 @@ static void batch_sphere_lat_lon_vert(float lat, float lon)
 	pos[1] = cosf(lat);
 	pos[2] = sinf(lat) * sinf(lon);
 
-	setAttrib(vbo, nor_id, vert, pos);
-	setAttrib(vbo, pos_id, vert++, pos);
+	VertexBuffer_set_attrib(vbo, nor_id, vert, pos);
+	VertexBuffer_set_attrib(vbo, pos_id, vert++, pos);
 }
 
 /* Replacement for gluSphere */
@@ -67,33 +67,33 @@ static Batch *batch_sphere(int lat_res, int lon_res)
 	float lon, lat;
 
 	if (format.attrib_ct == 0) {
-		pos_id = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-		nor_id = add_attrib(&format, "nor", GL_FLOAT, 3, KEEP_FLOAT);
+		pos_id = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+		nor_id = VertexFormat_add_attrib(&format, "nor", COMP_F32, 3, KEEP_FLOAT);
 	}
 
 	vbo = VertexBuffer_create_with_format(&format);
-	VertexBuffer_allocate_data(vbo, (lat_res-1) * lon_res * 6);
+	VertexBuffer_allocate_data(vbo, (lat_res - 1) * lon_res * 6);
 	vert = 0;
 
 	lon = 0.0f;
-	for(int i = 0; i < lon_res; i++, lon += lon_inc) {
+	for (int i = 0; i < lon_res; i++, lon += lon_inc) {
 		lat = 0.0f;
-		for(int j = 0; j < lat_res; j++, lat += lat_inc) {
+		for (int j = 0; j < lat_res; j++, lat += lat_inc) {
 			if (j != lat_res - 1) { /* Pole */
-				batch_sphere_lat_lon_vert(lat+lat_inc, lon+lon_inc);
-				batch_sphere_lat_lon_vert(lat+lat_inc, lon);
-				batch_sphere_lat_lon_vert(lat,         lon);
+				batch_sphere_lat_lon_vert(lat + lat_inc, lon + lon_inc);
+				batch_sphere_lat_lon_vert(lat + lat_inc, lon);
+				batch_sphere_lat_lon_vert(lat,           lon);
 			}
 
 			if (j != 0) { /* Pole */
-				batch_sphere_lat_lon_vert(lat,         lon+lon_inc);
-				batch_sphere_lat_lon_vert(lat+lat_inc, lon+lon_inc);
-				batch_sphere_lat_lon_vert(lat,         lon);
+				batch_sphere_lat_lon_vert(lat,           lon + lon_inc);
+				batch_sphere_lat_lon_vert(lat + lat_inc, lon + lon_inc);
+				batch_sphere_lat_lon_vert(lat,           lon);
 			}
 		}
 	}
 
-	return Batch_create(GL_TRIANGLES, vbo, NULL);
+	return Batch_create(PRIM_TRIANGLES, vbo, NULL);
 }
 
 static Batch *batch_sphere_wire(int lat_res, int lon_res)
@@ -103,29 +103,29 @@ static Batch *batch_sphere_wire(int lat_res, int lon_res)
 	float lon, lat;
 
 	if (format.attrib_ct == 0) {
-		pos_id = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-		nor_id = add_attrib(&format, "nor", GL_FLOAT, 3, KEEP_FLOAT);
+		pos_id = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+		nor_id = VertexFormat_add_attrib(&format, "nor", COMP_F32, 3, KEEP_FLOAT);
 	}
 
 	vbo = VertexBuffer_create_with_format(&format);
-	VertexBuffer_allocate_data(vbo, (lat_res * lon_res * 2) + ((lat_res-1) * lon_res * 2));
+	VertexBuffer_allocate_data(vbo, (lat_res * lon_res * 2) + ((lat_res - 1) * lon_res * 2));
 	vert = 0;
 
 	lon = 0.0f;
-	for(int i = 0; i < lon_res; i++, lon += lon_inc) {
+	for (int i = 0; i < lon_res; i++, lon += lon_inc) {
 		lat = 0.0f;
-		for(int j = 0; j < lat_res; j++, lat += lat_inc) {
-			batch_sphere_lat_lon_vert(lat+lat_inc, lon);
-			batch_sphere_lat_lon_vert(lat,         lon);
+		for (int j = 0; j < lat_res; j++, lat += lat_inc) {
+			batch_sphere_lat_lon_vert(lat + lat_inc, lon);
+			batch_sphere_lat_lon_vert(lat,           lon);
 
 			if (j != lat_res - 1) { /* Pole */
-				batch_sphere_lat_lon_vert(lat+lat_inc, lon+lon_inc);
-				batch_sphere_lat_lon_vert(lat+lat_inc, lon);
+				batch_sphere_lat_lon_vert(lat + lat_inc, lon + lon_inc);
+				batch_sphere_lat_lon_vert(lat + lat_inc, lon);
 			}
 		}
 	}
 
-	return Batch_create(GL_LINES, vbo, NULL);
+	return Batch_create(PRIM_LINES, vbo, NULL);
 }
 
 Batch *Batch_get_sphere(int lod)

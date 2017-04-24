@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 // necessary functions from matrix API
-extern void gpuBindMatrices(GLuint program);
+extern void gpuBindMatrices(const ShaderInterface* shaderface);
 extern bool gpuMatricesDirty(void); // how best to use this here?
 
 Batch* Batch_create(PrimitiveType prim_type, VertexBuffer* verts, ElementList* elem)
@@ -30,8 +30,6 @@ void Batch_init(Batch* batch, PrimitiveType prim_type, VertexBuffer* verts, Elem
 	{
 #if TRUST_NO_ONE
 	assert(verts != NULL);
-	// assert(prim_type == PRIM_POINTS || prim_type == PRIM_LINES || prim_type == PRIM_TRIANGLES);
-	// we will allow other primitive types in a future update
 #endif
 
 	batch->verts[0] = verts;
@@ -39,6 +37,7 @@ void Batch_init(Batch* batch, PrimitiveType prim_type, VertexBuffer* verts, Elem
 		batch->verts[v] = NULL;
 	batch->elem = elem;
 	batch->prim_type = prim_type;
+	batch->gl_prim_type = convert_prim_type_to_gl(prim_type);
 	batch->phase = READY_TO_DRAW;
 	}
 
@@ -89,13 +88,14 @@ int Batch_add_VertexBuffer(Batch* batch, VertexBuffer* verts)
 	return -1;
 	}
 
-void Batch_set_program(Batch* batch, GLuint program)
+void Batch_set_program(Batch* batch, GLuint program, const ShaderInterface* shaderface)
 	{
 #if TRUST_NO_ONE
 	assert(glIsProgram(program));
 #endif
 
 	batch->program = program;
+	batch->interface = shaderface;
 	batch->program_dirty = true;
 
 	Batch_use_program(batch); // hack! to make Batch_Uniform* simpler
@@ -127,23 +127,23 @@ static void Batch_update_program_bindings(Batch* batch)
 
 			const GLvoid* pointer = (const GLubyte*)0 + a->offset;
 
-			const GLint loc = glGetAttribLocation(batch->program, a->name);
+			const ShaderInput* input = ShaderInterface_attrib(batch->interface, a->name);
 
-			if (loc == -1) continue;
+			if (input == NULL) continue;
 
-			glEnableVertexAttribArray(loc);
+			glEnableVertexAttribArray(input->location);
 
 			switch (a->fetch_mode)
 				{
 				case KEEP_FLOAT:
 				case CONVERT_INT_TO_FLOAT:
-					glVertexAttribPointer(loc, a->comp_ct, a->comp_type, GL_FALSE, stride, pointer);
+					glVertexAttribPointer(input->location, a->comp_ct, a->gl_comp_type, GL_FALSE, stride, pointer);
 					break;
 				case NORMALIZE_INT_TO_FLOAT:
-					glVertexAttribPointer(loc, a->comp_ct, a->comp_type, GL_TRUE, stride, pointer);
+					glVertexAttribPointer(input->location, a->comp_ct, a->gl_comp_type, GL_TRUE, stride, pointer);
 					break;
 				case KEEP_INT:
-					glVertexAttribIPointer(loc, a->comp_ct, a->comp_type, stride, pointer);
+					glVertexAttribIPointer(input->location, a->comp_ct, a->gl_comp_type, stride, pointer);
 				}
 			}
 		}
@@ -173,92 +173,58 @@ void Batch_done_using_program(Batch* batch)
 		}
 	}
 
-void Batch_Uniform1i(Batch* batch, const char* name, int value)
-	{
-	int loc = glGetUniformLocation(batch->program, name);
-
 #if TRUST_NO_ONE
-	assert(loc != -1);
+  #define GET_UNIFORM const ShaderInput* uniform = ShaderInterface_uniform(batch->interface, name); assert(uniform);
+#else
+  #define GET_UNIFORM const ShaderInput* uniform = ShaderInterface_uniform(batch->interface, name);
 #endif
 
-	glUniform1i(loc, value);
+void Batch_Uniform1i(Batch* batch, const char* name, int value)
+	{
+	GET_UNIFORM
+	glUniform1i(uniform->location, value);
 	}
 
 void Batch_Uniform1b(Batch* batch, const char* name, bool value)
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform1i(loc, value ? GL_TRUE : GL_FALSE);
+	GET_UNIFORM
+	glUniform1i(uniform->location, value ? GL_TRUE : GL_FALSE);
 	}
 
 void Batch_Uniform2f(Batch* batch, const char* name, float x, float y)
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform2f(loc, x, y);
+	GET_UNIFORM
+	glUniform2f(uniform->location, x, y);
 	}
 
 void Batch_Uniform3f(Batch* batch, const char* name, float x, float y, float z)
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform3f(loc, x, y, z);
+	GET_UNIFORM
+	glUniform3f(uniform->location, x, y, z);
 	}
 
 void Batch_Uniform4f(Batch* batch, const char* name, float x, float y, float z, float w)
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform4f(loc, x, y, z, w);
+	GET_UNIFORM
+	glUniform4f(uniform->location, x, y, z, w);
 	}
 
 void Batch_Uniform1f(Batch* batch, const char* name, float x)
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform1f(loc, x);
+	GET_UNIFORM
+	glUniform1f(uniform->location, x);
 	}
 
 void Batch_Uniform3fv(Batch* batch, const char* name, const float data[3])
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform3fv(loc, 1, data);
+	GET_UNIFORM
+	glUniform3fv(uniform->location, 1, data);
 	}
 
 void Batch_Uniform4fv(Batch* batch, const char* name, const float data[4])
 	{
-	int loc = glGetUniformLocation(batch->program, name);
-
-#if TRUST_NO_ONE
-	assert(loc != -1);
-#endif
-
-	glUniform4fv(loc, 1, data);
+	GET_UNIFORM
+	glUniform4fv(uniform->location, 1, data);
 	}
 
 static void Batch_prime(Batch* batch)
@@ -296,7 +262,7 @@ void Batch_draw(Batch* batch)
 
 	Batch_use_program(batch);
 
-	gpuBindMatrices(batch->program);
+	gpuBindMatrices(batch->interface);
 
 	if (batch->elem)
 		{
@@ -304,15 +270,15 @@ void Batch_draw(Batch* batch)
 
 #if TRACK_INDEX_RANGE
 		if (el->base_index)
-			glDrawRangeElementsBaseVertex(batch->prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0, el->base_index);
+			glDrawRangeElementsBaseVertex(batch->gl_prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0, el->base_index);
 		else
-			glDrawRangeElements(batch->prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0);
+			glDrawRangeElements(batch->gl_prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0);
 #else
-		glDrawElements(batch->prim_type, el->index_ct, GL_UNSIGNED_INT, 0);
+		glDrawElements(batch->gl_prim_type, el->index_ct, GL_UNSIGNED_INT, 0);
 #endif
 		}
 	else
-		glDrawArrays(batch->prim_type, 0, batch->verts[0]->vertex_ct);
+		glDrawArrays(batch->gl_prim_type, 0, batch->verts[0]->vertex_ct);
 
 	Batch_done_using_program(batch);
 	glBindVertexArray(0);
@@ -341,15 +307,15 @@ void Batch_draw_stupid(Batch* batch)
 
 #if TRACK_INDEX_RANGE
 		if (el->base_index)
-			glDrawRangeElementsBaseVertex(batch->prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0, el->base_index);
+			glDrawRangeElementsBaseVertex(batch->gl_prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0, el->base_index);
 		else
-			glDrawRangeElements(batch->prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0);
+			glDrawRangeElements(batch->gl_prim_type, el->min_index, el->max_index, el->index_ct, el->index_type, 0);
 #else
-		glDrawElements(batch->prim_type, el->index_ct, GL_UNSIGNED_INT, 0);
+		glDrawElements(batch->gl_prim_type, el->index_ct, GL_UNSIGNED_INT, 0);
 #endif
 		}
 	else
-		glDrawArrays(batch->prim_type, 0, batch->verts[0]->vertex_ct);
+		glDrawArrays(batch->gl_prim_type, 0, batch->verts[0]->vertex_ct);
 
 	// Batch_done_using_program(batch);
 	glBindVertexArray(0);
@@ -394,10 +360,10 @@ void Batch_draw_stupid_instanced(Batch* batch, unsigned int instance_vbo, int in
 		{
 		const ElementList* el = batch->elem;
 
-		glDrawElementsInstanced(batch->prim_type, el->index_ct, GL_UNSIGNED_INT, 0, instance_count);
+		glDrawElementsInstanced(batch->gl_prim_type, el->index_ct, GL_UNSIGNED_INT, 0, instance_count);
 		}
 	else
-		glDrawArraysInstanced(batch->prim_type, 0, batch->verts[0]->vertex_ct, instance_count);
+		glDrawArraysInstanced(batch->gl_prim_type, 0, batch->verts[0]->vertex_ct, instance_count);
 
 	// Batch_done_using_program(batch);
 	glBindVertexArray(0);

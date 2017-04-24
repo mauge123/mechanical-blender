@@ -793,7 +793,7 @@ void OBJECT_OT_modifier_add(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name = "Add Modifier";
-	ot->description = "Add a modifier to the active object";
+	ot->description = "Add a procedural operation/effect to the active object";
 	ot->idname = "OBJECT_OT_modifier_add";
 	
 	/* api callbacks */
@@ -872,7 +872,7 @@ ModifierData *edit_modifier_property_get(wmOperator *op, Object *ob, int type)
 static int modifier_remove_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
-	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *ob = ED_object_active_context(C);
 	ModifierData *md = edit_modifier_property_get(op, ob, 0);
 	int mode_orig = ob->mode;
@@ -885,7 +885,7 @@ static int modifier_remove_exec(bContext *C, wmOperator *op)
 	/* if cloth/softbody was removed, particle mode could be cleared */
 	if (mode_orig & OB_MODE_PARTICLE_EDIT)
 		if ((ob->mode & OB_MODE_PARTICLE_EDIT) == 0)
-			if (scene->basact && scene->basact->object == ob)
+			if (sl->basact && sl->basact->object == ob)
 				WM_event_add_notifier(C, NC_SCENE | ND_MODE | NS_MODE_OBJECT, NULL);
 	
 	return OPERATOR_FINISHED;
@@ -1485,7 +1485,6 @@ static int skin_root_mark_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(ob);
 	BMesh *bm = em->bm;
-	const int cd_vert_skin_offset = CustomData_get_offset(&bm->vdata, CD_MVERT_SKIN);
 	BMVert *bm_vert;
 	BMIter bm_iter;
 	GSet *visited;
@@ -1493,6 +1492,8 @@ static int skin_root_mark_exec(bContext *C, wmOperator *UNUSED(op))
 	visited = BLI_gset_ptr_new(__func__);
 
 	BKE_mesh_ensure_skin_customdata(ob->data);
+
+	const int cd_vert_skin_offset = CustomData_get_offset(&bm->vdata, CD_MVERT_SKIN);
 
 	BM_ITER_MESH (bm_vert, &bm_iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(bm_vert, BM_ELEM_SELECT) &&

@@ -65,9 +65,7 @@
 #include "BKE_unit.h"
 #include "BKE_editmesh.h"
 
-
 #include "BIF_gl.h"
-#include "BIF_glutil.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -2955,7 +2953,8 @@ static int view3d_all_exec(bContext *C, wmOperator *op) /* was view3d_home() in 
 	ARegion *ar = CTX_wm_region(C);
 	View3D *v3d = CTX_wm_view3d(C);
 	Scene *scene = CTX_data_scene(C);
-	BaseLegacy *base;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Base *base;
 	float *curs;
 	const bool use_all_regions = RNA_boolean_get(op->ptr, "use_all_regions");
 	const bool skip_camera = (ED_view3d_camera_lock_check(v3d, ar->regiondata) ||
@@ -2978,8 +2977,8 @@ static int view3d_all_exec(bContext *C, wmOperator *op) /* was view3d_home() in 
 		INIT_MINMAX(min, max);
 	}
 
-	for (base = scene->base.first; base; base = base->next) {
-		if (BASE_VISIBLE(v3d, base)) {
+	for (base = sl->object_bases.first; base; base = base->next) {
+		if (BASE_VISIBLE_NEW(base)) {
 			changed = true;
 
 			if (skip_camera && base->object == v3d->camera) {
@@ -3107,9 +3106,9 @@ static int viewselected_exec(bContext *C, wmOperator *op)
 		ok_dist = 0; /* don't zoom */
 	}
 	else {
-		BaseLegacy *base;
-		for (base = FIRSTBASE; base; base = base->next) {
-			if (TESTBASE(v3d, base)) {
+		Base *base;
+		for (base = FIRSTBASE_NEW; base; base = base->next) {
+			if (TESTBASE_NEW(base)) {
 
 				if (skip_camera && base->object == v3d->camera) {
 					continue;
@@ -4782,45 +4781,6 @@ void VIEW3D_OT_cursor3d(wmOperatorType *ot)
 }
 
 /* ***************** manipulator op ******************* */
-
-
-static int manipulator_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-	View3D *v3d = CTX_wm_view3d(C);
-
-	if (!(v3d->twflag & V3D_USE_MANIPULATOR)) return OPERATOR_PASS_THROUGH;
-	if (!(v3d->twflag & V3D_DRAW_MANIPULATOR)) return OPERATOR_PASS_THROUGH;
-
-	/* note; otherwise opengl won't work */
-	view3d_operator_needs_opengl(C);
-
-	if (BIF_do_manipulator(C, event, op) == 0)
-		return OPERATOR_PASS_THROUGH;
-
-	return OPERATOR_FINISHED;
-}
-
-void VIEW3D_OT_manipulator(wmOperatorType *ot)
-{
-	PropertyRNA *prop;
-
-	/* identifiers */
-	ot->name = "3D Manipulator";
-	ot->description = "Manipulate selected item by axis";
-	ot->idname = "VIEW3D_OT_manipulator";
-
-	/* api callbacks */
-	ot->invoke = manipulator_invoke;
-
-	ot->poll = ED_operator_view3d_active;
-
-	/* properties to pass to transform */
-	Transform_Properties(ot, P_CONSTRAINT);
-
-	prop = RNA_def_boolean(ot->srna, "use_planar_constraint", false, "Planar Constraint", "Limit the transformation to the "
-	                       "two axes that have not been clicked (translate/scale only)");
-	RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
-}
 
 static int enable_manipulator_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {

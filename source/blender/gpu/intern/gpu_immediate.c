@@ -35,7 +35,7 @@
 void immBindBuiltinProgram(GPUBuiltinShader shader_id)
 {
 	GPUShader *shader = GPU_shader_get_builtin_shader(shader_id);
-	immBindProgram(shader->program);
+	immBindProgram(shader->program, shader->interface);
 }
 
 void immUniformThemeColor(int color_id)
@@ -43,6 +43,13 @@ void immUniformThemeColor(int color_id)
 	float color[4];
 	UI_GetThemeColor4fv(color_id, color);
 	immUniformColor4fv(color);
+}
+
+void immUniformThemeColor3(int color_id)
+{
+	float color[3];
+	UI_GetThemeColor3fv(color_id, color);
+	immUniformColor3fv(color);
 }
 
 void immUniformThemeColorShade(int color_id, int offset)

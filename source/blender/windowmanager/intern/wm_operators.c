@@ -70,7 +70,6 @@
 #include "BKE_blender_version.h"
 #include "BKE_brush.h"
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_icons.h"
 #include "BKE_idprop.h"
 #include "BKE_image.h"
@@ -88,9 +87,8 @@
 
 #include "BLF_api.h"
 
-#include "BIF_glutil.h" /* for paint cursor */
-
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_matrix.h"
 
 #include "IMB_imbuf_types.h"
@@ -175,6 +173,10 @@ void WM_operatortype_append(void (*opfunc)(wmOperatorType *))
 	if (ot->name == NULL) {
 		fprintf(stderr, "ERROR: Operator %s has no name property!\n", ot->idname);
 		ot->name = N_("Dummy Name");
+	}
+
+	if (ot->mgrouptype) {
+		ot->mgrouptype->flag |= WM_MANIPULATORGROUPTYPE_OP;
 	}
 
 	/* XXX All ops should have a description but for now allow them not to. */
@@ -905,7 +907,7 @@ void WM_operator_properties_create_ptr(PointerRNA *ptr, wmOperatorType *ot)
 
 void WM_operator_properties_create(PointerRNA *ptr, const char *opstring)
 {
-	wmOperatorType *ot = WM_operatortype_find(opstring, 0);
+	wmOperatorType *ot = WM_operatortype_find(opstring, false);
 
 	if (ot)
 		WM_operator_properties_create_ptr(ptr, ot);
@@ -1432,20 +1434,6 @@ static void dialog_exec_cb(bContext *C, void *arg1, void *arg2)
 	}
 }
 
-static void popup_check_cb(bContext *C, void *op_ptr, void *UNUSED(arg))
-{
-	wmOperator *op = op_ptr;
-	if (op->type->check) {
-		if (op->type->check(C, op)) {
-			/* check for popup and re-layout buttons */
-			ARegion *ar_menu = CTX_wm_menu(C);
-			if (ar_menu) {
-				ED_region_tag_refresh_ui(ar_menu);
-			}
-		}
-	}
-}
-
 /* Dialogs are popups that require user verification (click OK) before exec */
 static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 {
@@ -1464,8 +1452,6 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
 	
-	UI_block_func_set(block, popup_check_cb, op, NULL);
-
 	uiLayoutOperatorButs(C, layout, op, NULL, 'H', UI_LAYOUT_OP_SHOW_TITLE);
 	
 	/* clear so the OK button is left alone */
@@ -1503,8 +1489,6 @@ static uiBlock *wm_operator_ui_create(bContext *C, ARegion *ar, void *userData)
 	UI_block_flag_enable(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
-
-	UI_block_func_set(block, popup_check_cb, op, NULL);
 
 	/* since ui is defined the auto-layout args are not used */
 	uiLayoutOperatorButs(C, layout, op, NULL, 'V', 0);
@@ -1552,7 +1536,7 @@ int WM_operator_ui_popup(bContext *C, wmOperator *op, int width, int height)
 	data->width = width;
 	data->height = height;
 	data->free_op = true; /* if this runs and gets registered we may want not to free it */
-	UI_popup_block_ex(C, wm_operator_ui_create, NULL, wm_operator_ui_popup_cancel, data);
+	UI_popup_block_ex(C, wm_operator_ui_create, NULL, wm_operator_ui_popup_cancel, data, op);
 	return OPERATOR_RUNNING_MODAL;
 }
 
@@ -1582,7 +1566,7 @@ static int wm_operator_props_popup_ex(bContext *C, wmOperator *op,
 	if (!do_redo || !(U.uiflag & USER_GLOBALUNDO))
 		return WM_operator_props_dialog_popup(C, op, 15 * UI_UNIT_X, UI_UNIT_Y);
 
-	UI_popup_block_ex(C, wm_block_create_redo, NULL, wm_block_redo_cancel_cb, op);
+	UI_popup_block_ex(C, wm_block_create_redo, NULL, wm_block_redo_cancel_cb, op, op);
 
 	if (do_call)
 		wm_block_redo_cb(C, op, 0);
@@ -1624,7 +1608,7 @@ int WM_operator_props_dialog_popup(bContext *C, wmOperator *op, int width, int h
 	data->free_op = true; /* if this runs and gets registered we may want not to free it */
 
 	/* op is not executed until popup OK but is clicked */
-	UI_popup_block_ex(C, wm_block_dialog_create, wm_operator_ui_popup_ok, wm_operator_ui_popup_cancel, data);
+	UI_popup_block_ex(C, wm_block_dialog_create, wm_operator_ui_popup_ok, wm_operator_ui_popup_cancel, data, op);
 
 	return OPERATOR_RUNNING_MODAL;
 }
@@ -1791,6 +1775,36 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 		ibuf = IMB_ibImageFromMemory((unsigned char *)datatoc_splash_png,
 		                             datatoc_splash_png_size, IB_rect, NULL, "<splash screen>");
 	}
+
+	/* overwrite splash with template image */
+	if (U.app_template[0] != '\0') {
+		ImBuf *ibuf_template = NULL;
+		char splash_filepath[FILE_MAX];
+		char template_directory[FILE_MAX];
+
+		if (BKE_appdir_app_template_id_search(
+		        U.app_template,
+		        template_directory, sizeof(template_directory)))
+		{
+			BLI_join_dirfile(
+			        splash_filepath, sizeof(splash_filepath), template_directory,
+			        (U.pixelsize == 2) ? "splash_2x.png" : "splash.png");
+			ibuf_template = IMB_loadiffname(splash_filepath, IB_rect, NULL);
+			if (ibuf_template) {
+				const int x_expect = ibuf->x;
+				const int y_expect = 230 * (int)U.pixelsize;
+				/* don't cover the header text */
+				if (ibuf_template->x == x_expect && ibuf_template->y == y_expect) {
+					memcpy(ibuf->rect, ibuf_template->rect, ibuf_template->x * ibuf_template->y * sizeof(char[4]));
+				}
+				else {
+					printf("Splash expected %dx%d found %dx%d, ignoring: %s\n",
+					       x_expect, y_expect, ibuf_template->x, ibuf_template->y, splash_filepath);
+				}
+				IMB_freeImBuf(ibuf_template);
+			}
+		}
+	}
 #endif
 
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
@@ -1816,13 +1830,13 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	if (version_suffix != NULL && version_suffix[0]) {
 		/* placed after the version number in the image,
 		 * placing y is tricky to match baseline */
-		int x = 260 - (2 * UI_DPI_WINDOW_FAC);
-		int y = 242 + (4 * UI_DPI_WINDOW_FAC);
-		int w = 240;
+		int x = 260 * U.pixelsize - (2 * UI_DPI_FAC);
+		int y = 242 * U.pixelsize + (4 * UI_DPI_FAC);
+		int w = 240 * U.pixelsize;
 
 		/* hack to have text draw 'text_sel' */
 		UI_block_emboss_set(block, UI_EMBOSS_NONE);
-		but = uiDefBut(block, UI_BTYPE_LABEL, 0, version_suffix, x * U.pixelsize, y * U.pixelsize, w * U.pixelsize, UI_UNIT_Y, NULL, 0, 0, 0, 0, NULL);
+		but = uiDefBut(block, UI_BTYPE_LABEL, 0, version_suffix, x, y, w, UI_UNIT_Y, NULL, 0, 0, 0, 0, NULL);
 		/* XXX, set internal flag - UI_SELECT */
 		UI_but_flag_enable(but, 1);
 		UI_block_emboss_set(block, UI_EMBOSS);
@@ -3062,11 +3076,11 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 	}
 		
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	if (rc->gltex) {
 
-		unsigned texCoord = add_attrib(format, "texCoord", GL_FLOAT, 2, KEEP_FLOAT);
+		unsigned int texCoord = VertexFormat_add_attrib(format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
 
 		glBindTexture(GL_TEXTURE_2D, rc->gltex);
 
@@ -3078,7 +3092,7 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 
 		immBindBuiltinProgram(GPU_SHADER_2D_IMAGE_MASK_UNIFORM_COLOR);
 
-		immUniform4f("color", col[0], col[1], col[2], alpha);
+		immUniformColor3fvAlpha(col, alpha);
 		immUniform1i("image", GL_TEXTURE0);
 
 		/* set up rotation if available */
@@ -3089,7 +3103,7 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 		}
 
 		/* draw textured quad */
-		immBegin(GL_QUADS, 4);
+		immBegin(PRIM_TRIANGLE_FAN, 4);
 
 		immAttrib2f(texCoord, 0, 0);
 		immVertex2f(pos, -radius, -radius);
@@ -3113,7 +3127,7 @@ static void radial_control_paint_tex(RadialControl *rc, float radius, float alph
 		/* flat color if no texture available */
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		immUniformColor3fvAlpha(col, alpha);
-		imm_draw_filled_circle(pos, 0.0f, 0.0f, radius, 40);
+		imm_draw_circle_fill(pos, 0.0f, 0.0f, radius, 40);
 	}
 	
 	immUnbindProgram();
@@ -3194,24 +3208,24 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 		RNA_property_float_get_array(&rc->col_ptr, rc->col_prop, col);
 
 	VertexFormat *format = immVertexFormat();
-	unsigned pos = add_attrib(format, "pos", GL_FLOAT, 2, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
-	immUniformColor3fvAlpha(col, 0.5); 
+	immUniformColor3fvAlpha(col, 0.5f);
 
 	if (rc->subtype == PROP_ANGLE) {
 		gpuPushMatrix();
 
 		/* draw original angle line */
 		gpuRotate2D(RAD2DEGF(rc->initial_value));
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
 		immEnd();
 
 		/* draw new angle line */
 		gpuRotate2D(RAD2DEGF(rc->current_value - rc->initial_value));
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_MIN_SIZE, 0.0f);
 		immVertex2f(pos, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
 		immEnd();
@@ -3220,10 +3234,11 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 	}
 
 	/* draw circles on top */
-	imm_draw_lined_circle(pos, 0.0f, 0.0f, r1, 40);
-	imm_draw_lined_circle(pos, 0.0f, 0.0f, r2, 40);
+	imm_draw_circle_wire(pos, 0.0f, 0.0f, r1, 40);
+	imm_draw_circle_wire(pos, 0.0f, 0.0f, r2, 40);
 	if (rmin > 0.0f)
-		imm_draw_lined_circle(pos, 0.0, 0.0f, rmin, 40);
+		imm_draw_circle_wire(pos, 0.0, 0.0f, rmin, 40);
+	immUnbindProgram();
 
 	BLF_size(fontid, 1.5 * fstyle_points * U.pixelsize, U.dpi);
 	BLF_enable(fontid, BLF_SHADOW);
@@ -3240,7 +3255,6 @@ static void radial_control_paint_cursor(bContext *C, int x, int y, void *customd
 	glDisable(GL_BLEND);
 	glDisable(GL_LINE_SMOOTH);
 
-	immUnbindProgram();
 }
 
 typedef enum {
@@ -3846,7 +3860,7 @@ static void redraw_timer_step(
 	}
 	else if (type == eRTAnimationStep) {
 		scene->r.cfra += (cfra == scene->r.cfra) ? 1 : -1;
-		BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene, scene->lay);
+		BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene);
 	}
 	else if (type == eRTAnimationPlay) {
 		/* play anim, return on same frame as started with */
@@ -3858,7 +3872,7 @@ static void redraw_timer_step(
 			if (scene->r.cfra > scene->r.efra)
 				scene->r.cfra = scene->r.sfra;
 
-			BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene, scene->lay);
+			BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene);
 			redraw_timer_window_swap(C);
 		}
 	}
@@ -3944,28 +3958,6 @@ static void WM_OT_memory_statistics(wmOperatorType *ot)
 	ot->description = "Print memory statistics to the console";
 	
 	ot->exec = memory_statistics_exec;
-}
-
-/* ************************** memory statistics for testing ***************** */
-
-static int dependency_relations_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	Main *bmain = CTX_data_main(C);
-	Scene *scene = CTX_data_scene(C);
-	Object *ob = CTX_data_active_object(C);
-
-	DAG_print_dependencies(bmain, scene, ob);
-
-	return OPERATOR_FINISHED;
-}
-
-static void WM_OT_dependency_relations(wmOperatorType *ot)
-{
-	ot->name = "Dependency Relations";
-	ot->idname = "WM_OT_dependency_relations";
-	ot->description = "Print dependency graph relations to the console";
-	
-	ot->exec = dependency_relations_exec;
 }
 
 /* *************************** Mat/tex/etc. previews generation ************* */
@@ -4236,7 +4228,6 @@ void wm_operatortype_init(void)
 	WM_operatortype_append(WM_OT_save_mainfile);
 	WM_operatortype_append(WM_OT_redraw_timer);
 	WM_operatortype_append(WM_OT_memory_statistics);
-	WM_operatortype_append(WM_OT_dependency_relations);
 	WM_operatortype_append(WM_OT_debug_menu);
 	WM_operatortype_append(WM_OT_operator_defaults);
 	WM_operatortype_append(WM_OT_splash);

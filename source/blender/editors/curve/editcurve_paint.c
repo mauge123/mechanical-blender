@@ -46,10 +46,10 @@
 #include "ED_curve.h"
 
 #include "BIF_gl.h"
-#include "BIF_glutil.h"
 
 #include "GPU_batch.h"
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_matrix.h"
 
 #include "curve_intern.h"
@@ -475,9 +475,8 @@ static void curve_draw_stroke_3d(const struct bContext *UNUSED(C), ARegion *UNUS
 		Batch_Uniform3fv(sphere, "color", color);
 
 		/* scale to edit-mode space */
-		gpuMatrixBegin3D_legacy();
 		gpuPushMatrix();
-		gpuMultMatrix3D(obedit->obmat);
+		gpuMultMatrix(obedit->obmat);
 
 		BLI_mempool_iternew(cdd->stroke_elem_pool, &iter);
 		for (selem = BLI_mempool_iterstep(&iter); selem; selem = BLI_mempool_iterstep(&iter)) {
@@ -489,15 +488,15 @@ static void curve_draw_stroke_3d(const struct bContext *UNUSED(C), ARegion *UNUS
 
 			const float radius = stroke_elem_radius(cdd, selem);
 
+			gpuPushMatrix();
 			gpuScaleUniform(radius);
 			Batch_draw(sphere);
-			gpuScaleUniform(1.0f / radius);
+			gpuPopMatrix();
 
 			location_prev = selem->location_local;
 		}
 
 		gpuPopMatrix();
-		gpuMatrixEnd();
 	}
 
 	if (stroke_len > 1) {
@@ -515,14 +514,14 @@ static void curve_draw_stroke_3d(const struct bContext *UNUSED(C), ARegion *UNUS
 
 		{
 			VertexFormat *format = immVertexFormat();
-			unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+			unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
 			glEnable(GL_BLEND);
 			glEnable(GL_LINE_SMOOTH);
 
 			imm_cpack(0x0);
-			immBegin(GL_LINE_STRIP, stroke_len);
+			immBegin(PRIM_LINE_STRIP, stroke_len);
 			glLineWidth(3.0f);
 
 			if (v3d->zbuf) {
@@ -536,7 +535,7 @@ static void curve_draw_stroke_3d(const struct bContext *UNUSED(C), ARegion *UNUS
 			immEnd();
 
 			imm_cpack(0xffffffff);
-			immBegin(GL_LINE_STRIP, stroke_len);
+			immBegin(PRIM_LINE_STRIP, stroke_len);
 			glLineWidth(1.0f);
 
 			for (int i = 0; i < stroke_len; i++) {
@@ -701,7 +700,7 @@ static bool curve_draw_init(bContext *C, wmOperator *op, bool is_invoke)
 	}
 	else {
 		cdd->vc.scene = CTX_data_scene(C);
-		cdd->vc.sl = CTX_data_scene_layer(C);
+		cdd->vc.scene_layer = CTX_data_scene_layer(C);
 		cdd->vc.obedit = CTX_data_edit_object(C);
 	}
 

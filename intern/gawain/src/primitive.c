@@ -15,7 +15,6 @@ PrimitiveClass prim_class_of_type(PrimitiveType prim_type)
 	{
 	static const PrimitiveClass classes[] =
 		{
-		[PRIM_NONE] = PRIM_CLASS_NONE,
 		[PRIM_POINTS] = PRIM_CLASS_POINT,
 		[PRIM_LINES] = PRIM_CLASS_LINE,
 		[PRIM_LINE_STRIP] = PRIM_CLASS_LINE,
@@ -24,9 +23,9 @@ PrimitiveClass prim_class_of_type(PrimitiveType prim_type)
 		[PRIM_TRIANGLE_STRIP] = PRIM_CLASS_SURFACE,
 		[PRIM_TRIANGLE_FAN] = PRIM_CLASS_SURFACE,
 
-#ifdef WITH_GL_PROFILE_COMPAT
-		[PRIM_QUADS] = PRIM_CLASS_SURFACE,
-#endif
+		[PRIM_LINE_STRIP_ADJACENCY] = PRIM_CLASS_LINE,
+
+		[PRIM_NONE] = PRIM_CLASS_NONE
 		};
 
 	return classes[prim_type];
@@ -38,4 +37,26 @@ bool prim_type_belongs_to_class(PrimitiveType prim_type, PrimitiveClass prim_cla
 		return true;
 
 	return prim_class & prim_class_of_type(prim_type);
+	}
+
+GLenum convert_prim_type_to_gl(PrimitiveType prim_type)
+	{
+#if TRUST_NO_ONE
+	assert(prim_type != PRIM_NONE);
+#endif
+
+	static const GLenum table[] =
+		{
+		[PRIM_POINTS] = GL_POINTS,
+		[PRIM_LINES] = GL_LINES,
+		[PRIM_LINE_STRIP] = GL_LINE_STRIP,
+		[PRIM_LINE_LOOP] = GL_LINE_LOOP,
+		[PRIM_TRIANGLES] = PRIM_CLASS_SURFACE,
+		[PRIM_TRIANGLE_STRIP] = GL_TRIANGLE_STRIP,
+		[PRIM_TRIANGLE_FAN] = GL_TRIANGLE_FAN,
+
+		[PRIM_LINE_STRIP_ADJACENCY] = GL_LINE_STRIP_ADJACENCY,
+		};
+
+	return table[prim_type];
 	}

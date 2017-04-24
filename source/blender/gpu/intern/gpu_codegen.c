@@ -360,7 +360,7 @@ static void codegen_print_datatype(DynStr *ds, const GPUType type, float *data)
 	BLI_dynstr_appendf(ds, "%s(", GPU_DATATYPE_STR[type]);
 
 	for (i = 0; i < type; i++) {
-		BLI_dynstr_appendf(ds, "%f", data[i]);
+		BLI_dynstr_appendf(ds, "%.12f", data[i]);
 		if (i == type - 1)
 			BLI_dynstr_append(ds, ")");
 		else
@@ -410,6 +410,8 @@ const char *GPU_builtin_name(GPUBuiltin builtin)
 		return "unfparticlevel";
 	else if (builtin == GPU_PARTICLE_ANG_VELOCITY)
 		return "unfparticleangvel";
+	else if (builtin == GPU_OBJECT_INFO)
+		return "unfobjectinfo";
 	else
 		return "";
 }
@@ -653,7 +655,7 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUOutput *final
 		BLI_dynstr_append(ds, ");\n");
 	}
 
-	BLI_dynstr_append(ds, "\n\tgl_FragColor = ");
+	BLI_dynstr_append(ds, "\n\tfragColor = ");
 	codegen_convert_datatype(ds, finaloutput->type, GPU_VEC4, "tmp", finaloutput->id);
 	BLI_dynstr_append(ds, ";\n");
 }
@@ -788,7 +790,7 @@ static char *code_generate_vertex(ListBase *nodes, const GPUMatType type)
 					BLI_dynstr_appendf(ds, "#ifndef USE_OPENSUBDIV\n");
 #endif
 					BLI_dynstr_appendf(
-					        ds, "\tvar%d.xyz = normalize(gl_NormalMatrix * att%d.xyz);\n",
+					        ds, "\tvar%d.xyz = normalize(NormalMatrix * att%d.xyz);\n",
 					        input->attribid, input->attribid);
 					BLI_dynstr_appendf(
 					        ds, "\tvar%d.w = att%d.w;\n",
@@ -1686,9 +1688,6 @@ GPUPass *GPU_generate_pass(
 	                              geometrycode,
 	                              glsl_material_library,
 	                              NULL,
-	                              0,
-	                              0,
-	                              0,
 	                              flags);
 
 	/* failed? */

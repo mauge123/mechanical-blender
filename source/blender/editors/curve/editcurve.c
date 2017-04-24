@@ -5015,7 +5015,7 @@ static int add_vertex_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 			const float mval[2] = {UNPACK2(event->mval)};
 
 			struct SnapObjectContext *snap_context = ED_transform_snap_object_context_create_view3d(
-			        CTX_data_main(C), vc.scene, 0,
+			        CTX_data_main(C), vc.scene, vc.scene_layer, 0,
 			        vc.ar, vc.v3d);
 
 			ED_transform_snap_object_project_view3d_mixed(
@@ -6049,6 +6049,9 @@ int join_curve_exec(bContext *C, wmOperator *op)
 	cu = ob->data;
 	BLI_movelisttolist(&cu->nurb, &tempbase);
 	
+	/* Account for mixed 2D/3D curves when joining */
+	BKE_curve_curve_dimension_update(cu);
+
 	DAG_relations_tag_update(bmain);   // because we removed object(s), call before editmode!
 
 	//DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA);

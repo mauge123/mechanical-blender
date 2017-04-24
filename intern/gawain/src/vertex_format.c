@@ -10,7 +10,8 @@
 // the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include "vertex_format.h"
-#include <stdlib.h>
+#include "vertex_format_private.h"
+#include <stddef.h>
 #include <string.h>
 
 #define PACK_DEBUG 0
@@ -36,14 +37,33 @@ void VertexFormat_copy(VertexFormat* dest, const VertexFormat* src)
 	memcpy(dest, src, sizeof(VertexFormat));
 	}
 
+static GLenum convert_comp_type_to_gl(VertexCompType type)
+	{
+	static const GLenum table[] = {
+		[COMP_I8] = GL_BYTE,
+		[COMP_U8] = GL_UNSIGNED_BYTE,
+		[COMP_I16] = GL_SHORT,
+		[COMP_U16] = GL_UNSIGNED_SHORT,
+		[COMP_I32] = GL_INT,
+		[COMP_U32] = GL_UNSIGNED_INT,
+
+		[COMP_F32] = GL_FLOAT,
+
+	#if USE_10_10_10
+		[COMP_I10] = GL_INT_2_10_10_10_REV
+	#endif
+		};
+	return table[type];
+	}
+
 static unsigned comp_sz(VertexCompType type)
 	{
 #if TRUST_NO_ONE
-	assert(type >= GL_BYTE && type <= GL_FLOAT);
+	assert(type <= COMP_F32); // other types have irregular sizes (not bytes)
 #endif
 
 	const GLubyte sizes[] = {1,1,2,2,4,4,4};
-	return sizes[type - GL_BYTE];
+	return sizes[type];
 	}
 
 static unsigned attrib_sz(const Attrib *a)
@@ -101,12 +121,14 @@ static const char* copy_attrib_name(VertexFormat* format, const char* name)
 #if TRUST_NO_ONE
 	assert(terminated);
 	assert(format->name_offset <= VERTEX_ATTRIB_NAMES_BUFFER_LEN);
+#else
+	(void)terminated;
 #endif
 
 	return name_copy;
 	}
 
-unsigned add_attrib(VertexFormat* format, const char* name, VertexCompType comp_type, unsigned comp_ct, VertexFetchMode fetch_mode)
+unsigned VertexFormat_add_attrib(VertexFormat* format, const char* name, VertexCompType comp_type, unsigned comp_ct, VertexFetchMode fetch_mode)
 	{
 #if TRUST_NO_ONE
 	assert(format->attrib_ct < MAX_VERTEX_ATTRIBS); // there's room for more
@@ -137,6 +159,7 @@ unsigned add_attrib(VertexFormat* format, const char* name, VertexCompType comp_
 
 	attrib->name = copy_attrib_name(format, name);
 	attrib->comp_type = comp_type;
+	attrib->gl_comp_type = convert_comp_type_to_gl(comp_type);
 #if USE_10_10_10
 	attrib->comp_ct = (comp_type == COMP_I10) ? 4 : comp_ct; // system needs 10_10_10_2 to be 4 or BGRA
 #else

@@ -135,6 +135,7 @@ void blf_glyph_cache_clear(FontBLF *font)
 	while ((gc = BLI_pophead(&font->cache))) {
 		blf_glyph_cache_free(gc);
 	}
+	font->glyph_cache = NULL;
 }
 
 void blf_glyph_cache_free(GlyphCacheBLF *gc)
@@ -182,7 +183,7 @@ static void blf_glyph_cache_texture(FontBLF *font, GlyphCacheBLF *gc)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA8, gc->p2_width, gc->p2_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, gc->p2_width, gc->p2_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
 }
 
 GlyphBLF *blf_glyph_search(GlyphCacheBLF *gc, unsigned int c)
@@ -317,6 +318,7 @@ void blf_glyph_free(GlyphBLF *g)
 
 static void blf_texture_draw(const unsigned char color[4], float uv[2][2], float dx, float y1, float dx1, float y2)
 {
+	/* First triangle. */
 	immAttrib2f(BLF_COORD_ID, uv[0][0], uv[0][1]);
 	immSkipAttrib(BLF_COLOR_ID); /* skip color of most vertices */
 	immVertex2f(BLF_POS_ID, dx, y1);
@@ -324,6 +326,15 @@ static void blf_texture_draw(const unsigned char color[4], float uv[2][2], float
 	immAttrib2f(BLF_COORD_ID, uv[0][0], uv[1][1]);
 	immSkipAttrib(BLF_COLOR_ID);
 	immVertex2f(BLF_POS_ID, dx, y2);
+
+	immAttrib2f(BLF_COORD_ID, uv[1][0], uv[1][1]);
+	immAttrib4ubv(BLF_COLOR_ID, color); /* set color of provoking vertex */
+	immVertex2f(BLF_POS_ID, dx1, y2);
+
+	/* Second triangle. */
+	immAttrib2f(BLF_COORD_ID, uv[0][0], uv[0][1]);
+	immSkipAttrib(BLF_COLOR_ID); /* skip color of most vertices */
+	immVertex2f(BLF_POS_ID, dx, y1);
 
 	immAttrib2f(BLF_COORD_ID, uv[1][0], uv[1][1]);
 	immSkipAttrib(BLF_COLOR_ID);
@@ -438,14 +449,21 @@ void blf_glyph_render(FontBLF *font, GlyphBLF *g, float x, float y)
 		}
 
 
-		glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
+		GLint lsb_first, row_length, alignment;
+		glGetIntegerv(GL_UNPACK_LSB_FIRST, &lsb_first);
+		glGetIntegerv(GL_UNPACK_ROW_LENGTH, &row_length);
+		glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
+
 		glPixelStorei(GL_UNPACK_LSB_FIRST, GL_FALSE);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 		glBindTexture(GL_TEXTURE_2D, g->tex);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, g->xoff, g->yoff, g->width, g->height, GL_ALPHA, GL_UNSIGNED_BYTE, g->bitmap);
-		glPopClientAttrib();
+		glTexSubImage2D(GL_TEXTURE_2D, 0, g->xoff, g->yoff, g->width, g->height, GL_RED, GL_UNSIGNED_BYTE, g->bitmap);
+
+		glPixelStorei(GL_UNPACK_LSB_FIRST, lsb_first);
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, row_length);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
 
 		g->uv[0][0] = ((float)g->xoff) / ((float)gc->p2_width);
 		g->uv[0][1] = ((float)g->yoff) / ((float)gc->p2_height);

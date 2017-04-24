@@ -244,6 +244,8 @@ option(WITH_OPENCOLORIO   "Enable OpenColorIO color management" ${_init_OPENCOLO
 
 option(WITH_CLAY_ENGINE    "Enable New Clay engine (Breaks Mac and Intel compatibility)" ON)
 
+option(WITH_LEGACY_OPENGL  "Enable build of legacy OpenGL" ON)
+
 # Compositor
 option(WITH_COMPOSITOR         "Enable the tile based nodal compositor" ON)
 
@@ -465,7 +467,7 @@ option(WITH_GLEW_MX             "Support multiple GLEW contexts (experimental)" 
 option(WITH_GLEW_ES             "Switches to experimental copy of GLEW that has support for OpenGL ES. (temporary option for development purposes)" OFF)
 option(WITH_GL_EGL              "Use the EGL OpenGL system library instead of the platform specific OpenGL system library (CGL, glX, or WGL)"       OFF)
 option(WITH_GL_PROFILE_COMPAT   "Support using the OpenGL 'compatibility' profile. (deprecated)"                                                    ON )
-option(WITH_GL_PROFILE_CORE     "Support using the OpenGL 3.2+ 'core' profile."                                                                     OFF)
+option(WITH_GL_PROFILE_CORE     "Support using the OpenGL 3.3+ 'core' profile."                                                                     OFF)
 option(WITH_GL_PROFILE_ES20     "Support using OpenGL ES 2.0. (thru either EGL or the AGL/WGL/XGL 'es20' profile)"                                  OFF)
 
 mark_as_advanced(
@@ -476,12 +478,6 @@ mark_as_advanced(
 	WITH_GL_PROFILE_CORE
 	WITH_GL_PROFILE_ES20
 )
-
-if(WITH_GL_PROFILE_COMPAT)
-	set(WITH_GLU ON)
-else()
-	set(WITH_GLU OFF)
-endif()
 
 if(WIN32)
 	option(WITH_GL_ANGLE "Link with the ANGLE library, an OpenGL ES 2.0 implementation based on Direct3D, instead of the system OpenGL library." OFF)
@@ -686,6 +682,10 @@ endif()
 
 if(NOT WITH_GAMEENGINE AND WITH_PLAYER)
 	message(FATAL_ERROR "WITH_PLAYER requires WITH_GAMEENGINE")
+endif()
+
+if(WITH_GAMEENGINE AND NOT WITH_LEGACY_OPENGL)
+	message(FATAL_ERROR "WITH_GAME_ENGINE requires WITH_LEGACY_OPENGL")
 endif()
 
 if(NOT WITH_AUDASPACE)
@@ -1061,11 +1061,6 @@ endif()
 find_package(OpenGL)
 blender_include_dirs_sys("${OPENGL_INCLUDE_DIR}")
 
-if(WITH_GLU)
-	list(APPEND BLENDER_GL_LIBRARIES "${OPENGL_glu_LIBRARY}")
-	list(APPEND GL_DEFINITIONS -DWITH_GLU)
-endif()
-
 if(WITH_SYSTEM_GLES)
 	find_package_wrapper(OpenGLES)
 endif()
@@ -1293,9 +1288,7 @@ else()
 
 endif()
 
-if(NOT WITH_GLU)
-	list(APPEND GL_DEFINITIONS -DGLEW_NO_GLU)
-endif()
+list(APPEND GL_DEFINITIONS -DGLEW_NO_GLU)
 
 #-----------------------------------------------------------------------------
 # Configure Bullet
@@ -1804,7 +1797,6 @@ if(FIRST_RUN)
 
 	info_cfg_text("OpenGL:")
 	info_cfg_option(WITH_GLEW_ES)
-	info_cfg_option(WITH_GLU)
 	info_cfg_option(WITH_GL_EGL)
 	info_cfg_option(WITH_GL_PROFILE_COMPAT)
 	info_cfg_option(WITH_GL_PROFILE_CORE)

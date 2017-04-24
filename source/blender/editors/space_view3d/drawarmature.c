@@ -63,6 +63,7 @@
 #include "GPU_basic_shader.h"
 #include "GPU_batch.h"
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 #include "GPU_matrix.h"
 
 #include "UI_resources.h"
@@ -333,12 +334,12 @@ static void set_ebone_color(const unsigned int boneflag)
 static void add_solid_flat_triangle(VertexBuffer *vbo, unsigned int *vertex, unsigned int pos, unsigned int nor,
                                     const float p1[3], const float p2[3], const float p3[3], const float n[3])
 {
-	setAttrib(vbo, nor, *vertex, n);
-	setAttrib(vbo, pos, (*vertex)++, p1);
-	setAttrib(vbo, nor, *vertex, n);
-	setAttrib(vbo, pos, (*vertex)++, p2);
-	setAttrib(vbo, nor, *vertex, n);
-	setAttrib(vbo, pos, (*vertex)++, p3);
+	VertexBuffer_set_attrib(vbo, nor, *vertex, n);
+	VertexBuffer_set_attrib(vbo, pos, (*vertex)++, p1);
+	VertexBuffer_set_attrib(vbo, nor, *vertex, n);
+	VertexBuffer_set_attrib(vbo, pos, (*vertex)++, p2);
+	VertexBuffer_set_attrib(vbo, nor, *vertex, n);
+	VertexBuffer_set_attrib(vbo, pos, (*vertex)++, p3);
 }
 
 /* half the cube, in Y */
@@ -370,8 +371,8 @@ static void drawsolidcube_size(float xsize, float ysize, float zsize)
 		unsigned int i = 0;
 		float n[3] = {0.0f};
 		/* Vertex format */
-		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-		unsigned int nor = add_attrib(&format, "nor", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+		unsigned int nor = VertexFormat_add_attrib(&format, "nor", COMP_F32, 3, KEEP_FLOAT);
 
 		/* Vertices */
 		VertexBuffer_init_with_format(&vbo, &format);
@@ -400,10 +401,10 @@ static void drawsolidcube_size(float xsize, float ysize, float zsize)
 		add_solid_flat_triangle(&vbo, &i, pos, nor, cube_vert[7], cube_vert[4], cube_vert[0], n);
 		add_solid_flat_triangle(&vbo, &i, pos, nor, cube_vert[0], cube_vert[3], cube_vert[7], n);
 
-		Batch_init(&batch, GL_TRIANGLES, &vbo, NULL);
+		Batch_init(&batch, PRIM_TRIANGLES, &vbo, NULL);
 	}
 
-	gpuMatrixBegin3D_legacy(); /* TODO: replace Begin/End with Push/Pop */
+	gpuPushMatrix();
 	gpuScale3f(xsize, ysize, zsize);
 
 	if (flat_color) {
@@ -417,7 +418,7 @@ static void drawsolidcube_size(float xsize, float ysize, float zsize)
 	Batch_Uniform4fv(&batch, "color", fcolor);
 	Batch_draw(&batch);
 
-	gpuMatrixEnd();
+	gpuPopMatrix();
 }
 
 static void drawcube_size(float xsize, float ysize, float zsize)
@@ -430,10 +431,10 @@ static void drawcube_size(float xsize, float ysize, float zsize)
 
 	if (format.attrib_ct == 0) {
 		/* Vertex format */
-		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 		/* Elements */
-		ElementListBuilder_init(&elb, GL_LINES, 12, 8);
+		ElementListBuilder_init(&elb, PRIM_LINES, 12, 8);
 		for (int i = 0; i < 12; ++i) {
 			add_line_vertices(&elb, cube_wire[i*2], cube_wire[i*2+1]);
 		}
@@ -443,21 +444,21 @@ static void drawcube_size(float xsize, float ysize, float zsize)
 		VertexBuffer_init_with_format(&vbo, &format);
 		VertexBuffer_allocate_data(&vbo, 8);
 		for (int i = 0; i < 8; ++i) {
-			setAttrib(&vbo, pos, i, cube_vert[i]);
+			VertexBuffer_set_attrib(&vbo, pos, i, cube_vert[i]);
 		}
 
-		Batch_init(&batch, GL_LINES, &vbo, &el);
+		Batch_init(&batch, PRIM_LINES, &vbo, &el);
 		Batch_set_builtin_program(&batch, GPU_SHADER_3D_UNIFORM_COLOR);
 	}
 
-	gpuMatrixBegin3D_legacy(); /* TODO: replace Begin/End with Push/Pop */
+	gpuPushMatrix();
 	gpuScale3f(xsize, ysize, zsize);
 
 	Batch_use_program(&batch);
 	Batch_Uniform4fv(&batch, "color", fcolor);
 	Batch_draw(&batch);
 
-	gpuMatrixEnd();
+	gpuPopMatrix();
 }
 
 
@@ -469,7 +470,7 @@ static void draw_bonevert(void)
 
 	if (format.attrib_ct == 0) {
 		/* Vertex format */
-		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 		/* Vertices */
 		VertexBuffer_init_with_format(&vbo, &format);
@@ -480,39 +481,35 @@ static void draw_bonevert(void)
 
 			vert[0] = r * cosf(2 * M_PI * i / 16.f);
 			vert[1] = r * sinf(2 * M_PI * i / 16.f);
-			setAttrib(&vbo, pos, i * 6 + 0, vert);
+			VertexBuffer_set_attrib(&vbo, pos, i * 6 + 0, vert);
 			vert[0] = r * cosf(2 * M_PI * (i + 1) / 16.f);
 			vert[1] = r * sinf(2 * M_PI * (i + 1) / 16.f);
-			setAttrib(&vbo, pos, i * 6 + 1, vert);
+			VertexBuffer_set_attrib(&vbo, pos, i * 6 + 1, vert);
 
 			vert[0] = 0.f;
 			vert[1] = r * cosf(2 * M_PI * i / 16.f);
 			vert[2] = r * sinf(2 * M_PI * i / 16.f);
-			setAttrib(&vbo, pos, i * 6 + 2, vert);
+			VertexBuffer_set_attrib(&vbo, pos, i * 6 + 2, vert);
 			vert[1] = r * cosf(2 * M_PI * (i + 1) / 16.f);
 			vert[2] = r * sinf(2 * M_PI * (i + 1) / 16.f);
-			setAttrib(&vbo, pos, i * 6 + 3, vert);
+			VertexBuffer_set_attrib(&vbo, pos, i * 6 + 3, vert);
 
 			vert[1] = 0.f;
 			vert[0] = r * cosf(2 * M_PI * i / 16.f);
 			vert[2] = r * sinf(2 * M_PI * i / 16.f);
-			setAttrib(&vbo, pos, i * 6 + 4, vert);
+			VertexBuffer_set_attrib(&vbo, pos, i * 6 + 4, vert);
 			vert[0] = r * cosf(2 * M_PI * (i + 1) / 16.f);
 			vert[2] = r * sinf(2 * M_PI * (i + 1) / 16.f);
-			setAttrib(&vbo, pos, i * 6 + 5, vert);
+			VertexBuffer_set_attrib(&vbo, pos, i * 6 + 5, vert);
 		}
 
-		Batch_init(&batch, GL_LINES, &vbo, NULL);
+		Batch_init(&batch, PRIM_LINES, &vbo, NULL);
 		Batch_set_builtin_program(&batch, GPU_SHADER_3D_UNIFORM_COLOR);
 	}
-
-	gpuMatrixBegin3D_legacy();
 
 	Batch_use_program(&batch);
 	Batch_Uniform4fv(&batch, "color", fcolor);
 	Batch_draw(&batch);
-
-	gpuMatrixEnd();
 }
 
 static void draw_bonevert_solid(void)
@@ -520,9 +517,8 @@ static void draw_bonevert_solid(void)
 	Batch *batch = Batch_get_sphere(0);
 	const float light_vec[3] = {0.0f, 0.0f, 1.0f};
 
-	gpuMatrixBegin3D_legacy();
-
-	gpuScale3f(0.05, 0.05, 0.05);
+	gpuPushMatrix();
+	gpuScaleUniform(0.05);
 
 	if (flat_color) {
 		Batch_set_builtin_program(batch, GPU_SHADER_3D_UNIFORM_COLOR);
@@ -535,7 +531,7 @@ static void draw_bonevert_solid(void)
 	Batch_Uniform4fv(batch, "color", fcolor);
 	Batch_draw(batch);
 
-	gpuMatrixEnd();
+	gpuPopMatrix();
 }
 
 static const float bone_octahedral_verts[6][3] = {
@@ -587,10 +583,10 @@ static void draw_bone_octahedral(void)
 
 	if (format.attrib_ct == 0) {
 		/* Vertex format */
-		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 		/* Elements */
-		ElementListBuilder_init(&elb, GL_LINES, 12, 6);
+		ElementListBuilder_init(&elb, PRIM_LINES, 12, 6);
 		for (int i = 0; i < 12; ++i) {
 			add_line_vertices(&elb, bone_octahedral_wire[i*2], bone_octahedral_wire[i*2+1]);
 		}
@@ -600,21 +596,17 @@ static void draw_bone_octahedral(void)
 		VertexBuffer_init_with_format(&vbo, &format);
 		VertexBuffer_allocate_data(&vbo, 6);
 		for (int i = 0; i < 6; ++i) {
-			setAttrib(&vbo, pos, i, bone_octahedral_verts[i]);
+			VertexBuffer_set_attrib(&vbo, pos, i, bone_octahedral_verts[i]);
 		}
 
-		Batch_init(&batch, GL_LINES, &vbo, &el);
+		Batch_init(&batch, PRIM_LINES, &vbo, &el);
 		Batch_set_builtin_program(&batch, GPU_SHADER_3D_UNIFORM_COLOR);
 	}
-
-	gpuMatrixBegin3D_legacy();
 
 	Batch_use_program(&batch);
 	Batch_Uniform4fv(&batch, "color", fcolor);
 	Batch_draw(&batch);
-
-	gpuMatrixEnd();
-}	
+}
 
 static void draw_bone_solid_octahedral(void)
 {
@@ -626,8 +618,8 @@ static void draw_bone_solid_octahedral(void)
 	if (format.attrib_ct == 0) {
 		unsigned int v_idx = 0;
 		/* Vertex format */
-		unsigned int pos = add_attrib(&format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-		unsigned int nor = add_attrib(&format, "nor", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+		unsigned int nor = VertexFormat_add_attrib(&format, "nor", COMP_F32, 3, KEEP_FLOAT);
 
 		/* Vertices */
 		VertexBuffer_init_with_format(&vbo, &format);
@@ -641,10 +633,8 @@ static void draw_bone_solid_octahedral(void)
 			                        bone_octahedral_solid_normals[i]);
 		}
 
-		Batch_init(&batch, GL_TRIANGLES, &vbo, NULL);
+		Batch_init(&batch, PRIM_TRIANGLES, &vbo, NULL);
 	}
-
-	gpuMatrixBegin3D_legacy();
 
 	if (flat_color) {
 		Batch_set_builtin_program(&batch, GPU_SHADER_3D_UNIFORM_COLOR);
@@ -656,9 +646,7 @@ static void draw_bone_solid_octahedral(void)
 	}
 	Batch_Uniform4fv(&batch, "color", fcolor);
 	Batch_draw(&batch);
-
-	gpuMatrixEnd();
-}	
+}
 
 /* *************** Armature drawing, bones ******************* */
 
@@ -823,10 +811,10 @@ static void draw_sphere_bone_dist(float smat[4][4], float imat[4][4], bPoseChann
 		cross_v3_v3v3(norvec, dirvec, imat[2]);
 
 		VertexFormat *format = immVertexFormat();
-		unsigned pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-		immBegin(GL_TRIANGLE_STRIP, 66);
+		immBegin(PRIM_TRIANGLE_STRIP, 66);
 		immUniformColor4ub(255, 255, 255, 50);
 		
 		for (a = 0; a < 16; a++) {
@@ -879,7 +867,7 @@ static void draw_sphere_bone_wire(float smat[4][4], float imat[4][4],
 	float *headvec, *tailvec, dirvec[3];
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 	
@@ -978,7 +966,7 @@ static void draw_sphere_bone_wire(float smat[4][4], float imat[4][4],
 		if (id != -1)
 			GPU_select_load_id(id | BONESEL_BONE);
 		
-		immBegin(GL_LINES, 4);
+		immBegin(PRIM_LINES, 4);
 
 		add_v3_v3v3(vec, headvec, norvech);
 		immVertex3fv(pos, vec);
@@ -1011,7 +999,6 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 	Batch_set_builtin_program(sphere, GPU_SHADER_SIMPLE_LIGHTING);
 	Batch_Uniform3fv(sphere, "light", light_vec);
 
-	gpuMatrixBegin3D_legacy();
 	gpuPushMatrix();
 
 	/* figure out the sizes of spheres */
@@ -1033,7 +1020,7 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 	}
 	
 	/* move to z-axis space */
-	gpuRotate3f(-90.0f, 1.0f, 0.0f, 0.0f);
+	gpuRotateAxis(-90.0f, 'X');
 
 	/* sphere root color */
 	if (armflag & ARM_EDITMODE) {
@@ -1052,7 +1039,7 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 		if (id != -1)
 			GPU_select_load_id(id | BONESEL_ROOT);
 		gpuPushMatrix();
-		gpuScale3f(head, head, head);
+		gpuScaleUniform(head);
 		Batch_Uniform4fv(sphere, "color", fcolor);
 		Batch_draw(sphere);
 		gpuPopMatrix();
@@ -1070,7 +1057,7 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 	gpuTranslate3f(0.0f, 0.0f, length);
 
 	gpuPushMatrix();
-	gpuScale3f(tail, tail, tail);
+	gpuScaleUniform(tail);
 	Batch_use_program(sphere); /* hack to make the following uniforms stick */
 	Batch_Uniform4fv(sphere, "color", fcolor);
 	Batch_draw(sphere);
@@ -1104,14 +1091,14 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 		/* draw sphere on extrema */
 		gpuPushMatrix();
 		gpuTranslate3f(0.0f, 0.0f, length - tail);
-		gpuScale3f(size1, size1, size1);
+		gpuScaleUniform(size1);
 
 		Batch_draw(sphere);
 		gpuPopMatrix();
 
 		gpuPushMatrix();
 		gpuTranslate3f(0.0f, 0.0f, head);
-		gpuScale3f(size2, size2, size2);
+		gpuScaleUniform(size2);
 
 		Batch_draw(sphere);
 		gpuPopMatrix();
@@ -1121,15 +1108,15 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 		glPolygonOffset(-1.0f, -1.0f);
 
 		VertexFormat *format = immVertexFormat();
-		unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
-		unsigned int nor = add_attrib(format, "nor", GL_FLOAT, 3, KEEP_FLOAT);
+		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+		unsigned int nor = VertexFormat_add_attrib(format, "nor", COMP_F32, 3, KEEP_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_SIMPLE_LIGHTING);
 		immUniformColor4fv(fcolor);
 		immUniform3fv("light", light_vec);
 
 		gpuTranslate3f(0.0f, 0.0f, head);
-		imm_cylinder_nor(pos, nor, size2, size1, length - head - tail, 16, 1);
+		imm_draw_cylinder_fill_normal_3d(pos, nor, size2, size1, length - head - tail, 16, 1);
 
 		immUnbindProgram();
 		
@@ -1141,12 +1128,11 @@ static void draw_sphere_bone(const short dt, int armflag, int boneflag, short co
 		/* 1 sphere in center */
 		gpuTranslate3f(0.0f, 0.0f, (head + length - tail) / 2.0f);
 
-		gpuScale3f(size1, size1, size1);
+		gpuScaleUniform(size1);
 		Batch_draw(sphere);
 	}
 	
 	gpuPopMatrix();
-	gpuMatrixEnd();
 }
 
 static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned int id,
@@ -1160,11 +1146,10 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 		length = ebone->length;
 	
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
-	gpuMatrixBegin3D_legacy();
 	gpuPushMatrix();
-	gpuScale3f(length, length, length);
+	gpuScaleUniform(length);
 	
 	/* this chunk not in object mode */
 	if (armflag & (ARM_EDITMODE | ARM_POSEMODE)) {
@@ -1184,7 +1169,7 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 		if (id != -1)
 			GPU_select_load_id(id | BONESEL_BONE);
 
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immVertex3f(pos, 0.0f, 1.0f, 0.0f);
 		immVertex3f(pos, 0.0f, 0.0f, 0.0f);
 		immEnd();
@@ -1199,7 +1184,7 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 			if (G.f & G_PICKSEL)
 				GPU_select_load_id(id | BONESEL_ROOT);
 
-			immBegin(GL_POINTS, 1);
+			immBegin(PRIM_POINTS, 1);
 			immVertex3f(pos, 0.0f, 0.0f, 0.0f);
 			immEnd();
 		}
@@ -1208,7 +1193,7 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 		if (G.f & G_PICKSEL)
 			GPU_select_load_id(id | BONESEL_TIP);
 
-		immBegin(GL_POINTS, 1);
+		immBegin(PRIM_POINTS, 1);
 		immVertex3f(pos, 0.0f, 1.0f, 0.0f);
 		immEnd();
 
@@ -1236,7 +1221,7 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 	immUniformColor4fv(fcolor);
 
-	immBegin(GL_LINES, 2);
+	immBegin(PRIM_LINES, 2);
 	immVertex3f(pos, 0.0f, 1.0f, 0.0f);
 	immVertex3f(pos, 0.0f, 0.0f, 0.0f);
 	immEnd();
@@ -1252,7 +1237,7 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 			else UI_GetThemeColor4fv(TH_VERTEX, fcolor);
 		}
 		immUniformColor4fv(fcolor);
-		immBegin(GL_POINTS, 1);
+		immBegin(PRIM_POINTS, 1);
 		immVertex3f(pos, 0.0f, 0.0f, 0.0f);
 		immEnd();
 	}
@@ -1265,7 +1250,7 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 			else UI_GetThemeColor4fv(TH_VERTEX, fcolor);
 		}
 		immUniformColor4fv(fcolor);
-		immBegin(GL_POINTS, 1);
+		immBegin(PRIM_POINTS, 1);
 		immVertex3f(pos, 0.0f, 1.0f, 0.0f);
 		immEnd();
 	}
@@ -1273,7 +1258,6 @@ static void draw_line_bone(int armflag, int boneflag, short constflag, unsigned 
 	immUnbindProgram();
 
 	gpuPopMatrix();
-	gpuMatrixEnd();
 }
 
 /* A partial copy of b_bone_spline_setup(), with just the parts for previewing editmode curve settings 
@@ -1373,7 +1357,7 @@ static void draw_b_bone_boxes(const short dt, bPoseChannel *pchan, EditBone *ebo
 		
 		for (a = 0; a < segments; a++) {
 			gpuPushMatrix();
-			gpuMultMatrix3D(bbone[a].mat);
+			gpuMultMatrix(bbone[a].mat);
 			if (dt == OB_SOLID) drawsolidcube_size(xwidth, dlen, zwidth);
 			else drawcube_size(xwidth, dlen, zwidth);
 			gpuPopMatrix();
@@ -1468,12 +1452,10 @@ static void draw_b_bone(const short dt, int armflag, int boneflag, short constfl
 static void draw_wire_bone_segments(bPoseChannel *pchan, Mat4 *bbones, float length, int segments)
 {
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 	immUniformColor4fv(fcolor);
-
-	gpuMatrixBegin3D_legacy();
 
 	if ((segments > 1) && (pchan)) {
 		float dlen = length / (float)segments;
@@ -1482,9 +1464,9 @@ static void draw_wire_bone_segments(bPoseChannel *pchan, Mat4 *bbones, float len
 
 		for (a = 0; a < segments; a++, bbone++) {
 			gpuPushMatrix();
-			gpuMultMatrix3D(bbone->mat);
+			gpuMultMatrix(bbone->mat);
 
-			immBegin(GL_LINES, 2);
+			immBegin(PRIM_LINES, 2);
 			immVertex3f(pos, 0.0f, 0.0f, 0.0f);
 			immVertex3f(pos, 0.0f, dlen, 0.0f);
 			immEnd();
@@ -1495,15 +1477,13 @@ static void draw_wire_bone_segments(bPoseChannel *pchan, Mat4 *bbones, float len
 	else {
 		gpuPushMatrix();
 
-		immBegin(GL_LINES, 2);
+		immBegin(PRIM_LINES, 2);
 		immVertex3f(pos, 0.0f, 0.0f, 0.0f);
 		immVertex3f(pos, 0.0f, length, 0.0f);
 		immEnd();
 
 		gpuPopMatrix();
 	}
-
-	gpuMatrixEnd();
 
 	immUnbindProgram();
 }
@@ -1653,7 +1633,7 @@ static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 	bPoseChannel *parchan;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 	immUniformColor4fv(fcolor);
@@ -1691,7 +1671,7 @@ static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 				}
 
 				if (parchan) {
-					immBegin(GL_LINES, 2);
+					immBegin(PRIM_LINES, 2);
 					immVertex3fv(pos, ik_tip);
 					immVertex3fv(pos, parchan->pose_head);
 					immEnd();
@@ -1717,7 +1697,7 @@ static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 				}
 				/* Only draw line in case our chain is more than one bone long! */
 				if (parchan != pchan) { /* XXX revise the breaking conditions to only stop at the tail? */
-					immBegin(GL_LINES, 2);
+					immBegin(PRIM_LINES, 2);
 					immVertex3fv(pos, ik_tip);
 					immVertex3fv(pos, parchan->pose_head);
 					immEnd();
@@ -1764,7 +1744,7 @@ static void draw_dof_ellipse(unsigned int pos, float ax, float az)
 
 	immUniformColor4ub(70, 70, 70, 50);
 
-	immBegin(GL_TRIANGLES, tri*3);
+	immBegin(PRIM_TRIANGLES, tri*3);
 	pz = 0.0f;
 	for (i = 1; i < n; i++) {
 		z = staticSine[i];
@@ -1799,7 +1779,7 @@ static void draw_dof_ellipse(unsigned int pos, float ax, float az)
 
 	immUniformColor3ub(0, 0, 0);
 
-	immBegin(GL_LINE_STRIP, n);
+	immBegin(PRIM_LINE_STRIP, n);
 	for (i = 0; i < n; i++)
 		imm_sphere_project(pos, staticSine[n - i - 1] * ax, staticSine[i] * az);
 	immEnd();
@@ -1812,10 +1792,9 @@ static void draw_pose_dofs(Object *ob)
 	Bone *bone;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-	gpuMatrixBegin3D_legacy();
 
 	for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
 		bone = pchan->bone;
@@ -1838,14 +1817,14 @@ static void draw_pose_dofs(Object *ob)
 							if (pchan->parent) {
 								copy_m4_m4(mat, pchan->parent->pose_mat);
 								mat[3][0] = mat[3][1] = mat[3][2] = 0.0f;
-								gpuMultMatrix3D(mat);
+								gpuMultMatrix(mat);
 							}
 							
 							copy_m4_m3(mat, pchan->bone->bone_mat);
-							gpuMultMatrix3D(mat);
+							gpuMultMatrix(mat);
 							
 							scale = bone->length * pchan->size[1];
-							gpuScale3f(scale, scale, scale);
+							gpuScaleUniform(scale);
 							
 							if (((pchan->ikflag & BONE_IK_XLIMIT) != 0) &&
 							    ((pchan->ikflag & BONE_IK_ZLIMIT) != 0))
@@ -1867,17 +1846,18 @@ static void draw_pose_dofs(Object *ob)
 									draw_dof_ellipse(pos, amax[0], amin[2]);
 								if ((amax[0] != 0.0f) && (amax[2] != 0.0f))
 									draw_dof_ellipse(pos, amax[0], amax[2]);
-								gpuScale3f(1.0f, -1.0f, 1.0f);
+								gpuScale3f(1.0f, -1.0f, 1.0f); /* XXX same as above, is this intentional? */
 							}
 							
 							/* arcs */
 							if (pchan->ikflag & BONE_IK_ZLIMIT) {
 								/* OpenGL requires rotations in degrees; so we're taking the average angle here */
 								theta = RAD2DEGF(0.5f * (pchan->limitmin[2] + pchan->limitmax[2]));
-								gpuRotate3f(theta, 0.0f, 0.0f, 1.0f);
+								gpuPushMatrix();
+								gpuRotateAxis(theta, 'Z');
 								
 								immUniformColor3ub(50, 50, 255);  /* blue, Z axis limit */
-								immBegin(GL_LINE_STRIP, 33);
+								immBegin(PRIM_LINE_STRIP, 33);
 								for (a = -16; a <= 16; a++) {
 									/* *0.5f here comes from M_PI/360.0f when rotations were still in degrees */
 									float fac = ((float)a) / 16.0f * 0.5f;
@@ -1892,16 +1872,17 @@ static void draw_pose_dofs(Object *ob)
 								}
 								immEnd();
 								
-								gpuRotate3f(-theta, 0.0f, 0.0f, 1.0f);
+								gpuPopMatrix();
 							}
 							
 							if (pchan->ikflag & BONE_IK_XLIMIT) {
 								/* OpenGL requires rotations in degrees; so we're taking the average angle here */
 								theta = RAD2DEGF(0.5f * (pchan->limitmin[0] + pchan->limitmax[0]));
-								gpuRotate3f(theta, 1.0f, 0.0f, 0.0f);
+								gpuPushMatrix();
+								gpuRotateAxis(theta, 'X');
 								
 								immUniformColor3ub(255, 50, 50);  /* Red, X axis limit */
-								immBegin(GL_LINE_STRIP, 33);
+								immBegin(PRIM_LINE_STRIP, 33);
 								for (a = -16; a <= 16; a++) {
 									/* *0.5f here comes from M_PI/360.0f when rotations were still in degrees */
 									float fac = ((float)a) / 16.0f * 0.5f;
@@ -1915,7 +1896,7 @@ static void draw_pose_dofs(Object *ob)
 								}
 								immEnd();
 								
-								gpuRotate3f(-theta, 1.0f, 0.0f, 0.0f);
+								gpuPopMatrix();
 							}
 							
 							/* out of cone, out of bone */
@@ -1926,7 +1907,7 @@ static void draw_pose_dofs(Object *ob)
 			}
 		}
 	}
-	gpuMatrixEnd();
+
 	immUnbindProgram();
 }
 
@@ -2029,10 +2010,10 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 					gpuPushMatrix();
 					
 					if (use_custom && pchan->custom_tx) {
-						gpuMultMatrix3D(pchan->custom_tx->pose_mat);
+						gpuMultMatrix(pchan->custom_tx->pose_mat);
 					}
 					else {
-						gpuMultMatrix3D(pchan->pose_mat);
+						gpuMultMatrix(pchan->pose_mat);
 					}
 					
 					/* catch exception for bone with hidden parent */
@@ -2133,10 +2114,10 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 							gpuPushMatrix();
 							
 							if (pchan->custom_tx) {
-								gpuMultMatrix3D(pchan->custom_tx->pose_mat);
+								gpuMultMatrix(pchan->custom_tx->pose_mat);
 							}
 							else {
-								gpuMultMatrix3D(pchan->pose_mat);
+								gpuMultMatrix(pchan->pose_mat);
 							}
 							
 							/* prepare colors */
@@ -2221,7 +2202,7 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 						 */
 						if ((do_dashed & DASH_HELP_LINES) && ((bone->flag & BONE_CONNECTED) == 0)) {
 							VertexFormat *format = immVertexFormat();
-							unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+							unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 							immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
@@ -2232,7 +2213,7 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 							}
 
 							setlinestyle(3);
-							immBegin(GL_LINES, 2);
+							immBegin(PRIM_LINES, 2);
 							immVertex3fv(pos, pchan->pose_head);
 							immVertex3fv(pos, pchan->parent->pose_tail);
 							immEnd();
@@ -2267,7 +2248,7 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 					
 					gpuPushMatrix();
 					if (arm->drawtype != ARM_ENVELOPE)
-						gpuMultMatrix3D(pchan->pose_mat);
+						gpuMultMatrix(pchan->pose_mat);
 					
 					/* catch exception for bone with hidden parent */
 					flag = bone->flag;
@@ -2368,7 +2349,7 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 							gpuPushMatrix();
 							copy_m4_m4(bmat, pchan->pose_mat);
 							bone_matrix_translate_y(bmat, pchan->bone->length);
-							gpuMultMatrix3D(bmat);
+							gpuMultMatrix(bmat);
 							
 							float viewmat_pchan[4][4];
 							mul_m4_m4m4(viewmat_pchan, rv3d->viewmatob, bmat);
@@ -2442,7 +2423,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 				if ((eBone->flag & BONE_HIDDEN_A) == 0) {
 					gpuPushMatrix();
 					get_matrix_editbone(eBone, bmat);
-					gpuMultMatrix3D(bmat);
+					gpuMultMatrix(bmat);
 					
 					/* catch exception for bone with hidden parent */
 					flag = eBone->flag;
@@ -2504,7 +2485,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 				else {
 					gpuPushMatrix();
 					get_matrix_editbone(eBone, bmat);
-					gpuMultMatrix3D(bmat);
+					gpuMultMatrix(bmat);
 					
 					if (arm->drawtype == ARM_LINE) 
 						draw_line_bone(arm->flag, flag, 0, index, NULL, eBone);
@@ -2521,7 +2502,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 				/* offset to parent */
 				if (eBone->parent) {
 					VertexFormat *format = immVertexFormat();
-					unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+					unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 					GPU_select_load_id(-1);  /* -1 here is OK! */
 
@@ -2530,7 +2511,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 					immUniformColor4fv(fcolor);
 					
 					setlinestyle(3);
-					immBegin(GL_LINES, 2);
+					immBegin(PRIM_LINES, 2);
 					immVertex3fv(pos, eBone->head);
 					immVertex3fv(pos, eBone->parent->tail);
 					immEnd();
@@ -2581,7 +2562,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 							gpuPushMatrix();
 							get_matrix_editbone(eBone, bmat);
 							bone_matrix_translate_y(bmat, eBone->length);
-							gpuMultMatrix3D(bmat);
+							gpuMultMatrix(bmat);
 
 							float viewmat_ebone[4][4];
 							mul_m4_m4m4(viewmat_ebone, rv3d->viewmatob, bmat);

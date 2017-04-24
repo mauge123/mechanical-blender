@@ -980,8 +980,8 @@ static void do_view3d_vgroup_buttons(bContext *C, void *UNUSED(arg), int event)
 		return;
 	}
 	else {
-		Scene *scene = CTX_data_scene(C);
-		Object *ob = scene->basact->object;
+		SceneLayer *sl = CTX_data_scene_layer(C);
+		Object *ob = sl->basact->object;
 		ED_vgroup_vert_active_mirror(ob, event - B_VGRP_PNL_EDIT_SINGLE);
 		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 		WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob->data);
@@ -1009,7 +1009,8 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 {
 	uiBlock *block = uiLayoutAbsoluteBlock(pa->layout);
 	Scene *scene = CTX_data_scene(C);
-	Object *ob = scene->basact->object;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *ob = sl->basact->object;
 
 	MDeformVert *dv;
 
@@ -1017,10 +1018,6 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 
 	if (dv && dv->totweight) {
 		ToolSettings *ts = scene->toolsettings;
-
-		wmOperatorType *ot_weight_set_active = WM_operatortype_find("OBJECT_OT_vertex_weight_set_active", true);
-		wmOperatorType *ot_weight_paste = WM_operatortype_find("OBJECT_OT_vertex_weight_paste", true);
-		wmOperatorType *ot_weight_delete = WM_operatortype_find("OBJECT_OT_vertex_weight_delete", true);
 
 		wmOperatorType *ot;
 		PointerRNA op_ptr, tools_ptr;
@@ -1060,7 +1057,7 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 
 					/* The Weight Group Name */
 
-					ot = ot_weight_set_active;
+					ot = WM_operatortype_find("OBJECT_OT_vertex_weight_set_active", true);
 					but = uiDefButO_ptr(block, UI_BTYPE_BUT, ot, WM_OP_EXEC_DEFAULT, dg->name,
 					                    xco, yco, (x = UI_UNIT_X * 5), UI_UNIT_Y, "");
 					but_ptr = UI_but_operator_ptr_get(but);
@@ -1086,23 +1083,16 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 					xco += x;
 
 					/* The weight group paste function */
-
-					ot = ot_weight_paste;
-					WM_operator_properties_create_ptr(&op_ptr, ot);
-					RNA_int_set(&op_ptr, "weight_group", i);
 					icon = (locked) ? ICON_BLANK1 : ICON_PASTEDOWN;
-					uiItemFullO_ptr(row, ot, "", icon, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
+					op_ptr = uiItemFullO(row, "OBJECT_OT_vertex_weight_paste", "", icon, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+					RNA_int_set(&op_ptr, "weight_group", i);
 
 					/* The weight entry delete function */
-
-					ot = ot_weight_delete;
-					WM_operator_properties_create_ptr(&op_ptr, ot);
-					RNA_int_set(&op_ptr, "weight_group", i);
 					icon = (locked) ? ICON_LOCKED : ICON_X;
-					uiItemFullO_ptr(row, ot, "", icon, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
+					op_ptr = uiItemFullO(row, "OBJECT_OT_vertex_weight_delete", "", icon, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+					RNA_int_set(&op_ptr, "weight_group", i);
 
 					yco -= UI_UNIT_Y;
-					
 				}
 			}
 		}
@@ -1444,16 +1434,17 @@ static void view3d_panel_mesh_references(const bContext *C, Panel *pa){
 
 static int view3d_panel_transform_poll(const bContext *C, PanelType *UNUSED(pt))
 {
-	Scene *scene = CTX_data_scene(C);
-	return (scene->basact != NULL);
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	return (sl->basact != NULL);
 }
 
 static void view3d_panel_transform(const bContext *C, Panel *pa)
 {
 	uiBlock *block;
 	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	Object *obedit = CTX_data_edit_object(C);
-	Object *ob = scene->basact->object;
+	Object *ob = sl->basact->object;
 	uiLayout *col;
 
 	block = uiLayoutGetBlock(pa->layout);

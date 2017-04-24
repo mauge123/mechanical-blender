@@ -33,6 +33,7 @@
 
 #include "BKE_context.h"
 #include "BKE_sketch.h"
+#include "BKE_layer.h"
 
 #include "RNA_define.h"
 #include "RNA_access.h"
@@ -41,7 +42,6 @@
 #include "ED_screen.h"
 
 #include "BIF_gl.h"
-#include "BIF_glutil.h"
 #include "ED_armature.h"
 #include "armature_intern.h"
 #include "BIF_retarget.h"
@@ -57,6 +57,7 @@
 #include "GPU_matrix.h"
 #include "GPU_batch.h"
 #include "GPU_immediate.h"
+#include "GPU_immediate_util.h"
 
 typedef int (*GestureDetectFct)(bContext *, SK_Gesture *, SK_Sketch *);
 typedef void (*GestureApplyFct)(bContext *, SK_Gesture *, SK_Sketch *);
@@ -144,9 +145,8 @@ static RigGraph *TEMPLATE_RIGG = NULL;
 void BIF_makeListTemplates(const bContext *C)
 {
 	Object *obedit = CTX_data_edit_object(C);
-	Scene *scene = CTX_data_scene(C);
+	SceneLayer *sl = CTX_data_scene_layer(C);
 	ToolSettings *ts = CTX_data_tool_settings(C);
-	BaseLegacy *base;
 	int index = 0;
 
 	if (TEMPLATES_HASH != NULL) {
@@ -156,9 +156,8 @@ void BIF_makeListTemplates(const bContext *C)
 	TEMPLATES_HASH = BLI_ghash_int_new("makeListTemplates gh");
 	TEMPLATES_CURRENT = 0;
 
-	for (base = FIRSTBASE; base; base = base->next) {
-		Object *ob = base->object;
-
+	FOREACH_OBJECT(sl, ob)
+	{
 		if (ob != obedit && ob->type == OB_ARMATURE) {
 			index++;
 			BLI_ghash_insert(TEMPLATES_HASH, SET_INT_IN_POINTER(index), ob);
@@ -168,6 +167,7 @@ void BIF_makeListTemplates(const bContext *C)
 			}
 		}
 	}
+	FOREACH_OBJECT_END
 }
 
 #if 0  /* UNUSED */
@@ -463,7 +463,7 @@ static void sk_drawEdge(SK_Point *pt0, SK_Point *pt1, float size, float color[4]
 	float angle, length;
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	sub_v3_v3v3(vec1, pt1->p, pt0->p);
 	length = normalize_v3(vec1);
@@ -478,7 +478,7 @@ static void sk_drawEdge(SK_Point *pt0, SK_Point *pt1, float size, float color[4]
 
 	angle = angle_normalized_v3v3(vec2, vec1);
 	gpuRotate3fv(angle * (float)(180.0 / M_PI) + 180.0f, axis);
-	imm_cylinder(pos, sk_clampPointSize(pt1, size), sk_clampPointSize(pt0, size), length, 8, 8);
+	imm_draw_cylinder_fill_3d(pos, sk_clampPointSize(pt1, size), sk_clampPointSize(pt0, size), length, 8, 8);
 
 	immUnbindProgram();
 }
@@ -490,7 +490,7 @@ static void sk_drawNormal(SK_Point *pt, float size, float height)
 	float color[3] = { 0.0f, 1.0f, 1.0f };
 
 	VertexFormat *format = immVertexFormat();
-	unsigned int pos = add_attrib(format, "pos", GL_FLOAT, 3, KEEP_FLOAT);
+	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
 
 	gpuPushMatrix();
 
@@ -506,7 +506,7 @@ static void sk_drawNormal(SK_Point *pt, float size, float height)
 	angle = angle_normalized_v3v3(vec2, pt->no);
 	gpuRotate3fv(angle * (float)(180.0 / M_PI), axis);
 
-	imm_cylinder(pos, sk_clampPointSize(pt, size), 0, sk_clampPointSize(pt, height), 10, 2);
+	imm_draw_cylinder_fill_3d(pos, sk_clampPointSize(pt, size), 0, sk_clampPointSize(pt, height), 10, 2);
 
 	immUnbindProgram();
 
@@ -996,7 +996,7 @@ static int sk_getStrokeSnapPoint(bContext *C, SK_Point *pt, SK_Sketch *sketch, S
 	 * the ideal would be to call this function only at the beginning of the snap operation,
 	 * or at the beginning of the operator itself */
 	struct SnapObjectContext *snap_context = ED_transform_snap_object_context_create_view3d(
-	        CTX_data_main(C), CTX_data_scene(C), 0,
+	        CTX_data_main(C), CTX_data_scene(C), CTX_data_scene_layer(C), 0,
 	        CTX_wm_region(C), CTX_wm_view3d(C));
 
 	float mvalf[2] = {UNPACK2(dd->mval)};
@@ -1988,8 +1988,6 @@ static void sk_drawSketch(Scene *scene, View3D *UNUSED(v3d), SK_Sketch *sketch, 
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 
-	gpuMatrixBegin3D_legacy();
-
 	if (with_names) {
 		int id;
 		for (id = 1, stk = sketch->strokes.first; stk; id++, stk = stk->next) {
@@ -2058,8 +2056,6 @@ static void sk_drawSketch(Scene *scene, View3D *UNUSED(v3d), SK_Sketch *sketch, 
 		float gesture_rgb[3] = { 0, 0.5, 1 };
 		sk_drawStroke(sketch->gesture, -1, gesture_rgb, -1, -1);
 	}
-
-	gpuMatrixEnd();
 }
 
 static int sk_finish_stroke(bContext *C, SK_Sketch *sketch)
