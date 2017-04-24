@@ -853,13 +853,12 @@ void initTransformOrientation(struct bContext *C, TransInfo *t);
 bool createSpaceNormal(float mat[3][3], const float normal[3]);
 bool createSpaceNormalTangent(float mat[3][3], const float normal[3], const float tangent[3]);
 
-#ifdef WITH_MECHANICAL_UCS
+// WITH_MECHANICAL_UCS
 struct TransformOrientation *addMatrixSpace(struct bContext *C, float mat[3][3],float origin[3],
-                                            const char *name, const bool overwrite);
-#else
-struct TransformOrientation *addMatrixSpace(struct bContext *C, float mat[3][3],
-                                            const char *name, const bool overwrite);
-#endif
+                                         const char *name, const bool overwrite);
+// ELSE
+//struct TransformOrientation *addMatrixSpace(struct bContext *C, float mat[3][3],
+//                                            const char *name, const bool overwrite);
 bool applyTransformOrientation(const struct bContext *C, float mat[3][3], char r_name[64], int index);
 
 #define ORIENTATION_NONE	0
