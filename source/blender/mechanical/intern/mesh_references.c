@@ -88,5 +88,10 @@ void reference_plane_normal(BMReference *erf, float *r) {
 }
 
 void reference_plane_origin(BMReference *erf, float *origin) {
-	copy_v3_v3(origin, erf->v4);
+	float median[3]={0};
+	add_v3_v3(median, erf->v1);
+	add_v3_v3(median, erf->v2);
+	add_v3_v3(median, erf->v3);
+	add_v3_v3(median, erf->v4);
+	mul_v3_v3fl(origin,median,0.25);
 }
