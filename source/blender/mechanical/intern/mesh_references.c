@@ -83,6 +83,10 @@ bool reference_plane_project_input (Object *ob, BMReference *erf, ARegion *ar, V
 #endif
 }
 
-void reference_plane_normal (BMReference *erf, float *r) {
-	normal_tri_v3(r,erf->v1,erf->v2,erf->v3);
+void reference_plane_normal(BMReference *erf, float *r) {
+	normal_tri_v3(r, erf->v1, erf->v2, erf->v3);
+}
+
+void reference_plane_origin(BMReference *erf, float *origin) {
+	copy_v3_v3(origin, erf->v4);
 }

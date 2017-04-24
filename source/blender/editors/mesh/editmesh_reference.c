@@ -98,8 +98,10 @@ static int mechanical_add_reference_exec(bContext *C, wmOperator *op)
 
 	if (erf && create_ts) {
 		float pmat[3][3];
+		float origin[3];
 		reference_plane_matrix(erf,pmat);
-		addMatrixSpace(C, pmat, erf->name, true);
+		reference_plane_origin(erf, origin);
+		addMatrixSpace(C, pmat, origin, erf->name, true);
 	}
 
 	if (!EDBM_op_finish(em, &bmop, op, true)) {
