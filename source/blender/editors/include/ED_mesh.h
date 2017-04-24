@@ -171,7 +171,7 @@ struct BMDim *EDBM_dim_find_nearest_ex(
 #endif
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-struct BMReference *EDBM_reference_plane_find_nearest_ex(
+struct BMReference *EDBM_reference_find_nearest_ex(
         struct ViewContext *vc, float *r_dist,
         const bool use_select_bias, const bool use_cycle);
 #endif

@@ -8997,22 +8997,37 @@ static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
 }
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-static void bbs_mesh_solid_reference_planes_EM(BMEditMesh *em, Scene *UNUSED(scene), View3D *UNUSED(v3d),
+static void bbs_mesh_solid_references_EM(BMEditMesh *em, Scene *UNUSED(scene), View3D *UNUSED(v3d),
 							  Object *UNUSED(ob))
 {
+	float pr_width;
 	BMReference *erf;
 	BMIter iter;
 	int i;
+	glGetFloatv(GL_LINE_WIDTH, &pr_width);
+	glLineWidth(5.0f);
 	BM_ITER_MESH_INDEX(erf, &iter, em->bm, BM_REFERENCES_OF_MESH, i){
 		if (bbs_mesh_solid_plane_setSolidDrawOptions(erf, i) == DM_DRAW_OPTION_NORMAL) {
-			glBegin(GL_QUADS);
-			glVertex3fv(erf->v1);
-			glVertex3fv(erf->v2);
-			glVertex3fv(erf->v3);
-			glVertex3fv(erf->v4);
-			glEnd();
+			switch (erf->type) {
+				case BM_REFERENCE_TYPE_PLANE:
+					glBegin(GL_QUADS);
+					glVertex3fv(erf->v1);
+					glVertex3fv(erf->v2);
+					glVertex3fv(erf->v3);
+					glVertex3fv(erf->v4);
+					glEnd();
+					break;
+				case BM_REFERENCE_TYPE_AXIS:
+					glBegin(GL_LINES);
+					glVertex3fv(erf->v1);
+					glVertex3fv(erf->v2);
+					glEnd();
+				default:
+					BLI_assert(false);
+			}
 		}
 	}
+	glLineWidth(pr_width);
 
 	//dm->drawMappedReferencePlanes(dm, bbs_mesh_solid_plane_setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
 
@@ -9099,7 +9114,7 @@ void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, Objec
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 			if (ob->mode & OB_MODE_EDIT && ts->selectmode & SCE_SELECT_REFERENCE) {
 				Mesh *me = ob->data;
-				bbs_mesh_solid_reference_planes_EM(me->edit_btmesh, scene, v3d, ob);
+				bbs_mesh_solid_references_EM(me->edit_btmesh, scene, v3d, ob);
 
 			} else if (ob->mode & OB_MODE_EDIT) {
 #else

@@ -883,7 +883,7 @@ static void findnearestface__doClosest(void *userData, BMFace *efa, const float 
 }
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-BMReference *EDBM_reference_plane_find_nearest_ex(
+BMReference *EDBM_reference_find_nearest_ex(
         ViewContext *vc, float *r_dist,
         const bool UNUSED(use_select_bias), const bool UNUSED(use_cycle))
 {
@@ -1048,7 +1048,7 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	if ((dist > 0.0f) && em->selectmode & SCE_SELECT_REFERENCE) {
-		erf = EDBM_reference_plane_find_nearest_ex(vc, &dist, true, use_cycle);
+		erf = EDBM_reference_find_nearest_ex(vc, &dist, true, use_cycle);
 	}
 
 #endif
