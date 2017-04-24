@@ -3239,7 +3239,16 @@ static void draw_em_reference_axis(View3D *v3d,BMReference *erf, int index)
 {
 	BLI_assert(erf->type == BM_REFERENCE_TYPE_AXIS);
 
-	// TODO
+	if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+		glColor4f(0.8f,0.8f,1.0f,0.5f);
+    }else {
+		glColor4f(0.0f,0.0f,0.0f,0.5f);
+	}
+
+	glBegin(GL_LINES);
+	glVertex3fv(erf->v1);
+	glVertex3fv(erf->v2);
+	glEnd();
 }
 #endif
 

@@ -95,3 +95,6 @@ void reference_plane_origin(BMReference *erf, float *origin) {
 	add_v3_v3(median, erf->v4);
 	mul_v3_v3fl(origin,median,0.25);
 }
+
+
+

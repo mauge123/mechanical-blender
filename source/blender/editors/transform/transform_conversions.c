@@ -2457,8 +2457,10 @@ static void createTransEditRefs(TransInfo *t)
 				if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
 					createPlanePointTransdata(td,erf->v1,mtx,smtx);td++;
 					createPlanePointTransdata(td,erf->v2,mtx,smtx);td++;
-					createPlanePointTransdata(td,erf->v3,mtx,smtx);td++;
-					createPlanePointTransdata(td,erf->v4,mtx,smtx);td++;
+					if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+						createPlanePointTransdata(td,erf->v3,mtx,smtx);td++;
+						createPlanePointTransdata(td,erf->v4,mtx,smtx);td++;
+					}
 				}
 			}
 		}

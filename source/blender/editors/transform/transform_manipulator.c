@@ -702,11 +702,13 @@ static int calc_manipulator_stats(const bContext *C)
 					BMReference *erf;
 					BM_ITER_MESH(erf, &iter, bm, BM_REFERENCES_OF_MESH) {
 						if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
-							totsel+=4;
-							calc_tw_center(scene, erf->v1);
-							calc_tw_center(scene, erf->v2);
-							calc_tw_center(scene, erf->v3);
-							calc_tw_center(scene, erf->v4);
+							calc_tw_center(scene, erf->v1);totsel++;
+							calc_tw_center(scene, erf->v2);totsel++;
+
+							if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+								calc_tw_center(scene, erf->v3);totsel++;
+								calc_tw_center(scene, erf->v4);totsel++;
+							}
 						}
 					}
 				}
