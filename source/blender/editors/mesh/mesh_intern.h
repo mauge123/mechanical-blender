@@ -106,6 +106,7 @@ void MESH_OT_mechanical_dimension_data_set(struct wmOperatorType *ot);
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 void MESH_OT_mechanical_reference_plane_add(struct wmOperatorType *ot);
+void MESH_OT_mechanical_reference_axis_add(struct wmOperatorType *ot);
 #endif
 
 

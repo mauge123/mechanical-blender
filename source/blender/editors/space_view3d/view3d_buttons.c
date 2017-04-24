@@ -74,6 +74,7 @@
 #include "ED_screen.h"
 
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -418,11 +419,12 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		if (bm->totrefsel) {
 			BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
 				if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
-					add_v3_v3(&median[LOC_X], erf->v1);
-					add_v3_v3(&median[LOC_X], erf->v2);
-					add_v3_v3(&median[LOC_X], erf->v3);
-					add_v3_v3(&median[LOC_X], erf->v4);
-					tot+=4;
+					add_v3_v3(&median[LOC_X], erf->v1);tot+=1;
+					add_v3_v3(&median[LOC_X], erf->v2);tot+=1;
+					if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+						add_v3_v3(&median[LOC_X], erf->v3);tot+=1;
+						add_v3_v3(&median[LOC_X], erf->v4);tot+=1;
+					}
 				}
 			}
 		}
@@ -808,8 +810,10 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 						if (apply_vcos) {
 							apply_raw_diff_v3(erf->v1, tot, &ve_median[LOC_X], &median[LOC_X]);
 							apply_raw_diff_v3(erf->v2, tot, &ve_median[LOC_X], &median[LOC_X]);
-							apply_raw_diff_v3(erf->v3, tot, &ve_median[LOC_X], &median[LOC_X]);
-							apply_raw_diff_v3(erf->v4, tot, &ve_median[LOC_X], &median[LOC_X]);
+							if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+								apply_raw_diff_v3(erf->v3, tot, &ve_median[LOC_X], &median[LOC_X]);
+								apply_raw_diff_v3(erf->v4, tot, &ve_median[LOC_X], &median[LOC_X]);
+							}
 						}
 					}
 				}

@@ -117,8 +117,6 @@ static int mechanical_add_reference_exec(bContext *C, wmOperator *op)
 
 void MESH_OT_mechanical_reference_plane_add(wmOperatorType *ot)
 {
-	PropertyRNA *prop;
-
 	/* identifiers */
 	ot->name = "Add Reference Plane";
 	ot->description = "Adds a Reference plane to be used on Mesh";
@@ -133,7 +131,7 @@ void MESH_OT_mechanical_reference_plane_add(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum(ot->srna,"reference_type",reference_type_items,BM_REFERENCE_TYPE_PLANE,"reference type","reference type");
 
-	prop = RNA_def_boolean(ot->srna,"create_ts",false,"Create transform orientation","creates a tranform orientation");
+	RNA_def_boolean(ot->srna,"create_ts",false,"Create transform orientation","creates a tranform orientation");
 
 	ED_object_add_generic_props(ot,false);
 }
@@ -153,7 +151,9 @@ void MESH_OT_mechanical_reference_axis_add(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
-	ot->prop = RNA_def_boolean(ot->srna,"create_ts",false,"Create transform orientation","creates a tranform orientation");
+	ot->prop = RNA_def_enum(ot->srna,"reference_type",reference_type_items,BM_REFERENCE_TYPE_AXIS,"reference type","reference type");
+
+	RNA_def_boolean(ot->srna,"create_ts",false,"Create transform orientation","creates a tranform orientation");
 
 	ED_object_add_generic_props(ot,false);
 }
