@@ -555,6 +555,7 @@ EnumPropertyItem *rna_ucs_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSE
 	return item;
 }
 
+
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
 {
@@ -587,10 +588,12 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 					RNA_enum_item_add_separator(&item, &totitem);
 				}
 				BM_ITER_MESH_INDEX (erf, &iter, em->bm, BM_REFERENCES_OF_MESH, i) {
-					tmp.identifier = erf->name;
-					tmp.name = erf->name;
-					tmp.value = i+1;
-					RNA_enum_item_add(&item, &totitem, &tmp);
+					if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+						tmp.identifier = erf->name;
+						tmp.name = erf->name;
+						tmp.value = i+1;
+						RNA_enum_item_add(&item, &totitem, &tmp);
+					}
 				}
 			}
 		}
