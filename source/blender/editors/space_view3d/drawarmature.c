@@ -1265,7 +1265,7 @@ static void draw_b_bone(const short dt, int armflag, int boneflag, short constfl
 	else {
 		/* wire */
 		if (armflag & ARM_POSEMODE) {
-			if (constflag) {
+			if (constflag && ((G.f & G_PICKSEL) == 0)) {
 				/* set constraint colors */
 				if (set_pchan_glColor(PCHAN_COLOR_CONSTS, boneflag, constflag)) {
 					glEnable(GL_BLEND);
@@ -1406,7 +1406,7 @@ static void draw_bone(const short dt, int armflag, int boneflag, short constflag
 			set_ebone_glColor(boneflag);
 		}
 		else if (armflag & ARM_POSEMODE) {
-			if (constflag) {
+			if (constflag && ((G.f & G_PICKSEL) == 0)) {
 				/* draw constraint colors */
 				if (set_pchan_glColor(PCHAN_COLOR_CONSTS, boneflag, constflag)) {
 					glEnable(GL_BLEND);
@@ -2360,7 +2360,6 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 						/*	Draw name */
 						if (arm->flag & ARM_DRAWNAMES) {
 							mid_v3_v3v3(vec, eBone->head, eBone->tail);
-							glRasterPos3fv(vec);
 							view3d_cached_text_draw_add(vec, eBone->name, strlen(eBone->name), 10, 0, col);
 						}
 						/*	Draw additional axes */
@@ -2462,6 +2461,10 @@ static void draw_ghost_poses_range(Scene *scene, View3D *v3d, ARegion *ar, Base 
 	end = (float)arm->ghostef;
 	if (end <= start)
 		return;
+	
+	/* prevent infinite loops if this is set to 0 - T49527 */
+	if (arm->ghostsize < 1)
+		arm->ghostsize = 1;
 	
 	stepsize = (float)(arm->ghostsize);
 	range = (float)(end - start);
@@ -2608,7 +2611,11 @@ static void draw_ghost_poses(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 	calc_action_range(adt->action, &start, &end, 0);
 	if (start == end)
 		return;
-
+	
+	/* prevent infinite loops if this is set to 0 - T49527 */
+	if (arm->ghostsize < 1)
+		arm->ghostsize = 1;
+	
 	stepsize = (float)(arm->ghostsize);
 	range = (float)(arm->ghostep) * stepsize + 0.5f;   /* plus half to make the for loop end correct */
 	

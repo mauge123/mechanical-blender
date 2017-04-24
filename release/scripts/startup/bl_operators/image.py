@@ -82,8 +82,8 @@ class EditExternally(Operator):
             import traceback
             traceback.print_exc()
             self.report({'ERROR'},
-                        "Image editor not found, "
-                        "please specify in User Preferences > File")
+                        "Image editor could not be launched, please ensure that "
+                        "the path in User Preferences > File is valid, and Blender has rights to launch it")
 
             return {'CANCELLED'}
 
@@ -242,3 +242,11 @@ class ProjectApply(Operator):
         bpy.ops.paint.project_image(image=image_name)
 
         return {'FINISHED'}
+
+
+classes = (
+    EditExternally,
+    ProjectApply,
+    ProjectEdit,
+    SaveDirty,
+)

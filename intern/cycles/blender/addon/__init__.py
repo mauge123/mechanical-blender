@@ -23,10 +23,24 @@ bl_info = {
     "location": "Info header, render engine menu",
     "description": "Cycles Render Engine integration",
     "warning": "",
-    "wiki_url": "https://www.blender.org/manual/render/cycles/index.html",
+    "wiki_url": "https://docs.blender.org/manual/en/dev/render/cycles/",
     "tracker_url": "",
     "support": 'OFFICIAL',
     "category": "Render"}
+
+# Support 'reload' case.
+if "bpy" in locals():
+    import importlib
+    if "engine" in locals():
+        importlib.reload(engine)
+    if "version_update" in locals():
+        importlib.reload(version_update)
+    if "ui" in locals():
+        importlib.reload(ui)
+    if "properties" in locals():
+        importlib.reload(properties)
+    if "presets" in locals():
+        importlib.reload(presets)
 
 import bpy
 
@@ -93,7 +107,13 @@ def engine_exit():
     engine.exit()
 
 
+classes = (
+    CyclesRender,
+)
+
+
 def register():
+    from bpy.utils import register_class
     from . import ui
     from . import properties
     from . import presets
@@ -108,12 +128,15 @@ def register():
     properties.register()
     ui.register()
     presets.register()
-    bpy.utils.register_module(__name__)
+
+    for cls in classes:
+        register_class(cls)
 
     bpy.app.handlers.version_update.append(version_update.do_versions)
 
 
 def unregister():
+    from bpy.utils import unregister_class
     from . import ui
     from . import properties
     from . import presets
@@ -124,4 +147,6 @@ def unregister():
     ui.unregister()
     properties.unregister()
     presets.unregister()
-    bpy.utils.unregister_module(__name__)
+
+    for cls in classes:
+        unregister_class(cls)

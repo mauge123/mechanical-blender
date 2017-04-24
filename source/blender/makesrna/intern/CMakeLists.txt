@@ -95,6 +95,7 @@ set(DEFSRC
 	rna_vfont.c
 	rna_wm.c
 	rna_world.c
+	rna_drawings.c
 )
 
 set(APISRC
@@ -321,6 +322,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_MESH_REFERENCE_OBJECTS)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 	add_definitions(-DWITH_MECHANICAL_UCS)
+	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
 
 	list(APPEND INC
 		../../mechanical/

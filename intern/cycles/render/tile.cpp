@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "tile.h"
+#include "render/tile.h"
 
-#include "util_algorithm.h"
-#include "util_types.h"
+#include "util/util_algorithm.h"
+#include "util/util_types.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -131,7 +131,6 @@ void TileManager::reset(BufferParams& params_, int num_samples_)
 	state.buffer = BufferParams();
 	state.sample = range_start_sample - 1;
 	state.num_tiles = 0;
-	state.num_rendered_tiles = 0;
 	state.num_samples = 0;
 	state.resolution_divider = get_divider(params.width, params.height, start_resolution);
 	state.tiles.clear();
@@ -157,7 +156,7 @@ void TileManager::set_samples(int num_samples_)
 			divider >>= 1;
 		}
 
-		state.total_pixel_samples = pixel_samples + get_num_effective_samples() * params.width*params.height;
+		state.total_pixel_samples = pixel_samples + (uint64_t)get_num_effective_samples() * params.width*params.height;
 	}
 }
 
@@ -343,7 +342,6 @@ bool TileManager::next_tile(Tile& tile, int device)
 
 	tile = Tile(state.tiles[logical_device].front());
 	state.tiles[logical_device].pop_front();
-	state.num_rendered_tiles++;
 	return true;
 }
 

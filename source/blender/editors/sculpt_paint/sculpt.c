@@ -5361,8 +5361,12 @@ static int sculpt_mode_toggle_exec(bContext *C, wmOperator *op)
 		if (mmd)
 			multires_force_update(ob);
 
-		if (flush_recalc || (ob->sculpt && ob->sculpt->bm))
+		/* Always for now, so leaving sculpt mode always ensures scene is in
+		 * a consistent state.
+		 */
+		if (true || flush_recalc || (ob->sculpt && ob->sculpt->bm)) {
 			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+		}
 
 		if (me->flag & ME_SCULPT_DYNAMIC_TOPOLOGY) {
 			/* Dynamic topology must be disabled before exiting sculpt
@@ -5693,11 +5697,11 @@ static int sculpt_set_detail_size_exec(bContext *C, wmOperator *UNUSED(op))
 	WM_operator_properties_create_ptr(&props_ptr, ot);
 
 	if (sd->flags & SCULPT_DYNTOPO_DETAIL_CONSTANT) {
-		set_brush_rc_props(&props_ptr, "sculpt", "constant_detail", NULL, 0);
-		RNA_string_set(&props_ptr, "data_path_primary", "tool_settings.sculpt.constant_detail");
+		set_brush_rc_props(&props_ptr, "sculpt", "constant_detail_resolution", NULL, 0);
+		RNA_string_set(&props_ptr, "data_path_primary", "tool_settings.sculpt.constant_detail_resolution");
 	}
 	else if (sd->flags & SCULPT_DYNTOPO_DETAIL_BRUSH) {
-		set_brush_rc_props(&props_ptr, "sculpt", "constant_detail", NULL, 0);
+		set_brush_rc_props(&props_ptr, "sculpt", "constant_detail_resolution", NULL, 0);
 		RNA_string_set(&props_ptr, "data_path_primary", "tool_settings.sculpt.detail_percent");
 	}
 	else {

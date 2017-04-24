@@ -66,7 +66,7 @@ struct ID *BKE_libblock_find_name(const short type, const char *name) ATTR_WARN_
 void  BKE_libblock_free(struct Main *bmain, void *idv) ATTR_NONNULL();
 void  BKE_libblock_free_ex(struct Main *bmain, void *idv, const bool do_id_user, const bool do_ui_user) ATTR_NONNULL();
 void  BKE_libblock_free_us(struct Main *bmain, void *idv) ATTR_NONNULL();
-void  BKE_libblock_free_data(struct Main *bmain, struct ID *id) ATTR_NONNULL();
+void  BKE_libblock_free_data(struct Main *bmain, struct ID *id, const bool do_id_user) ATTR_NONNULL();
 void  BKE_libblock_delete(struct Main *bmain, void *idv) ATTR_NONNULL();
 
 void BKE_id_lib_local_paths(struct Main *bmain, struct Library *lib, struct ID *id);
@@ -86,7 +86,7 @@ bool id_make_local(struct Main *bmain, struct ID *id, const bool test, const boo
 bool id_single_user(struct bContext *C, struct ID *id, struct PointerRNA *ptr, struct PropertyRNA *prop);
 bool id_copy(struct Main *bmain, struct ID *id, struct ID **newid, bool test);
 void id_sort_by_name(struct ListBase *lb, struct ID *id);
-void BKE_id_expand_local(struct ID *id);
+void BKE_id_expand_local(struct Main *bmain, struct ID *id);
 void BKE_id_copy_ensure_local(struct Main *bmain, struct ID *old_id, struct ID *new_id);
 
 bool new_id(struct ListBase *lb, struct ID *id, const char *name);
@@ -95,7 +95,7 @@ void id_clear_lib_data_ex(struct Main *bmain, struct ID *id, const bool id_in_ma
 
 struct ListBase *which_libbase(struct Main *mainlib, short type);
 
-#define MAX_LIBARRAY    35
+#define MAX_LIBARRAY    37
 int set_listbasepointers(struct Main *main, struct ListBase *lb[MAX_LIBARRAY]);
 
 /* Main API */
@@ -104,6 +104,9 @@ void BKE_main_free(struct Main *mainvar);
 
 void BKE_main_lock(struct Main *bmain);
 void BKE_main_unlock(struct Main *bmain);
+
+void BKE_main_relations_create(struct Main *bmain);
+void BKE_main_relations_free(struct Main *bmain);
 
 struct BlendThumbnail *BKE_main_thumbnail_from_imbuf(struct Main *bmain, struct ImBuf *img);
 struct ImBuf *BKE_main_thumbnail_to_imbuf(struct Main *bmain, struct BlendThumbnail *data);

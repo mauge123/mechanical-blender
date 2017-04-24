@@ -24,7 +24,7 @@ ccl_device_inline void kernel_path_volume_connect_light(
         ShaderData *sd,
         ShaderData *emission_sd,
         float3 throughput,
-        PathState *state,
+        ccl_addr_space PathState *state,
         PathRadiance *L)
 {
 #ifdef __EMISSION__
@@ -59,7 +59,7 @@ ccl_device_inline void kernel_path_volume_connect_light(
 			}
 		}
 	}
-#endif
+#endif /* __EMISSION__ */
 }
 
 #ifdef __KERNEL_GPU__
@@ -67,8 +67,14 @@ ccl_device_noinline
 #else
 ccl_device
 #endif
-bool kernel_path_volume_bounce(KernelGlobals *kg, RNG *rng,
-	ShaderData *sd, float3 *throughput, PathState *state, PathRadiance *L, Ray *ray)
+bool kernel_path_volume_bounce(
+    KernelGlobals *kg,
+    RNG *rng,
+    ShaderData *sd,
+    ccl_addr_space float3 *throughput,
+    ccl_addr_space PathState *state,
+    PathRadiance *L,
+    ccl_addr_space Ray *ray)
 {
 	/* sample phase function */
 	float phase_pdf;
@@ -111,9 +117,18 @@ bool kernel_path_volume_bounce(KernelGlobals *kg, RNG *rng,
 	return true;
 }
 
-ccl_device void kernel_branched_path_volume_connect_light(KernelGlobals *kg, RNG *rng,
-	ShaderData *sd, ShaderData *emission_sd, float3 throughput, PathState *state, PathRadiance *L,
-	bool sample_all_lights, Ray *ray, const VolumeSegment *segment)
+#ifndef __SPLIT_KERNEL__
+ccl_device void kernel_branched_path_volume_connect_light(
+        KernelGlobals *kg,
+        RNG *rng,
+        ShaderData *sd,
+        ShaderData *emission_sd,
+        float3 throughput,
+        ccl_addr_space PathState *state,
+        PathRadiance *L,
+        bool sample_all_lights,
+        Ray *ray,
+        const VolumeSegment *segment)
 {
 #ifdef __EMISSION__
 	if(!kernel_data.integrator.use_direct_light)
@@ -261,10 +276,11 @@ ccl_device void kernel_branched_path_volume_connect_light(KernelGlobals *kg, RNG
 			}
 		}
 	}
-#endif
+#endif /* __EMISSION__ */
 }
+#endif /* __SPLIT_KERNEL__ */
 
-#endif
+#endif /* __VOLUME_SCATTER__ */
 
 CCL_NAMESPACE_END
 

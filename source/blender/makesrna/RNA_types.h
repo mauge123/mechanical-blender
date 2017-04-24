@@ -174,8 +174,10 @@ typedef enum PropertyFlag {
 	 * and collections */
 	PROP_ANIMATABLE              = (1 << 1),
 
-	/* This flag means when the property's widget is in 'textedit' mode, it will be updated after every typed char,
-	 * instead of waiting final validation. Used e.g. for text searchbox. */
+	/* This flag means when the property's widget is in 'textedit' mode, it will be updated
+	 * after every typed char, instead of waiting final validation. Used e.g. for text searchbox.
+	 * It will also cause UI_BUT_VALUE_CLEAR to be set for text buttons. We could add an own flag
+	 * for search/filter properties, but this works just fine for now. */
 	PROP_TEXTEDIT_UPDATE         = (1 << 31),
 
 	/* icon */
@@ -432,6 +434,8 @@ typedef enum StructFlag {
 	STRUCT_GENERATED       = (1 << 4),
 	STRUCT_FREE_POINTERS   = (1 << 5),
 	STRUCT_NO_IDPROPERTIES = (1 << 6), /* Menus and Panels don't need properties */
+	STRUCT_NO_DATABLOCK_IDPROPERTIES = (1 << 7), /* e.g. for Operator */
+	STRUCT_CONTAINS_DATABLOCK_IDPROPERTIES = (1 << 8), /* for PropertyGroup which contains pointers to datablocks */
 } StructFlag;
 
 typedef int (*StructValidateFunc)(struct PointerRNA *ptr, void *data, int *have_function);

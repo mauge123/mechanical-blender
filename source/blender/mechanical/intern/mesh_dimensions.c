@@ -16,6 +16,8 @@
 #include "mechanical_utils.h"
 
 
+static void set_dimension_start_end(BMDim *edm);
+
 bool valid_constraint_setting(BMDim *edm, int constraint) {
 	bool ret = false;
 	switch (constraint) {
@@ -50,7 +52,7 @@ float get_dimension_value(BMDim *edm){
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
-			v = RAD2DEG(angle_v3v3v3(edm->v[0]->co,edm->mdim->center,edm->v[2]->co));
+			v = RAD2DEG(angle_v3v3v3(edm->mdim->start,edm->mdim->center,edm->mdim->end));
 			break;
 		case DIM_TYPE_ANGLE_4P:
 			v = RAD2DEG(angle_v3v3v3(edm->v[0]->co,edm->mdim->center, edm->v[3]->co));
@@ -302,13 +304,19 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		return;
 	}
 
+	if (edm->mdim->dimension_flag & DIMENSION_FLAG_ANGLE_COMPLEMENTARY) {
+		d = -d;
+	}
+
+
 	// Get Dimension dir
 	if (edm->mdim->dir == DIM_DIR_RIGHT) {
-		copy_v3_v3(p, edm->v[2]->co);
-		sub_v3_v3v3(r, edm->v[2]->co, edm->mdim->center);
+		copy_v3_v3(p, edm->mdim->end);
+		sub_v3_v3v3(r, edm->mdim->end, edm->mdim->center);
 	} else if (edm->mdim->dir == DIM_DIR_LEFT) {
-		copy_v3_v3(p, edm->v[0]->co);
-		sub_v3_v3v3(r, edm->v[0]->co, edm->mdim->center);
+
+		copy_v3_v3(p, edm->mdim->start);
+		sub_v3_v3v3(r, edm->mdim->start, edm->mdim->center);
 	}
 	cross_v3_v3v3(d_dir,axis,r);
 	normalize_v3(d_dir);
@@ -395,6 +403,9 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 			apply_dimension_angle_exec(bm, edm->v[1],edm->mdim->center, axis,d, constraints, p_constraint_axis);
 		}
 	}
+
+	// To get correct dimension value in case of nexts steps (BOTH SIDES)
+	set_dimension_start_end(edm);
 
 	//Rotate tagged points against axis
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
@@ -538,15 +549,30 @@ static void set_dimension_angle_start_end(BMDim *edm, float *a, float *b) {
 	normalize_v3(edm->mdim->end);
 	mul_v3_fl(edm->mdim->end,len);
 	add_v3_v3(edm->mdim->end,edm->mdim->center);
+
+	if (edm->mdim->dimension_flag & DIMENSION_FLAG_ANGLE_COMPLEMENTARY ) {
+		BLI_assert (ELEM(edm->mdim->dim_type, DIM_TYPE_ANGLE_3P, DIM_TYPE_ANGLE_3P_CON));
+		sub_v3_v3(edm->mdim->start, edm->mdim->center);
+		sub_v3_v3v3(edm->mdim->start, edm->mdim->center, edm->mdim->start);
+	}
 }
 
-static void set_dimension_circ_start_end(BMDim* edm, float value) {
+static void set_dimension_diameter_start_end(BMDim* edm) {
 	float v[3];
-	sub_v3_v3v3(v,edm->mdim->fpos, edm->mdim->center);
+	copy_v3_v3(v,edm->mdim->fpos);
 	normalize_v3(v);
-	mul_v3_fl(v,value);
+	mul_v3_fl(v,get_dimension_value(edm)/2.0f);
 	add_v3_v3v3(edm->mdim->start,edm->mdim->center,v);
 	sub_v3_v3v3(edm->mdim->end, edm->mdim->center,v);
+}
+
+static void set_dimension_radius_start_end(BMDim* edm) {
+	float v[3];
+	copy_v3_v3(v, edm->mdim->fpos);
+	normalize_v3(v);
+	mul_v3_fl(v, get_dimension_value(edm));
+	add_v3_v3v3(edm->mdim->end, edm->mdim->center, v);
+	copy_v3_v3(edm->mdim->start, edm->mdim->center);
 }
 
 static void set_dimension_start_end(BMDim *edm) {
@@ -556,10 +582,10 @@ static void set_dimension_start_end(BMDim *edm) {
 			add_v3_v3v3(edm->mdim->end, edm->mdim->fpos, edm->v[1]->co);
 			break;
 		case DIM_TYPE_DIAMETER:
-			set_dimension_circ_start_end(edm,get_dimension_value(edm)/2.0f);
+			set_dimension_diameter_start_end(edm);
 			break;
 		case DIM_TYPE_RADIUS:
-			set_dimension_circ_start_end(edm,get_dimension_value(edm));
+			set_dimension_radius_start_end(edm);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
@@ -679,12 +705,14 @@ void dimension_data_update (BMDim *edm) {
 			sub_v3_v3v3(v1,edm->mdim->start,edm->mdim->center);
 			normalize_v3(v1);
 			sub_v3_v3v3(v2,edm->mdim->end,edm->mdim->center);
-			cross_v3_v3v3(axis,v1,v2);
 			normalize_v3(v2);
+
+			cross_v3_v3v3(axis,v1,v2);
+
 
 			// Set txt pos acording pos factor
 			mul_v3_fl(v1,len_v3(edm->mdim->fpos));
-			rotate_v3_v3v3fl(edm->mdim->dpos,v1,axis, acos(dot_v3v3(v1,v2))*edm->mdim->dpos_fact);
+			rotate_v3_v3v3fl(edm->mdim->dpos,v1,axis, angle_normalized_v3v3(v1,v2)*edm->mdim->dpos_fact);
 			add_v3_v3(edm->mdim->dpos, edm->mdim->center);
 			break;
 		default:

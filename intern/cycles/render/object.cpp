@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-#include "camera.h"
-#include "device.h"
-#include "light.h"
-#include "mesh.h"
-#include "curves.h"
-#include "object.h"
-#include "particles.h"
-#include "scene.h"
+#include "render/camera.h"
+#include "device/device.h"
+#include "render/light.h"
+#include "render/mesh.h"
+#include "render/curves.h"
+#include "render/object.h"
+#include "render/particles.h"
+#include "render/scene.h"
 
-#include "util_foreach.h"
-#include "util_logging.h"
-#include "util_map.h"
-#include "util_progress.h"
-#include "util_vector.h"
+#include "util/util_foreach.h"
+#include "util/util_logging.h"
+#include "util/util_map.h"
+#include "util/util_progress.h"
+#include "util/util_vector.h"
 
-#include "subd_patch_table.h"
+#include "subd/subd_patch_table.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -48,6 +48,8 @@ NODE_DEFINE(Object)
 	SOCKET_BOOLEAN(hide_on_missing_motion, "Hide on Missing Motion", false);
 	SOCKET_POINT(dupli_generated, "Dupli Generated", make_float3(0.0f, 0.0f, 0.0f));
 	SOCKET_POINT2(dupli_uv, "Dupli UV", make_float2(0.0f, 0.0f));
+
+	SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
 
 	return type;
 }
@@ -166,7 +168,7 @@ void Object::apply_transform(bool apply_to_motion)
 		float3 c0 = transform_get_column(&tfm, 0);
 		float3 c1 = transform_get_column(&tfm, 1);
 		float3 c2 = transform_get_column(&tfm, 2);
-		float scalar = pow(fabsf(dot(cross(c0, c1), c2)), 1.0f/3.0f);
+		float scalar = powf(fabsf(dot(cross(c0, c1), c2)), 1.0f/3.0f);
 
 		/* apply transform to curve keys */
 		for(size_t i = 0; i < mesh->curve_keys.size(); i++) {
@@ -410,7 +412,7 @@ void ObjectManager::device_update_object_transform(UpdateObejctTransformState *s
 
 	/* Object flag. */
 	if(ob->use_holdout) {
-		flag |= SD_HOLDOUT_MASK;
+		flag |= SD_OBJECT_HOLDOUT_MASK;
 	}
 	state->object_flag[object_index] = flag;
 
@@ -597,6 +599,12 @@ void ObjectManager::device_update_flags(Device *device,
 		else {
 			object_flag[object_index] &= ~SD_OBJECT_HAS_VOLUME;
 		}
+		if(object->is_shadow_catcher) {
+			object_flag[object_index] |= SD_OBJECT_SHADOW_CATCHER;
+		}
+		else {
+			object_flag[object_index] &= ~SD_OBJECT_SHADOW_CATCHER;
+		}
 
 		if(bounds_valid) {
 			foreach(Object *volume_object, volume_objects) {
@@ -716,9 +724,9 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, u
 					if(progress.get_cancel()) return;
 				}
 
-				object_flag[i] |= SD_TRANSFORM_APPLIED;
+				object_flag[i] |= SD_OBJECT_TRANSFORM_APPLIED;
 				if(object->mesh->transform_negative_scaled)
-					object_flag[i] |= SD_NEGATIVE_SCALE_APPLIED;
+					object_flag[i] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
 			}
 			else
 				have_instancing = true;

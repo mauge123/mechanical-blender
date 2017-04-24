@@ -69,6 +69,8 @@ struct SpaceImage;
 struct SpaceClip;
 struct ID;
 
+struct Drawing;
+
 /* Structs */
 
 struct bContext;
@@ -166,6 +168,9 @@ struct SpaceAction *CTX_wm_space_action(const bContext *C);
 struct SpaceInfo *CTX_wm_space_info(const bContext *C);
 struct SpaceUserPref *CTX_wm_space_userpref(const bContext *C);
 struct SpaceClip *CTX_wm_space_clip(const bContext *C);
+// WITH_MECHANICAL_DRAWINGS
+struct SpaceDrawings *CTX_wm_space_drawings(const bContext *C);
+
 
 void CTX_wm_manager_set(bContext *C, struct wmWindowManager *wm);
 void CTX_wm_window_set(bContext *C, struct wmWindow *win);
@@ -271,6 +276,9 @@ struct Image *CTX_data_edit_image(const bContext *C);
 struct Text *CTX_data_edit_text(const bContext *C);
 struct MovieClip *CTX_data_edit_movieclip(const bContext *C);
 struct Mask *CTX_data_edit_mask(const bContext *C);
+#ifdef WITH_MECHANICAL_DRAWINGS
+struct Drawing *CTX_data_edit_drawing(const bContext *C);
+#endif
 
 struct CacheFile *CTX_data_edit_cachefile(const bContext *C);
 

@@ -17,13 +17,13 @@
 #ifndef __IMAGE_H__
 #define __IMAGE_H__
 
-#include "device.h"
-#include "device_memory.h"
+#include "device/device.h"
+#include "device/device_memory.h"
 
-#include "util_image.h"
-#include "util_string.h"
-#include "util_thread.h"
-#include "util_vector.h"
+#include "util/util_image.h"
+#include "util/util_string.h"
+#include "util/util_thread.h"
+#include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -61,11 +61,13 @@ public:
 	void remove_image(const string& filename,
 	                  void *builtin_data,
 	                  InterpolationType interpolation,
-	                  ExtensionType extension);
+	                  ExtensionType extension,
+	                  bool use_alpha);
 	void tag_reload_image(const string& filename,
 	                      void *builtin_data,
 	                      InterpolationType interpolation,
-	                      ExtensionType extension);
+	                      ExtensionType extension,
+	                      bool use_alpha);
 	ImageDataType get_image_metadata(const string& filename, void *builtin_data, bool& is_linear);
 
 	void device_update(Device *device,

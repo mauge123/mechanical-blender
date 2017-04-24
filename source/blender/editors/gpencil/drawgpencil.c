@@ -701,24 +701,25 @@ static void gp_draw_stroke_2d(bGPDspoint *points, int totpoints, short thickness
 	 */
 	{
 		bGPDspoint *pt1, *pt2;
-		float pm[2];
+		float s0[2], s1[2];     /* segment 'center' points */
+		float pm[2];  /* normal from previous segment. */
 		int i;
 		float fpt[3];
 		
 		glShadeModel(GL_FLAT);
 		glBegin(GL_QUADS);
-		
+
+		/* get x and y coordinates from first point */
+		mul_v3_m4v3(fpt, diff_mat, &points->x);
+		gp_calc_2d_stroke_fxy(fpt, sflag, offsx, offsy, winx, winy, s0);
+
 		for (i = 0, pt1 = points, pt2 = points + 1; i < (totpoints - 1); i++, pt1++, pt2++) {
-			float s0[2], s1[2];     /* segment 'center' points */
 			float t0[2], t1[2];     /* tessellated coordinates */
 			float m1[2], m2[2];     /* gradient and normal */
 			float mt[2], sc[2];     /* gradient for thickness, point for end-cap */
 			float pthick;           /* thickness at segment point */
 
-			/* get x and y coordinates from points */
-			mul_v3_m4v3(fpt, diff_mat, &pt1->x);
-			gp_calc_2d_stroke_fxy(fpt, sflag, offsx, offsy, winx, winy, s0);
-
+			/* get x and y coordinates from point2 (point1 has already been computed in previous iteration). */
 			mul_v3_m4v3(fpt, diff_mat, &pt2->x);
 			gp_calc_2d_stroke_fxy(fpt, sflag, offsx, offsy, winx, winy, s1);
 			
@@ -846,6 +847,8 @@ static void gp_draw_stroke_2d(bGPDspoint *points, int totpoints, short thickness
 				glVertex2fv(t0);
 			}
 			
+			/* store computed point2 coordinates as point1 ones of next segment. */
+			copy_v2_v2(s0, s1);
 			/* store stroke's 'natural' normal for next stroke to use */
 			copy_v2_v2(pm, m2);
 		}
@@ -1419,8 +1422,16 @@ static void gp_draw_data_layers(
 
 #undef GP_DRAWFLAG_APPLY
 		
-		/* draw 'onionskins' (frame left + right) */
-		if ((gpl->flag & GP_LAYER_ONIONSKIN) && !(dflag & GP_DRAWDATA_NO_ONIONS)) {
+		/* Draw 'onionskins' (frame left + right)
+		 *   - It is only possible to show these if the option is enabled
+		 *   - The "no onions" flag prevents ghosts from appearing during animation playback/scrubbing
+		 *     and in renders
+		 *   - The per-layer "always show" flag however overrides the playback/render restriction,
+		 *     allowing artists to selectively turn onionskins on/off during playback
+		 */
+		if ((gpl->flag & GP_LAYER_ONIONSKIN) && 
+		    ((dflag & GP_DRAWDATA_NO_ONIONS) == 0 || (gpl->flag & GP_LAYER_GHOST_ALWAYS))) 
+		{
 			/* Drawing method - only immediately surrounding (gstep = 0),
 			 * or within a frame range on either side (gstep > 0)
 			 */
@@ -1555,7 +1566,7 @@ static void gp_draw_data_all(Scene *scene, bGPdata *gpd, int offsx, int offsy, i
 {
 	bGPdata *gpd_source = NULL;
 	ToolSettings *ts;
-	bGPDbrush *brush;
+	bGPDbrush *brush = NULL;
 	if (scene) {
 		ts = scene->toolsettings;
 		brush = BKE_gpencil_brush_getactive(ts);
@@ -1564,8 +1575,7 @@ static void gp_draw_data_all(Scene *scene, bGPdata *gpd, int offsx, int offsy, i
 			BKE_gpencil_brush_init_presets(ts);
 			brush = BKE_gpencil_brush_getactive(ts);
 		}
-	}
-	if (scene) {
+
 		if (spacetype == SPACE_VIEW3D) {
 			gpd_source = (scene->gpd ? scene->gpd : NULL);
 		}
@@ -1573,13 +1583,12 @@ static void gp_draw_data_all(Scene *scene, bGPdata *gpd, int offsx, int offsy, i
 			/* currently drawing only gpencil data from either clip or track, but not both - XXX fix logic behind */
 			gpd_source = (scene->clip->gpd ? scene->clip->gpd : NULL);
 		}
-		
+
 		if (gpd_source) {
 			if (brush != NULL) {
 				gp_draw_data(brush, ts->gp_sculpt.alpha, gpd_source,
 				             offsx, offsy, winx, winy, cfra, dflag);
 			}
-			
 		}
 	}
 	

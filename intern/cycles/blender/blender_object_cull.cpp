@@ -16,9 +16,9 @@
 
 #include <cstdlib>
 
-#include "camera.h"
+#include "render/camera.h"
 
-#include "blender_object_cull.h"
+#include "blender/blender_object_cull.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -43,7 +43,7 @@ BlenderObjectCulling::BlenderObjectCulling(Scene *scene, BL::Scene& b_scene)
 		camera_cull_margin_ = get_float(cscene, "camera_cull_margin");
 		distance_cull_margin_ = get_float(cscene, "distance_cull_margin");
 
-		if (distance_cull_margin_ == 0.0f) {
+		if(distance_cull_margin_ == 0.0f) {
 			use_scene_distance_cull_ = false;
 		}
 	}

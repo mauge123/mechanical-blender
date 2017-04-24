@@ -507,7 +507,7 @@ static void rna_float_print(FILE *f, float num)
 {
 	if (num == -FLT_MAX) fprintf(f, "-FLT_MAX");
 	else if (num == FLT_MAX) fprintf(f, "FLT_MAX");
-	else if ((int64_t)num == num) fprintf(f, "%.1ff", num);
+	else if ((ABS(num) < INT64_MAX) && ((int64_t)num == num)) fprintf(f, "%.1ff", num);
 	else fprintf(f, "%.10ff", num);
 }
 
@@ -3368,6 +3368,9 @@ static RNAProcessItem PROCESS_ITEMS[] = {
 	{"rna_movieclip.c", NULL, RNA_def_movieclip},
 	{"rna_tracking.c", NULL, RNA_def_tracking},
 	{"rna_mask.c", NULL, RNA_def_mask},
+#ifdef WITH_MECHANICAL_DRAWINGS
+	{"rna_drawings.c", NULL, RNA_def_drawings},
+#endif
 	{NULL, NULL}
 };
 

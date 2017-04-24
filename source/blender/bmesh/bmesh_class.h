@@ -198,6 +198,7 @@ typedef struct BMDim_OFlag {
 
 /* BMReference->type */
 #define BM_REFERENCE_TYPE_PLANE 1
+#define BM_REFERENCE_TYPE_AXIS 2
 
 typedef struct BMReference {
 	BMHeader head;
@@ -421,14 +422,20 @@ enum {
 #define _BM_GENERIC_TYPE_ELEM_NONCONST \
 	void *, BMVert *, BMEdge *, BMLoop *, BMFace *, \
 	BMVert_OFlag *, BMEdge_OFlag *, BMFace_OFlag *, \
-	BMElem *, BMElemF *, BMHeader *
+	BMElem *, BMElemF *, BMHeader *, \
+	BMGeom *, BMDim *, BMReference *, \
+	BMGeom_OFlag *, BMDim_OFlag *, BMReference_OFlag *
 
 #define _BM_GENERIC_TYPE_ELEM_CONST \
 	const void *, const BMVert *, const BMEdge *, const BMLoop *, const BMFace *, \
 	const BMVert_OFlag *, const BMEdge_OFlag *, const BMFace_OFlag *, \
 	const BMElem *, const BMElemF *, const BMHeader *, \
+	const BMGeom *, const BMDim *, const BMReference *, \
+	const BMGeom_OFlag *, const BMDim_OFlag *, const BMReference_OFlag *, \
 	void * const, BMVert * const, BMEdge * const, BMLoop * const, BMFace * const, \
-	BMElem * const, BMElemF * const, BMHeader * const
+	BMElem * const, BMElemF * const, BMHeader * const, \
+	BMGeom * const, BMDim * const, BMReference * const,  \
+	BMGeom_OFlag * const, BMDim_OFlag * const, BMReference_OFlag * const
 
 #define BM_CHECK_TYPE_ELEM_CONST(ele) \
 	CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPES_CONST)
@@ -457,22 +464,23 @@ enum {
 #define BM_CHECK_TYPE_FACE_CONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_FACE_CONST)
 #define BM_CHECK_TYPE_FACE_NONCONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST)
 #define BM_CHECK_TYPE_FACE(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_FACE_NONCONST, _BM_GENERIC_TYPE_FACE_CONST)
+
 /*Dimension*/
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 #define _BM_GENERIC_TYPE_DIM_NONCONST BMDim *, BMDim_OFlag *
 #define _BM_GENERIC_TYPE_DIM_CONST const BMDim *, const BMDim_OFlag *
 #define BM_CHECK_TYPE_DIM_CONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_DIM_CONST)
 #define BM_CHECK_TYPE_DIM_NONCONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST)
 #define BM_CHECK_TYPE_DIM(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_DIM_NONCONST, _BM_GENERIC_TYPE_DIM_CONST)
-#endif
+
 /*Reference*/
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 #define _BM_GENERIC_TYPE_REFERENCE_NONCONST BMReference *, BMReference_OFlag *
 #define _BM_GENERIC_TYPE_REFERENCE_CONST const BMReference *, const BMReference_OFlag *
 #define BM_CHECK_TYPE_REFERENCE_CONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_REFERENCE_CONST)
 #define BM_CHECK_TYPE_REFERENCE_NONCONST(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_ELEM_NONCONST)
-#define BM_CHECK_TYPE_REFERENCE(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_REFERENCE_NONCONST, _BM_GENERIC_TYPE_FACE_CONST)
-#endif
+#define BM_CHECK_TYPE_REFERENCE(ele) CHECK_TYPE_ANY(ele, _BM_GENERIC_TYPE_REFERENCE_NONCONST, _BM_GENERIC_TYPE_REFERENCE_CONST)
+
 
 
 

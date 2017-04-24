@@ -17,20 +17,22 @@
 #ifndef __MESH_H__
 #define __MESH_H__
 
-#include "attribute.h"
-#include "node.h"
-#include "shader.h"
+#include "graph/node.h"
 
-#include "util_boundbox.h"
-#include "util_list.h"
-#include "util_map.h"
-#include "util_param.h"
-#include "util_transform.h"
-#include "util_types.h"
-#include "util_vector.h"
+#include "render/attribute.h"
+#include "render/shader.h"
+
+#include "util/util_boundbox.h"
+#include "util/util_list.h"
+#include "util/util_map.h"
+#include "util/util_param.h"
+#include "util/util_transform.h"
+#include "util/util_types.h"
+#include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 
+class Attribute;
 class BVH;
 class Device;
 class DeviceScene;
@@ -47,18 +49,34 @@ struct PackedPatchTable;
 
 class Mesh : public Node {
 public:
-	NODE_DECLARE;
+	NODE_DECLARE
 
 	/* Mesh Triangle */
 	struct Triangle {
 		int v[3];
 
 		void bounds_grow(const float3 *verts, BoundBox& bounds) const;
+
+		void motion_verts(const float3 *verts,
+		                  const float3 *vert_steps,
+		                  size_t num_verts,
+		                  size_t num_steps,
+		                  float time,
+		                  float3 r_verts[3]) const;
+
+		void verts_for_step(const float3 *verts,
+		                    const float3 *vert_steps,
+		                    size_t num_verts,
+		                    size_t num_steps,
+		                    size_t step,
+		                    float3 r_verts[3]) const;
 	};
 
 	Triangle get_triangle(size_t i) const
 	{
-		Triangle tri = {{triangles[i*3 + 0], triangles[i*3 + 1], triangles[i*3 + 2]}};
+		Triangle tri = {{triangles[i*3 + 0],
+		                 triangles[i*3 + 1],
+		                 triangles[i*3 + 2]}};
 		return tri;
 	}
 
@@ -78,11 +96,48 @@ public:
 		                 const float3 *curve_keys,
 		                 const float *curve_radius,
 		                 BoundBox& bounds) const;
+		void bounds_grow(float4 keys[4], BoundBox& bounds) const;
 		void bounds_grow(const int k,
 		                 const float3 *curve_keys,
 		                 const float *curve_radius,
 		                 const Transform& aligned_space,
 		                 BoundBox& bounds) const;
+
+		void motion_keys(const float3 *curve_keys,
+		                 const float *curve_radius,
+		                 const float3 *key_steps,
+		                 size_t num_curve_keys,
+		                 size_t num_steps,
+		                 float time,
+		                 size_t k0, size_t k1,
+		                 float4 r_keys[2]) const;
+		void cardinal_motion_keys(const float3 *curve_keys,
+		                          const float *curve_radius,
+		                          const float3 *key_steps,
+		                          size_t num_curve_keys,
+		                          size_t num_steps,
+		                          float time,
+		                          size_t k0, size_t k1,
+		                          size_t k2, size_t k3,
+		                          float4 r_keys[4]) const;
+
+		void keys_for_step(const float3 *curve_keys,
+		                   const float *curve_radius,
+		                   const float3 *key_steps,
+		                   size_t num_curve_keys,
+		                   size_t num_steps,
+		                   size_t step,
+		                   size_t k0, size_t k1,
+		                   float4 r_keys[2]) const;
+		void cardinal_keys_for_step(const float3 *curve_keys,
+		                            const float *curve_radius,
+		                            const float3 *key_steps,
+		                            size_t num_curve_keys,
+		                            size_t num_steps,
+		                            size_t step,
+		                            size_t k0, size_t k1,
+		                            size_t k2, size_t k3,
+		                            float4 r_keys[4]) const;
 	};
 
 	Curve get_curve(size_t i) const

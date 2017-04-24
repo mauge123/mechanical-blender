@@ -23,11 +23,11 @@ from rna_prop_ui import PropertyPanel
 from bpy.app.translations import pgettext_iface as iface_
 
 from bl_ui.properties_physics_common import (
-        point_cache_ui,
-        effector_weights_ui,
-        basic_force_field_settings_ui,
-        basic_force_field_falloff_ui,
-        )
+    point_cache_ui,
+    effector_weights_ui,
+    basic_force_field_settings_ui,
+    basic_force_field_falloff_ui,
+)
 
 
 def particle_panel_enabled(context, psys):
@@ -108,6 +108,7 @@ def find_modifier(ob, psys):
 
 
 class PARTICLE_UL_particle_systems(bpy.types.UIList):
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index, flt_flag):
         ob = data
         psys = item
@@ -117,8 +118,10 @@ class PARTICLE_UL_particle_systems(bpy.types.UIList):
 
             layout.prop(psys, "name", text="", emboss=False, icon_value=icon)
             if md:
-                layout.prop(md, "show_render", emboss=False, icon_only=True, icon='RESTRICT_RENDER_OFF' if md.show_render else 'RESTRICT_RENDER_ON')
-                layout.prop(md, "show_viewport", emboss=False, icon_only=True, icon='RESTRICT_VIEW_OFF' if md.show_viewport else 'RESTRICT_VIEW_ON')
+                layout.prop(md, "show_render", emboss=False, icon_only=True,
+                            icon='RESTRICT_RENDER_OFF' if md.show_render else 'RESTRICT_RENDER_ON')
+                layout.prop(md, "show_viewport", emboss=False, icon_only=True,
+                            icon='RESTRICT_VIEW_OFF' if md.show_viewport else 'RESTRICT_VIEW_ON')
 
         elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
@@ -401,7 +404,8 @@ class PARTICLE_PT_hair_dynamics(ParticleButtonsPanel, Panel):
                 label = "ERROR"
                 icon = 'ERROR'
             box.label(label, icon=icon)
-            box.label("Iterations: %d .. %d (avg. %d)" % (result.min_iterations, result.max_iterations, result.avg_iterations))
+            box.label("Iterations: %d .. %d (avg. %d)" %
+                      (result.min_iterations, result.max_iterations, result.avg_iterations))
             box.label("Error: %.5f .. %.5f (avg. %.5f)" % (result.min_error, result.max_error, result.avg_error))
 
 
@@ -423,7 +427,12 @@ class PARTICLE_PT_cache(ParticleButtonsPanel, Panel):
         phystype = psys.settings.physics_type
         if phystype == 'NO' or phystype == 'KEYED':
             return False
-        return (psys.settings.type in {'EMITTER', 'REACTOR'} or (psys.settings.type == 'HAIR' and (psys.use_hair_dynamics or psys.point_cache.is_baked))) and engine in cls.COMPAT_ENGINES
+        return (
+            (psys.settings.type in {'EMITTER', 'REACTOR'} or
+             (psys.settings.type == 'HAIR' and
+              (psys.use_hair_dynamics or psys.point_cache.is_baked))) and
+            engine in cls.COMPAT_ENGINES
+        )
 
     def draw(self, context):
         psys = context.particle_system
@@ -743,7 +752,8 @@ class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
                 layout.label(text="Fluid interaction:")
 
             row = layout.row()
-            row.template_list("UI_UL_list", "particle_targets", psys, "targets", psys, "active_particle_target_index", rows=4)
+            row.template_list("UI_UL_list", "particle_targets", psys, "targets",
+                              psys, "active_particle_target_index", rows=4)
 
             col = row.column()
             sub = col.row()
@@ -752,15 +762,15 @@ class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
             subsub.operator("particle.target_remove", icon='ZOOMOUT', text="")
             sub = col.row()
             subsub = sub.column(align=True)
-            subsub.operator("particle.target_move_up", icon='MOVE_UP_VEC', text="")
-            subsub.operator("particle.target_move_down", icon='MOVE_DOWN_VEC', text="")
+            subsub.operator("particle.target_move_up", icon='TRIA_UP', text="")
+            subsub.operator("particle.target_move_down", icon='TRIA_DOWN', text="")
 
             key = psys.active_particle_target
             if key:
                 row = layout.row()
                 if part.physics_type == 'KEYED':
                     col = row.column()
-                    #doesn't work yet
+                    # doesn't work yet
                     #col.alert = key.valid
                     col.prop(key, "object", text="")
                     col.prop(key, "system", text="System")
@@ -770,7 +780,7 @@ class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
                     col.prop(key, "duration")
                 elif part.physics_type == 'BOIDS':
                     sub = row.row()
-                    #doesn't work yet
+                    # doesn't work yet
                     #sub.alert = key.valid
                     sub.prop(key, "object", text="")
                     sub.prop(key, "system", text="System")
@@ -778,7 +788,7 @@ class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
                     layout.prop(key, "alliance", expand=True)
                 elif part.physics_type == 'FLUID':
                     sub = row.row()
-                    #doesn't work yet
+                    # doesn't work yet
                     #sub.alert = key.valid
                     sub.prop(key, "object", text="")
                     sub.prop(key, "system", text="System")
@@ -816,8 +826,8 @@ class PARTICLE_PT_boidbrain(ParticleButtonsPanel, Panel):
         #sub.operator("boid.state_add", icon='ZOOMIN', text="")
         #sub.operator("boid.state_del", icon='ZOOMOUT', text="")
         #sub = row.row(align=True)
-        #sub.operator("boid.state_move_up", icon='MOVE_UP_VEC', text="")
-        #sub.operator("boid.state_move_down", icon='MOVE_DOWN_VEC', text="")
+        #sub.operator("boid.state_move_up", icon='TRIA_UP', text="")
+        #sub.operator("boid.state_move_down", icon='TRIA_DOWN', text="")
 
         state = boids.active_boid_state
 
@@ -831,7 +841,8 @@ class PARTICLE_PT_boidbrain(ParticleButtonsPanel, Panel):
             row.label(text="")
 
         row = layout.row()
-        row.template_list("UI_UL_list", "particle_boids_rules", state, "rules", state, "active_boid_rule_index", rows=4)
+        row.template_list("UI_UL_list", "particle_boids_rules", state,
+                          "rules", state, "active_boid_rule_index", rows=4)
 
         col = row.column()
         sub = col.row()
@@ -840,17 +851,17 @@ class PARTICLE_PT_boidbrain(ParticleButtonsPanel, Panel):
         subsub.operator("boid.rule_del", icon='ZOOMOUT', text="")
         sub = col.row()
         subsub = sub.column(align=True)
-        subsub.operator("boid.rule_move_up", icon='MOVE_UP_VEC', text="")
-        subsub.operator("boid.rule_move_down", icon='MOVE_DOWN_VEC', text="")
+        subsub.operator("boid.rule_move_up", icon='TRIA_UP', text="")
+        subsub.operator("boid.rule_move_down", icon='TRIA_DOWN', text="")
 
         rule = state.active_boid_rule
 
         if rule:
             row = layout.row()
             row.prop(rule, "name", text="")
-            #somebody make nice icons for boids here please! -jahka
-            row.prop(rule, "use_in_air", icon='MOVE_UP_VEC', text="")
-            row.prop(rule, "use_on_land", icon='MOVE_DOWN_VEC', text="")
+            # somebody make nice icons for boids here please! -jahka
+            row.prop(rule, "use_in_air", icon='TRIA_UP', text="")
+            row.prop(rule, "use_on_land", icon='TRIA_DOWN', text="")
 
             row = layout.row()
 
@@ -1009,8 +1020,8 @@ class PARTICLE_PT_render(ParticleButtonsPanel, Panel):
                 subsub = sub.column(align=True)
                 subsub.operator("particle.dupliob_copy", icon='ZOOMIN', text="")
                 subsub.operator("particle.dupliob_remove", icon='ZOOMOUT', text="")
-                subsub.operator("particle.dupliob_move_up", icon='MOVE_UP_VEC', text="")
-                subsub.operator("particle.dupliob_move_down", icon='MOVE_DOWN_VEC', text="")
+                subsub.operator("particle.dupliob_move_up", icon='TRIA_UP', text="")
+                subsub.operator("particle.dupliob_move_down", icon='TRIA_DOWN', text="")
 
                 weight = part.active_dupliweight
                 if weight:
@@ -1404,5 +1415,29 @@ class PARTICLE_PT_custom_props(ParticleButtonsPanel, PropertyPanel, Panel):
     _context_path = "particle_system.settings"
     _property_type = bpy.types.ParticleSettings
 
+
+classes = (
+    PARTICLE_MT_specials,
+    PARTICLE_MT_hair_dynamics_presets,
+    PARTICLE_UL_particle_systems,
+    PARTICLE_PT_context_particles,
+    PARTICLE_PT_emission,
+    PARTICLE_PT_hair_dynamics,
+    PARTICLE_PT_cache,
+    PARTICLE_PT_velocity,
+    PARTICLE_PT_rotation,
+    PARTICLE_PT_physics,
+    PARTICLE_PT_boidbrain,
+    PARTICLE_PT_render,
+    PARTICLE_PT_draw,
+    PARTICLE_PT_children,
+    PARTICLE_PT_field_weights,
+    PARTICLE_PT_force_fields,
+    PARTICLE_PT_vertexgroups,
+    PARTICLE_PT_custom_props,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

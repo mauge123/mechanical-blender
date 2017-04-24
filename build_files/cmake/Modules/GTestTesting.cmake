@@ -39,13 +39,16 @@ macro(BLENDER_SRC_GTEST_EX NAME SRC EXTRA_LIBS DO_ADD_TEST)
 		                      ${PTHREADS_LIBRARIES}
 		                      extern_glog
 		                      extern_gflags)
+		if(WITH_OPENMP_STATIC)
+			target_link_libraries(${NAME}_test ${OpenMP_LIBRARIES})
+		endif()
 		set_target_properties(${NAME}_test PROPERTIES
 		                      RUNTIME_OUTPUT_DIRECTORY         "${TESTS_OUTPUT_DIR}"
 		                      RUNTIME_OUTPUT_DIRECTORY_RELEASE "${TESTS_OUTPUT_DIR}"
 		                      RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${TESTS_OUTPUT_DIR}"
 		                      INCLUDE_DIRECTORIES              "${TEST_INC}")
 		if(${DO_ADD_TEST})
-			add_test(${NAME}_test ${TESTS_OUTPUT_DIR}/${NAME}_test)
+			add_test(NAME ${NAME}_test COMMAND ${TESTS_OUTPUT_DIR}/${NAME}_test WORKING_DIRECTORY $<TARGET_FILE_DIR:blender>)
 		endif()
 	endif()
 endmacro()

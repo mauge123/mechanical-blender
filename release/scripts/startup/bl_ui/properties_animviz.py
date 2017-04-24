@@ -86,14 +86,26 @@ class MotionPathButtonsPanel:
         col = split.column()
         col.label(text="Show:")
         col.prop(mps, "show_frame_numbers", text="Frame Numbers")
+        if mpath is not None:
+            col.prop(mpath, "lines", text='Lines')
+            col.prop(mpath, "line_thickness", text='Thickness')
 
         col = split.column()
+        col.label('')
         col.prop(mps, "show_keyframe_highlight", text="Keyframes")
         sub = col.column()
         sub.enabled = mps.show_keyframe_highlight
         if bones:
             sub.prop(mps, "show_keyframe_action_all", text="+ Non-Grouped Keyframes")
         sub.prop(mps, "show_keyframe_numbers", text="Keyframe Numbers")
+
+        # Customize path
+        if mpath is not None:
+            row = layout.row(align=True)
+            row.prop(mpath, "use_custom_color", text='', toggle=True, icon='COLOR')
+            sub = row.row(align=True)
+            sub.enabled = mpath.use_custom_color
+            sub.prop(mpath, "color", text='')
 
 
 # FIXME: this panel still needs to be ported so that it will work correctly with animviz
@@ -127,6 +139,11 @@ class OnionSkinButtonsPanel:
         col.label(text="Display:")
         col.prop(arm, "show_only_ghost_selected", text="Selected Only")
 
+
+classes = (
+)
+
 if __name__ == "__main__":  # only for live edit.
-    import bpy
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

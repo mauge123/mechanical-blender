@@ -59,6 +59,9 @@ void ED_spacetype_console(void);
 void ED_spacetype_userpref(void);
 void ED_spacetype_clip(void);
 
+// WITH_MECHANICAL_DRAWINGS
+void ED_spacetype_drawings(void);
+
 /* calls for instancing and freeing spacetype static data 
  * called in WM_init_exit */
 /* in space_file.c */

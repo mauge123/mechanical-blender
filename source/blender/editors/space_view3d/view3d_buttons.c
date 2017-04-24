@@ -74,6 +74,7 @@
 #include "ED_screen.h"
 
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -279,6 +280,12 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				                     &ptr,prop,0, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
 				UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 
+				if (ELEM(edm_sel->mdim->dim_type, DIM_TYPE_ANGLE_3P, DIM_TYPE_ANGLE_3P_CON)){
+					// Specific angle settings
+					prop = RNA_struct_find_property(&ptr, "dimension_angle_complementary");
+					uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+				}
+
 			} else {
 				tfp->dimension_value = get_dimension_value(edm_sel);
 				but = uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,IFACE_("Value:"),0, yi -= buth + but_margin, 200, buth,
@@ -412,11 +419,12 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		if (bm->totrefsel) {
 			BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
 				if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
-					add_v3_v3(&median[LOC_X], erf->v1);
-					add_v3_v3(&median[LOC_X], erf->v2);
-					add_v3_v3(&median[LOC_X], erf->v3);
-					add_v3_v3(&median[LOC_X], erf->v4);
-					tot+=4;
+					add_v3_v3(&median[LOC_X], erf->v1);tot+=1;
+					add_v3_v3(&median[LOC_X], erf->v2);tot+=1;
+					if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+						add_v3_v3(&median[LOC_X], erf->v3);tot+=1;
+						add_v3_v3(&median[LOC_X], erf->v4);tot+=1;
+					}
 				}
 			}
 		}
@@ -658,7 +666,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 				uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN,
 				          totedgedata == 1 ? IFACE_("Crease:") : IFACE_("Mean Crease:"),
 				          0, yi -= buth + but_margin, 200, buth,
-				          &(tfp->ve_median[M_CREASE]), 0.0, 1.0, 1, 2, TIP_("Weight used by SubSurf modifier"));
+				          &(tfp->ve_median[M_CREASE]), 0.0, 1.0, 1, 2, TIP_("Weight used by the Subdivision Surface modifier"));
 			}
 		}
 		/* Curve... */
@@ -673,7 +681,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		else if (totcurvedata > 1) {
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Mean Weight:"),
 			          0, yi -= buth + but_margin, 200, buth,
-			          &(tfp->ve_median[C_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for SoftBody Goal"));
+			          &(tfp->ve_median[C_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for Soft Body Goal"));
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Mean Radius:"),
 			          0, yi -= buth + but_margin, 200, buth,
 			          &(tfp->ve_median[C_RADIUS]), 0.0, 100.0, 1, 3, TIP_("Radius of curve control points"));
@@ -691,7 +699,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		else if (totlattdata > 1) {
 			uiDefButF(block, UI_BTYPE_NUM, B_OBJECTPANELMEDIAN, IFACE_("Mean Weight:"),
 			          0, yi -= buth + but_margin, 200, buth,
-			          &(tfp->ve_median[L_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for SoftBody Goal"));
+			          &(tfp->ve_median[L_WEIGHT]), 0.0, 1.0, 1, 3, TIP_("Weight used for Soft Body Goal"));
 		}
 
 		UI_block_align_end(block);
@@ -802,8 +810,10 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 						if (apply_vcos) {
 							apply_raw_diff_v3(erf->v1, tot, &ve_median[LOC_X], &median[LOC_X]);
 							apply_raw_diff_v3(erf->v2, tot, &ve_median[LOC_X], &median[LOC_X]);
-							apply_raw_diff_v3(erf->v3, tot, &ve_median[LOC_X], &median[LOC_X]);
-							apply_raw_diff_v3(erf->v4, tot, &ve_median[LOC_X], &median[LOC_X]);
+							if (erf->type == BM_REFERENCE_TYPE_PLANE) {
+								apply_raw_diff_v3(erf->v3, tot, &ve_median[LOC_X], &median[LOC_X]);
+								apply_raw_diff_v3(erf->v4, tot, &ve_median[LOC_X], &median[LOC_X]);
+							}
 						}
 					}
 				}
@@ -1012,10 +1022,6 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 	if (dv && dv->totweight) {
 		ToolSettings *ts = scene->toolsettings;
 
-		wmOperatorType *ot_weight_set_active = WM_operatortype_find("OBJECT_OT_vertex_weight_set_active", true);
-		wmOperatorType *ot_weight_paste = WM_operatortype_find("OBJECT_OT_vertex_weight_paste", true);
-		wmOperatorType *ot_weight_delete = WM_operatortype_find("OBJECT_OT_vertex_weight_delete", true);
-
 		wmOperatorType *ot;
 		PointerRNA op_ptr, tools_ptr;
 		PointerRNA *but_ptr;
@@ -1054,7 +1060,7 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 
 					/* The Weight Group Name */
 
-					ot = ot_weight_set_active;
+					ot = WM_operatortype_find("OBJECT_OT_vertex_weight_set_active", true);
 					but = uiDefButO_ptr(block, UI_BTYPE_BUT, ot, WM_OP_EXEC_DEFAULT, dg->name,
 					                    xco, yco, (x = UI_UNIT_X * 5), UI_UNIT_Y, "");
 					but_ptr = UI_but_operator_ptr_get(but);
@@ -1080,23 +1086,16 @@ static void view3d_panel_vgroup(const bContext *C, Panel *pa)
 					xco += x;
 
 					/* The weight group paste function */
-
-					ot = ot_weight_paste;
-					WM_operator_properties_create_ptr(&op_ptr, ot);
-					RNA_int_set(&op_ptr, "weight_group", i);
 					icon = (locked) ? ICON_BLANK1 : ICON_PASTEDOWN;
-					uiItemFullO_ptr(row, ot, "", icon, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
+					op_ptr = uiItemFullO(row, "OBJECT_OT_vertex_weight_paste", "", icon, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+					RNA_int_set(&op_ptr, "weight_group", i);
 
 					/* The weight entry delete function */
-
-					ot = ot_weight_delete;
-					WM_operator_properties_create_ptr(&op_ptr, ot);
-					RNA_int_set(&op_ptr, "weight_group", i);
 					icon = (locked) ? ICON_LOCKED : ICON_X;
-					uiItemFullO_ptr(row, ot, "", icon, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
+					op_ptr = uiItemFullO(row, "OBJECT_OT_vertex_weight_delete", "", icon, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+					RNA_int_set(&op_ptr, "weight_group", i);
 
 					yco -= UI_UNIT_Y;
-					
 				}
 			}
 		}

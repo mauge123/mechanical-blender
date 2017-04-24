@@ -1234,6 +1234,7 @@ static void node_shader_set_butfunc(bNodeType *ntype)
 		case SH_NODE_BSDF_GLOSSY:
 		case SH_NODE_BSDF_GLASS:
 		case SH_NODE_BSDF_REFRACTION:
+		case SH_NODE_BSDF_PRINCIPLED:
 			ntype->draw_buttons = node_shader_buts_glossy;
 			break;
 		case SH_NODE_BSDF_ANISOTROPIC:
@@ -1320,9 +1321,6 @@ static void node_composit_buts_renderlayers(uiLayout *layout, bContext *C, Point
 	PropertyRNA *prop;
 	const char *layer_name;
 	char scene_name[MAX_ID_NAME - 2];
-	wmOperatorType *ot = WM_operatortype_find("RENDER_OT_render", 1);
-
-	BLI_assert(ot != 0);
 
 	uiTemplateID(layout, C, ptr, "scene", NULL, NULL, NULL);
 	
@@ -1339,11 +1337,9 @@ static void node_composit_buts_renderlayers(uiLayout *layout, bContext *C, Point
 	scn_ptr = RNA_pointer_get(ptr, "scene");
 	RNA_string_get(&scn_ptr, "name", scene_name);
 
-	WM_operator_properties_create_ptr(&op_ptr, ot);
+	op_ptr = uiItemFullO(row, "RENDER_OT_render", "", ICON_RENDER_STILL, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_string_set(&op_ptr, "layer", layer_name);
 	RNA_string_set(&op_ptr, "scene", scene_name);
-	uiItemFullO_ptr(row, ot, "", ICON_RENDER_STILL, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
-
 }
 
 
@@ -1629,17 +1625,6 @@ static void node_composit_buts_zcombine(uiLayout *layout, bContext *UNUSED(C), P
 	uiItemR(col, ptr, "use_antialias_z", 0, NULL, ICON_NONE);
 }
 
-
-static void node_composit_buts_hue_sat(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-	uiLayout *col;
-	
-	col = uiLayoutColumn(layout, false);
-	uiItemR(col, ptr, "color_hue", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-	uiItemR(col, ptr, "color_saturation", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-	uiItemR(col, ptr, "color_value", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-}
-
 static void node_composit_buts_dilateerode(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
 	uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
@@ -1803,6 +1788,7 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
 	Scene *scene = CTX_data_scene(C);
 	PointerRNA imfptr = RNA_pointer_get(ptr, "format");
 	PointerRNA active_input_ptr, op_ptr;
+	wmOperatorType *ot;
 	uiLayout *row, *col;
 	int active_index;
 	const bool multilayer = RNA_enum_get(&imfptr, "file_format") == R_IMF_IMTYPE_MULTILAYER;
@@ -1841,11 +1827,10 @@ static void node_composit_buts_file_output_ex(uiLayout *layout, bContext *C, Poi
 	active_input_ptr.id.data = ptr->id.data;
 	
 	col = uiLayoutColumn(row, true);
-	op_ptr = uiItemFullO(col, "NODE_OT_output_file_move_active_socket", "",
-	                     ICON_TRIA_UP, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+	ot = WM_operatortype_find("NODE_OT_output_file_move_active_socket", false);
+	op_ptr = uiItemFullO_ptr(col, ot, "", ICON_TRIA_UP, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_enum_set(&op_ptr, "direction", 1);
-	op_ptr = uiItemFullO(col, "NODE_OT_output_file_move_active_socket", "",
-	                     ICON_TRIA_DOWN, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
+	op_ptr = uiItemFullO_ptr(col, ot, "", ICON_TRIA_DOWN, NULL, WM_OP_INVOKE_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_enum_set(&op_ptr, "direction", 2);
 	
 	if (active_input_ptr.data) {
@@ -2177,14 +2162,7 @@ static void node_composit_buts_switch(uiLayout *layout, bContext *UNUSED(C), Poi
 
 static void node_composit_buts_switch_view_ex(uiLayout *layout, bContext *UNUSED(C), PointerRNA *UNUSED(ptr))
 {
-	PointerRNA op_ptr;
-	wmOperatorType *ot = WM_operatortype_find("NODE_OT_switch_view_update", 1);
-
-	BLI_assert(ot != 0);
-
-	WM_operator_properties_create_ptr(&op_ptr, ot);
-
-	uiItemFullO_ptr(layout, ot, "Update Views", ICON_FILE_REFRESH, op_ptr.data, WM_OP_INVOKE_DEFAULT, 0);
+	uiItemFullO(layout, "NODE_OT_switch_view_update", "Update Views", ICON_FILE_REFRESH, NULL, WM_OP_INVOKE_DEFAULT, 0);
 }
 
 static void node_composit_buts_boxmask(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -2579,9 +2557,6 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 			break;
 		case CMP_NODE_ALPHAOVER:
 			ntype->draw_buttons = node_composit_buts_alphaover;
-			break;
-		case CMP_NODE_HUE_SAT:
-			ntype->draw_buttons = node_composit_buts_hue_sat;
 			break;
 		case CMP_NODE_TEXTURE:
 			ntype->draw_buttons = node_buts_texture;

@@ -62,4 +62,9 @@ if(WITH_BLENDER)
 	add_subdirectory(uvedit)
 endif()
 
+if(WITH_MECHANICAL)
+	add_subdirectory(space_drawings)
+endif()
+
+
 add_subdirectory(datafiles)

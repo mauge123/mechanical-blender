@@ -96,6 +96,7 @@ void ED_operatortypes_mesh(void)
 
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 	WM_operatortype_append(MESH_OT_mechanical_reference_plane_add);
+	WM_operatortype_append(MESH_OT_mechanical_reference_axis_add);
 #endif
 
 	WM_operatortype_append(MESH_OT_extrude_region);

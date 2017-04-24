@@ -289,7 +289,6 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
 
         row = layout.row()
         row.operator("view3d.game_start", text="Start")
-        row.label()
         row = layout.row()
         row.label(text="Resolution:")
         row = layout.row(align=True)
@@ -310,8 +309,6 @@ class RENDER_PT_game_player(RenderButtonsPanel, Panel):
 
         row = layout.row()
         row.operator("wm.blenderplayer_start", text="Start")
-        row.label()
-
         row = layout.row()
         row.label(text="Resolution:")
         row = layout.row(align=True)
@@ -472,8 +469,86 @@ class SceneButtonsPanel:
     bl_context = "scene"
 
 
+class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
+    bl_label = "Physics"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.render.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+
+        gs = context.scene.game_settings
+
+        layout.prop(gs, "physics_engine", text="Engine")
+        if gs.physics_engine != 'NONE':
+            layout.prop(gs, "physics_gravity", text="Gravity")
+
+            split = layout.split()
+
+            col = split.column()
+            col.label(text="Physics Steps:")
+            sub = col.column(align=True)
+            sub.prop(gs, "physics_step_max", text="Max")
+            sub.prop(gs, "physics_step_sub", text="Substeps")
+            col.prop(gs, "fps", text="FPS")
+
+            col = split.column()
+            col.label(text="Logic Steps:")
+            col.prop(gs, "logic_step_max", text="Max")
+
+            col = layout.column()
+            col.label(text="Physics Deactivation:")
+            sub = col.row(align=True)
+            sub.prop(gs, "deactivation_linear_threshold", text="Linear Threshold")
+            sub.prop(gs, "deactivation_angular_threshold", text="Angular Threshold")
+            sub = col.row()
+            sub.prop(gs, "deactivation_time", text="Time")
+
+            col = layout.column()
+            col.prop(gs, "use_occlusion_culling", text="Occlusion Culling")
+            sub = col.column()
+            sub.active = gs.use_occlusion_culling
+            sub.prop(gs, "occlusion_culling_resolution", text="Resolution")
+
+        else:
+            split = layout.split()
+
+            col = split.column()
+            col.label(text="Physics Steps:")
+            col.prop(gs, "fps", text="FPS")
+
+            col = split.column()
+            col.label(text="Logic Steps:")
+            col.prop(gs, "logic_step_max", text="Max")
+
+
+class SCENE_PT_game_physics_obstacles(SceneButtonsPanel, Panel):
+    bl_label = "Obstacle Simulation"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.render.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+
+        gs = context.scene.game_settings
+
+        layout.prop(gs, "obstacle_simulation", text="Type")
+        if gs.obstacle_simulation != 'NONE':
+            layout.prop(gs, "level_height")
+            layout.prop(gs, "show_obstacle_simulation")
+
+
 class SCENE_PT_game_navmesh(SceneButtonsPanel, Panel):
-    bl_label = "Navigation mesh"
+    bl_label = "Navigation Mesh"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -487,7 +562,7 @@ class SCENE_PT_game_navmesh(SceneButtonsPanel, Panel):
 
         rd = context.scene.game_settings.recast_data
 
-        layout.operator("mesh.navmesh_make", text="Build navigation mesh")
+        layout.operator("mesh.navmesh_make", text="Build Navigation Mesh")
 
         col = layout.column()
         col.label(text="Rasterization:")
@@ -659,83 +734,6 @@ class WORLD_PT_game_mist(WorldButtonsPanel, Panel):
         layout.prop(world.mist_settings, "intensity", text="Minimum Intensity")
 
 
-class WORLD_PT_game_physics(WorldButtonsPanel, Panel):
-    bl_label = "Physics"
-    COMPAT_ENGINES = {'BLENDER_GAME'}
-
-    @classmethod
-    def poll(cls, context):
-        scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
-
-    def draw(self, context):
-        layout = self.layout
-
-        gs = context.scene.game_settings
-
-        layout.prop(gs, "physics_engine", text="Engine")
-        if gs.physics_engine != 'NONE':
-            layout.prop(gs, "physics_gravity", text="Gravity")
-
-            split = layout.split()
-
-            col = split.column()
-            col.label(text="Physics Steps:")
-            sub = col.column(align=True)
-            sub.prop(gs, "physics_step_max", text="Max")
-            sub.prop(gs, "physics_step_sub", text="Substeps")
-            col.prop(gs, "fps", text="FPS")
-
-            col = split.column()
-            col.label(text="Logic Steps:")
-            col.prop(gs, "logic_step_max", text="Max")
-
-            col = layout.column()
-            col.label(text="Physics Deactivation:")
-            sub = col.row(align=True)
-            sub.prop(gs, "deactivation_linear_threshold", text="Linear Threshold")
-            sub.prop(gs, "deactivation_angular_threshold", text="Angular Threshold")
-            sub = col.row()
-            sub.prop(gs, "deactivation_time", text="Time")
-
-            col = layout.column()
-            col.prop(gs, "use_occlusion_culling", text="Occlusion Culling")
-            sub = col.column()
-            sub.active = gs.use_occlusion_culling
-            sub.prop(gs, "occlusion_culling_resolution", text="Resolution")
-
-        else:
-            split = layout.split()
-
-            col = split.column()
-            col.label(text="Physics Steps:")
-            col.prop(gs, "fps", text="FPS")
-
-            col = split.column()
-            col.label(text="Logic Steps:")
-            col.prop(gs, "logic_step_max", text="Max")
-
-
-class WORLD_PT_game_physics_obstacles(WorldButtonsPanel, Panel):
-    bl_label = "Obstacle simulation"
-    COMPAT_ENGINES = {'BLENDER_GAME'}
-
-    @classmethod
-    def poll(cls, context):
-        scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
-
-    def draw(self, context):
-        layout = self.layout
-
-        gs = context.scene.game_settings
-
-        layout.prop(gs, "obstacle_simulation", text="Type")
-        if gs.obstacle_simulation != 'NONE':
-            layout.prop(gs, "level_height")
-            layout.prop(gs, "show_obstacle_simulation")
-
-
 class DataButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -854,5 +852,30 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         row.menu("OBJECT_MT_lod_tools", text="", icon='TRIA_DOWN')
 
 
+classes = (
+    PHYSICS_PT_game_physics,
+    PHYSICS_PT_game_collision_bounds,
+    PHYSICS_PT_game_obstacles,
+    RENDER_PT_embedded,
+    RENDER_PT_game_player,
+    RENDER_PT_game_stereo,
+    RENDER_PT_game_shading,
+    RENDER_PT_game_system,
+    RENDER_PT_game_display,
+    SCENE_PT_game_physics,
+    SCENE_PT_game_physics_obstacles,
+    SCENE_PT_game_navmesh,
+    SCENE_PT_game_hysteresis,
+    WORLD_PT_game_context_world,
+    WORLD_PT_game_world,
+    WORLD_PT_game_environment_lighting,
+    WORLD_PT_game_mist,
+    DATA_PT_shadow_game,
+    OBJECT_MT_lod_tools,
+    OBJECT_PT_levels_of_detail,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

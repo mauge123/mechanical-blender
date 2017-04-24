@@ -188,6 +188,7 @@ set(SRC
 	intern/world.c
 	intern/writeavi.c
 	intern/writeframeserver.c
+	intern/drawing.c
 
 	BKE_DerivedMesh.h
 	BKE_action.h
@@ -295,6 +296,7 @@ set(SRC
 	BKE_world.h
 	BKE_writeavi.h
 	BKE_writeframeserver.h
+	BKE_drawing.h
 
 	depsgraph_private.h
 	nla_private.h
@@ -510,6 +512,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_SNAP_TO_PLANE)
 	add_definitions(-DWITH_MECHANICAL_UNIT_FORCE)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
+	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
 
 	list(APPEND INC
 		 ../mechanical

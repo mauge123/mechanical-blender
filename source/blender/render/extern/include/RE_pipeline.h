@@ -97,9 +97,10 @@ typedef struct RenderPass {
 } RenderPass;
 
 enum {
-	RENDER_PASS_DEBUG_BVH_TRAVERSAL_STEPS = 0,
+	RENDER_PASS_DEBUG_BVH_TRAVERSED_NODES = 0,
 	RENDER_PASS_DEBUG_BVH_TRAVERSED_INSTANCES = 1,
 	RENDER_PASS_DEBUG_RAY_BOUNCES = 2,
+	RENDER_PASS_DEBUG_BVH_INTERSECTIONS = 3,
 };
 
 /* a renderlayer is a full image, but with all passes and samples */
@@ -380,7 +381,7 @@ bool RE_allow_render_generic_object(struct Object *ob);
 /* RE_updateRenderInstances flag */
 enum {
 	RE_OBJECT_INSTANCES_UPDATE_VIEW  = (1 << 0),
-	RE_OBJECT_INSTANCES_UPDATE_OBMAT = (1 << 1),
+	RE_OBJECT_INSTANCES_UPDATE_OBMAT = (1 << 1)
 };
 void RE_updateRenderInstances(Render *re, int flag);
 

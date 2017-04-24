@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#include "camera.h"
-#include "device.h"
-#include "film.h"
-#include "integrator.h"
-#include "mesh.h"
-#include "scene.h"
-#include "tables.h"
+#include "render/camera.h"
+#include "device/device.h"
+#include "render/film.h"
+#include "render/integrator.h"
+#include "render/mesh.h"
+#include "render/scene.h"
+#include "render/tables.h"
 
-#include "util_algorithm.h"
-#include "util_debug.h"
-#include "util_foreach.h"
-#include "util_math.h"
-#include "util_math_cdf.h"
+#include "util/util_algorithm.h"
+#include "util/util_debug.h"
+#include "util/util_foreach.h"
+#include "util/util_math.h"
+#include "util/util_math_cdf.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -154,14 +154,9 @@ void Pass::add(PassType type, array<Pass>& passes)
 			pass.components = 0;
 			break;
 #ifdef WITH_CYCLES_DEBUG
-		case PASS_BVH_TRAVERSAL_STEPS:
-			pass.components = 1;
-			pass.exposure = false;
-			break;
+		case PASS_BVH_TRAVERSED_NODES:
 		case PASS_BVH_TRAVERSED_INSTANCES:
-			pass.components = 1;
-			pass.exposure = false;
-			break;
+		case PASS_BVH_INTERSECTIONS:
 		case PASS_RAY_BOUNCES:
 			pass.components = 1;
 			pass.exposure = false;
@@ -421,11 +416,14 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 				break;
 
 #ifdef WITH_CYCLES_DEBUG
-			case PASS_BVH_TRAVERSAL_STEPS:
-				kfilm->pass_bvh_traversal_steps = kfilm->pass_stride;
+			case PASS_BVH_TRAVERSED_NODES:
+				kfilm->pass_bvh_traversed_nodes = kfilm->pass_stride;
 				break;
 			case PASS_BVH_TRAVERSED_INSTANCES:
 				kfilm->pass_bvh_traversed_instances = kfilm->pass_stride;
+				break;
+			case PASS_BVH_INTERSECTIONS:
+				kfilm->pass_bvh_intersections = kfilm->pass_stride;
 				break;
 			case PASS_RAY_BOUNCES:
 				kfilm->pass_ray_bounces = kfilm->pass_stride;

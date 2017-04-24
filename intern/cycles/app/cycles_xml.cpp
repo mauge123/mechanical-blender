@@ -20,31 +20,31 @@
 #include <algorithm>
 #include <iterator>
 
-#include "node_xml.h"
+#include "graph/node_xml.h"
 
-#include "background.h"
-#include "camera.h"
-#include "film.h"
-#include "graph.h"
-#include "integrator.h"
-#include "light.h"
-#include "mesh.h"
-#include "nodes.h"
-#include "object.h"
-#include "osl.h"
-#include "shader.h"
-#include "scene.h"
+#include "render/background.h"
+#include "render/camera.h"
+#include "render/film.h"
+#include "render/graph.h"
+#include "render/integrator.h"
+#include "render/light.h"
+#include "render/mesh.h"
+#include "render/nodes.h"
+#include "render/object.h"
+#include "render/osl.h"
+#include "render/shader.h"
+#include "render/scene.h"
 
-#include "subd_patch.h"
-#include "subd_split.h"
+#include "subd/subd_patch.h"
+#include "subd/subd_split.h"
 
-#include "util_debug.h"
-#include "util_foreach.h"
-#include "util_path.h"
-#include "util_transform.h"
-#include "util_xml.h"
+#include "util/util_debug.h"
+#include "util/util_foreach.h"
+#include "util/util_path.h"
+#include "util/util_transform.h"
+#include "util/util_xml.h"
 
-#include "cycles_xml.h"
+#include "app/cycles_xml.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -523,7 +523,7 @@ static void xml_read_mesh(const XMLReadState& state, pugi::xml_node node)
 
 	/* we don't yet support arbitrary attributes, for now add vertex
 	 * coordinates as generated coordinates if requested */
-	if (mesh->need_attribute(state.scene, ATTR_STD_GENERATED)) {
+	if(mesh->need_attribute(state.scene, ATTR_STD_GENERATED)) {
 		Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
 		memcpy(attr->data_float3(), mesh->verts.data(), sizeof(float3)*mesh->verts.size());
 	}

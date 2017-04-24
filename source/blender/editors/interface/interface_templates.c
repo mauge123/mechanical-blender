@@ -375,6 +375,8 @@ static const char *template_id_browse_tip(StructRNA *type)
 			case ID_PAL: return N_("Browse Palette Data to be linked");
 			case ID_PC:  return N_("Browse Paint Curve Data to be linked");
 			case ID_CF:  return N_("Browse Cache Files to be linked");
+// WITH_MECHANICAL_DRAWING
+			case ID_DW:  return N_("Browse Drawing to be linked");
 		}
 	}
 	return N_("Browse ID data to be linked");
@@ -451,6 +453,11 @@ static void template_ID(
 		but = uiDefButR(block, UI_BTYPE_TEXT, 0, name, 0, 0, UI_UNIT_X * 6, UI_UNIT_Y,
 		                &idptr, "name", -1, 0, 0, -1, -1, RNA_struct_ui_description(type));
 		UI_but_funcN_set(but, template_id_cb, MEM_dupallocN(template), SET_INT_IN_POINTER(UI_ID_RENAME));
+
+		but->search_func = id_search_cb;
+		but->search_arg = template;
+		ui_but_search_refresh(but, true);
+
 		if (user_alert) UI_but_flag_enable(but, UI_BUT_REDALERT);
 
 		if (id->lib) {
@@ -494,7 +501,8 @@ static void template_ID(
 	
 		if (user_alert) UI_but_flag_enable(but, UI_BUT_REDALERT);
 		
-		if (id->lib == NULL && !(ELEM(GS(id->name), ID_GR, ID_SCE, ID_SCR, ID_TXT, ID_OB))) {
+// WITH_MECHANICAL_DRAWINGS
+		if (id->lib == NULL && !(ELEM(GS(id->name), ID_GR, ID_SCE, ID_SCR, ID_TXT, ID_OB, ID_DW))) {
 			uiDefButR(block, UI_BTYPE_TOGGLE, 0, "F", 0, 0, UI_UNIT_X, UI_UNIT_Y, &idptr, "use_fake_user", -1, 0, 0, -1, -1, NULL);
 		}
 	}
@@ -1978,6 +1986,7 @@ static void curvemap_tools_dofunc(bContext *C, void *cumap_v, int event)
 		case UICURVE_FUNC_HANDLE_AUTO_ANIM: /* set auto-clamped */
 			curvemap_handle_set(cuma, HD_AUTO_ANIM);
 			curvemapping_changed(cumap, false);
+			break;
 		case UICURVE_FUNC_EXTEND_HOZ: /* extend horiz */
 			cuma->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
 			curvemapping_changed(cumap, false);

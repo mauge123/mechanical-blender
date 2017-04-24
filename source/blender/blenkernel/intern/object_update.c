@@ -56,6 +56,7 @@
 #include "BKE_editmesh.h"
 #include "BKE_object.h"
 #include "BKE_particle.h"
+#include "BKE_pointcache.h"
 #include "BKE_scene.h"
 #include "BKE_material.h"
 #include "BKE_image.h"
@@ -293,7 +294,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 			}
 #endif
 #ifdef WITH_MECHANICAL_GEOMETRY
-			if (em && !G.moving) {
+			if (em && scene->geom_enabled && ob->geom_enabled && !G.moving) {
 				mechanical_update_mesh_geometry(em->bm);
 			}
 #endif
@@ -449,4 +450,10 @@ void BKE_object_eval_uber_data(EvaluationContext *eval_ctx,
 	BKE_object_handle_data_update(eval_ctx, scene, ob);
 
 	ob->recalc &= ~(OB_RECALC_DATA | OB_RECALC_TIME);
+}
+
+void BKE_object_eval_cloth(EvaluationContext *UNUSED(eval_ctx), Scene *scene, Object *object)
+{
+	DEBUG_PRINT("%s on %s\n", __func__, object->id.name);
+	BKE_ptcache_object_reset(scene, object, PTCACHE_RESET_DEPSGRAPH);
 }

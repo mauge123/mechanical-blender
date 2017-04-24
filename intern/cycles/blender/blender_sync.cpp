@@ -14,29 +14,29 @@
  * limitations under the License.
  */
 
-#include "background.h"
-#include "camera.h"
-#include "film.h"
-#include "graph.h"
-#include "integrator.h"
-#include "light.h"
-#include "mesh.h"
-#include "nodes.h"
-#include "object.h"
-#include "scene.h"
-#include "shader.h"
-#include "curves.h"
+#include "render/background.h"
+#include "render/camera.h"
+#include "render/film.h"
+#include "render/graph.h"
+#include "render/integrator.h"
+#include "render/light.h"
+#include "render/mesh.h"
+#include "render/nodes.h"
+#include "render/object.h"
+#include "render/scene.h"
+#include "render/shader.h"
+#include "render/curves.h"
 
-#include "device.h"
+#include "device/device.h"
 
-#include "blender_sync.h"
-#include "blender_session.h"
-#include "blender_util.h"
+#include "blender/blender_sync.h"
+#include "blender/blender_session.h"
+#include "blender/blender_util.h"
 
-#include "util_debug.h"
-#include "util_foreach.h"
-#include "util_opengl.h"
-#include "util_hash.h"
+#include "util/util_debug.h"
+#include "util/util_foreach.h"
+#include "util/util_opengl.h"
+#include "util/util_hash.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -322,6 +322,15 @@ void BlenderSync::sync_integrator()
 		integrator->volume_samples = volume_samples;
 	}
 
+	if(b_scene.render().use_simplify()) {
+		if(preview) {
+			integrator->ao_bounces = get_int(cscene, "ao_bounces");
+		}
+		else {
+			integrator->ao_bounces = get_int(cscene, "ao_bounces_render");
+		}
+	}
+
 	if(integrator->modified(previntegrator))
 		integrator->tag_update(scene);
 }
@@ -498,6 +507,7 @@ SceneParams BlenderSync::get_scene_params(BL::Scene& b_scene,
 
 	params.use_bvh_spatial_split = RNA_boolean_get(&cscene, "debug_use_spatial_splits");
 	params.use_bvh_unaligned_nodes = RNA_boolean_get(&cscene, "debug_use_hair_bvh");
+	params.num_bvh_time_steps = RNA_int_get(&cscene, "debug_bvh_time_steps");
 
 	if(background && params.shadingsystem != SHADINGSYSTEM_OSL)
 		params.persistent_data = r.use_persistent_data();

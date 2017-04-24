@@ -299,6 +299,10 @@ typedef struct Object {
 	LodLevel *currentlod;
 
 	struct PreviewImage *preview;
+
+// WITH_MECHANICAL_GEOMETRY
+	int geom_enabled;
+	char pad3[4];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -335,6 +339,8 @@ typedef struct DupliObject {
 
 	/* particle this dupli was generated from */
 	struct ParticleSystem *particle_system;
+	unsigned int random_id;
+	unsigned int pad;
 } DupliObject;
 
 /* **************** OBJECT ********************* */

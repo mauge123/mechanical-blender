@@ -230,7 +230,7 @@ static void BM_references_from_me_references(BMesh *bm, Mesh *me)
 		BM_mesh_elem_toolflags_ensure(bm);
 
 
-		erf = BM_reference_plane_create(bm,mrf->p1,mrf->p2, mrf->p3, mrf->p4, mrf->name, NULL,BM_CREATE_SKIP_CD);
+		erf = BM_reference_create(bm, mrf->type, mrf->p1,mrf->p2, mrf->p3, mrf->p4, mrf->name, NULL,BM_CREATE_SKIP_CD);
 
 		BM_elem_index_set(erf, i); /* set_ok */
 
@@ -1092,6 +1092,10 @@ void BM_mesh_bm_to_me(
 				/* propagate edited basis offsets to other shapes */
 				if (apply_offset) {
 					add_v3_v3(fp, *ofs_pt++);
+					/* Apply back new coordinates of offsetted shapekeys into BMesh.
+					 * Otherwise, in case we call again BM_mesh_bm_to_me on same BMesh, we'll apply diff from previous
+					 * call to BM_mesh_bm_to_me, to shapekey values from *original creation of the BMesh*. See T50524. */
+					copy_v3_v3(BM_ELEM_CD_GET_VOID_P(eve, cd_shape_offset), fp);
 				}
 
 				fp += 3;

@@ -65,6 +65,10 @@
 EnumPropertyItem rna_enum_space_type_items[] = {
 	/* empty must be here for python, is skipped for UI */
 	{SPACE_EMPTY, "EMPTY", ICON_NONE, "Empty", ""},
+#ifdef WITH_MECHANICAL_DRAWINGS
+	{SPACE_DRAWINGS, "DRAWINGS", ICON_DRAWING, "2D Drawings", "2D Drawings"},
+	{0, "", ICON_NONE, NULL, NULL},
+#endif
 	{SPACE_VIEW3D, "VIEW_3D", ICON_VIEW3D, "3D View", "3D viewport"},
 	{0, "", ICON_NONE, NULL, NULL},
 	{SPACE_TIME, "TIMELINE", ICON_TIME, "Timeline", "Timeline and playback controls"},
@@ -336,6 +340,10 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
 			return &RNA_SpaceUserPreferences;
 		case SPACE_CLIP:
 			return &RNA_SpaceClipEditor;
+#ifdef WITH_MECHANICAL_DRAWINGS
+		case SPACE_DRAWINGS:
+			return &RNA_SpaceDrawingsEditor;
+#endif
 		default:
 			return &RNA_Space;
 	}
@@ -2777,7 +2785,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "use_pivot_point_align", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_ALIGN);
-	RNA_def_property_ui_text(prop, "Align", "Manipulate center points (object and pose mode only)");
+	RNA_def_property_ui_text(prop, "Align", "Manipulate center points (object, pose and weight paint mode only)");
 	RNA_def_property_ui_icon(prop, ICON_ALIGN, 0);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_pivot_update");
 
@@ -4940,6 +4948,26 @@ static void rna_def_space_clip(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CLIP, NULL);
 }
 
+#ifdef WITH_MECHANICAL_DRAWINGS
+static void rna_def_space_drawings(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "SpaceDrawingsEditor", "Space");
+	RNA_def_struct_sdna(srna, "SpaceDrawings");
+	RNA_def_struct_ui_text(srna, "Space Drawings Editor", "Drawings editor space data");
+
+	prop = RNA_def_property(srna, "drawing", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Drawing", "Drawing displayed and edited in this space");
+	//RNA_def_property_pointer_funcs(prop, NULL, "rna_SpaceTextEditor_text_set", NULL, NULL);
+	//RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
+}
+
+#endif
+
 
 void RNA_def_space(BlenderRNA *brna)
 {
@@ -4966,6 +4994,9 @@ void RNA_def_space(BlenderRNA *brna)
 	rna_def_space_node(brna);
 	rna_def_space_logic(brna);
 	rna_def_space_clip(brna);
+#ifdef WITH_MECHANICAL_DRAWINGS
+	rna_def_space_drawings(brna);
+#endif
 }
 
 #endif

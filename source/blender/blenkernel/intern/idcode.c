@@ -91,6 +91,10 @@ static IDType idtypes[] = {
 	{ ID_VF,   "VFont",              "fonts",           BLT_I18NCONTEXT_ID_VFONT,              IDTYPE_FLAGS_ISLINKABLE },
 	{ ID_WO,   "World",              "worlds",          BLT_I18NCONTEXT_ID_WORLD,              IDTYPE_FLAGS_ISLINKABLE },
 	{ ID_WM,   "WindowManager",      "window_managers", BLT_I18NCONTEXT_ID_WINDOWMANAGER,      0                       },
+// WITH_MECHANICAL
+	{ ID_DM,   "Dimension",          "dimensions",	    BLT_I18NCONTEXT_ID_DIMENSION,	       IDTYPE_FLAGS_ISLINKABLE },
+// WITH_MECHANICAL_DRAWINGS
+	{ ID_DW,   "Drawing",            "Drawings",        BLT_I18NCONTEXT_ID_DRAWING,          IDTYPE_FLAGS_ISLINKABLE },
 
 	/** Keep last, not an ID exactly, only include for completeness */
 	{ ID_ID,   "ID",                 "ids",             BLT_I18NCONTEXT_ID_ID,                 0                       }, /* plural is fake */
@@ -304,6 +308,7 @@ int BKE_idcode_to_index(const short idcode)
 		CASE_IDINDEX(WM);
 		CASE_IDINDEX(WO);
 		CASE_IDINDEX(DM);
+		CASE_IDINDEX(DW);
 	}
 
 	BLI_assert(0);

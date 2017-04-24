@@ -1342,4 +1342,8 @@ int main(int argc, char **argv)
 #include "DNA_freestyle_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_cachefile_types.h"
+
+//WITH_MECHANICAL_DRAWINGS
+#include "DNA_drawing_types.h"
+
 /* end of list */

@@ -89,7 +89,11 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
         scene = context.scene
 
         split = layout.split()
-        
+        col = split.column()
+        col.label(text="Settings:")
+        col.prop(scene, "geom_enabled", text="Mesh Geometry Calcs")
+
+        split = layout.split()
         col = split.column() 
         col.label(text="Snap Mode:")
 
@@ -101,7 +105,7 @@ class SCENE_PT_geom(SceneButtonsPanel, Panel):
         col.prop(scene, "geom_ortho_point", text="Snap to Perpendicular Point")
         col.prop(scene, "geom_tangent_point", text="Snap to Tangent Point")
                 
-class SCENE_PT_dimenion(SceneButtonsPanel, Panel):
+class SCENE_PT_dimension(SceneButtonsPanel, Panel):
     bl_label = "Dimensions"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     
@@ -485,5 +489,26 @@ class SCENE_PT_custom_props(SceneButtonsPanel, PropertyPanel, Panel):
     _context_path = "scene"
     _property_type = bpy.types.Scene
 
+
+classes = (
+    SCENE_MT_units_length_presets,
+    SCENE_UL_keying_set_paths,
+    SCENE_PT_scene,
+    SCENE_PT_unit,
+    SCENE_PT_keying_sets,
+    SCENE_PT_keying_set_paths,
+    SCENE_PT_color_management,
+    SCENE_PT_audio,
+    SCENE_PT_physics,
+    SCENE_PT_rigid_body_world,
+    SCENE_PT_rigid_body_cache,
+    SCENE_PT_rigid_body_field_weights,
+    SCENE_PT_simplify,
+    SCENE_PT_custom_props,
+    SCENE_PT_geom,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

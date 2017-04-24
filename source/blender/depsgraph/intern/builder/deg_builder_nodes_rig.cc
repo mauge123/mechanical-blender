@@ -64,11 +64,12 @@ extern "C" {
 
 namespace DEG {
 
-void DepsgraphNodeBuilder::build_pose_constraints(Object *ob, bPoseChannel *pchan)
+void DepsgraphNodeBuilder::build_pose_constraints(Scene *scene, Object *ob, bPoseChannel *pchan)
 {
 	/* create node for constraint stack */
 	add_operation_node(&ob->id, DEPSNODE_TYPE_BONE, pchan->name,
-	                   DEPSOP_TYPE_EXEC, function_bind(BKE_pose_constraints_evaluate, _1, ob, pchan),
+	                   DEPSOP_TYPE_EXEC,
+	                   function_bind(BKE_pose_constraints_evaluate, _1, scene, ob, pchan),
 	                   DEG_OPCODE_BONE_CONSTRAINTS);
 }
 
@@ -119,7 +120,17 @@ void DepsgraphNodeBuilder::build_rig(Scene *scene, Object *ob)
 	 *       Eventually, we need some type of proxy/isolation mechanism in-between here
 	 *       to ensure that we can use same rig multiple times in same scene...
 	 */
-	build_animdata(&arm->id);
+	if ((arm->id.tag & LIB_TAG_DOIT) == 0) {
+		build_animdata(&arm->id);
+
+		/* Make sure pose is up-to-date with armature updates. */
+		add_operation_node(&arm->id,
+		                   DEPSNODE_TYPE_PARAMETERS,
+		                   DEPSOP_TYPE_EXEC,
+		                   NULL,
+		                   DEG_OPCODE_PLACEHOLDER,
+		                   "Armature Eval");
+	}
 
 	/* Rebuild pose if not up to date. */
 	if (ob->pose == NULL || (ob->pose->flag & POSE_RECALC)) {
@@ -140,14 +151,6 @@ void DepsgraphNodeBuilder::build_rig(Scene *scene, Object *ob)
 			BKE_pose_update_constraint_flags(ob->pose);
 		}
 	}
-
-	/* Make sure pose is up-to-date with armature updates. */
-	add_operation_node(&arm->id,
-	                   DEPSNODE_TYPE_PARAMETERS,
-	                   DEPSOP_TYPE_EXEC,
-	                   NULL,
-	                   DEG_OPCODE_PLACEHOLDER,
-	                   "Armature Eval");
 
 	/**
 	 * Pose Rig Graph
@@ -199,7 +202,7 @@ void DepsgraphNodeBuilder::build_rig(Scene *scene, Object *ob)
 
 		/* constraints */
 		if (pchan->constraints.first != NULL) {
-			build_pose_constraints(ob, pchan);
+			build_pose_constraints(scene, ob, pchan);
 		}
 
 		/**

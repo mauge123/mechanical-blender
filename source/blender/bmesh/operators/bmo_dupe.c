@@ -295,7 +295,8 @@ static void bmo_mesh_copy(BMOperator *op, BMesh *bm_dst, BMesh *bm_src)
 		if (BMO_elem_flag_test(bm_src, erf, DUPE_INPUT) &&
 		    !BMO_elem_flag_test(bm_src, erf, DUPE_DONE))
 		{
-			BMReference *nerf = BM_reference_plane_create(bm_dst, erf->v1, erf->v2, erf->v3, erf->v4, erf->name, NULL, 0);
+			BMReference *nerf = BM_reference_create(bm_dst, erf->type, erf->v1, erf->v2, erf->v3, erf->v4,
+			                                        erf->name, NULL, 0);
 			BMO_elem_flag_enable(bm_src, erf, DUPE_DONE);
 			BMO_elem_flag_enable(bm_src, nerf, DUPE_NEW);
 		}
@@ -392,6 +393,10 @@ void BMO_dupe_from_flag(BMesh *bm, int htype, const char hflag)
  * BMOP_DUPE_VOUTPUT: Buffer containing pointers to the split mesh vertices
  * BMOP_DUPE_EOUTPUT: Buffer containing pointers to the split mesh edges
  * BMOP_DUPE_FOUTPUT: Buffer containing pointers to the split mesh faces
+ *
+ * \note Lower level uses of this operator may want to use #BM_mesh_separate_faces
+ * Since it's faster for the 'use_only_faces' case.
+ *
  */
 void bmo_split_exec(BMesh *bm, BMOperator *op)
 {

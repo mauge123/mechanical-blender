@@ -112,7 +112,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	if (!mcmd->reader) {
 		mcmd->reader = CacheReader_open_alembic_object(cache_file->handle,
-		                                               mcmd->reader,
+		                                               NULL,
 		                                               ob,
 		                                               mcmd->object_path);
 		if (!mcmd->reader) {
@@ -151,7 +151,7 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 {
 	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
 
-	walk(userData, ob, (ID **)&mcmd->cache_file, IDWALK_USER);
+	walk(userData, ob, (ID **)&mcmd->cache_file, IDWALK_CB_USER);
 }
 
 

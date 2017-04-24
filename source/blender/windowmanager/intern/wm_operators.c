@@ -900,7 +900,7 @@ void WM_operator_properties_create_ptr(PointerRNA *ptr, wmOperatorType *ot)
 
 void WM_operator_properties_create(PointerRNA *ptr, const char *opstring)
 {
-	wmOperatorType *ot = WM_operatortype_find(opstring, 0);
+	wmOperatorType *ot = WM_operatortype_find(opstring, false);
 
 	if (ot)
 		WM_operator_properties_create_ptr(ptr, ot);
@@ -1118,6 +1118,7 @@ static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg_op)
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
 	UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
 
+	search[0] = '\0';
 #if 0 /* ok, this isn't so easy... */
 	uiDefBut(block, UI_BTYPE_LABEL, 0, RNA_struct_ui_name(op->type->srna), 10, 10, UI_searchbox_size_x(), UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
 #endif
@@ -1402,20 +1403,6 @@ static void dialog_exec_cb(bContext *C, void *arg1, void *arg2)
 	}
 }
 
-static void popup_check_cb(bContext *C, void *op_ptr, void *UNUSED(arg))
-{
-	wmOperator *op = op_ptr;
-	if (op->type->check) {
-		if (op->type->check(C, op)) {
-			/* check for popup and re-layout buttons */
-			ARegion *ar_menu = CTX_wm_menu(C);
-			if (ar_menu) {
-				ED_region_tag_refresh_ui(ar_menu);
-			}
-		}
-	}
-}
-
 /* Dialogs are popups that require user verification (click OK) before exec */
 static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 {
@@ -1434,8 +1421,6 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
 	
-	UI_block_func_set(block, popup_check_cb, op, NULL);
-
 	uiLayoutOperatorButs(C, layout, op, NULL, 'H', UI_LAYOUT_OP_SHOW_TITLE);
 	
 	/* clear so the OK button is left alone */
@@ -1473,8 +1458,6 @@ static uiBlock *wm_operator_ui_create(bContext *C, ARegion *ar, void *userData)
 	UI_block_flag_enable(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
-
-	UI_block_func_set(block, popup_check_cb, op, NULL);
 
 	/* since ui is defined the auto-layout args are not used */
 	uiLayoutOperatorButs(C, layout, op, NULL, 'V', 0);
@@ -1522,7 +1505,7 @@ int WM_operator_ui_popup(bContext *C, wmOperator *op, int width, int height)
 	data->width = width;
 	data->height = height;
 	data->free_op = true; /* if this runs and gets registered we may want not to free it */
-	UI_popup_block_ex(C, wm_operator_ui_create, NULL, wm_operator_ui_popup_cancel, data);
+	UI_popup_block_ex(C, wm_operator_ui_create, NULL, wm_operator_ui_popup_cancel, data, op);
 	return OPERATOR_RUNNING_MODAL;
 }
 
@@ -1552,7 +1535,7 @@ static int wm_operator_props_popup_ex(bContext *C, wmOperator *op,
 	if (!do_redo || !(U.uiflag & USER_GLOBALUNDO))
 		return WM_operator_props_dialog_popup(C, op, 15 * UI_UNIT_X, UI_UNIT_Y);
 
-	UI_popup_block_ex(C, wm_block_create_redo, NULL, wm_block_redo_cancel_cb, op);
+	UI_popup_block_ex(C, wm_block_create_redo, NULL, wm_block_redo_cancel_cb, op, op);
 
 	if (do_call)
 		wm_block_redo_cb(C, op, 0);
@@ -1594,7 +1577,7 @@ int WM_operator_props_dialog_popup(bContext *C, wmOperator *op, int width, int h
 	data->free_op = true; /* if this runs and gets registered we may want not to free it */
 
 	/* op is not executed until popup OK but is clicked */
-	UI_popup_block_ex(C, wm_block_dialog_create, wm_operator_ui_popup_ok, wm_operator_ui_popup_cancel, data);
+	UI_popup_block_ex(C, wm_block_dialog_create, wm_operator_ui_popup_ok, wm_operator_ui_popup_cancel, data, op);
 
 	return OPERATOR_RUNNING_MODAL;
 }
@@ -1761,6 +1744,36 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 		ibuf = IMB_ibImageFromMemory((unsigned char *)datatoc_splash_png,
 		                             datatoc_splash_png_size, IB_rect, NULL, "<splash screen>");
 	}
+
+	/* overwrite splash with template image */
+	if (U.app_template[0] != '\0') {
+		ImBuf *ibuf_template = NULL;
+		char splash_filepath[FILE_MAX];
+		char template_directory[FILE_MAX];
+
+		if (BKE_appdir_app_template_id_search(
+		        U.app_template,
+		        template_directory, sizeof(template_directory)))
+		{
+			BLI_join_dirfile(
+			        splash_filepath, sizeof(splash_filepath), template_directory,
+			        (U.pixelsize == 2) ? "splash_2x.png" : "splash.png");
+			ibuf_template = IMB_loadiffname(splash_filepath, IB_rect, NULL);
+			if (ibuf_template) {
+				const int x_expect = ibuf->x;
+				const int y_expect = 230 * (int)U.pixelsize;
+				/* don't cover the header text */
+				if (ibuf_template->x == x_expect && ibuf_template->y == y_expect) {
+					memcpy(ibuf->rect, ibuf_template->rect, ibuf_template->x * ibuf_template->y * sizeof(char[4]));
+				}
+				else {
+					printf("Splash expected %dx%d found %dx%d, ignoring: %s\n",
+					       x_expect, y_expect, ibuf_template->x, ibuf_template->y, splash_filepath);
+				}
+				IMB_freeImBuf(ibuf_template);
+			}
+		}
+	}
 #endif
 
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
@@ -1846,7 +1859,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	             BLENDER_VERSION / 100, BLENDER_VERSION % 100);
 	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", url);
 	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url",
-	              "http://www.blender.org/manual");
+	              "https://docs.blender.org/manual/en/dev/");
 	uiItemStringO(col, IFACE_("Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
 #ifdef WITH_MECHANICAL
 	uiItemStringO(col, IFACE_("Mechanical Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.mechanicalblender.org");
@@ -3913,8 +3926,12 @@ static void previews_id_ensure(bContext *C, Scene *scene, ID *id)
 	}
 }
 
-static int previews_id_ensure_callback(void *userdata, ID *UNUSED(self_id), ID **idptr, int UNUSED(cd_flag))
+static int previews_id_ensure_callback(void *userdata, ID *UNUSED(self_id), ID **idptr, int cb_flag)
 {
+	if (cb_flag & IDWALK_CB_PRIVATE) {
+		return IDWALK_RET_NOP;
+	}
+
 	PreviewsIDEnsureData *data = userdata;
 	ID *id = *idptr;
 
@@ -3947,7 +3964,7 @@ static int previews_ensure_exec(bContext *C, wmOperator *UNUSED(op))
 		preview_id_data.scene = scene;
 		id = (ID *)scene;
 
-		BKE_library_foreach_ID_link(id, previews_id_ensure_callback, &preview_id_data, IDWALK_RECURSE);
+		BKE_library_foreach_ID_link(NULL, id, previews_id_ensure_callback, &preview_id_data, IDWALK_RECURSE);
 	}
 
 	/* Check a last time for ID not used (fake users only, in theory), and
@@ -4561,4 +4578,3 @@ EnumPropertyItem *RNA_mask_local_itemf(bContext *C, PointerRNA *ptr, PropertyRNA
 {
 	return rna_id_itemf(C, ptr, r_free, C ? (ID *)CTX_data_main(C)->mask.first : NULL, true);
 }
-

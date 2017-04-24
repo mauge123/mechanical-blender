@@ -90,6 +90,63 @@ class USERPREF_MT_interaction_presets(Menu):
     draw = Menu.draw_preset
 
 
+class USERPREF_MT_app_templates(Menu):
+    bl_label = "Application Templates"
+    preset_subdir = "app_templates"
+
+    def draw_ex(self, context, *, use_splash=False, use_default=False, use_install=False):
+        import os
+
+        layout = self.layout
+
+        # now draw the presets
+        layout.operator_context = 'EXEC_DEFAULT'
+
+        if use_default:
+            props = layout.operator("wm.read_homefile", text="Default")
+            props.use_splash = True
+            props.app_template = ""
+            layout.separator()
+
+        template_paths = bpy.utils.app_template_paths()
+
+        # expand template paths
+        app_templates = []
+        for path in template_paths:
+            for d in os.listdir(path):
+                if d.startswith(("__", ".")):
+                    continue
+                template = os.path.join(path, d)
+                if os.path.isdir(template):
+                    # template_paths_expand.append(template)
+                    app_templates.append(d)
+
+        for d in sorted(app_templates):
+            props = layout.operator(
+                "wm.read_homefile",
+                text=bpy.path.display_name(d),
+            )
+            props.use_splash = True
+            props.app_template = d;
+
+        if use_install:
+            layout.separator()
+            layout.operator_context = 'INVOKE_DEFAULT'
+            props = layout.operator("wm.app_template_install")
+
+
+    def draw(self, context):
+        self.draw_ex(context, use_splash=False, use_default=True, use_install=True)
+
+
+class USERPREF_MT_templates_splash(Menu):
+    bl_label = "Startup Templates"
+    preset_subdir = "templates"
+
+    def draw(self, context):
+        USERPREF_MT_app_templates.draw_ex(self, context, use_splash=True, use_default=True)
+
+
 class USERPREF_MT_appconfigs(Menu):
     bl_label = "AppPresets"
     preset_subdir = "keyconfig"
@@ -114,6 +171,17 @@ class USERPREF_MT_splash(Menu):
         row.label("Mechanical Blender Version")
 ## ELSE
 ##      row.label("")
+
+        if any(bpy.utils.app_template_paths()):
+            row.label("Template:")
+            template = context.user_preferences.app_template
+            row.menu(
+                "USERPREF_MT_templates_splash",
+                text=bpy.path.display_name(template) if template else "Default",
+            )
+        else:
+            row.label("")
+
         row = split.row()
         row.label("Interaction:")
 
@@ -153,6 +221,7 @@ class USERPREF_PT_interface(Panel):
 
         col = row.column()
         col.label(text="Display:")
+        col.prop(view, "ui_scale", text="Scale")
         col.prop(view, "show_tooltips")
         col.prop(view, "show_tooltips_python")
         col.prop(view, "show_object_info", text="Object Info")
@@ -281,6 +350,7 @@ class USERPREF_PT_edit(Panel):
 
         col.label(text="New Objects:")
         col.prop(edit, "use_enter_edit_mode")
+        col.prop(edit, "enable_mesh_geometry")
         col.label(text="Align To:")
         col.prop(edit, "object_align", text="")
 
@@ -403,11 +473,6 @@ class USERPREF_PT_system(Panel):
 
         col = colsplit.column()
         col.label(text="General:")
-        col.prop(system, "dpi")
-        col.label("Virtual Pixel Mode:")
-        col.prop(system, "virtual_pixel_mode", text="")
-
-        col.separator()
 
         col.prop(system, "frame_server_port")
         col.prop(system, "scrollback", text="Console Scrollback")
@@ -456,6 +521,7 @@ class USERPREF_PT_system(Panel):
         col.separator()
         col.label(text="Selection")
         col.prop(system, "select_method", text="")
+        col.prop(system, "use_select_pick_depth")
 
         col.separator()
 
@@ -1164,33 +1230,42 @@ class USERPREF_PT_input(Panel):
         sub = col.column()
         sub.label(text="View Navigation:")
         sub.row().prop(inputs, "navigation_mode", expand=True)
-        if inputs.navigation_mode == 'WALK':
-            walk = inputs.walk_navigation
 
-            sub.prop(walk, "use_mouse_reverse")
-            sub.prop(walk, "mouse_speed")
-            sub.prop(walk, "teleport_time")
+        sub.label(text="Walk Navigation:")
 
-            sub = col.column(align=True)
-            sub.prop(walk, "walk_speed")
-            sub.prop(walk, "walk_speed_factor")
+        walk = inputs.walk_navigation
 
-            sub.separator()
-            sub.prop(walk, "use_gravity")
-            sub = col.column(align=True)
-            sub.active = walk.use_gravity
-            sub.prop(walk, "view_height")
-            sub.prop(walk, "jump_height")
+        sub.prop(walk, "use_mouse_reverse")
+        sub.prop(walk, "mouse_speed")
+        sub.prop(walk, "teleport_time")
+
+        sub = col.column(align=True)
+        sub.prop(walk, "walk_speed")
+        sub.prop(walk, "walk_speed_factor")
+
+        sub.separator()
+        sub.prop(walk, "use_gravity")
+        sub = col.column(align=True)
+        sub.active = walk.use_gravity
+        sub.prop(walk, "view_height")
+        sub.prop(walk, "jump_height")
 
         if inputs.use_ndof:
             col.separator()
             col.label(text="NDOF Device:")
             sub = col.column(align=True)
-            sub.prop(inputs, "ndof_sensitivity", text="NDOF Sensitivity")
-            sub.prop(inputs, "ndof_orbit_sensitivity", text="NDOF Orbit Sensitivity")
-            sub.prop(inputs, "ndof_deadzone", text="NDOF Deadzone")
+            sub.prop(inputs, "ndof_sensitivity", text="Pan Sensitivity")
+            sub.prop(inputs, "ndof_orbit_sensitivity", text="Orbit Sensitivity")
+            sub.prop(inputs, "ndof_deadzone", text="Deadzone")
+
+            sub.separator()
+            col.label(text="Navigation Style:")
             sub = col.column(align=True)
             sub.row().prop(inputs, "ndof_view_navigate_method", expand=True)
+
+            sub.separator()
+            col.label(text="Rotation Style:")
+            sub = col.column(align=True)
             sub.row().prop(inputs, "ndof_view_rotate_method", expand=True)
 
         row.separator()
@@ -1242,7 +1317,7 @@ class USERPREF_MT_addons_online_resources(Menu):
                 "wm.url_open", text="API Concepts", icon='URL',
                 ).url = bpy.types.WM_OT_doc_view._prefix + "/info_quickstart.html"
         layout.operator("wm.url_open", text="Add-on Tutorial", icon='URL',
-                ).url = "http://www.blender.org/api/blender_python_api_current/info_tutorial_addon.html"
+                ).url = bpy.types.WM_OT_doc_view._prefix + "/info_tutorial_addon.html"
 
 
 class USERPREF_PT_addons(Panel):
@@ -1316,11 +1391,18 @@ class USERPREF_PT_addons(Panel):
 
         # set in addon_utils.modules_refresh()
         if addon_utils.error_duplicates:
-            self.draw_error(col,
-                            "Multiple addons using the same name found!\n"
-                            "likely a problem with the script search path.\n"
-                            "(see console for details)",
-                            )
+            box = col.box()
+            row = box.row()
+            row.label("Multiple add-ons with the same name found!")
+            row.label(icon='ERROR')
+            box.label("Please delete one of each pair:")
+            for (addon_name, addon_file, addon_path) in addon_utils.error_duplicates:
+                box.separator()
+                sub_col = box.column(align=True)
+                sub_col.label(addon_name + ":")
+                sub_col.label("    " + addon_file)
+                sub_col.label("    " + addon_path)
+
 
         if addon_utils.error_encoding:
             self.draw_error(col,
@@ -1472,5 +1554,29 @@ class USERPREF_PT_addons(Panel):
                 row.label(text=module_name, translate=False)
 
 
+classes = (
+    USERPREF_HT_header,
+    USERPREF_PT_tabs,
+    USERPREF_MT_interaction_presets,
+    USERPREF_MT_templates_splash,
+    USERPREF_MT_app_templates,
+    USERPREF_MT_appconfigs,
+    USERPREF_MT_splash,
+    USERPREF_MT_splash_footer,
+    USERPREF_PT_interface,
+    USERPREF_PT_edit,
+    USERPREF_PT_system,
+    USERPREF_MT_interface_theme_presets,
+    USERPREF_PT_theme,
+    USERPREF_PT_file,
+    USERPREF_MT_ndof_settings,
+    USERPREF_MT_keyconfigs,
+    USERPREF_PT_input,
+    USERPREF_MT_addons_online_resources,
+    USERPREF_PT_addons,
+)
+
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

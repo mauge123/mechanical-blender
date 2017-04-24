@@ -74,6 +74,9 @@ typedef struct MVert {
 // Mdim::flag
 // SELECT			(1 << 0)
 
+// MDim::dimension_flag
+#define DIMENSION_FLAG_ANGLE_COMPLEMENTARY (1 << 0)
+
 typedef struct MDim {
 	ID id;
 	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
@@ -105,9 +108,10 @@ typedef struct MDim {
 	float value; //stored value
 	float value_pr; //previous value
 
+	int dimension_flag;
 	char flag;
 
-	char pad[7];
+	char pad[3];
 
 } MDim;
 /* */
@@ -222,8 +226,8 @@ typedef struct MLoop {
  *     MEdge *ed = &medge[mloop[lt->tri[j]].e];
  *     unsigned int tri_edge[2]  = {mloop[lt->tri[j]].v, mloop[lt->tri[j_next]].v};
  *
- *     if (ELEM(ed->v1, tri_edge[0], tri_edge[1]) &&
- *         ELEM(ed->v2, tri_edge[0], tri_edge[1]))
+ *     if (((ed->v1 == tri_edge[0]) && (ed->v1 == tri_edge[1])) ||
+ *         ((ed->v1 == tri_edge[1]) && (ed->v1 == tri_edge[0])))
  *     {
  *         printf("real edge found %u %u\n", tri_edge[0], tri_edge[1]);
  *     }

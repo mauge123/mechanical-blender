@@ -1284,7 +1284,7 @@ static BMOpDefine bmo_bisect_plane_def = {
 	 {"clear_inner",   BMO_OP_SLOT_BOOL},    /* when enabled. remove all geometry on the negative side of the plane */
 	 {{'\0'}},
 	},
-	{{"geom_cut.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE}},  /* output new geometry from the cut */
+	{{"geom_cut.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE}},  /* output geometry aligned with the plane (new and existing) */
 	 {"geom.out",     BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT | BM_EDGE | BM_FACE}},  /* input and output geometry (result of cut)  */
 	 {{'\0'}}},
 	bmo_bisect_plane_exec,
@@ -2107,17 +2107,38 @@ static BMOpDefine bmo_create_reference_plane_def = {
 	/* slots_in */
 	{
  	 {"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},
-     {"matrix", BMO_OP_SLOT_MAT},  /* matrix to multiply the new geometry with */
+	 {"matrix", BMO_OP_SLOT_MAT},  /* matrix to multiply the new geometry with */
 	 {"dia", BMO_OP_SLOT_FLT},
+	 {"ref_type",BMO_OP_SLOT_INT},
      {{'\0'}},
 	},
 	/* slots_out */
-	{{"reference.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_REFERENCE}}, /* output verts */
+	{{"reference.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_REFERENCE}}, /* output */
 	 {{'\0'}},
 	},
-	bmo_create_reference_plane_exec,
+	bmo_create_reference_exec,
 	0,
 };
+
+
+static BMOpDefine bmo_create_reference_axis_def = {
+	"create_axis_plane",
+	/* slots_in */
+	{
+ 	 {"verts", BMO_OP_SLOT_ELEMENT_BUF, {BM_VERT}},
+     {"matrix", BMO_OP_SLOT_MAT},  /* matrix to multiply the new geometry with */
+     {"dia", BMO_OP_SLOT_FLT},
+     {"ref_type",BMO_OP_SLOT_INT},
+     {{'\0'}},
+	},
+	/* slots_out */
+	{{"reference.out", BMO_OP_SLOT_ELEMENT_BUF, {BM_REFERENCE}}, /* output */
+	 {{'\0'}},
+	},
+	bmo_create_reference_exec,
+	0,
+};
+
 #endif
 
 const BMOpDefine *bmo_opdefines[] = {
@@ -2212,6 +2233,7 @@ const BMOpDefine *bmo_opdefines[] = {
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
     &bmo_create_reference_plane_def,
+    &bmo_create_reference_axis_def
 #endif
 };
 

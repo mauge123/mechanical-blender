@@ -1829,16 +1829,16 @@ static void drawcamera_volume(float near_plane[4][3], float far_plane[4][3], con
 
 	glBegin(mode);
 	glVertex3fv(near_plane[2]);
-	glVertex3fv(near_plane[1]);
-	glVertex3fv(far_plane[1]);
 	glVertex3fv(far_plane[2]);
+	glVertex3fv(far_plane[3]);
+	glVertex3fv(near_plane[3]);
 	glEnd();
 
 	glBegin(mode);
-	glVertex3fv(far_plane[0]);
-	glVertex3fv(near_plane[0]);
-	glVertex3fv(near_plane[3]);
 	glVertex3fv(far_plane[3]);
+	glVertex3fv(near_plane[3]);
+	glVertex3fv(near_plane[0]);
+	glVertex3fv(far_plane[0]);
 	glEnd();
 }
 
@@ -2697,25 +2697,14 @@ static void get_dimension_theme_values (int selected, unsigned char *r_lines, un
  * @param end
  * @param txt_pos
  */
-static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos_fact, int selected)
+static void draw_linear_dimension (float* p1, float *p2, float *start, float *end, float *txt_pos, int selected)
 {
 
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
-	float start[3], end[3], txt_pos[3];
 
 	get_dimension_theme_values(selected, col, tcol);
-
-	// Baseline
-	add_v3_v3v3(start,fpos, p1);
-	add_v3_v3v3(end, fpos, p2);
-
-	// Set txt pos acording pos factor
-	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos,  dpos_fact);
-	add_v3_v3(txt_pos, start);
-
 
 	glColor3ubv(col);
 	glPointSize(2);
@@ -2745,27 +2734,14 @@ static void draw_linear_dimension (float* p1, float *p2, float *fpos, float dpos
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_diameter_dimension(float* center, float *v_dir, float diameter, float dpos_fact, int selected)
+static void draw_diameter_dimension(float *start, float *end,  float *txt_pos, int selected)
 {
 
-	float start[3], end[3], vr[3], txt_pos[3];
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
 	get_dimension_theme_values(selected, col, tcol);
-
-	copy_v3_v3(vr,v_dir);
-	normalize_v3(vr);
-	mul_v3_fl(vr, diameter/2.0f); //Vector radius
-
-	add_v3_v3v3(start, center, vr);
-	sub_v3_v3v3(end, center, vr);
-
-	// Set txt pos acording pos factor
-	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos,  dpos_fact);
-	add_v3_v3(txt_pos, start);
 
 	glColor3ubv(col);
 
@@ -2791,27 +2767,14 @@ static void draw_diameter_dimension(float* center, float *v_dir, float diameter,
 }
 
 
-static void draw_radius_dimension(float* center, float *v_dir, float radius, float dpos_fact, int selected)
+static void draw_radius_dimension(float *start, float *end, float *txt_pos, int selected)
 {
 
-	float start[3], end[3], vr[3], txt_pos[3];
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
 	get_dimension_theme_values(selected, col, tcol);
-
-	copy_v3_v3(vr,v_dir);
-	normalize_v3(vr);
-	mul_v3_fl(vr, radius); //Vector radius
-
-	copy_v3_v3(start,center);
-	add_v3_v3v3(end, center, vr);
-
-	// Set txt pos acording pos factor
-	sub_v3_v3v3(txt_pos, end, start);
-	mul_v3_fl(txt_pos,  dpos_fact);
-	add_v3_v3(txt_pos, start);
 
 	glColor3ubv(col);
 
@@ -2836,12 +2799,10 @@ static void draw_radius_dimension(float* center, float *v_dir, float radius, flo
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
 
-static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *fpos, float dpos_fact, int selected)
+static void draw_angle_3p_dimension(float *center, float *start, float *end, float *txt_pos, int selected)
 {
-
-	float start[3], end[3], vr1[3], vr2[3], txt_pos[3];
+	float vr1[3],vr2[3];
 	float axis[3];
-	float lpos;
 	float w,h;
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
@@ -2849,27 +2810,16 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
 
 	get_dimension_theme_values(selected, col, tcol);
 
-	lpos = len_v3(fpos);
-
-	sub_v3_v3v3(vr1,p1,center);
+	sub_v3_v3v3(vr1,start,center);
 	normalize_v3(vr1);
 
-	sub_v3_v3v3(vr2,p2,center);
+	sub_v3_v3v3(vr2,end,center);
 	normalize_v3(vr2);
 
 	cross_v3_v3v3(axis,vr1,vr2);
 	//dim_angle = RAD2DEG(angle_v3v3(vr1,vr2));
 	dim_angle = RAD2DEG(acos(dot_v3v3(vr1,vr2)));
 
-	mul_v3_fl(vr1,lpos);
-	add_v3_v3v3(start, center, vr1);
-
-	mul_v3_fl(vr2,lpos);
-	add_v3_v3v3(end, center, vr2);
-
-	// Set txt pos acording pos factor
-	rotate_v3_v3v3fl(txt_pos,vr1,axis, DEG2RAD(dim_angle*dpos_fact));
-	add_v3_v3(txt_pos, center);
 
 	glColor3ubv(col);
 	glPointSize(2);
@@ -2880,6 +2830,7 @@ static void draw_angle_3p_dimension(float* p1, float *p2, float *center, float *
 	}
 	glEnd();
 
+	sub_v3_v3v3(vr1,start,center);
 	mechanical_draw_circle(center,vr1,axis,dim_angle);
 
 	glBegin(GL_LINES);
@@ -2913,34 +2864,22 @@ static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 		case DIM_TYPE_LINEAR:
 			draw_linear_dimension (CDDM_get_vert(dm,mdm->v[0])->co,
 								   CDDM_get_vert(dm,mdm->v[1])->co,
-								   mdm->fpos,
-								   mdm->dpos_fact,
+								   mdm->start,
+								   mdm->end,
+								   mdm->dpos,
 								   false);
 			break;
 		case DIM_TYPE_DIAMETER:
-			draw_diameter_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
+			draw_diameter_dimension(mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		case DIM_TYPE_RADIUS:
-			draw_radius_dimension(mdm->center,mdm->fpos,mdm->value,mdm->dpos_fact,false);
+			draw_radius_dimension(mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_3P_CON:
-			draw_angle_3p_dimension(
-			            CDDM_get_vert(dm,mdm->v[0])->co,
-						CDDM_get_vert(dm,mdm->v[2])->co,
-						CDDM_get_vert(dm,mdm->v[1])->co,
-						mdm->fpos,
-						mdm->dpos_fact,
-						false);
-			break;
 		case DIM_TYPE_ANGLE_4P:
 			draw_angle_3p_dimension(
-			            CDDM_get_vert(dm,mdm->v[0])->co,
-						CDDM_get_vert(dm,mdm->v[3])->co,
-						mdm->center,
-						mdm->fpos,
-						mdm->dpos_fact,
-						false);
+			            mdm->center, mdm->start, mdm->end, mdm->dpos, false);
 			break;
 		default:
 			BLI_assert(0);
@@ -3034,39 +2973,45 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 */
 static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 {
-
 	if(check_dim_visibility(edm, rv3d, obedit)){
 
 		switch (edm->mdim->dim_type) {
 			case DIM_TYPE_LINEAR:
-				draw_linear_dimension(edm->v[0]->co,edm->v[1]->co,edm->mdim->fpos, edm->mdim->dpos_fact,
-										   BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_linear_dimension(
+					edm->v[0]->co,
+				    edm->v[1]->co,
+				    edm->mdim->start,
+				    edm->mdim->end,
+				    edm->mdim->dpos,
+				    BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 
 			break;
 			case DIM_TYPE_DIAMETER:
 
-				draw_diameter_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
-										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_diameter_dimension(
+				            edm->mdim->start,
+				            edm->mdim->end,
+				            edm->mdim->dpos,
+							BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_RADIUS:
 
-				draw_radius_dimension(edm->mdim->center, edm->mdim->fpos, get_dimension_value(edm), edm->mdim->dpos_fact,
-										 BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				draw_radius_dimension(
+				            edm->mdim->start,
+				            edm->mdim->end,
+				            edm->mdim->dpos,
+				            BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				break;
 			case DIM_TYPE_ANGLE_3P:
+			case DIM_TYPE_ANGLE_4P:
 			case DIM_TYPE_ANGLE_3P_CON:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->v[1]->co, edm->mdim->fpos, edm->mdim->dpos_fact,
+				draw_angle_3p_dimension(edm->mdim->center,edm->mdim->start, edm->mdim->end, edm->mdim->dpos,
 									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
 				draw_dimension_direction_points(edm);
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT) && edm->mdim->dim_type == DIM_TYPE_ANGLE_3P_CON) {
 					draw_dimension_axis(edm);
 				}
-				break;
-			case DIM_TYPE_ANGLE_4P:
-				draw_angle_3p_dimension(edm->v[0]->co, edm->v[2]->co,edm->mdim->center, edm->mdim->fpos, edm->mdim->dpos_fact,
-									   BM_elem_flag_test(edm, BM_ELEM_SELECT));
-				draw_dimension_direction_points(edm);
 				break;
 			default:
 				BLI_assert(0);
@@ -3097,6 +3042,8 @@ static void draw_ob_dims(Object *ob, DerivedMesh *dm)
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static void draw_em_reference_plane(View3D *v3d,BMReference *erf, int index)
 {
+	BLI_assert(erf->type == BM_REFERENCE_TYPE_PLANE);
+
 	// May be set to other values
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 	glEnable (GL_BLEND);
@@ -3120,6 +3067,23 @@ static void draw_em_reference_plane(View3D *v3d,BMReference *erf, int index)
 	glVertex3fv(erf->v4);
 	glEnd();
 	glDisable(GL_BLEND);
+}
+
+
+static void draw_em_reference_axis(View3D *v3d,BMReference *erf, int index)
+{
+	BLI_assert(erf->type == BM_REFERENCE_TYPE_AXIS);
+
+	if (BM_elem_flag_test(erf, BM_ELEM_SELECT)) {
+		glColor4f(0.8f,0.8f,1.0f,0.5f);
+    }else {
+		glColor4f(0.0f,0.0f,0.0f,0.5f);
+	}
+
+	glBegin(GL_LINES);
+	glVertex3fv(erf->v1);
+	glVertex3fv(erf->v2);
+	glEnd();
 }
 #endif
 
@@ -3824,7 +3788,16 @@ static void draw_em_reference_planes(View3D *v3d, BMEditMesh *em)
 	BMIter iter;
 	int i =0;
 	BM_ITER_MESH_INDEX(erf,&iter,em->bm, BM_REFERENCES_OF_MESH, i) {
-		draw_em_reference_plane(v3d, erf, i);
+		switch (erf->type) {
+			case BM_REFERENCE_TYPE_PLANE:
+				draw_em_reference_plane(v3d, erf, i);
+				break;
+			case BM_REFERENCE_TYPE_AXIS:
+				draw_em_reference_axis(v3d, erf, i);
+				break;
+		}
+
+
 	}
 
 }
@@ -4877,7 +4850,6 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	
 	if (is_obact && BKE_paint_select_vert_test(ob)) {
 		const bool use_depth = (v3d->flag & V3D_ZBUF_SELECT) != 0;
-		glColor3f(0.0f, 0.0f, 0.0f);
 		glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE));
 
 		if (!use_depth) glDisable(GL_DEPTH_TEST);
@@ -7836,8 +7808,9 @@ static void drawtexspace(Object *ob)
 }
 
 /* draws wire outline */
-static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
-                             const unsigned char ob_wire_col[4])
+static void draw_object_selected_outline(
+        Scene *scene, View3D *v3d, ARegion *ar, Base *base,
+        const unsigned char ob_wire_col[4])
 {
 	RegionView3D *rv3d = ar->regiondata;
 	Object *ob = base->object;
@@ -8310,7 +8283,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 		if ((v3d->flag & V3D_SELECT_OUTLINE) && !render_override && ob->type != OB_MESH) {
 			if (dt > OB_WIRE && (ob->mode & OB_MODE_EDIT) == 0 && (dflag & DRAW_SCENESET) == 0) {
 				if (!(ob->dtx & OB_DRAWWIRE) && (ob->flag & SELECT) && !(dflag & (DRAW_PICKING | DRAW_CONSTCOLOR))) {
-					drawObjectSelect(scene, v3d, ar, base, ob_wire_col);
+					draw_object_selected_outline(scene, v3d, ar, base, ob_wire_col);
 				}
 			}
 		}
@@ -8837,6 +8810,50 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	}
 
 	ED_view3d_clear_mats_rv3d(rv3d);
+}
+
+
+/**
+ * Drawing for selection picking,
+ * caller must have called 'GPU_select_load_id(base->selcode)' first.
+ */
+void draw_object_select(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
+{
+	BLI_assert(dflag & DRAW_PICKING && dflag & DRAW_CONSTCOLOR);
+	draw_object(scene, ar, v3d, base, dflag);
+
+	/* we draw duplicators for selection too */
+	if ((base->object->transflag & OB_DUPLI)) {
+		ListBase *lb;
+		DupliObject *dob;
+		Base tbase;
+
+		tbase.flag = OB_FROMDUPLI;
+		lb = object_duplilist(G.main->eval_ctx, scene, base->object);
+
+		for (dob = lb->first; dob; dob = dob->next) {
+			float omat[4][4];
+			char dt;
+			short dtx;
+
+			tbase.object = dob->ob;
+			copy_m4_m4(omat, dob->ob->obmat);
+			copy_m4_m4(dob->ob->obmat, dob->mat);
+
+			/* extra service: draw the duplicator in drawtype of parent */
+			/* MIN2 for the drawtype to allow bounding box objects in groups for lods */
+			dt = tbase.object->dt;   tbase.object->dt = MIN2(tbase.object->dt, base->object->dt);
+			dtx = tbase.object->dtx; tbase.object->dtx = base->object->dtx;
+
+			draw_object(scene, ar, v3d, &tbase, dflag);
+
+			tbase.object->dt = dt;
+			tbase.object->dtx = dtx;
+
+			copy_m4_m4(dob->ob->obmat, omat);
+		}
+		free_object_duplilist(lb);
+	}
 }
 
 /* ***************** BACKBUF SEL (BBS) ********* */

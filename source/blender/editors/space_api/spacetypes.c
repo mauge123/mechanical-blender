@@ -96,6 +96,10 @@ void ED_spacetypes_init(void)
 	ED_spacetype_console();
 	ED_spacetype_userpref();
 	ED_spacetype_clip();
+#ifdef WITH_MECHANICAL_DRAWINGS
+	ED_spacetype_drawings();
+#endif
+
 //	...
 	
 	/* register operator types for screen and all spaces */

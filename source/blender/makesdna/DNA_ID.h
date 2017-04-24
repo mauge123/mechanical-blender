@@ -82,8 +82,6 @@ enum {
 	IDP_FLOAT            = 2,
 	IDP_ARRAY            = 5,
 	IDP_GROUP            = 6,
-	/* the ID link property type hasn't been implemented yet, this will require
-	 * some cleanup of blenkernel, most likely. */
 	IDP_ID               = 7,
 	IDP_DOUBLE           = 8,
 	IDP_IDPARRAY         = 9,
@@ -256,7 +254,11 @@ typedef enum ID_Type {
 	ID_PAL  = MAKE_ID2('P', 'L'), /* Palette */
 	ID_PC   = MAKE_ID2('P', 'C'), /* PaintCurve  */
 	ID_CF   = MAKE_ID2('C', 'F'), /* CacheFile */
+// WITH_MECHANICAL_DIMENSIONS
 	ID_DM   = MAKE_ID2('D', 'M'), /* Dimension */
+// WITH_MECHANICAL_DRAWINGS
+	ID_DW	= MAKE_ID2('D', 'W'), /* Drawing */
+
 } ID_Type;
 
 /* Only used as 'placeholder' in .blend files for directly linked datablocks. */
@@ -278,6 +280,7 @@ typedef enum ID_Type {
 
 #define ID_FAKE_USERS(id) ((((ID *)id)->flag & LIB_FAKEUSER) ? 1 : 0)
 #define ID_REAL_USERS(id) (((ID *)id)->us - ID_FAKE_USERS(id))
+#define ID_EXTRA_USERS(id) (((ID *)id)->tag & LIB_TAG_EXTRAUSER ? 1 : 0)
 
 #define ID_CHECK_UNDO(id) ((GS((id)->name) != ID_SCR) && (GS((id)->name) != ID_WM))
 
@@ -428,7 +431,11 @@ enum {
 	INDEX_ID_SCE,
 	INDEX_ID_WM,
 	INDEX_ID_MSK,
+// WITH_MECHANICAL_DIMENSIONS
 	INDEX_ID_DM,
+// WITH_MECHANICAL_DRAWINGS
+	INDEX_ID_DW,
+
 	INDEX_ID_NULL,
 };
 

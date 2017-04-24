@@ -31,6 +31,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -59,6 +60,7 @@ static EnumPropertyItem parent_type_items[] = {
 
 #include "WM_api.h"
 
+#include "BKE_animsys.h"
 #include "BKE_gpencil.h"
 #include "BKE_action.h"
 
@@ -352,10 +354,16 @@ static void rna_GPencilLayer_info_set(PointerRNA *ptr, const char *value)
 	bGPdata *gpd = ptr->id.data;
 	bGPDlayer *gpl = ptr->data;
 
+	char oldname[128] = "";
+	BLI_strncpy(oldname, gpl->info, sizeof(oldname));
+
 	/* copy the new name into the name slot */
 	BLI_strncpy_utf8(gpl->info, value, sizeof(gpl->info));
 
 	BLI_uniquename(&gpd->layers, gpl, DATA_("GP_Layer"), '.', offsetof(bGPDlayer, info), sizeof(gpl->info));
+
+	/* now fix animation paths */
+	BKE_animdata_fix_paths_rename_all(&gpd->id, "layers", oldname, gpl->info);
 }
 
 static void rna_GPencil_use_onion_skinning_set(PointerRNA *ptr, const int value)
@@ -776,11 +784,16 @@ static void rna_GPencilPalette_info_set(PointerRNA *ptr, const char *value)
 	bGPdata *gpd = ptr->id.data;
 	bGPDpalette *palette = ptr->data;
 
+	char oldname[64] = "";
+	BLI_strncpy(oldname, palette->info, sizeof(oldname));
+
 	/* copy the new name into the name slot */
 	BLI_strncpy_utf8(palette->info, value, sizeof(palette->info));
 
 	BLI_uniquename(&gpd->palettes, palette, DATA_("GP_Palette"), '.', offsetof(bGPDpalette, info),
 	               sizeof(palette->info));
+	/* now fix animation paths */
+	BKE_animdata_fix_paths_rename_all(&gpd->id, "palettes", oldname, palette->info);
 }
 
 static char *rna_GPencilPalette_path(PointerRNA *ptr)
@@ -813,14 +826,20 @@ static void rna_GPencilPaletteColor_info_set(PointerRNA *ptr, const char *value)
 	bGPdata *gpd = ptr->id.data;
 	bGPDpalette *palette = BKE_gpencil_palette_getactive(gpd);
 	bGPDpalettecolor *palcolor = ptr->data;
-
-	/* rename all strokes */
-	BKE_gpencil_palettecolor_changename(gpd, palcolor->info, value);
+	
+	char oldname[64] = "";
+	BLI_strncpy(oldname, palcolor->info, sizeof(oldname));
 
 	/* copy the new name into the name slot */
 	BLI_strncpy_utf8(palcolor->info, value, sizeof(palcolor->info));
 	BLI_uniquename(&palette->colors, palcolor, DATA_("Color"), '.', offsetof(bGPDpalettecolor, info),
 	               sizeof(palcolor->info));
+	
+	/* rename all strokes */
+	BKE_gpencil_palettecolor_changename(gpd, oldname, palcolor->info);
+
+	/* now fix animation paths */
+	BKE_animdata_fix_paths_rename_all(&gpd->id, "colors", oldname, palcolor->info);
 }
 
 static void rna_GPencilStrokeColor_info_set(PointerRNA *ptr, const char *value)
@@ -1242,6 +1261,13 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "After Color", "Base color for ghosts after the active frame");
 	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
 	
+	prop = RNA_def_property(srna, "use_ghosts_always", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_LAYER_GHOST_ALWAYS);
+	RNA_def_property_ui_text(prop, "Always Show Ghosts",
+	                         "Ghosts are shown in renders and animation playback. Useful for special effects (e.g. motion blur)");
+	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
+	
+	
 	/* Flags */
 	prop = RNA_def_property(srna, "hide", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_LAYER_HIDE);
@@ -1276,13 +1302,13 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_LAYER_ACTIVE);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_GPencilLayer_active_set");
 	RNA_def_property_ui_text(prop, "Active", "Set active layer for editing");
-	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
+	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA | NA_SELECTED, NULL);
 #endif
 
 	prop = RNA_def_property(srna, "select", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_LAYER_SELECT);
 	RNA_def_property_ui_text(prop, "Select", "Layer is selected for editing in the Dope Sheet");
-	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
+	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA | NA_SELECTED, "rna_GPencil_update");
 	
 	/* XXX keep this option? */
 	prop = RNA_def_property(srna, "show_points", PROP_BOOLEAN, PROP_NONE);
@@ -1370,14 +1396,15 @@ static void rna_def_gpencil_layers_api(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_pointer_funcs(prop, "rna_GPencil_active_layer_get", "rna_GPencil_active_layer_set", NULL, NULL);
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Active Layer", "Active grease pencil layer");
+	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA | NA_SELECTED, NULL);
 	
 	prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_UNSIGNED);
-	
 	RNA_def_property_int_funcs(prop,
 	                           "rna_GPencil_active_layer_index_get", 
 	                           "rna_GPencil_active_layer_index_set", 
 	                           "rna_GPencil_active_layer_index_range");
 	RNA_def_property_ui_text(prop, "Active Layer Index", "Index of active grease pencil layer");
+	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA | NA_SELECTED, NULL);
 }
 
 static void rna_def_gpencil_palettecolor(BlenderRNA *brna)

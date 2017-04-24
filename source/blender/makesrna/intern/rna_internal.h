@@ -194,6 +194,8 @@ void RNA_def_mask(struct BlenderRNA *brna);
 // WITH_MECHANICAL_MESH_DIMENSIONS
 void RNA_def_dimension(struct BlenderRNA *brna);
 
+// WITH_MECHANICAL_DRAWINGS
+void RNA_def_drawings(struct BlenderRNA *brna);
 
 /* Common Define functions */
 
@@ -348,6 +350,7 @@ extern IntPropertyRNA rna_PropertyGroupItem_int_array;
 extern FloatPropertyRNA rna_PropertyGroupItem_float;
 extern FloatPropertyRNA rna_PropertyGroupItem_float_array;
 extern PointerPropertyRNA rna_PropertyGroupItem_group;
+extern PointerPropertyRNA rna_PropertyGroupItem_id;
 extern CollectionPropertyRNA rna_PropertyGroupItem_collection;
 extern CollectionPropertyRNA rna_PropertyGroupItem_idp_array;
 extern FloatPropertyRNA rna_PropertyGroupItem_double;

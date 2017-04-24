@@ -18,7 +18,7 @@
  */
 
 #ifdef __QBVH__
-#  include "qbvh_volume_all.h"
+#  include "kernel/bvh/qbvh_volume_all.h"
 #endif
 
 #if BVH_FEATURE(BVH_HAIR)
@@ -100,9 +100,6 @@ uint BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 
 	gen_idirsplat_swap(pn, shuf_identity, shuf_swap, idir, idirsplat, shufflexyz);
 #endif  /* __KERNEL_SSE2__ */
-
-	IsectPrecalc isect_precalc;
-	triangle_intersect_precalc(dir, &isect_precalc);
 
 	/* traversal loop */
 	do {
@@ -199,9 +196,9 @@ uint BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 									continue;
 								}
 								hit = triangle_intersect(kg,
-								                         &isect_precalc,
 								                         isect_array,
 								                         P,
+								                         dir,
 								                         visibility,
 								                         object,
 								                         prim_addr);
@@ -287,16 +284,13 @@ uint BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 					/* instance push */
 					object = kernel_tex_fetch(__prim_object, -prim_addr-1);
 					int object_flag = kernel_tex_fetch(__object_flag, object);
-
 					if(object_flag & SD_OBJECT_HAS_VOLUME) {
-
 #  if BVH_FEATURE(BVH_MOTION)
-						bvh_instance_motion_push(kg, object, ray, &P, &dir, &idir, &isect_t, &ob_itfm);
+						isect_t = bvh_instance_motion_push(kg, object, ray, &P, &dir, &idir, isect_t, &ob_itfm);
 #  else
-						bvh_instance_push(kg, object, ray, &P, &dir, &idir, &isect_t);
+						isect_t = bvh_instance_push(kg, object, ray, &P, &dir, &idir, isect_t);
 #  endif
 
-						triangle_intersect_precalc(dir, &isect_precalc);
 						num_hits_in_instance = 0;
 						isect_array->t = isect_t;
 
@@ -342,20 +336,17 @@ uint BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
 #  else
 				bvh_instance_pop_factor(kg, object, ray, &P, &dir, &idir, &t_fac);
 #  endif
-				triangle_intersect_precalc(dir, &isect_precalc);
 				/* Scale isect->t to adjust for instancing. */
 				for(int i = 0; i < num_hits_in_instance; i++) {
 					(isect_array-i-1)->t *= t_fac;
 				}
 			}
 			else {
-				float ignore_t = FLT_MAX;
 #  if BVH_FEATURE(BVH_MOTION)
-				bvh_instance_motion_pop(kg, object, ray, &P, &dir, &idir, &ignore_t, &ob_itfm);
+				bvh_instance_motion_pop(kg, object, ray, &P, &dir, &idir, FLT_MAX, &ob_itfm);
 #  else
-				bvh_instance_pop(kg, object, ray, &P, &dir, &idir, &ignore_t);
+				bvh_instance_pop(kg, object, ray, &P, &dir, &idir, FLT_MAX);
 #  endif
-				triangle_intersect_precalc(dir, &isect_precalc);
 			}
 
 			isect_t = tmax;
