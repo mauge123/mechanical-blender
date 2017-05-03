@@ -230,6 +230,7 @@ EnumPropertyItem *rna_ucs_itemf(struct bContext *C, struct PointerRNA *ptr, stru
 
 // WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 EnumPropertyItem *rna_ReferencePlane_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
+EnumPropertyItem *rna_ReferenceAxis_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 //WITH_MECHANICAL_DIMENSION
 EnumPropertyItem *rna_ReferenceDim_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 

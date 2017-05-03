@@ -3281,6 +3281,7 @@ BMReference *BM_reference_create(
 	/* --- done --- */
 
 	bm->totref++;
+	bm->elem_index_dirty |= BM_REFERENCE;
 
 	erf->type = ref_type;
 	erf->name[0] = '\0';
@@ -3294,7 +3295,6 @@ BMReference *BM_reference_create(
 	} else {
 		BLI_strncpy(erf->name, name, MAX_NAME);
 	}
-
 	return erf;
 }
 

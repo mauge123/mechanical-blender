@@ -88,6 +88,7 @@ typedef struct MDim {
 	int totverts;
 	int dim_type;
 	int constraints; //Overrided automatic constraints
+	int axis; // Mesh Reference: Axis index
 
 	// Dimension position, used for select
 	float dpos[3];
@@ -111,7 +112,7 @@ typedef struct MDim {
 	int dimension_flag;
 	char flag;
 
-	char pad[3];
+	char pad[7];
 
 } MDim;
 /* */

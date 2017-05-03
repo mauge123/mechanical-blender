@@ -36,6 +36,7 @@
 #include "BLI_math.h"
 #include "BLI_stack.h"
 #include "BLI_utildefines.h"
+#include "BLI_string.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_editmesh.h"
@@ -1616,6 +1617,19 @@ BMReference *BM_reference_at_index_find(BMesh *bm, const int index)
 {
 	return BLI_mempool_findelem(bm->ppool, index);
 }
+
+BMReference *BM_reference_find_by_name(BMesh *bm, const char *name)
+{
+	BMReference *erf = NULL;
+	BMIter iter;
+	BM_ITER_MESH (erf, &iter, bm, BM_REFERENCES_OF_MESH) {
+		if (BLI_strcasecmp(name,erf->name) == 0) {
+			break;
+		}
+	}
+	return erf;
+}
+
 #endif
 
 

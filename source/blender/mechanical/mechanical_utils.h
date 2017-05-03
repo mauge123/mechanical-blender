@@ -13,6 +13,9 @@ bool point_on_axis(float *c, float*a, float *p);
 bool point_on_plane(float *c, float *a, float *p);
 
 
+void project_v3_v3v3_prec(float out[3], const float p[3], const float v_proj[3]);
+
+
 bool point_on_plane_prec(float *c, float *a, float *p);
 bool parallel_v3u_v3u_prec(float *v1, float *v2);
 bool point_on_axis_prec(float *c, float*a, float *p);
@@ -25,6 +28,7 @@ void tag_vertexs_on_plane(BMesh *bm, float* point, float *dir);
 void tag_vertexs_affected_by_dimension (BMesh *bm, BMDim *edm);
 
 float point_dist_to_plane (float *c, float *a, float *);
+float point_dist_to_plane_prec (float *c, float *a, float *p);
 float point_dist_to_axis (float *c, float *a, float *p);
 
 int center_of_3_points(float *center, float *p1, float *p2, float *p3);

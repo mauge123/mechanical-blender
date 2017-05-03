@@ -100,6 +100,7 @@ typedef struct {
 	float dim_txt_pos;
 	int constraints;
 	int dim_constraints;
+	char dim_axis_name[255];
 #endif
 } TransformProperties;
 
@@ -210,6 +211,64 @@ static int v3d_mesh_constraints_buts(BMDim *edm, int totdim, uiBlock *block,int 
 }
 
 
+/* generic  search invoke */
+static void dimension_find_cb(const struct bContext *C, void *UNUSED(arg), const char *str, uiSearchItems *items)
+{
+	Scene *scene = NULL;
+
+	scene = CTX_data_scene(C);
+
+	if (scene) {
+		Object *ob = OBACT;
+		Object *obedit = scene->obedit;
+		BMEditMesh *em = NULL;
+		if (obedit) {
+			if (ob->type == OB_MESH) {
+				em = BKE_editmesh_from_object(ob);
+			}
+			if(em){
+				BMReference *erf = NULL;
+				BMIter iter;
+				BM_ITER_MESH (erf, &iter, em->bm, BM_REFERENCES_OF_MESH) {
+					if (erf->type == BM_REFERENCE_TYPE_AXIS) {
+						if (BLI_strcasestr(erf->name, str)) {
+							char name[256];
+
+							BLI_strncpy(name, erf->name, 256);
+							if (false == UI_search_item_add(items, name, erf, 0))
+								break;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+static void dimension_axis_set_cb(bContext *C, void *name_v, void *UNUSED(arg2))
+{
+	// Arg2 comes from ui_searchbox_apply
+	Scene *scene = CTX_data_scene(C);
+	Object *ob = OBACT;
+	char *name = name_v;
+	BMDim *edm;
+	BLI_assert(ob->type == OB_MESH);
+	Mesh *me = ob->data;
+	BMEditMesh *em = me->edit_btmesh;
+	BMesh *bm = em->bm;
+	BMIter iter;
+	if (bm->totdimsel) {
+		BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
+			if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
+				edm->mdim->axis = (name[0] ? BM_elem_index_get(BM_reference_find_by_name(bm, name))+1 : 0);
+			}
+	    }
+	}
+}
+
+
+
 static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d, Object *ob, float lim)
 {
 	uiBlock *block = (layout) ? uiLayoutAbsoluteBlock(layout) : NULL;
@@ -217,6 +276,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 	int totdim;
 	ToolSettings *ts = scene->toolsettings;
 	BMDim *edm_sel;
+	BMReference *axis = NULL;
 	uiBut *but;
 
 	totdim = 0;
@@ -239,6 +299,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					totdim++;
 					edm_sel = edm;
+					axis = BM_reference_at_index_find(bm,edm->mdim->axis-1);
 				}
 		    }
 		}
@@ -269,6 +330,22 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			/* Dimension default dir */
 			prop = RNA_struct_find_property(&ptr, "direction");
 			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+
+			/* Dimension Axis */
+			//prop = RNA_struct_find_property(&ptr, "dimension_axis");
+			//uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+			if (axis) {
+				BLI_strncpy(tfp->dim_axis_name,axis->name,255);
+			} else {
+				tfp->dim_axis_name[0] = '\0';
+			}
+			but = uiDefSearchBut(block, tfp->dim_axis_name, 0, ICON_VIEWZOOM, 2550, 0, yi -= buth + but_margin, 200, buth, 0, 0, "Reference Axis");
+			UI_but_func_search_set(but, NULL, dimension_find_cb, edm_sel->mdim, NULL, NULL);
+			/**
+			 * UGLY: arg2 cannot be used as is overrided on ui_searchbox_apply
+			 */
+			UI_but_func_set(but,dimension_axis_set_cb, tfp->dim_axis_name, NULL);
+
 
 			if (totdim == 1) {
 				// Only one dimension
