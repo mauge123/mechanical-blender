@@ -58,8 +58,7 @@ if NOT "%1" == "" (
 		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% ^
 		    -C"%BLENDER_DIR%\build_files\cmake\config\bpy_module.cmake"
 	) else if "%1" == "mechanical" (
-		set TARGET_SET=1
-		set BUILD_DIR=%BUILD_DIR%_mechanical
+		set TARGET=mechanical
 		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% ^
 		    -C"%BLENDER_DIR%\build_files\cmake\config\blender_mechanical.cmake"
 	) else if "%1" == "release" (
