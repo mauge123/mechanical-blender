@@ -3891,17 +3891,6 @@ static void rna_def_dimension(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "dimension_flag", DIMENSION_FLAG_ANGLE_COMPLEMENTARY);
 	RNA_def_property_ui_text(prop, "Complementary Angle", "Sets the complementary angle");
 
-	prop = RNA_def_property(srna, "dimension_axis", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop,NULL,"axis");
-	RNA_def_property_flag(prop,PROP_EDITABLE);
-	//RNA_def_property_flag(prop, PROP_REGISTER);
-	//RNA_def_property_pointer_funcs(prop,NULL,"rna_dimension_axis_set", NULL,NULL);
-	//RNA_def_property_enum_sdna(prop, NULL, "axis");
-	//RNA_def_property_flag(prop, PROP_ENUM_FLAG); /* important to run before default set */
-	//RNA_def_property_enum_items(prop, reference_axis_items);
-	//RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_ReferenceAxis_itemf");
-	RNA_def_property_ui_text(prop, "Refefence Axis", "Reference Axis");
-
 }
 
 void RNA_def_mesh(BlenderRNA *brna)
