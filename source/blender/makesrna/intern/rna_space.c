@@ -481,8 +481,8 @@ EnumPropertyItem *rna_TransformOrientation_itemf(bContext *C, PointerRNA *ptr, P
 
 	return item;
 }
-//WITH_MECHANICAL_DIMENSION
 
+//WITH_MECHANICAL_DIMENSION
 EnumPropertyItem *rna_ReferenceDim_itemf(bContext *UNUSED(C), PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
 {
 	EnumPropertyItem tmp = {0, "", 0, "", ""};
@@ -599,7 +599,8 @@ EnumPropertyItem *rna_ReferencePlane_itemf(bContext *C, PointerRNA *ptr, Propert
 	*r_free = true;
 
 	return item;
-	}
+}
+
 
 /* Space 3D View */
 static void rna_SpaceView3D_camera_update(Main *bmain, Scene *scene, PointerRNA *ptr)

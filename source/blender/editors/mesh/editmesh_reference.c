@@ -88,7 +88,7 @@ static int mechanical_add_reference_exec(bContext *C, wmOperator *op)
 	dia = ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
 	bool create_ts = RNA_boolean_get(op->ptr,"create_ts");
 
-	sprintf(op_str,"create_reference_plane %s %s %s %s", "verts=%hv", "matrix=%m4", "dia=%f", "ref_type=%i");
+	sprintf(op_str,"create_reference_element %s %s %s %s", "verts=%hv", "matrix=%m4", "dia=%f", "ref_type=%i");
 
 	EDBM_op_init(em, &bmop, op, op_str, BM_ELEM_SELECT, mat, dia, reference_type);
 

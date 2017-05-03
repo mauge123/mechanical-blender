@@ -1528,6 +1528,16 @@ static void bmo_flag_layer_free(BMesh *bm)
 				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
 			}
 		}
+#pragma omp section
+		{
+			BMIter iter;
+			BMReference_OFlag *ele;
+			int i;
+			BM_ITER_MESH_INDEX (ele, &iter, bm, BM_REFERENCES_OF_MESH, i) {
+				BM_elem_index_set(&ele->base, i); /* set_inline */
+				BM_ELEM_API_FLAG_CLEAR((BMElemF *)ele);
+			}
+		}
 	}
 
 	BLI_mempool_destroy(voldpool);
@@ -1537,8 +1547,8 @@ static void bmo_flag_layer_free(BMesh *bm)
 	BLI_mempool_destroy(doldpool);
 #endif
 
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
-	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE |BM_DIM);
+#ifdef WITH_MECHANICAL
+	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE |BM_DIM | BM_REFERENCE);
 #else
 	bm->elem_index_dirty &= ~(BM_VERT | BM_EDGE | BM_FACE);
 #endif

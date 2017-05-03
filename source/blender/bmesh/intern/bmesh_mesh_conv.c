@@ -834,7 +834,7 @@ void BM_mesh_bm_to_me(
 	bm->elem_index_dirty &= ~BM_DIM;
 #endif
 #ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_ITER_MESH(erf,&iter,bm,BM_REFERENCES_OF_MESH) {
+	BM_ITER_MESH_INDEX(erf,&iter,bm,BM_REFERENCES_OF_MESH, i) {
 		 copy_v3_v3(mrf->p1, erf->v1);
 		 copy_v3_v3(mrf->p2, erf->v2);
 		 copy_v3_v3(mrf->p3, erf->v3);
@@ -846,6 +846,7 @@ void BM_mesh_bm_to_me(
 		 mrf++;
 		 BM_CHECK_ELEMENT(erf);
 	}
+	bm->elem_index_dirty &= ~BM_REFERENCE;
 #endif
 
 

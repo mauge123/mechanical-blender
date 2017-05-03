@@ -61,9 +61,14 @@ EnumPropertyItem rna_enum_mesh_delimit_mode_items[] = {
 	{0, NULL, 0, NULL, NULL},
 };
 
+static EnumPropertyItem reference_axis_items[] = {
+    {0, NULL, 0, NULL, NULL}
+};
+
 #ifdef RNA_RUNTIME
 
 #include "DNA_scene_types.h"
+#include "DNA_screen_types.h"
 
 #include "BLI_math.h"
 
@@ -1889,6 +1894,52 @@ static void rna_MDim_set_value(PointerRNA *ptr, const float value)
 	WM_main_add_notifier(NC_OBJECT , &mdim->ob->id);
 }
 
+// WITH MECHANICAL MESH_REFERENCE_OBJECTS
+EnumPropertyItem *rna_ReferenceAxis_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	Scene *scene = NULL;
+	EnumPropertyItem tmp = {0, "", 0, "", ""};
+	EnumPropertyItem *item = NULL;
+	int i = 0, totitem = 0;
+
+	RNA_enum_items_add(&item, &totitem, reference_axis_items);
+
+	if (ptr->type == &RNA_SpaceView3D)
+		scene = ((bScreen *)ptr->id.data)->scene;
+	else
+		scene = CTX_data_scene(C);  /* can't use scene from ptr->id.data because that enum is also used by operators */
+
+	if (scene) {
+		Object *ob = OBACT;
+		Object *obedit = scene->obedit;
+		BMEditMesh *em = NULL;
+		if (obedit) {
+			if (ob->type == OB_MESH) {
+				em = BKE_editmesh_from_object(ob);
+			}
+			if(em){
+				BMReference *erf = NULL;
+				BMIter iter;
+				if (em->bm->totref > 0) {
+					RNA_enum_item_add_separator(&item, &totitem);
+				}
+				BM_ITER_MESH_INDEX (erf, &iter, em->bm, BM_REFERENCES_OF_MESH, i) {
+					if (erf->type == BM_REFERENCE_TYPE_AXIS) {
+						tmp.identifier = erf->name;
+						tmp.name = erf->name;
+						tmp.value = i+1;
+						RNA_enum_item_add(&item, &totitem, &tmp);
+					}
+				}
+			}
+		}
+	}
+
+	RNA_enum_item_end(&item, &totitem);
+	*r_free = true;
+
+	return item;
+}
 
 
 #else
@@ -3839,6 +3890,17 @@ static void rna_def_dimension(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "dimension_angle_complementary", PROP_BOOLEAN , PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "dimension_flag", DIMENSION_FLAG_ANGLE_COMPLEMENTARY);
 	RNA_def_property_ui_text(prop, "Complementary Angle", "Sets the complementary angle");
+
+	prop = RNA_def_property(srna, "dimension_axis", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop,NULL,"axis");
+	RNA_def_property_flag(prop,PROP_EDITABLE);
+	//RNA_def_property_flag(prop, PROP_REGISTER);
+	//RNA_def_property_pointer_funcs(prop,NULL,"rna_dimension_axis_set", NULL,NULL);
+	//RNA_def_property_enum_sdna(prop, NULL, "axis");
+	//RNA_def_property_flag(prop, PROP_ENUM_FLAG); /* important to run before default set */
+	//RNA_def_property_enum_items(prop, reference_axis_items);
+	//RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_ReferenceAxis_itemf");
+	RNA_def_property_ui_text(prop, "Refefence Axis", "Reference Axis");
 
 }
 

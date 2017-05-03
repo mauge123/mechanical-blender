@@ -76,10 +76,10 @@ static void reference_axis_data_from_3_vertices (BMVert **v, float *v1, float *v
 	float center[3]; float normal[3];
 	if (center_of_3_points(center,v[0]->co,v[1]->co,v[2]->co)) {
 		normal_tri_v3(normal,v[0]->co,v[1]->co,v[2]->co);
+		sub_v3_v3v3(v1, center, normal);
+		add_v3_v3v3(v2, center, normal);
 		zero_v3(v3);
 		zero_v3(v4);
-		sub_v3_v3v3(v2, center, normal);
-		add_v3_v3v3(v2, center, normal);
 	} else {
 		reference_axis_data_from_2_vertices(v, v1, v2, v3, v4);
 	}
