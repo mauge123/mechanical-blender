@@ -61,10 +61,6 @@ EnumPropertyItem rna_enum_mesh_delimit_mode_items[] = {
 	{0, NULL, 0, NULL, NULL},
 };
 
-static EnumPropertyItem reference_axis_items[] = {
-    {0, NULL, 0, NULL, NULL}
-};
-
 #ifdef RNA_RUNTIME
 
 #include "DNA_scene_types.h"
@@ -1895,6 +1891,10 @@ static void rna_MDim_set_value(PointerRNA *ptr, const float value)
 }
 
 // WITH MECHANICAL MESH_REFERENCE_OBJECTS
+static EnumPropertyItem reference_axis_items[] = {
+    {0, NULL, 0, NULL, NULL}
+};
+
 EnumPropertyItem *rna_ReferenceAxis_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
 {
 	Scene *scene = NULL;

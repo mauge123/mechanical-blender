@@ -73,30 +73,29 @@ void           BM_mesh_elem_table_free(BMesh *bm, const char htype);
 BMVert *BM_vert_at_index(BMesh *bm, const int index);
 BMEdge *BM_edge_at_index(BMesh *bm, const int index);
 BMFace *BM_face_at_index(BMesh *bm, const int index);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_at_index(BMesh *bm, const int index);
-#endif
 
 BMVert *BM_vert_at_index_find(BMesh *bm, const int index);
 BMEdge *BM_edge_at_index_find(BMesh *bm, const int index);
 BMFace *BM_face_at_index_find(BMesh *bm, const int index);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+
+// WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim  *BM_dim_at_index_find(BMesh *bm, const int index);
-#endif
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+
+// WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 BMReference *BM_reference_at_index_find(BMesh *bm, const int index);
 BMReference *BM_reference_find_by_name(BMesh *bm, const char *name);
-#endif
-#ifdef WITH_MECHANICAL_GEOMETRY
+
+// WITH_MECHANICAL_GEOMETRY
 BMGeom *BM_geom_at_index_find(BMesh *bm, const int index);
-#endif
+
 
 BMVert *BM_vert_at_index_find_or_table(BMesh *bm, const int index);
 BMEdge *BM_edge_at_index_find_or_table(BMesh *bm, const int index);
 BMFace *BM_face_at_index_find_or_table(BMesh *bm, const int index);
-#ifdef WITH_MECHANICAL_MESH_DIMENSIONS
+// WITH_MECHANICAL_MESH_DIMENSIONS
 BMDim *BM_dim_at_index_find_or_table(BMesh *bm, const int index);
-#endif
 
 // XXX
 
