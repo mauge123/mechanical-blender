@@ -245,7 +245,6 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 							// Changed dimension value
 							apply_dimension_value(bm,edm,edm->mdim->value,scene->toolsettings);
 						}
-						dimension_data_update(edm);
 					}
 
 					if (BM_elem_flag_test(edm, BM_ELEM_TAG)) {
@@ -261,7 +260,6 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 								get_dimension_mid(edm->mdim->fpos,edm);
 								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
 								mul_v3_fl(edm->mdim->fpos,-1.0f);
-								dimension_data_update(edm);
 								break;
 							case DIM_TYPE_DIAMETER:
 							case DIM_TYPE_RADIUS:
@@ -270,17 +268,12 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 								copy_v3_v3(edm->mdim->fpos,edm->mdim->center);
 								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
 								mul_v3_fl(edm->mdim->fpos,-1.0f);
-								dimension_data_update(edm);
 								break;
 							default:
 								BLI_assert(0);
 						}
-
-
 					}
-
-
-
+					dimension_data_update(edm);
 				}
 			}
 			if (temp_em) {
