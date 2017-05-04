@@ -354,8 +354,9 @@ static void apply_dimension_concentric_constraint (BMesh *bm, BMDim *edm, float 
 	float h[3];
 	float r1, r2;
 	float n[3];
-	BMVert *eve;
-	BMIter iter;
+	int i =0;
+	BMVert *eve, *eve1;
+	BMIter iter, iter1;
 	BMReference *erf = BM_reference_at_index_find(bm, edm->mdim->axis-1);
 	BLI_assert(erf->type == BM_REFERENCE_TYPE_AXIS);
 	sub_v3_v3v3(constraint_axis,erf->v1, erf->v2);
@@ -363,15 +364,19 @@ static void apply_dimension_concentric_constraint (BMesh *bm, BMDim *edm, float 
 
 	tag_vertexs_affected_by_dimension(bm,edm);
 
-	for (int i=0;i<edm->totverts;i++){
-		if (!equals_v3v3(&v_in[i*3],edm->v[i]->co)) {
+	BM_ITER_MESH_INDEX (eve1, &iter1, bm, BM_VERTS_OF_MESH, i) {
+		if (!BM_elem_flag_test_bool(eve1, BM_ELEM_TAG)) {
+			continue;
+		}
+		if (!equals_v3v3(&v_in[i*3],eve1->co)) {
 			// Changed apply changes on concetric
 			v_perpendicular_to_axis (r_original, &v_in[i*3], erf->v1, constraint_axis);
 			add_v3_v3v3(c_original, &v_in[i*3], r_original);
-			normal_tri_v3(n,edm->v[i]->co, &v_in[i*3], c_original);
-			if (perpendicular_v3_v3(n,constraint_axis)) {
-				v_perpendicular_to_axis (r_modified, edm->v[i]->co, erf->v1, constraint_axis);
-				add_v3_v3v3(c_modified,edm->v[i]->co, r_modified);
+			normal_tri_v3(n,eve1->co, &v_in[i*3], c_original);
+			// point_on_plane, covers the case on perpendicular translation to axis
+			if (perpendicular_v3_v3(n,constraint_axis) || point_on_plane_prec(&v_in[i*3], constraint_axis, eve1->co)) {
+				v_perpendicular_to_axis (r_modified, eve1->co, erf->v1, constraint_axis);
+				add_v3_v3v3(c_modified,eve1->co, r_modified);
 				r1 = len_v3(r_original);
 				r2 = len_v3(r_modified);
 				sub_v3_v3v3(h,c_modified, c_original);
@@ -397,8 +402,7 @@ static void apply_dimension_concentric_constraint (BMesh *bm, BMDim *edm, float 
 
 	}
 
-	// Disable all:  some enabled verts may not be part on dim vertices (eg, selected ones)
-	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+	BM_ITER_MESH(eve, &iter, bm, BM_VERTS_OF_MESH) {
 		BM_elem_flag_disable(eve, BM_ELEM_TAG);
 	}
 }
@@ -407,12 +411,14 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts
 
 	int constraints = (edm->mdim->constraints & DIM_CONSTRAINT_OVERRIDE) ? edm->mdim->constraints : ts->dimension_constraints;
 	float *v_in = NULL;
-
+	int i =0;
+	BMVert *eve;
+	BMIter iter;
 
 	if (edm->mdim->axis > 0) {
-		v_in = MEM_callocN(sizeof(float)*3*edm->totverts, "Original Coordinates");
-		for (int i=0;i<edm->totverts;i++){
-			copy_v3_v3(&v_in[i*3],edm->v[i]->co);
+		v_in = MEM_callocN(sizeof(float)*3*bm->totvert, "Original Coordinates");
+		BM_ITER_MESH_INDEX (eve, &iter, bm, BM_VERTS_OF_MESH, i) {
+			copy_v3_v3(&v_in[i*3],eve->co);
 		}
 	}
 
