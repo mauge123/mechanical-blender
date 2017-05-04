@@ -721,6 +721,7 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	BMEdge *e, *e_new, **etable = NULL;
 	BMFace *f, *f_new, **ftable = NULL;
 	BMDim *d, *d_new, **dtable = NULL;
+	BMReference *erf, *erf_new;
 	BMElem **eletable;
 	BMEditSelection *ese;
 	BMIter iter;
@@ -800,6 +801,24 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
 	BLI_assert(i == bm_old->totdim);
 #endif
 
+
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	BM_ITER_MESH_INDEX (erf, &iter, bm_old, BM_REFERENCES_OF_MESH, i) {
+		erf_new = BM_reference_create(bm_new, erf->type,
+		                       erf->v1, erf->v2, erf->v3, erf->v4,
+		                       erf->name, erf, BM_CREATE_SKIP_CD);
+
+		BM_elem_attrs_copy_ex(bm_old, bm_new, erf, erf_new, 0xff);
+		erf_new->head.hflag = erf->head.hflag;  /* low level! don't do this for normal api use */
+		BM_elem_index_set(erf, i); /* set_inline */
+		BM_elem_index_set(erf_new, i); /* set_inline */
+	}
+	bm_old->elem_index_dirty &= ~BM_REFERENCE;
+	bm_new->elem_index_dirty &= ~BM_REFERENCE;
+
+	/* safety check */
+	BLI_assert(i == bm_old->totref);
+#endif
 	
 	BM_ITER_MESH_INDEX (f, &iter, bm_old, BM_FACES_OF_MESH, i) {
 		BM_elem_index_set(f, i); /* set_inline */
