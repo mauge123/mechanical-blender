@@ -32,9 +32,6 @@ bool valid_constraint_setting(BMDim *edm, int constraint) {
 		case DIM_ALLOW_SLIDE_CONSTRAINT:
 			ret = ELEM(edm->mdim->dim_type,DIM_TYPE_ANGLE_3P,DIM_TYPE_ANGLE_4P);
 			break;
-		case DIM_CONCENTRIC_CONSTRAINT:
-			ret = (edm->mdim->axis > 0);
-			break;
 	}
 	return ret;
 }
@@ -308,7 +305,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 	tag_vertexs_affected_by_dimension (bm, edm);
 
-	if ((constraints & DIM_PLANE_CONSTRAINT) &&  (~constraints &  DIM_CONCENTRIC_CONSTRAINT )) {
+	if (constraints & DIM_PLANE_CONSTRAINT) {
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
 		tag_vertexs_on_plane(bm, p, d_dir);
 	}
@@ -412,7 +409,7 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts
 	float *v_in = NULL;
 
 
-	if (edm->mdim->axis > 0 &&  (constraints & DIM_CONCENTRIC_CONSTRAINT)) {
+	if (edm->mdim->axis > 0) {
 		v_in = MEM_callocN(sizeof(float)*3*edm->totverts, "Original Coordinates");
 		for (int i=0;i<edm->totverts;i++){
 			copy_v3_v3(&v_in[i*3],edm->v[i]->co);
@@ -438,7 +435,7 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts
 			BLI_assert(0);
 	}
 
-	if ((constraints & DIM_CONCENTRIC_CONSTRAINT) &&  (edm->mdim->axis > 0)) {
+	if (edm->mdim->axis > 0) {
 		apply_dimension_concentric_constraint (bm, edm, v_in);
 		MEM_freeN (v_in);
 	}

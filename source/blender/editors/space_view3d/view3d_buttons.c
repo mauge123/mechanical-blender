@@ -202,11 +202,6 @@ static int v3d_mesh_constraints_buts(BMDim *edm, int totdim, uiBlock *block,int 
 		constraints,0.0f,0.0f, 0, 0, TIP_("Allow Slide: Changed vertex by dimension can change position"));
 	UI_block_lock_clear(block);
 
-	UI_block_lock_set(block,none || !(all || valid_constraint_setting (edm, DIM_CONCENTRIC_CONSTRAINT)), "Valid Contraint");
-	uiDefButBitI(block, UI_BTYPE_CHECKBOX, DIM_CONCENTRIC_CONSTRAINT ,B_OBJECTPANELMEDIAN, IFACE_("Concetric"),0, yi -= buth + but_margin, 200, buth,
-		constraints,0.0f,0.0f, 0, 0, TIP_("Automatic concentric constraint: Concentric data will be aplied same distance to axis"));
-	UI_block_lock_clear(block);
-
 	return yi;
 }
 
