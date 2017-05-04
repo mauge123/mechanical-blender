@@ -3807,10 +3807,6 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "dimension_constraints", DIM_ALLOW_SLIDE_CONSTRAINT);
 	RNA_def_property_ui_text(prop, "Allow Slide", "Enables auto dimension constraint allow slide");
 
-	prop = RNA_def_property(srna, "dimension_constraint_concentric", PROP_BOOLEAN , PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "dimension_constraints", DIM_CONCENTRIC_CONSTRAINT);
-	RNA_def_property_ui_text(prop, "Concentric Constraint", "Enables auto dimension concentric constraint");
-
 #endif
 }
 
