@@ -214,6 +214,14 @@ Imath::M44d get_matrix(const IXformSchema &schema, const float time)
 	return s0.getMatrix();
 }
 
+DerivedMesh *AbcObjectReader::read_derivedmesh(DerivedMesh *dm,
+                                               const Alembic::Abc::ISampleSelector &UNUSED(sample_sel),
+                                               int UNUSED(read_flag),
+                                               const char **UNUSED(err_str))
+{
+	return dm;
+}
+
 void AbcObjectReader::setupObjectTransform(const float time)
 {
 	bool is_constant = false;
@@ -361,4 +369,5 @@ void AbcObjectReader::incref()
 void AbcObjectReader::decref()
 {
 	--m_refcount;
+	BLI_assert(m_refcount >= 0);
 }

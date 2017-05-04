@@ -14,7 +14,7 @@
 #include "common.h"
 
 #define MAX_VERTEX_ATTRIBS 16
-#define AVG_VERTEX_ATTRIB_NAME_LEN 5
+#define AVG_VERTEX_ATTRIB_NAME_LEN 11
 #define VERTEX_ATTRIB_NAMES_BUFFER_LEN ((AVG_VERTEX_ATTRIB_NAME_LEN + 1) * MAX_VERTEX_ATTRIBS)
 
 #if defined(WITH_GL_PROFILE_CORE) || defined(_WIN32)
@@ -70,6 +70,10 @@ void VertexFormat_clear(VertexFormat*);
 void VertexFormat_copy(VertexFormat* dest, const VertexFormat* src);
 
 unsigned VertexFormat_add_attrib(VertexFormat*, const char* name, VertexCompType, unsigned comp_ct, VertexFetchMode);
+
+// Memory Management
+
+unsigned VertexBuffer_get_memory_usage(void);
 
 // format conversion
 

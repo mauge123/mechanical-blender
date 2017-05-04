@@ -49,6 +49,7 @@ void immAttrib2i(unsigned attrib_id, int x, int y);
 
 void immAttrib2s(unsigned attrib_id, short x, short y);
 
+void immAttrib2fv(unsigned attrib_id, const float data[2]);
 void immAttrib3fv(unsigned attrib_id, const float data[3]);
 void immAttrib4fv(unsigned attrib_id, const float data[4]);
 
@@ -89,6 +90,7 @@ void immUniform3fv(const char* name, const float data[3]);
 void immUniformArray3fv(const char* name, const float *data, int count);
 void immUniform4f(const char* name, float x, float y, float z, float w);
 void immUniform4fv(const char* name, const float data[4]);
+void immUniformArray4fv(const char* bare_name, const float *data, int count);
 void immUniformMatrix4fv(const char* name, const float data[4][4]);
 
 

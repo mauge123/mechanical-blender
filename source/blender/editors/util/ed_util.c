@@ -318,21 +318,25 @@ void ED_region_draw_mouse_line_cb(const bContext *C, ARegion *ar, void *arg_info
 	const float mval_dst[2] = {win->eventstate->x - ar->winrct.xmin,
 	                           win->eventstate->y - ar->winrct.ymin};
 
-	setlinestyle(3);
+	const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
 
-	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	float viewport_size[4];
+	glGetFloatv(GL_VIEWPORT, viewport_size);
+	immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+
+	immUniform1i("num_colors", 0);  /* "simple" mode */
 	immUniformThemeColor(TH_VIEW_OVERLAY);
+	immUniform1f("dash_width", 6.0f);
+	immUniform1f("dash_factor", 0.5f);
 
 	immBegin(PRIM_LINES, 2);
-	immVertex2fv(pos, mval_dst);
-	immVertex2fv(pos, mval_src);
+	immVertex2fv(shdr_pos, mval_src);
+	immVertex2fv(shdr_pos, mval_dst);
 	immEnd();
-	immUnbindProgram();
 
-	setlinestyle(0);
+	immUnbindProgram();
 }
 
 /**

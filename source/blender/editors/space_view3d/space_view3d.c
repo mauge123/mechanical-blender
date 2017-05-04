@@ -43,17 +43,16 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
+#include "BKE_curve.h"
 #include "BKE_depsgraph.h"
 #include "BKE_icons.h"
+#include "BKE_lattice.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_mesh.h"
 #include "BKE_object.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
-
-#include "BKE_curve_render.h"
-#include "BKE_lattice_render.h"
-#include "BKE_mesh_render.h"
 
 #include "ED_space_api.h"
 #include "ED_screen.h"
@@ -802,7 +801,7 @@ static void *view3d_main_region_duplicate(void *poin)
 	return NULL;
 }
 
-static void view3d_recalc_used_layers(ARegion *ar, wmNotifier *wmn, Scene *scene)
+static void view3d_recalc_used_layers(ARegion *ar, wmNotifier *wmn, const Scene *scene)
 {
 	wmWindow *win = wmn->wm->winactive;
 	ScrArea *sa;
@@ -832,9 +831,10 @@ static void view3d_recalc_used_layers(ARegion *ar, wmNotifier *wmn, Scene *scene
 	}
 }
 
-static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, wmNotifier *wmn)
+static void view3d_main_region_listener(
+        bScreen *UNUSED(sc), ScrArea *sa, ARegion *ar,
+        wmNotifier *wmn, const Scene *scene)
 {
-	Scene *scene = sc->scene;
 	View3D *v3d = sa->spacedata.first;
 	RegionView3D *rv3d = ar->regiondata;
 	wmManipulatorMap *mmap = ar->manipulator_map;
@@ -932,15 +932,15 @@ static void view3d_main_region_listener(bScreen *sc, ScrArea *sa, ARegion *ar, w
 						Object *ob = scene->obedit;
 						switch (ob->type) {
 							case OB_MESH:
-								BKE_mesh_batch_selection_dirty(ob->data);
+								BKE_mesh_batch_cache_dirty(ob->data, BKE_CURVE_BATCH_DIRTY_SELECT);
 								break;
 							// case OB_FONT:  /* handled by text_update_edited */
 							case OB_CURVE:
 							case OB_SURF:
-								BKE_curve_batch_selection_dirty(ob->data);
+								BKE_curve_batch_cache_dirty(ob->data, BKE_CURVE_BATCH_DIRTY_SELECT);
 								break;
 							case OB_LATTICE:
-								BKE_lattice_batch_selection_dirty(ob->data);
+								BKE_lattice_batch_cache_dirty(ob->data, BKE_CURVE_BATCH_DIRTY_SELECT);
 								break;
 						}
 					}
@@ -1106,7 +1106,9 @@ static void view3d_header_region_draw(const bContext *C, ARegion *ar)
 	ED_region_header(C, ar);
 }
 
-static void view3d_header_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)
+static void view3d_header_region_listener(
+        bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar,
+        wmNotifier *wmn, const Scene *UNUSED(scene))
 {
 	/* context changes */
 	switch (wmn->category) {
@@ -1152,7 +1154,9 @@ static void view3d_buttons_region_draw(const bContext *C, ARegion *ar)
 	ED_region_panels(C, ar, NULL, -1, true);
 }
 
-static void view3d_buttons_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)
+static void view3d_buttons_region_listener(
+        bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar,
+        wmNotifier *wmn, const Scene *UNUSED(scene))
 {
 	/* context changes */
 	switch (wmn->category) {
@@ -1258,7 +1262,9 @@ static void view3d_tools_region_draw(const bContext *C, ARegion *ar)
 	ED_region_panels(C, ar, CTX_data_mode_string(C), -1, true);
 }
 
-static void view3d_props_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)
+static void view3d_props_region_listener(
+        bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar,
+        wmNotifier *wmn, const Scene *UNUSED(scene))
 {
 	/* context changes */
 	switch (wmn->category) {
@@ -1278,7 +1284,8 @@ static void view3d_props_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa
 }
 
 /* area (not region) level listener */
-static void space_view3d_listener(bScreen *UNUSED(sc), ScrArea *sa, struct wmNotifier *wmn)
+static void space_view3d_listener(
+        bScreen *UNUSED(sc), ScrArea *sa, struct wmNotifier *wmn, const Scene *UNUSED(scene))
 {
 	View3D *v3d = sa->spacedata.first;
 

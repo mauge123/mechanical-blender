@@ -74,6 +74,9 @@ void DepsgraphRelationBuilder::build_scene(Main *bmain, Scene *scene)
 		build_scene(bmain, scene->set);
 	}
 
+	/* XXX store scene to access from DAG_get_scene */
+	m_graph->scene = scene;
+
 	/* scene objects */
 	FOREACH_SCENE_OBJECT(scene, ob)
 	{

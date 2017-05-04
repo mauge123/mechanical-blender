@@ -2058,26 +2058,47 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 		gpuPushMatrix();
 
+		/* Dashed lines first. */
+		if (ELEM(t->helpline, HLP_SPRING, HLP_ANGLE)) {
+			const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+
+			UNUSED_VARS_NDEBUG(shdr_pos); /* silence warning */
+			BLI_assert(shdr_pos == POS_INDEX);
+
+			glLineWidth(1.0f);
+
+			immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
+
+			float viewport_size[4];
+			glGetFloatv(GL_VIEWPORT, viewport_size);
+			immUniform2f("viewport_size", viewport_size[2], viewport_size[3]);
+
+			immUniform1i("num_colors", 0);  /* "simple" mode */
+			immUniformThemeColor(TH_VIEW_OVERLAY);
+			immUniform1f("dash_width", 6.0f);
+			immUniform1f("dash_factor", 0.5f);
+
+			immBegin(PRIM_LINES, 2);
+			immVertex2fv(POS_INDEX, cent);
+			immVertex2f(POS_INDEX, (float)t->mval[0], (float)t->mval[1]);
+			immEnd();
+
+			immUnbindProgram();
+		}
+
+		/* And now, solid lines. */
 		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
-		UNUSED_VARS(pos); /* silence warning */
+		UNUSED_VARS_NDEBUG(pos); /* silence warning */
 		BLI_assert(pos == POS_INDEX);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		switch (t->helpline) {
 			case HLP_SPRING:
 				immUniformThemeColor(TH_VIEW_OVERLAY);
-				setlinestyle(3);
-				glLineWidth(1.0f);
-
-				immBegin(PRIM_LINES, 2);
-				immVertex2f(POS_INDEX, (float)t->mval[0], (float)t->mval[1]);
-				immVertex2fv(POS_INDEX, cent);
-				immEnd();
 
 				gpuTranslate3fv(mval);
 				gpuRotateAxis(-RAD2DEGF(atan2f(cent[0] - t->mval[0], cent[1] - t->mval[1])), 'Z');
 
-				setlinestyle(0);
 				glLineWidth(3.0f);
 				drawArrow(UP, 5, 10, 5);
 				drawArrow(DOWN, 5, 10, 5);
@@ -2109,17 +2130,8 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 				immUniformThemeColor(TH_VIEW_OVERLAY);
 
-				setlinestyle(3);
-				glLineWidth(1.0f);
-
-				immBegin(PRIM_LINES, 2);
-				immVertex2f(POS_INDEX, (float)t->mval[0], (float)t->mval[1]);
-				immVertex2fv(POS_INDEX, cent);
-				immEnd();
-
 				gpuTranslate3f(cent[0] - t->mval[0] + mval[0], cent[1] - t->mval[1] + mval[1], 0);
 
-				setlinestyle(0);
 				glLineWidth(3.0f);
 				drawArc(dist, angle - delta_angle, angle - spacing_angle, 10);
 				drawArc(dist, angle + spacing_angle, angle + delta_angle, 10);
@@ -7982,7 +7994,7 @@ static void drawVertSlide(TransInfo *t)
 
 			glLineWidth(line_size);
 
-			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+			const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 			 
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 			immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
@@ -7991,8 +8003,8 @@ static void drawVertSlide(TransInfo *t)
 			if (is_clamp) {
 				sv = sld->sv;
 				for (i = 0; i < sld->totsv; i++, sv++) {
-					immVertex3fv(pos, sv->co_orig_3d);
-					immVertex3fv(pos, sv->co_link_orig_3d[sv->co_link_curr]);
+					immVertex3fv(shdr_pos, sv->co_orig_3d);
+					immVertex3fv(shdr_pos, sv->co_link_orig_3d[sv->co_link_curr]);
 				}
 			}
 			else {
@@ -8005,8 +8017,8 @@ static void drawVertSlide(TransInfo *t)
 					add_v3_v3(a, sv->co_orig_3d);
 					add_v3_v3(b, sv->co_orig_3d);
 
-					immVertex3fv(pos, a);
-					immVertex3fv(pos, b);
+					immVertex3fv(shdr_pos, a);
+					immVertex3fv(shdr_pos, b);
 				}
 			}
 			immEnd();
@@ -8014,12 +8026,12 @@ static void drawVertSlide(TransInfo *t)
 			glPointSize(ctrl_size);
 
 			immBegin(PRIM_POINTS, 1);
-			immVertex3fv(pos, (sld->flipped && sld->use_even) ?
+			immVertex3fv(shdr_pos, (sld->flipped && sld->use_even) ?
 			            curr_sv->co_link_orig_3d[curr_sv->co_link_curr] :
 			            curr_sv->co_orig_3d);
 			immEnd();
 
-			glDisable(GL_BLEND);
+			immUnbindProgram();
 
 			/* direction from active vertex! */
 			if ((t->mval[0] != t->mouse.imval[0]) ||
@@ -8044,17 +8056,25 @@ static void drawVertSlide(TransInfo *t)
 				add_v3_v3(co_dest_3d, curr_sv->co_orig_3d);
 
 				glLineWidth(1.0f);
-				setlinestyle(1);
 
-				imm_cpack(0xffffff);
+				immBindBuiltinProgram(GPU_SHADER_3D_LINE_DASHED_COLOR);
+
+				float viewport_size[4];
+				glGetFloatv(GL_VIEWPORT, viewport_size);
+				immUniform2f("viewport_size", viewport_size[2], viewport_size[3]);
+
+				immUniform1i("num_colors", 0);  /* "simple" mode */
+				immUniformColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+				immUniform1f("dash_width", 6.0f);
+				immUniform1f("dash_factor", 0.5f);
 
 				immBegin(PRIM_LINES, 2);
-				immVertex3fv(pos, curr_sv->co_orig_3d);
-				immVertex3fv(pos, co_dest_3d);
+				immVertex3fv(shdr_pos, curr_sv->co_orig_3d);
+				immVertex3fv(shdr_pos, co_dest_3d);
 				immEnd();
-			}
 
-			immUnbindProgram();
+				immUnbindProgram();
+			}
 
 			gpuPopMatrix();
 

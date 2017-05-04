@@ -307,10 +307,10 @@ typedef struct Object {
 
 	ListBase drawdata;		/* runtime, for draw engine datas */
 
-
 // WITH_MECHANICAL_GEOMETRY
 	int geom_enabled;
-	char pad3[4];
+
+	int base_selection_color; /* flushed by depsgraph only */
 
 } Object;
 

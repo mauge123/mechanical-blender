@@ -106,6 +106,8 @@ void paintface_flush_flags(Object *ob, short flag)
 		/* draw-object caches hidden faces, force re-generation T46867 */
 		GPU_drawobject_free(dm);
 	}
+
+	BKE_mesh_batch_cache_dirty(me, BKE_MESH_BATCH_DIRTY_PAINT);
 }
 
 void paintface_hide(Object *ob, const bool unselected)
@@ -306,31 +308,30 @@ void paintface_deselect_all_visible(Object *ob, int action, bool flush_flags)
 
 bool paintface_minmax(Object *ob, float r_min[3], float r_max[3])
 {
-	Mesh *me;
-	MPoly *mp;
-	MTexPoly *tf;
-	MLoop *ml;
-	MVert *mvert;
+	const Mesh *me;
+	const MPoly *mp;
+	const MLoop *ml;
+	const MVert *mvert;
 	int a, b;
 	bool ok = false;
 	float vec[3], bmat[3][3];
 
 	me = BKE_mesh_from_object(ob);
-	if (!me || !me->mtpoly) return ok;
+	if (!me || !me->mloopuv) {
+		return ok;
+	}
 	
 	copy_m3_m4(bmat, ob->obmat);
 
 	mvert = me->mvert;
 	mp = me->mpoly;
-	tf = me->mtpoly;
-	for (a = me->totpoly; a > 0; a--, mp++, tf++) {
+	for (a = me->totpoly; a > 0; a--, mp++) {
 		if (mp->flag & ME_HIDE || !(mp->flag & ME_FACE_SEL))
 			continue;
 
 		ml = me->mloop + mp->totloop;
 		for (b = 0; b < mp->totloop; b++, ml++) {
-			copy_v3_v3(vec, (mvert[ml->v].co));
-			mul_m3_v3(bmat, vec);
+			mul_v3_m3v3(vec, bmat, mvert[ml->v].co);
 			add_v3_v3v3(vec, vec, ob->obmat[3]);
 			minmax_v3v3_v3(r_min, r_max, vec);
 		}
@@ -388,7 +389,7 @@ bool paintface_mouse_select(struct bContext *C, Object *ob, const int mval[2], b
 	}
 	
 	/* image window redraw */
-	
+
 	paintface_flush_flags(ob, SELECT);
 	WM_event_add_notifier(C, NC_GEOM | ND_SELECT, ob->data);
 	ED_region_tag_redraw(CTX_wm_region(C)); // XXX - should redraw all 3D views
@@ -516,6 +517,8 @@ void paintvert_flush_flags(Object *ob)
 			dm_mv->flag = me->mvert[i].flag;
 		}
 	}
+
+	BKE_mesh_batch_cache_dirty(me, BKE_MESH_BATCH_DIRTY_PAINT);
 }
 /*  note: if the caller passes false to flush_flags, then they will need to run paintvert_flush_flags(ob) themselves */
 void paintvert_deselect_all_visible(Object *ob, int action, bool flush_flags)

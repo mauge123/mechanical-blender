@@ -137,9 +137,9 @@ static void gp_draw_stroke_buffer_fill(const tGPspoint *points, int totpoints, f
 	float(*points2d)[2] = MEM_mallocN(sizeof(*points2d) * totpoints, "GP Stroke buffer temp 2d points");
 
 	/* Convert points to array and triangulate
-	* Here a cache is not used because while drawing the information changes all the time, so the cache
-	* would be recalculated constantly, so it is better to do direct calculation for each function call
-	*/
+	 * Here a cache is not used because while drawing the information changes all the time, so the cache
+	 * would be recalculated constantly, so it is better to do direct calculation for each function call
+	 */
 	for (int i = 0; i < totpoints; i++) {
 		const tGPspoint *pt = &points[i];
 		points2d[i][0] = pt->x;
@@ -225,8 +225,6 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 		float oldpressure = points[0].pressure;
 
 		/* draw stroke curve */
-		if (G.debug & G_DEBUG) setlinestyle(2);
-
 		glLineWidth(max_ff(oldpressure * thickness, 1.0));
 		immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
 		immBeginAtMost(PRIM_LINE_STRIP, totpoints);
@@ -270,8 +268,6 @@ static void gp_draw_stroke_buffer(const tGPspoint *points, int totpoints, short 
 			gp_set_tpoint_varying_color(pt - 1, ink, color);
 			immVertex2iv(pos, &(pt - 1)->x);
 		}
-
-		if (G.debug & G_DEBUG) setlinestyle(0);
 	}
 
 	immEnd();

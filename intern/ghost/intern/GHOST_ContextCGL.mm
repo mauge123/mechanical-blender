@@ -159,9 +159,6 @@ GHOST_TSuccess GHOST_ContextCGL::activateDrawingContext()
 	if (m_openGLContext != nil) {
 		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 		[m_openGLContext makeCurrentContext];
-
-		activateGLEW();
-
 		[pool drain];
 		return GHOST_kSuccess;
 	}
@@ -214,9 +211,6 @@ static void makeAttribList(
 	attribs.push_back(NSOpenGLPFAAllowOfflineRenderers); // for automatic GPU switching
 
 	attribs.push_back(NSOpenGLPFADepthSize);
-	attribs.push_back((NSOpenGLPixelFormatAttribute) 32);
-
-	attribs.push_back(NSOpenGLPFAAccumSize);
 	attribs.push_back((NSOpenGLPixelFormatAttribute) 32);
 
 	if (stereoVisual)

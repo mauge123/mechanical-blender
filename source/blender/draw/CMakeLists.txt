@@ -26,21 +26,20 @@
 set(INC
 	.
 	intern
-	engines/clay
-	engines/eevee
 	modes
 
 	../blenfont
 	../blenkernel
 	../blenlib
 	../blentranslation
-	../imbuf
+	../bmesh
 	../depsgraph
-	../makesdna
-	../makesrna
-	../gpu
 	../editors/include
 	../editors/space_view3d
+	../gpu
+	../imbuf
+	../makesdna
+	../makesrna
 	../render/extern/include
 	../render/intern/include
 	../windowmanager
@@ -54,22 +53,16 @@ set(INC_SYS
 )
 
 set(SRC
-	intern/draw_manager.c
-	intern/draw_common.c
-	intern/draw_cache.c
-	intern/draw_view.c
 	intern/draw_armature.c
-
-	engines/clay/clay.c
-	engines/clay/clay.h
-
-	engines/eevee/eevee.c
-	engines/eevee/eevee_lights.c
-	engines/eevee/eevee_probes.c
-	engines/eevee/eevee.h
-	engines/eevee/eevee_private.h
-
-	modes/object_mode.c
+	intern/draw_cache.c
+	intern/draw_cache_impl_curve.c
+	intern/draw_cache_impl_displist.c
+	intern/draw_cache_impl_lattice.c
+	intern/draw_cache_impl_mesh.c
+	intern/draw_common.c
+	intern/draw_manager.c
+	intern/draw_manager_text.c
+	intern/draw_view.c
 	modes/edit_armature_mode.c
 	modes/edit_curve_mode.c
 	modes/edit_lattice_mode.c
@@ -77,20 +70,34 @@ set(SRC
 	modes/edit_metaball_mode.c
 	modes/edit_surface_mode.c
 	modes/edit_text_mode.c
+	modes/object_mode.c
 	modes/paint_texture_mode.c
 	modes/paint_vertex_mode.c
 	modes/paint_weight_mode.c
 	modes/particle_mode.c
 	modes/pose_mode.c
 	modes/sculpt_mode.c
+	engines/basic/basic_engine.c
+	engines/clay/clay_engine.c
+	engines/eevee/eevee_engine.c
+	engines/eevee/eevee_lights.c
+	engines/eevee/eevee_probes.c
+	engines/eevee/eevee_effects.c
+	engines/external/external_engine.c
 
+	DRW_engine.h
 	intern/DRW_render.h
-	intern/draw_common.h
 	intern/draw_cache.h
+	intern/draw_cache_impl.h
+	intern/draw_common.h
+	intern/draw_manager_text.h
 	intern/draw_view.h
 	modes/draw_mode_engines.h
-
-	./DRW_engine.h
+	engines/basic/basic_engine.h
+	engines/clay/clay_engine.h
+	engines/eevee/eevee_engine.h
+	engines/eevee/eevee_private.h
+	engines/external/external_engine.h
 )
 
 if(WITH_CLAY_ENGINE)
@@ -102,11 +109,14 @@ data_to_c_simple(engines/clay/shaders/clay_vert.glsl SRC)
 data_to_c_simple(engines/clay/shaders/ssao_alchemy.glsl SRC)
 data_to_c_simple(engines/clay/shaders/ssao_groundtruth.glsl SRC)
 
+data_to_c_simple(engines/eevee/shaders/default_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/default_world_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/background_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/lit_surface_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/lit_surface_vert.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/effect_motion_blur_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/probe_filter_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/probe_sh_frag.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/probe_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/probe_geom.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/probe_vert.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/shadow_frag.glsl SRC)

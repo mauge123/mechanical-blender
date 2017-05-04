@@ -208,12 +208,26 @@ void immBegin(PrimitiveType prim_type, unsigned vertex_ct)
 	else
 		{
 		// orphan this buffer & start with a fresh one
+#if 1 || APPLE_LEGACY
+		// this method works on all platforms, old & new
 		glBufferData(GL_ARRAY_BUFFER, IMM_BUFFER_SIZE, NULL, GL_DYNAMIC_DRAW);
-#if !APPLE_LEGACY
+#else
+		// TODO: use other (more recent) methods after thorough testing
 		if (GLEW_VERSION_4_3 || GLEW_ARB_invalidate_subdata)
 			glInvalidateBufferData(imm.vbo_id);
 		else
-			glMapBufferRange(GL_ARRAY_BUFFER, 0, IMM_BUFFER_SIZE, GL_MAP_INVALIDATE_BUFFER_BIT);
+			{
+			// glitches!
+//			glMapBufferRange(GL_ARRAY_BUFFER, 0, IMM_BUFFER_SIZE, GL_MAP_INVALIDATE_BUFFER_BIT);
+
+			// works
+//			glMapBufferRange(GL_ARRAY_BUFFER, 0, IMM_BUFFER_SIZE,
+//			                 GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+//			glUnmapBuffer(GL_ARRAY_BUFFER);
+
+			// also works
+			glBufferData(GL_ARRAY_BUFFER, IMM_BUFFER_SIZE, NULL, GL_DYNAMIC_DRAW);
+			}
 #endif
 
 		imm.buffer_offset = 0;
@@ -222,7 +236,7 @@ void immBegin(PrimitiveType prim_type, unsigned vertex_ct)
 //	printf("mapping %u to %u\n", imm.buffer_offset, imm.buffer_offset + bytes_needed - 1);
 
 #if APPLE_LEGACY
-	imm.buffer_data = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY) + imm.buffer_offset;
+	imm.buffer_data = (GLubyte*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY) + imm.buffer_offset;
 #else
 	imm.buffer_data = glMapBufferRange(GL_ARRAY_BUFFER, imm.buffer_offset, bytes_needed,
 	                                   GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | (imm.strict_vertex_ct ? 0 : GL_MAP_FLUSH_EXPLICIT_BIT));
@@ -563,6 +577,11 @@ void immAttrib2s(unsigned attrib_id, short x, short y)
 	data[1] = y;
 	}
 
+void immAttrib2fv(unsigned attrib_id, const float data[2])
+	{
+	immAttrib2f(attrib_id, data[0], data[1]);
+	}
+
 void immAttrib3fv(unsigned attrib_id, const float data[3])
 	{
 	immAttrib3f(attrib_id, data[0], data[1], data[2]);
@@ -786,6 +805,24 @@ void immUniform4fv(const char* name, const float data[4])
 	{
 	GET_UNIFORM
 	glUniform4fv(uniform->location, 1, data);
+	}
+
+void immUniformArray4fv(const char* bare_name, const float *data, int count)
+	{
+	// look up "name[0]" when given "name"
+	const size_t len = strlen(bare_name);
+#if TRUST_NO_ONE
+	assert(len <= MAX_UNIFORM_NAME_LEN);
+#endif
+	char name[MAX_UNIFORM_NAME_LEN];
+	strcpy(name, bare_name);
+	name[len + 0] = '[';
+	name[len + 1] = '0';
+	name[len + 2] = ']';
+	name[len + 3] = '\0';
+
+	GET_UNIFORM
+	glUniform4fv(uniform->location, count, data);
 	}
 
 void immUniformMatrix4fv(const char* name, const float data[4][4])

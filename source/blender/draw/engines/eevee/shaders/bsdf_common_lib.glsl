@@ -54,20 +54,15 @@ struct ShadowMapData {
 #define sh_map_bias   near_far_bias.z
 
 #ifndef MAX_CASCADE_NUM
-#define MAX_CASCADE_NUM 1
+#define MAX_CASCADE_NUM 4
 #endif
 
 struct ShadowCascadeData {
 	mat4 shadowmat[MAX_CASCADE_NUM];
-	vec4 bias_count;
-	float near[MAX_CASCADE_NUM];
-	float far[MAX_CASCADE_NUM];
+	/* arrays of float are not aligned so use vec4 */
+	vec4 split_distances;
+	vec4 bias;
 };
-
-/* convenience aliases */
-#define sh_cascade_bias   bias_count.x
-#define sh_cascade_count  bias_count.y
-
 
 struct AreaData {
 	vec3 corner[4];
@@ -98,8 +93,6 @@ vec4 saturate(vec4 a) { return vec4(saturate(a.x), saturate(a.y), saturate(a.z),
 
 float distance_squared(vec2 a, vec2 b) { a -= b; return dot(a, a); }
 float distance_squared(vec3 a, vec3 b) { a -= b; return dot(a, a); }
-
-float hypot(float x, float y) { return sqrt(x*x + y*y); }
 
 float inverse_distance(vec3 V) { return max( 1 / length(V), 1e-8); }
 
@@ -274,6 +267,13 @@ vec3 mrp_area(LightData ld, ShadingData sd, vec3 dir, inout float roughness, out
 	energy_conservation /= len * len;
 
 	return closest_point_on_rectangle / len;
+}
+
+/* Fresnel */
+vec3 F_schlick(vec3 f0, float cos_theta)
+{
+	float fac = pow(1.0 - cos_theta, 5);
+	return f0 + (1.0 - f0) * fac;
 }
 
 /* GGX */

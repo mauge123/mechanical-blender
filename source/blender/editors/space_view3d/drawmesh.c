@@ -323,7 +323,6 @@ static bool set_draw_settings_cached(
 			if (texpaint) {
 				c_badtex = false;
 				if (GPU_verify_image(ima, NULL, GL_TEXTURE_2D, 0, 1, 0, false)) {
-					glEnable(GL_TEXTURE_2D);
 					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
 					glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_RGB, GL_TEXTURE);
@@ -332,7 +331,6 @@ static bool set_draw_settings_cached(
 					glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_ALPHA, GL_TEXTURE);
 					
 					glActiveTexture(GL_TEXTURE1);
-					glEnable(GL_TEXTURE_2D);
 					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_INTERPOLATE);
 					glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_RGB, GL_PREVIOUS);
@@ -346,14 +344,12 @@ static bool set_draw_settings_cached(
 				}
 				else {
 					glActiveTexture(GL_TEXTURE1);
-					glDisable(GL_TEXTURE_2D);
 					glBindTexture(GL_TEXTURE_2D, 0);
 					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 					glActiveTexture(GL_TEXTURE0);									
 
 					c_badtex = true;
 					GPU_clear_tpage(true);
-					glDisable(GL_TEXTURE_2D);
 					glBindTexture(GL_TEXTURE_2D, 0);
 					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 				}
@@ -403,7 +399,7 @@ static bool set_draw_settings_cached(
 	return c_badtex;
 }
 
-static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *ob)
+static void draw_textured_begin(Scene *scene, SceneLayer *sl, View3D *v3d, RegionView3D *rv3d, Object *ob)
 {
 	unsigned char obcol[4];
 	bool is_tex, solidtex;
@@ -439,9 +435,7 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 			Gtexdraw.is_lit = 0;
 		}
 		else {
-			Gtexdraw.is_lit = GPU_scene_object_lights(
-			                      scene, ob, v3d->localvd ? v3d->localvd->lay : v3d->lay,
-			                      rv3d->viewmat, !rv3d->is_persp);
+			Gtexdraw.is_lit = GPU_scene_object_lights(sl, rv3d->viewmat, !rv3d->is_persp);
 		}
 	}
 
@@ -461,7 +455,6 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 	 * in new texpaint code. The better solution here would be to support GLSL */
 	if (Gtexdraw.is_texpaint) {			
 		glActiveTexture(GL_TEXTURE1);
-		glEnable(GL_TEXTURE_2D);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_INTERPOLATE);
 		glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_RGB, GL_PREVIOUS);
@@ -476,7 +469,6 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 			glActiveTexture(GL_TEXTURE2);
 			if (GPU_verify_image(Gtexdraw.stencil, NULL, GL_TEXTURE_2D, false, false, false, false)) {
 				float col[4] = {imapaint->stencil_col[0], imapaint->stencil_col[1], imapaint->stencil_col[2], 1.0f};
-				glEnable(GL_TEXTURE_2D);
 				glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 				glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_INTERPOLATE);
 				glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_RGB, GL_PREVIOUS);
@@ -511,14 +503,12 @@ static void draw_textured_end(void)
 {
 	if (Gtexdraw.ob->mode & OB_MODE_TEXTURE_PAINT) {
 		glActiveTexture(GL_TEXTURE1);
-		glDisable(GL_TEXTURE_2D);
 		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB, GL_SRC_COLOR);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		if (Gtexdraw.stencil != NULL) {
 			glActiveTexture(GL_TEXTURE2);
-			glDisable(GL_TEXTURE_2D);
 			glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB, GL_SRC_COLOR);
 			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 			glBindTexture(GL_TEXTURE_2D, 0);
@@ -957,7 +947,7 @@ static void draw_mesh_textured_old(Scene *scene, SceneLayer *sl, View3D *v3d, Re
 	else glFrontFace(GL_CCW);
 	
 	/* draw the textured mesh */
-	draw_textured_begin(scene, v3d, rv3d, ob);
+	draw_textured_begin(scene, sl, v3d, rv3d, ob);
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -1181,6 +1171,11 @@ static bool tex_mat_set_face_editmesh_cb(void *userData, int index)
 void draw_mesh_textured(Scene *scene, SceneLayer *sl, View3D *v3d, RegionView3D *rv3d,
                         Object *ob, DerivedMesh *dm, const int draw_flags)
 {
+#ifndef WITH_LEGACY_OPENGL
+	/* some legacy GL calls here will *crash* blender */
+	return;
+#endif
+
 	/* if not cycles, or preview-modifiers, or drawing matcaps */
 	if ((draw_flags & DRAW_MODIFIERS_PREVIEW) ||
 	    (v3d->flag2 & V3D_SHOW_SOLID_MATCAP) ||

@@ -40,10 +40,6 @@
 #include <vector>
 
 
-#ifdef WITH_GLEW_MX
-WGLEWContext *wglewContext = NULL;
-#endif
-
 HGLRC GHOST_ContextWGL::s_sharedHGLRC = NULL;
 int   GHOST_ContextWGL::s_sharedCount = 0;
 
@@ -82,10 +78,6 @@ GHOST_ContextWGL::GHOST_ContextWGL(
       m_alphaBackground(alphaBackground),
       m_contextResetNotificationStrategy(contextResetNotificationStrategy),
       m_hGLRC(NULL)
-#ifdef WITH_GLEW_MX
-      ,
-      m_wglewContext(NULL)
-#endif
 #ifndef NDEBUG
       ,
       m_dummyVendor(NULL),
@@ -115,10 +107,6 @@ GHOST_ContextWGL::~GHOST_ContextWGL()
 			WIN32_CHK(::wglDeleteContext(m_hGLRC));
 		}
 	}
-
-#ifdef WITH_GLEW_MX
-	delete m_wglewContext;
-#endif
 
 #ifndef NDEBUG
 	free((void*)m_dummyRenderer);
@@ -158,7 +146,6 @@ GHOST_TSuccess GHOST_ContextWGL::getSwapInterval(int &intervalOut)
 GHOST_TSuccess GHOST_ContextWGL::activateDrawingContext()
 {
 	if (WIN32_CHK(::wglMakeCurrent(m_hDC, m_hGLRC))) {
-		activateGLEW();
 		return GHOST_kSuccess;
 	}
 	else {
@@ -338,15 +325,6 @@ void GHOST_ContextWGL::initContextWGLEW(PIXELFORMATDESCRIPTOR &preferredPFD)
 
 	int iPixelFormat;
 
-
-#ifdef WITH_GLEW_MX
-	wglewContext = new WGLEWContext;
-	memset(wglewContext, 0, sizeof(WGLEWContext));
-
-	delete m_wglewContext;
-	m_wglewContext = wglewContext;
-#endif
-
 	SetLastError(NO_ERROR);
 
 	prevHDC = ::wglGetCurrentDC();
@@ -385,13 +363,8 @@ void GHOST_ContextWGL::initContextWGLEW(PIXELFORMATDESCRIPTOR &preferredPFD)
 	if (!WIN32_CHK(::wglMakeCurrent(dummyHDC, dummyHGLRC)))
 		goto finalize;
 
-#ifdef WITH_GLEW_MX
-	if (GLEW_CHK(wglewInit()) != GLEW_OK)
-		fprintf(stderr, "Warning! WGLEW failed to initialize properly.\n");
-#else
 	if (GLEW_CHK(glewInit()) != GLEW_OK)
 		fprintf(stderr, "Warning! Dummy GLEW/WGLEW failed to initialize properly.\n");
-#endif
 
 	// the following are not technially WGLEW, but they also require a context to work
 
@@ -828,8 +801,6 @@ GHOST_TSuccess GHOST_ContextWGL::initializeDrawingContext()
 		return GHOST_kFailure;
 	}
 
-	activateWGLEW();
-
 	if (WGLEW_ARB_create_context) {
 		int profileBitCore   = m_contextProfileMask & WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
 		int profileBitCompat = m_contextProfileMask & WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB;
@@ -907,6 +878,7 @@ GHOST_TSuccess GHOST_ContextWGL::initializeDrawingContext()
 		else
 			m_hGLRC = s_sharedHGLRC;
 	}
+#ifdef WITH_LEGACY_OPENGL
 	else {
 		if (m_contextProfileMask  != 0)
 			fprintf(stderr, "Warning! Legacy WGL is unable to select between OpenGL profiles.");
@@ -922,6 +894,7 @@ GHOST_TSuccess GHOST_ContextWGL::initializeDrawingContext()
 		else
 			m_hGLRC = s_sharedHGLRC;
 	}
+#endif // WITH_LEGACY_OPENGL
 
 	if (!WIN32_CHK(m_hGLRC != NULL)) {
 		::wglMakeCurrent(prevHDC, prevHGLRC);
@@ -973,7 +946,13 @@ GHOST_TSuccess GHOST_ContextWGL::initializeDrawingContext()
 		           MB_OK | MB_ICONERROR);
 		exit(0);
 	}
+#if defined(WITH_LEGACY_OPENGL)
+	else if (version[0] < '3') {
+		// relax requirements for Mesa, which uses GL 3.0
+		// while other drivers use GL 3.3+ compatibility profile
+#else
 	else if (version[0] < '3' || (version[0] == '3' && version[2] < '3')) {
+#endif
 		MessageBox(m_hWnd, "Blender requires a graphics driver with OpenGL 3.3 support.\n\n"
 		                   "The program will now close.",
 		           "Blender - Unsupported Graphics Driver!",

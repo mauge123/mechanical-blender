@@ -1,7 +1,13 @@
 
 uniform mat4 ModelViewMatrix;
+#ifndef PROBE_CAPTURE
+#ifndef WORLD_BACKGROUND
 uniform mat4 ProjectionMatrix;
+#endif
+#endif
+uniform mat4 ModelMatrixInverse;
 uniform mat4 ModelViewMatrixInverse;
+uniform mat4 ViewMatrixInverse;
 uniform mat4 ProjectionMatrixInverse;
 uniform mat3 NormalMatrix;
 
@@ -172,7 +178,7 @@ void color_to_blender_normal_new_shading(vec3 color, out vec3 normal)
 }
 
 #define M_PI 3.14159265358979323846
-#define M_1_PI 0.31830988618379069
+#define M_1_PI 0.318309886183790671538
 
 /*********** SHADER NODES ***************/
 
@@ -2813,7 +2819,24 @@ void background_transform_to_world(vec3 viewvec, out vec3 worldvec)
 	worldvec = (ModelViewMatrixInverse * co).xyz;
 }
 
-void node_background(vec4 color, float strength, vec3 N, out vec4 result)
+#if defined(PROBE_CAPTURE) || defined(WORLD_BACKGROUND)
+void environment_default_vector(out vec3 worldvec)
+{
+#ifdef WORLD_BACKGROUND
+	vec4 v = (ProjectionMatrix[3][3] == 0.0) ? vec4(viewPosition, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
+	vec4 co_homogenous = (ProjectionMatrixInverse * v);
+
+	vec4 co = vec4(co_homogenous.xyz / co_homogenous.w, 0.0);
+
+	co = normalize(co);
+	worldvec = (ViewMatrixInverse * co).xyz;
+#else
+	worldvec = normalize(worldPosition);
+#endif
+}
+#endif
+
+void node_background(vec4 color, float strength, out vec4 result)
 {
 	result = color * strength;
 }
@@ -2941,7 +2964,12 @@ void node_tex_coord_background(
 	vec4 co = vec4(co_homogenous.xyz / co_homogenous.w, 0.0);
 
 	co = normalize(co);
+
+#ifdef PROBE_CAPTURE
+	vec3 coords = normalize(worldPosition);
+#else
 	vec3 coords = (ModelViewMatrixInverse * co).xyz;
+#endif
 
 	generated = coords;
 	normal = -coords;
@@ -2955,6 +2983,10 @@ void node_tex_coord_background(
 
 	reflection = -coords;
 }
+
+#if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
+#define node_tex_coord node_tex_coord_background
+#endif
 
 /* textures */
 
@@ -3101,7 +3133,19 @@ void node_tex_environment_equirectangular(vec3 co, sampler2D ima, out vec4 color
 	float u = -atan(nco.y, nco.x) / (2.0 * M_PI) + 0.5;
 	float v = atan(nco.z, hypot(nco.x, nco.y)) / M_PI + 0.5;
 
+#if __VERSION__ > 120
+	/* Fix pole bleeding */
+	float half_width = 0.5 / float(textureSize(ima, 0).x);
+	v = clamp(v, half_width, 1.0 - half_width);
+
+	/* Fix u = 0 seam */
+	/* This is caused by texture filtering, since uv don't have smooth derivatives
+	 * at u = 0 or 2PI, hardware filtering is using the smallest mipmap for certain
+	 * texels. So we force the highest mipmap and don't do anisotropic filtering. */
+	color = textureLod(ima, vec2(u, v), 0.0);
+#else
 	color = texture2D(ima, vec2(u, v));
+#endif
 }
 
 void node_tex_environment_mirror_ball(vec3 co, sampler2D ima, out vec4 color)
@@ -3816,6 +3860,37 @@ void node_output_material(vec4 surface, vec4 volume, float displacement, out vec
 void node_output_world(vec4 surface, vec4 volume, out vec4 result)
 {
 	result = surface;
+}
+
+void convert_metallic_to_specular(vec4 basecol, float metallic, float specular_fac, out vec4 diffuse, out vec4 f0)
+{
+	vec4 dielectric = vec4(0.034) * specular_fac * 2.0;
+	diffuse = mix(basecol, vec4(0.0), metallic);
+	f0 = mix(dielectric, basecol, metallic);
+}
+
+void world_normals_get(out vec3 N)
+{
+	N = gl_FrontFacing ? worldNormal : -worldNormal;
+}
+
+void node_output_metallic(
+        vec4 basecol, float metallic, float specular, float roughness, vec4 emissive, float transp, vec3 normal,
+        float clearcoat, float clearcoat_roughness, vec3 clearcoat_normal,
+        float occlusion, out vec4 result)
+{
+	vec4 diffuse, f0;
+	convert_metallic_to_specular(basecol, metallic, specular, diffuse, f0);
+
+	result = vec4(eevee_surface_lit(normal, diffuse.rgb, f0.rgb, roughness, occlusion) + emissive.rgb, 1.0 - transp);
+}
+
+void node_output_specular(
+        vec4 diffuse, vec4 specular, float roughness, vec4 emissive, float transp, vec3 normal,
+        float clearcoat, float clearcoat_roughness, vec3 clearcoat_normal,
+        float occlusion, out vec4 result)
+{
+	result = vec4(eevee_surface_lit(normal, diffuse.rgb, specular.rgb, roughness, occlusion) + emissive.rgb, 1.0 - transp);
 }
 
 /* ********************** matcap style render ******************** */

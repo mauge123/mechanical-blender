@@ -82,6 +82,7 @@ void BKE_cachefile_init(CacheFile *cache_file)
 	cache_file->is_sequence = false;
 	cache_file->scale = 1.0f;
 	cache_file->handle_mutex = BLI_mutex_alloc();
+	BLI_listbase_clear(&cache_file->object_paths);
 }
 
 /** Free (or release) any data used by this cachefile (does not free the cachefile itself). */
@@ -203,11 +204,9 @@ float BKE_cachefile_time_offset(CacheFile *cache_file, const float time, const f
 }
 
 /* TODO(kevin): replace this with some depsgraph mechanism, or something similar. */
-void BKE_cachefile_clean(Scene *scene, CacheFile *cache_file)
+void BKE_cachefile_clean(struct Main *bmain, CacheFile *cache_file)
 {
-	for (BaseLegacy *base = scene->base.first; base; base = base->next) {
-		Object *ob = base->object;
-
+	for (Object *ob = bmain->object.first; ob; ob = ob->id.next) {
 		ModifierData *md = modifiers_findByType(ob, eModifierType_MeshSequenceCache);
 
 		if (md) {
@@ -220,7 +219,6 @@ void BKE_cachefile_clean(Scene *scene, CacheFile *cache_file)
 				}
 #endif
 				mcmd->reader = NULL;
-				mcmd->object_path[0] = '\0';
 			}
 		}
 
@@ -238,7 +236,6 @@ void BKE_cachefile_clean(Scene *scene, CacheFile *cache_file)
 				}
 #endif
 				data->reader = NULL;
-				data->object_path[0] = '\0';
 			}
 		}
 	}

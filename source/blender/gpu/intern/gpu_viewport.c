@@ -83,6 +83,24 @@ GPUViewport *GPU_viewport_create(void)
 	return viewport;
 }
 
+GPUViewport *GPU_viewport_create_from_offscreen(struct GPUOffScreen *ofs)
+{
+	GPUViewport *viewport = GPU_viewport_create();
+	GPU_offscreen_viewport_data_get(ofs, &viewport->fbl->default_fb, &viewport->txl->color, &viewport->txl->depth);
+	viewport->size[0] = GPU_offscreen_width(ofs);
+	viewport->size[1] = GPU_offscreen_height(ofs);
+	return viewport;
+}
+/**
+ * Clear vars assigned from offscreen, so we don't free data owned by `GPUOffScreen`.
+ */
+void GPU_viewport_clear_from_offscreen(GPUViewport *viewport)
+{
+	viewport->fbl->default_fb = NULL;
+	viewport->txl->color = NULL;
+	viewport->txl->depth = NULL;
+}
+
 void *GPU_viewport_engine_data_create(GPUViewport *viewport, void *engine_type)
 {
 	LinkData *ld = MEM_callocN(sizeof(LinkData), "LinkData");
@@ -123,6 +141,13 @@ static void gpu_viewport_engines_data_free(GPUViewport *viewport)
 		MEM_freeN(data->psl);
 		MEM_freeN(data->stl);
 
+		/* We could handle this in the DRW module */
+		if (data->text_draw_cache) {
+			extern void DRW_text_cache_destroy(struct DRWTextStore *dt);
+			DRW_text_cache_destroy(data->text_draw_cache);
+			data->text_draw_cache = NULL;
+		}
+
 		MEM_freeN(data);
 
 		BLI_remlink(&viewport->data, link);
@@ -151,10 +176,20 @@ void *GPU_viewport_texture_list_get(GPUViewport *viewport)
 	return viewport->txl;
 }
 
-void GPU_viewport_size_get(GPUViewport *viewport, int *size)
+void GPU_viewport_size_get(const GPUViewport *viewport, int size[2])
 {
 	size[0] = viewport->size[0];
 	size[1] = viewport->size[1];
+}
+
+/**
+ * Special case, this is needed for when we have a viewport without a frame-buffer output
+ * (occlusion queries for eg) but still need to set the size since it may be used for other calculations.
+ */
+void GPU_viewport_size_set(GPUViewport *viewport, const int size[2])
+{
+	viewport->size[0] = size[0];
+	viewport->size[1] = size[1];
 }
 
 bool GPU_viewport_cache_validate(GPUViewport *viewport, unsigned int hash)

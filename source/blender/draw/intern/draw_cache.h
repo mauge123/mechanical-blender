@@ -39,7 +39,9 @@ struct Batch *DRW_cache_single_line_endpoints_get(void);
 struct Batch *DRW_cache_screenspace_circle_get(void);
 
 /* Common Object */
+struct Batch *DRW_cache_object_wire_outline_get(struct Object *ob);
 struct Batch *DRW_cache_object_surface_get(struct Object *ob);
+struct Batch **DRW_cache_object_surface_material_get(struct Object *ob);
 
 /* Empties */
 struct Batch *DRW_cache_plain_axes_get(void);
@@ -77,19 +79,30 @@ struct Batch *DRW_cache_speaker_get(void);
 /* Bones */
 struct Batch *DRW_cache_bone_octahedral_get(void);
 struct Batch *DRW_cache_bone_octahedral_wire_outline_get(void);
+struct Batch *DRW_cache_bone_box_get(void);
+struct Batch *DRW_cache_bone_box_wire_outline_get(void);
+struct Batch *DRW_cache_bone_wire_wire_outline_get(void);
 struct Batch *DRW_cache_bone_point_get(void);
 struct Batch *DRW_cache_bone_point_wire_outline_get(void);
 struct Batch *DRW_cache_bone_arrows_get(void);
 
 /* Meshes */
+struct Batch *DRW_cache_mesh_surface_overlay_get(struct Object *ob);
 void DRW_cache_mesh_wire_overlay_get(
         struct Object *ob,
         struct Batch **r_tris, struct Batch **r_ledges, struct Batch **r_lverts);
 struct Batch *DRW_cache_face_centers_get(struct Object *ob);
 struct Batch *DRW_cache_mesh_wire_outline_get(struct Object *ob);
 struct Batch *DRW_cache_mesh_surface_get(struct Object *ob);
+struct Batch *DRW_cache_mesh_surface_weights_get(struct Object *ob);
+struct Batch *DRW_cache_mesh_surface_vert_colors_get(struct Object *ob);
 struct Batch *DRW_cache_mesh_surface_verts_get(struct Object *ob);
+struct Batch *DRW_cache_mesh_edges_get(struct Object *ob);
 struct Batch *DRW_cache_mesh_verts_get(struct Object *ob);
+struct Batch *DRW_cache_mesh_edges_paint_overlay_get(struct Object *ob, bool use_wire, bool use_sel,  bool use_theme);
+struct Batch *DRW_cache_mesh_faces_weight_overlay_get(struct Object *ob);
+struct Batch *DRW_cache_mesh_verts_weight_overlay_get(struct Object *ob);
+struct Batch **DRW_cache_mesh_surface_shaded_get(struct Object *ob);
 
 /* Curve */
 struct Batch *DRW_cache_curve_surface_get(struct Object *ob);

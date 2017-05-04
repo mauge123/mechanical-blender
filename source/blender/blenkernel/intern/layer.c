@@ -267,7 +267,7 @@ static Base *object_base_add(SceneLayer *sl, Object *ob)
 	if (base == NULL) {
 		base = MEM_callocN(sizeof(Base), "Object Base");
 
-		/* do not bump user count, leave it for SceneCollections */
+		/* Do not bump user count, leave it for SceneCollections. */
 		base->object = ob;
 		BLI_addtail(&sl->object_bases, base);
 
@@ -775,11 +775,23 @@ static void layer_collection_object_add(SceneLayer *sl, LayerCollection *lc, Obj
 {
 	Base *base = object_base_add(sl, ob);
 
-	/* only add an object once - prevent SceneCollection->objects and
-	 * SceneCollection->filter_objects to add the same object */
+	/* Only add an object once - prevent SceneCollection->objects and
+	 * SceneCollection->filter_objects to add the same object. */
 
 	if (BLI_findptr(&lc->object_bases, base, offsetof(LinkData, data))) {
 		return;
+	}
+
+	bool is_visible = (lc->flag & COLLECTION_VISIBLE) != 0;
+	bool is_selectable = is_visible && ((lc->flag & COLLECTION_SELECTABLE) != 0);
+
+	if (is_visible) {
+		base->flag |= BASE_VISIBLED;
+	}
+
+	if (is_selectable) {
+		base->flag |= BASE_SELECTABLED;
+		base->flag |= BASE_SELECTED;
 	}
 
 	BLI_addtail(&lc->object_bases, BLI_genericNodeN(base));
@@ -1077,6 +1089,38 @@ static void layer_collection_create_mode_settings_edit(IDProperty *root, const b
 	IDP_AddToGroup(root, props);
 }
 
+static void layer_collection_create_mode_settings_paint_weight(IDProperty *root, const bool populate)
+{
+	IDProperty *props;
+	IDPropertyTemplate val = {0};
+
+	props = IDP_New(IDP_GROUP, &val, "WeightPaintMode");
+	props->subtype = IDP_GROUP_SUB_MODE_PAINT_WEIGHT;
+
+	/* properties */
+	if (populate) {
+		PAINT_WEIGHT_collection_settings_create(props);
+	}
+
+	IDP_AddToGroup(root, props);
+}
+
+static void layer_collection_create_mode_settings_paint_vertex(IDProperty *root, const bool populate)
+{
+	IDProperty *props;
+	IDPropertyTemplate val = {0};
+
+	props = IDP_New(IDP_GROUP, &val, "VertexPaintMode");
+	props->subtype = IDP_GROUP_SUB_MODE_PAINT_VERTEX;
+
+	/* properties */
+	if (populate) {
+		PAINT_VERTEX_collection_settings_create(props);
+	}
+
+	IDP_AddToGroup(root, props);
+}
+
 static void collection_create_render_settings(IDProperty *root, const bool populate)
 {
 	CollectionEngineSettingsCB_Type *ces_type;
@@ -1092,6 +1136,8 @@ static void collection_create_mode_settings(IDProperty *root, const bool populat
 	 * and have IDP_AddToGroup outside the callbacks */
 	layer_collection_create_mode_settings_object(root, populate);
 	layer_collection_create_mode_settings_edit(root, populate);
+	layer_collection_create_mode_settings_paint_weight(root, populate);
+	layer_collection_create_mode_settings_paint_vertex(root, populate);
 }
 
 static int idproperty_group_subtype(const int mode_type)
@@ -1104,6 +1150,12 @@ static int idproperty_group_subtype(const int mode_type)
 			break;
 		case COLLECTION_MODE_EDIT:
 			idgroup_type = IDP_GROUP_SUB_MODE_EDIT;
+			break;
+		case COLLECTION_MODE_PAINT_WEIGHT:
+			idgroup_type = IDP_GROUP_SUB_MODE_PAINT_WEIGHT;
+			break;
+		case COLLECTION_MODE_PAINT_VERTEX:
+			idgroup_type = IDP_GROUP_SUB_MODE_PAINT_VERTEX;
 			break;
 		default:
 		case COLLECTION_MODE_NONE:
@@ -1242,6 +1294,86 @@ void BKE_layer_collection_engine_settings_create(IDProperty *root)
 	collection_engine_settings_init(root, true);
 }
 
+/**
+ * Reference of IDProperty group scene collection settings
+ * Used when reading blendfiles, to see if there is any missing settings.
+ */
+static struct {
+	IDProperty *scene;
+	IDProperty *layer_collection;
+} root_reference = {
+	.scene = NULL,
+	.layer_collection = NULL,
+};
+
+/**
+ * Free the reference scene collection settings IDProperty group.
+ */
+static void layer_collection_engine_settings_validate_init(void)
+{
+	IDPropertyTemplate val = {0};
+
+	if (root_reference.scene == NULL) {
+		root_reference.scene = IDP_New(IDP_GROUP, &val, ROOT_PROP);
+		collection_engine_settings_init(root_reference.scene, true);
+	}
+
+	if (root_reference.layer_collection == NULL) {
+		root_reference.layer_collection = IDP_New(IDP_GROUP, &val, ROOT_PROP);
+		collection_engine_settings_init(root_reference.layer_collection, false);
+	}
+}
+
+/**
+ * Free the reference scene collection settings IDProperty group.
+ */
+static void layer_collection_engine_settings_validate_free(void)
+{
+	if (root_reference.scene != NULL) {
+		IDP_FreeProperty(root_reference.scene);
+		MEM_freeN(root_reference.scene);
+		root_reference.scene = NULL;
+	}
+
+	if (root_reference.layer_collection != NULL) {
+		IDP_FreeProperty(root_reference.layer_collection);
+		MEM_freeN(root_reference.layer_collection);
+		root_reference.layer_collection = NULL;
+	}
+}
+
+/**
+ * Make sure Scene has all required collection settings.
+ */
+void BKE_layer_collection_engine_settings_validate_scene(Scene *scene)
+{
+	if (root_reference.scene == NULL) {
+		layer_collection_engine_settings_validate_init();
+	}
+
+	if (scene->collection_properties == NULL) {
+		IDPropertyTemplate val = {0};
+		scene->collection_properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
+		BKE_layer_collection_engine_settings_create(scene->collection_properties);
+	}
+	else {
+		IDP_MergeGroup(scene->collection_properties, root_reference.scene, false);
+	}
+}
+
+/**
+ * Maker sure LayerCollection has all required collection settings.
+ */
+void BKE_layer_collection_engine_settings_validate_collection(LayerCollection *lc)
+{
+	if (root_reference.layer_collection == NULL) {
+		layer_collection_engine_settings_validate_init();
+	}
+
+	BLI_assert(lc->properties != NULL);
+	IDP_MergeGroup(lc->properties, root_reference.layer_collection, false);
+}
+
 /* ---------------------------------------------------------------------- */
 /* Iterators */
 
@@ -1302,47 +1434,62 @@ static void objects_Iterator_next(Iterator *iter, const int flag)
 	}
 }
 
-void BKE_selected_objects_Iterator_begin(Iterator *iter, void *data_in)
+void BKE_selected_objects_iterator_begin(Iterator *iter, void *data_in)
 {
 	objects_Iterator_begin(iter, data_in, BASE_SELECTED);
 }
 
-void BKE_selected_objects_Iterator_next(Iterator *iter)
+void BKE_selected_objects_iterator_next(Iterator *iter)
 {
 	objects_Iterator_next(iter, BASE_SELECTED);
 }
 
-void BKE_selected_objects_Iterator_end(Iterator *UNUSED(iter))
+void BKE_selected_objects_iterator_end(Iterator *UNUSED(iter))
 {
 	/* do nothing */
 }
 
-void BKE_visible_objects_Iterator_begin(Iterator *iter, void *data_in)
+void BKE_visible_objects_iterator_begin(Iterator *iter, void *data_in)
 {
 	objects_Iterator_begin(iter, data_in, BASE_VISIBLED);
 }
 
-void BKE_visible_objects_Iterator_next(Iterator *iter)
+void BKE_visible_objects_iterator_next(Iterator *iter)
 {
 	objects_Iterator_next(iter, BASE_VISIBLED);
 }
 
-void BKE_visible_objects_Iterator_end(Iterator *UNUSED(iter))
+void BKE_visible_objects_iterator_end(Iterator *UNUSED(iter))
 {
 	/* do nothing */
 }
 
-void BKE_visible_bases_Iterator_begin(Iterator *iter, void *data_in)
+void BKE_selected_bases_iterator_begin(Iterator *iter, void *data_in)
+{
+	object_bases_Iterator_begin(iter, data_in, BASE_SELECTED);
+}
+
+void BKE_selected_bases_iterator_next(Iterator *iter)
+{
+	object_bases_Iterator_next(iter, BASE_SELECTED);
+}
+
+void BKE_selected_bases_iterator_end(Iterator *UNUSED(iter))
+{
+	/* do nothing */
+}
+
+void BKE_visible_bases_iterator_begin(Iterator *iter, void *data_in)
 {
 	object_bases_Iterator_begin(iter, data_in, BASE_VISIBLED);
 }
 
-void BKE_visible_bases_Iterator_next(Iterator *iter)
+void BKE_visible_bases_iterator_next(Iterator *iter)
 {
 	object_bases_Iterator_next(iter, BASE_VISIBLED);
 }
 
-void BKE_visible_bases_Iterator_end(Iterator *UNUSED(iter))
+void BKE_visible_bases_iterator_end(Iterator *UNUSED(iter))
 {
 	/* do nothing */
 }
@@ -1365,7 +1512,7 @@ static void idproperty_reset(IDProperty **props, IDProperty *props_ref)
 	*props = IDP_New(IDP_GROUP, &val, ROOT_PROP);
 
 	if (props_ref) {
-		IDP_MergeGroupValues(*props, props_ref);
+		IDP_MergeGroup(*props, props_ref, true);
 	}
 }
 
@@ -1409,7 +1556,7 @@ void BKE_layer_eval_layer_collection(struct EvaluationContext *UNUSED(eval_ctx),
 		}
 		else {
 			idproperty_reset(&layer_collection->properties_evaluated, parent_layer_collection->properties_evaluated);
-			IDP_MergeGroupValues(layer_collection->properties_evaluated, layer_collection->properties);
+			IDP_MergeGroup(layer_collection->properties_evaluated, layer_collection->properties, true);
 		}
 	}
 
@@ -1417,7 +1564,7 @@ void BKE_layer_eval_layer_collection(struct EvaluationContext *UNUSED(eval_ctx),
 		Base *base = link->data;
 
 		if (is_visible) {
-			IDP_MergeGroupValues(base->collection_properties, layer_collection->properties_evaluated);
+			IDP_MergeGroup(base->collection_properties, layer_collection->properties_evaluated, true);
 			base->flag |= BASE_VISIBLED;
 		}
 
@@ -1437,4 +1584,12 @@ void BKE_layer_eval_layer_collection_post(struct EvaluationContext *UNUSED(eval_
 			base->flag &= ~BASE_SELECTED;
 		}
 	}
+}
+
+/**
+ * Free any static allocated memory.
+ */
+void BKE_layer_exit()
+{
+	layer_collection_engine_settings_validate_free();
 }

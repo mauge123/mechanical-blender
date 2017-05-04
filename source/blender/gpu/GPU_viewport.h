@@ -39,6 +39,8 @@
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
 
+#define GPU_INFO_SIZE 512 /* IMA_MAX_RENDER_TEXT */
+
 typedef struct GPUViewport GPUViewport;
 
 /* All FramebufferLists are just the same pointers with different names */
@@ -65,6 +67,10 @@ typedef struct ViewportEngineData {
 	TextureList *txl;
 	PassList *psl;
 	StorageList *stl;
+	char info[GPU_INFO_SIZE];
+
+	/* we may want to put this elsewhere */
+	struct DRWTextStore *text_draw_cache;
 
 	/* Profiling data */
 	double init_time;
@@ -85,11 +91,15 @@ void GPU_viewport_bind(GPUViewport *viewport, const rcti *rect);
 void GPU_viewport_unbind(GPUViewport *viewport);
 void GPU_viewport_free(GPUViewport *viewport);
 
+GPUViewport *GPU_viewport_create_from_offscreen(struct GPUOffScreen *ofs);
+void GPU_viewport_clear_from_offscreen(GPUViewport *viewport);
+
 void *GPU_viewport_engine_data_create(GPUViewport *viewport, void *engine_type);
 void *GPU_viewport_engine_data_get(GPUViewport *viewport, void *engine_type);
 void *GPU_viewport_framebuffer_list_get(GPUViewport *viewport);
 void *GPU_viewport_texture_list_get(GPUViewport *viewport);
-void  GPU_viewport_size_get(GPUViewport *viewport, int *size);
+void  GPU_viewport_size_get(const GPUViewport *viewport, int size[2]);
+void  GPU_viewport_size_set(GPUViewport *viewport, const int size[2]);
 
 bool GPU_viewport_cache_validate(GPUViewport *viewport, unsigned int hash);
 

@@ -55,6 +55,8 @@
 #include "BKE_screen.h"
 #include "BKE_editmesh.h"
 
+#include "DEG_depsgraph.h"
+
 #include "BIF_glutil.h"
 
 #include "GPU_select.h"
@@ -68,6 +70,8 @@
 
 #include "bmesh.h"
 #include "mesh_dimensions.h"
+
+#include "DRW_engine.h"
 
 
 #ifdef WITH_GAMEENGINE
@@ -1178,8 +1182,8 @@ int view3d_opengl_select(
         ViewContext *vc, unsigned int *buffer, unsigned int bufsize, const rcti *input,
         eV3DSelectMode select_mode)
 {
+	Depsgraph *graph = vc->depsgraph;
 	Scene *scene = vc->scene;
-	SceneLayer *sl = vc->scene_layer;
 	View3D *v3d = vc->v3d;
 	ARegion *ar = vc->ar;
 	rcti rect;
@@ -1247,7 +1251,16 @@ int view3d_opengl_select(
 	
 	GPU_select_begin(buffer, bufsize, &rect, gpu_select_mode, 0);
 
-	ED_view3d_draw_select_loop(vc, scene, sl, v3d, ar, use_obedit_skip, use_nearest);
+#ifdef WITH_OPENGL_LEGACY
+	if (IS_VIEWPORT_LEGACY(vc->v3d)) {
+		ED_view3d_draw_select_loop(vc, scene, sl, v3d, ar, use_obedit_skip, use_nearest);
+	}
+	else
+#else
+	{
+		DRW_draw_select_loop(graph, ar, v3d, use_obedit_skip, use_nearest, &rect);
+	}
+#endif /* WITH_OPENGL_LEGACY */
 
 	hits = GPU_select_end();
 	
@@ -1255,7 +1268,16 @@ int view3d_opengl_select(
 	if (do_passes) {
 		GPU_select_begin(buffer, bufsize, &rect, GPU_SELECT_NEAREST_SECOND_PASS, hits);
 
-		ED_view3d_draw_select_loop(vc, scene, sl, v3d, ar, use_obedit_skip, use_nearest);
+#ifdef WITH_OPENGL_LEGACY
+		if (IS_VIEWPORT_LEGACY(vc->v3d)) {
+			ED_view3d_draw_select_loop(vc, scene, sl, v3d, ar, use_obedit_skip, use_nearest);
+		}
+		else
+#else
+		{
+			DRW_draw_select_loop(graph, ar, v3d, use_obedit_skip, use_nearest, &rect);
+		}
+#endif /* WITH_OPENGL_LEGACY */
 
 		GPU_select_end();
 	}

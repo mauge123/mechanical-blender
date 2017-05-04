@@ -191,8 +191,12 @@ void ED_render_engine_changed(Main *bmain)
 
 	RE_FreePersistentData();
 
-	for (scene = bmain->scene.first; scene; scene = scene->id.next)
+	for (scene = bmain->scene.first; scene; scene = scene->id.next) {
 		ED_render_id_flush_update(bmain, &scene->id);
+		if (scene->nodetree) {
+			ntreeCompositUpdateRLayers(scene->nodetree);
+		}
+	}
 }
 
 /***************************** Updates ***********************************
@@ -574,6 +578,6 @@ void ED_render_internal_init(void)
 	RenderEngineType *ret = RE_engines_find(RE_engine_id_BLENDER_RENDER);
 	
 	ret->view_update = render_view3d_update;
-	ret->view_draw = render_view3d_draw;
+	ret->render_to_view = render_view3d_draw;
 	
 }

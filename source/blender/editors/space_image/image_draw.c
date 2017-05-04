@@ -686,22 +686,23 @@ void draw_image_sample_line(SpaceImage *sima)
 	if (sima->sample_line_hist.flag & HISTO_FLAG_SAMPLELINE) {
 		Histogram *hist = &sima->sample_line_hist;
 
-		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
-		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+		VertexFormat *format = immVertexFormat();
+		unsigned int shdr_dashed_pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+
+		immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
+
+		float viewport_size[4];
+		glGetFloatv(GL_VIEWPORT, viewport_size);
+		immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+
+		immUniform1i("num_colors", 2);  /* Advanced dashes. */
+		immUniformArray4fv("colors", (float *)(float[][4]){{1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}, 2);
+		immUniform1f("dash_width", 2.0f);
 
 		immBegin(PRIM_LINES, 2);
-		immUniformColor3ub(0, 0, 0);
-		immVertex2fv(pos, hist->co[0]);
-		immVertex2fv(pos, hist->co[1]);
+		immVertex2fv(shdr_dashed_pos, hist->co[0]);
+		immVertex2fv(shdr_dashed_pos, hist->co[1]);
 		immEnd();
-
-		setlinestyle(1);
-		immBegin(PRIM_LINES, 2);
-		immUniformColor3ub(255, 255, 255);
-		immVertex2fv(pos, hist->co[0]);
-		immVertex2fv(pos, hist->co[1]);
-		immEnd();
-		setlinestyle(0);
 
 		immUnbindProgram();
 	}

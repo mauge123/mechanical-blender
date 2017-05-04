@@ -43,10 +43,15 @@ typedef struct EEVEE_PassList {
 	struct DRWPass *probe_prefilter;
 	struct DRWPass *probe_sh_compute;
 
+	/* Effects */
+	struct DRWPass *motion_blur;
+	struct DRWPass *tonemap;
+
 	struct DRWPass *depth_pass;
 	struct DRWPass *depth_pass_cull;
-	struct DRWPass *pass;
-	struct DRWPass *tonemap;
+	struct DRWPass *default_pass;
+	struct DRWPass *material_pass;
+	struct DRWPass *background_pass;
 } EEVEE_PassList;
 
 typedef struct EEVEE_FramebufferList {
@@ -58,6 +63,8 @@ typedef struct EEVEE_FramebufferList {
 	struct GPUFrameBuffer *probe_fb;
 	struct GPUFrameBuffer *probe_filter_fb;
 	struct GPUFrameBuffer *probe_sh_fb;
+	/* Effects */
+	struct GPUFrameBuffer *effect_fb; /* HDR */
 
 	struct GPUFrameBuffer *main; /* HDR */
 } EEVEE_FramebufferList;
@@ -74,6 +81,7 @@ typedef struct EEVEE_TextureList {
 	struct GPUTexture *probe_sh; /* R16_G16_B16 */
 
 	struct GPUTexture *color; /* R16_G16_B16 */
+	struct GPUTexture *color_post; /* R16_G16_B16 */
 } EEVEE_TextureList;
 
 typedef struct EEVEE_StorageList {
@@ -88,7 +96,10 @@ typedef struct EEVEE_StorageList {
 	struct EEVEE_ProbesInfo *probes;
 	struct GPUUniformBuffer *probe_ubo;
 
-	struct g_data *g_data;
+	/* Effects */
+	struct EEVEE_EffectsInfo *effects;
+
+	struct EEVEE_PrivateData *g_data;
 } EEVEE_StorageList;
 
 /* ************ LIGHT UBO ************* */
@@ -112,9 +123,8 @@ typedef struct EEVEE_ShadowMap {
 
 typedef struct EEVEE_ShadowCascade {
 	float shadowmat[MAX_CASCADE_NUM][4][4]; /* World->Lamp->NDC->Tex : used for sampling the shadow map. */
-	float bias, count, pad[2];
-	float near[MAX_CASCADE_NUM];
-	float far[MAX_CASCADE_NUM];
+	float split[4];
+	float bias[4];
 } EEVEE_ShadowCascade;
 
 typedef struct EEVEE_ShadowRender {
@@ -157,6 +167,24 @@ typedef struct EEVEE_ProbesInfo {
 	struct GPUTexture *backgroundtex;
 } EEVEE_ProbesInfo;
 
+/* ************ EFFECTS DATA ************* */
+typedef struct EEVEE_EffectsInfo {
+	float current_ndc_to_world[4][4];
+	float past_world_to_ndc[4][4];
+	float tmp_mat[4][4];
+	float blur_amount;
+
+	int enabled_effects;
+
+	/* not alloced, just a pointer to a texture in EEVEE_TextureList.
+	 * Point to the final color buffer to transform to display color space. */
+	struct GPUTexture *final_color;
+} EEVEE_EffectsInfo;
+
+enum {
+	EFFECT_MOTION_BLUR = (1 << 0),
+};
+
 /* *********************************** */
 
 typedef struct EEVEE_Data {
@@ -173,14 +201,14 @@ typedef struct EEVEE_LampEngineData {
 	void *pad;
 } EEVEE_LampEngineData;
 
-typedef struct g_data{
+typedef struct EEVEE_PrivateData {
 	struct DRWShadingGroup *default_lit_grp;
 	struct DRWShadingGroup *shadow_shgrp;
 	struct DRWShadingGroup *depth_shgrp;
 	struct DRWShadingGroup *depth_shgrp_cull;
 
 	struct ListBase lamps; /* Lamps gathered during cache iteration */
-} g_data; /* Transient data */
+} EEVEE_PrivateData; /* Transient data */
 
 /* eevee_lights.c */
 void EEVEE_lights_init(EEVEE_StorageList *stl);
@@ -197,6 +225,12 @@ void EEVEE_probes_cache_add(EEVEE_Data *vedata, Object *ob);
 void EEVEE_probes_cache_finish(EEVEE_Data *vedata);
 void EEVEE_probes_update(EEVEE_Data *vedata);
 void EEVEE_refresh_probe(EEVEE_Data *vedata);
+
+/* eevee_effects.c */
+void EEVEE_effects_init(EEVEE_Data *vedata);
+void EEVEE_effects_cache_init(EEVEE_Data *vedata);
+void EEVEE_draw_effects(EEVEE_Data *vedata);
+void EEVEE_effects_free(void);
 
 /* Shadow Matrix */
 static const float texcomat[4][4] = { /* From NDC to TexCo */

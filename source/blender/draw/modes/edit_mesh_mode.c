@@ -73,7 +73,7 @@ typedef struct EDIT_MESH_TextureList {
 } EDIT_MESH_TextureList;
 
 typedef struct EDIT_MESH_StorageList {
-	struct g_data *g_data;
+	struct EDIT_MESH_PrivateData *g_data;
 } EDIT_MESH_StorageList;
 
 typedef struct EDIT_MESH_Data {
@@ -102,7 +102,7 @@ static struct {
 	GPUShader *depth_sh;
 } e_data = {NULL}; /* Engine data */
 
-typedef struct g_data {
+typedef struct EDIT_MESH_PrivateData {
 	DRWShadingGroup *depth_shgrp_hidden_wire;
 
 	DRWShadingGroup *fnormals_shgrp;
@@ -120,7 +120,7 @@ typedef struct g_data {
 	DRWShadingGroup *facedot_occluded_shgrp;
 	DRWShadingGroup *facefill_occluded_shgrp;
 
-} g_data; /* Transient data */
+} EDIT_MESH_PrivateData; /* Transient data */
 
 /* *********** FUNCTIONS *********** */
 
@@ -232,9 +232,9 @@ static DRWPass *edit_mesh_create_overlay_pass(
         DRWShadingGroup **r_lverts_shgrp, DRWShadingGroup **r_facedot_shgrp)
 {
 	GPUShader *tri_sh, *ledge_sh;
-	const struct bContext *C = DRW_get_context();
-	RegionView3D *rv3d = CTX_wm_region_view3d(C);
-	Scene *scene = CTX_data_scene(C);
+	const DRWContextState *draw_ctx = DRW_context_state_get();
+	RegionView3D *rv3d = draw_ctx->rv3d;
+	Scene *scene = draw_ctx->scene;
 	ToolSettings *tsettings = scene->toolsettings;
 
 	if ((tsettings->selectmode & SCE_SELECT_VERTEX) != 0) {
@@ -289,8 +289,8 @@ static void EDIT_MESH_cache_init(void *vedata)
 	EDIT_MESH_StorageList *stl = ((EDIT_MESH_Data *)vedata)->stl;
 	DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
 
-	const struct bContext *C = DRW_get_context();
-	View3D *v3d = CTX_wm_view3d(C);
+	const DRWContextState *draw_ctx = DRW_context_state_get();
+	View3D *v3d = draw_ctx->v3d;
 
 	bool do_zbufclip = ((v3d->flag & V3D_ZBUF_SELECT) == 0);
 
@@ -298,7 +298,7 @@ static void EDIT_MESH_cache_init(void *vedata)
 
 	if (!stl->g_data) {
 		/* Alloc transient pointers */
-		stl->g_data = MEM_mallocN(sizeof(g_data), "g_data");
+		stl->g_data = MEM_mallocN(sizeof(*stl->g_data), __func__);
 	}
 
 	{
@@ -392,9 +392,9 @@ static void edit_mesh_add_ob_to_pass(
 static void EDIT_MESH_cache_populate(void *vedata, Object *ob)
 {
 	EDIT_MESH_StorageList *stl = ((EDIT_MESH_Data *)vedata)->stl;
-	const struct bContext *C = DRW_get_context();
-	View3D *v3d = CTX_wm_view3d(C);
-	Scene *scene = CTX_data_scene(C);
+	const DRWContextState *draw_ctx = DRW_context_state_get();
+	View3D *v3d = draw_ctx->v3d;
+	Scene *scene = draw_ctx->scene;
 	Object *obedit = scene->obedit;
 	struct Batch *geom;
 

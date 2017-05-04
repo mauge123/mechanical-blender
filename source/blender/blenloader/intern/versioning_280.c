@@ -193,6 +193,11 @@ void do_versions_after_linking_280(Main *main)
 						soutliner->outlinevis = SO_ACT_LAYER;
 
 						if (BLI_listbase_count_ex(&layer->layer_collections, 2) == 1) {
+							if (soutliner->treestore == NULL) {
+								soutliner->treestore = BLI_mempool_create(
+								        sizeof(TreeStoreElem), 1, 512, BLI_MEMPOOL_ALLOW_ITER);
+							}
+
 							/* Create a tree store element for the collection. This is normally
 							 * done in check_persistent (outliner_tree.c), but we need to access
 							 * it here :/ (expand element if it's the only one) */
@@ -205,14 +210,6 @@ void do_versions_after_linking_280(Main *main)
 					}
 				}
 			}
-		}
-	}
-
-	if (!MAIN_VERSION_ATLEAST(main, 280, 0)) {
-		IDPropertyTemplate val = {0};
-		for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
-			scene->collection_properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
-			BKE_layer_collection_engine_settings_create(scene->collection_properties);
 		}
 	}
 }

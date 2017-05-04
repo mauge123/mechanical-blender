@@ -79,7 +79,7 @@ typedef struct EDIT_TEXT_StorageList {
 	 * free with MEM_freeN() when viewport is freed.
 	 * (not per object) */
 	struct CustomStruct *block;
-	struct g_data *g_data;
+	struct EDIT_TEXT_PrivateData *g_data;
 } EDIT_TEXT_StorageList;
 
 typedef struct EDIT_TEXT_Data {
@@ -105,12 +105,12 @@ static struct {
 	GPUShader *overlay_cursor_sh;
 } e_data = {NULL}; /* Engine data */
 
-typedef struct g_data {
+typedef struct EDIT_TEXT_PrivateData {
 	/* resulting curve as 'wire' for fast editmode drawing */
 	DRWShadingGroup *wire_shgrp;
 	DRWShadingGroup *overlay_select_shgrp;
 	DRWShadingGroup *overlay_cursor_shgrp;
-} g_data; /* Transient data */
+} EDIT_TEXT_PrivateData; /* Transient data */
 
 /* *********** FUNCTIONS *********** */
 
@@ -162,7 +162,7 @@ static void EDIT_TEXT_cache_init(void *vedata)
 
 	if (!stl->g_data) {
 		/* Alloc transient pointers */
-		stl->g_data = MEM_mallocN(sizeof(g_data), "g_data");
+		stl->g_data = MEM_mallocN(sizeof(*stl->g_data), __func__);
 	}
 
 	{
@@ -189,8 +189,8 @@ static void EDIT_TEXT_cache_populate(void *vedata, Object *ob)
 {
 	EDIT_TEXT_PassList *psl = ((EDIT_TEXT_Data *)vedata)->psl;
 	EDIT_TEXT_StorageList *stl = ((EDIT_TEXT_Data *)vedata)->stl;
-	const struct bContext *C = DRW_get_context();
-	Scene *scene = CTX_data_scene(C);
+	const DRWContextState *draw_ctx = DRW_context_state_get();
+	Scene *scene = draw_ctx->scene;
 	Object *obedit = scene->obedit;
 
 	UNUSED_VARS(psl, stl);

@@ -45,6 +45,7 @@
 #include "BKE_armature.h"
 #include "BKE_action.h"
 #include "BKE_constraint.h"
+#include "BKE_curve.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_animsys.h"
 #include "BKE_displist.h"
@@ -58,15 +59,12 @@
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
 #include "BKE_material.h"
+#include "BKE_mesh.h"
 #include "BKE_image.h"
 
 #include "ED_mesh.h"
 
 #include "MEM_guardedalloc.h"
-
-#include "BKE_curve_render.h"
-#include "BKE_lattice_render.h"
-#include "BKE_mesh_render.h"
 
 #include "DEG_depsgraph.h"
 
@@ -442,15 +440,15 @@ void BKE_object_eval_uber_data(EvaluationContext *eval_ctx,
 
 	switch (ob->type) {
 		case OB_MESH:
-			BKE_mesh_batch_cache_dirty(ob->data);
+			BKE_mesh_batch_cache_dirty(ob->data, BKE_MESH_BATCH_DIRTY_ALL);
 			break;
 		case OB_LATTICE:
-			BKE_lattice_batch_cache_dirty(ob->data);
+			BKE_lattice_batch_cache_dirty(ob->data, BKE_LATTICE_BATCH_DIRTY_ALL);
 			break;
 		case OB_CURVE:
 		case OB_FONT:
 		case OB_SURF:
-			BKE_curve_batch_cache_dirty(ob->data);
+			BKE_curve_batch_cache_dirty(ob->data, BKE_CURVE_BATCH_DIRTY_ALL);
 			break;
 	}
 

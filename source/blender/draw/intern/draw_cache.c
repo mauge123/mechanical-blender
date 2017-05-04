@@ -32,13 +32,10 @@
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
 
-#include "BKE_curve_render.h"
-#include "BKE_lattice_render.h"
-#include "BKE_mesh_render.h"
-
 #include "GPU_batch.h"
 
 #include "draw_cache.h"
+#include "draw_cache_impl.h"
 
 static struct DRWShapeCache {
 	Batch *drw_single_vertice;
@@ -69,6 +66,9 @@ static struct DRWShapeCache {
 	Batch *drw_speaker;
 	Batch *drw_bone_octahedral;
 	Batch *drw_bone_octahedral_wire;
+	Batch *drw_bone_box;
+	Batch *drw_bone_box_wire;
+	Batch *drw_bone_wire_wire;
 	Batch *drw_bone_point;
 	Batch *drw_bone_point_wire;
 	Batch *drw_bone_arrows;
@@ -106,6 +106,9 @@ void DRW_shape_cache_free(void)
 	BATCH_DISCARD_ALL_SAFE(SHC.drw_speaker);
 	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_octahedral);
 	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_octahedral_wire);
+	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_box);
+	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_box_wire);
+	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_wire_wire);
 	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_point);
 	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_point_wire);
 	BATCH_DISCARD_ALL_SAFE(SHC.drw_bone_arrows);
@@ -456,6 +459,18 @@ Batch *DRW_cache_screenspace_circle_get(void)
 /** \name Common Object API
  * \{ */
 
+Batch *DRW_cache_object_wire_outline_get(Object *ob)
+{
+	switch (ob->type) {
+		case OB_MESH:
+			return DRW_cache_mesh_wire_outline_get(ob);
+
+		/* TODO, should match 'DRW_cache_object_surface_get' */
+		default:
+			return NULL;
+	}
+}
+
 Batch *DRW_cache_object_surface_get(Object *ob)
 {
 	switch (ob->type) {
@@ -467,6 +482,16 @@ Batch *DRW_cache_object_surface_get(Object *ob)
 			return DRW_cache_surf_surface_get(ob);
 		case OB_FONT:
 			return DRW_cache_text_surface_get(ob);
+		default:
+			return NULL;
+	}
+}
+
+Batch **DRW_cache_object_surface_material_get(struct Object *ob)
+{
+	switch (ob->type) {
+		case OB_MESH:
+			return DRW_cache_mesh_surface_shaded_get(ob);
 		default:
 			return NULL;
 	}
@@ -1341,6 +1366,161 @@ Batch *DRW_cache_bone_octahedral_wire_outline_get(void)
 	return SHC.drw_bone_octahedral_wire;
 }
 
+
+/* XXX TODO move that 1 unit cube to more common/generic place? */
+static const float bone_box_verts[8][3] = {
+	{ 1.0f, 0.0f,  1.0f},
+	{ 1.0f, 0.0f, -1.0f},
+	{-1.0f, 0.0f, -1.0f},
+	{-1.0f, 0.0f,  1.0f},
+	{ 1.0f, 1.0f,  1.0f},
+	{ 1.0f, 1.0f, -1.0f},
+	{-1.0f, 1.0f, -1.0f},
+	{-1.0f, 1.0f,  1.0f}
+};
+
+static const unsigned int bone_box_wire[24] = {
+	0, 1,  1, 2,  2, 3,  3, 0,
+	4, 5,  5, 6,  6, 7,  7, 4,
+	0, 4,  1, 5,  2, 6,  3, 7,
+};
+
+/* aligned with bone_octahedral_wire
+ * Contains adjacent normal index */
+static const unsigned int bone_box_wire_adjacent_face[24] = {
+	0,  2,   0,  4,   1,  6,   1,  8,
+	3, 10,   5, 10,   7, 11,   9, 11,
+	3,  8,   2,  5,   4,  7,   6,  9,
+};
+
+static const unsigned int bone_box_solid_tris[12][3] = {
+	{0, 1, 2}, /* bottom */
+	{0, 2, 3},
+
+	{0, 1, 5}, /* sides */
+	{0, 5, 4},
+
+	{1, 2, 6},
+	{1, 6, 5},
+
+	{2, 3, 7},
+	{2, 7, 6},
+
+	{3, 0, 4},
+	{3, 4, 7},
+
+	{4, 5, 6}, /* top */
+	{4, 6, 7},
+};
+
+/* aligned with bone_octahedral_solid_tris */
+static const float bone_box_solid_normals[12][3] = {
+	{ 0.0f, -1.0f,  0.0f},
+    { 0.0f, -1.0f,  0.0f},
+
+	{ 1.0f,  0.0f,  0.0f},
+	{ 1.0f,  0.0f,  0.0f},
+
+	{ 0.0f,  0.0f, -1.0f},
+	{ 0.0f,  0.0f, -1.0f},
+
+	{-1.0f,  0.0f,  0.0f},
+	{-1.0f,  0.0f,  0.0f},
+
+	{ 0.0f,  0.0f,  1.0f},
+	{ 0.0f,  0.0f,  1.0f},
+
+	{ 0.0f,  1.0f,  0.0f},
+	{ 0.0f,  1.0f,  0.0f},
+};
+
+Batch *DRW_cache_bone_box_get(void)
+{
+	if (!SHC.drw_bone_box) {
+		unsigned int v_idx = 0;
+
+		static VertexFormat format = { 0 };
+		static unsigned int pos_id, nor_id;
+		if (format.attrib_ct == 0) {
+			pos_id = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+			nor_id = VertexFormat_add_attrib(&format, "nor", COMP_F32, 3, KEEP_FLOAT);
+		}
+
+		/* Vertices */
+		VertexBuffer *vbo = VertexBuffer_create_with_format(&format);
+		VertexBuffer_allocate_data(vbo, 36);
+
+		for (int i = 0; i < 12; i++) {
+			for (int j = 0; j < 3; j++) {
+				VertexBuffer_set_attrib(vbo, nor_id, v_idx, bone_box_solid_normals[i]);
+				VertexBuffer_set_attrib(vbo, pos_id, v_idx++, bone_box_verts[bone_box_solid_tris[i][j]]);
+			}
+		}
+
+		SHC.drw_bone_box = Batch_create(PRIM_TRIANGLES, vbo, NULL);
+	}
+	return SHC.drw_bone_box;
+}
+
+Batch *DRW_cache_bone_box_wire_outline_get(void)
+{
+	if (!SHC.drw_bone_box_wire) {
+		unsigned int v_idx = 0;
+
+		static VertexFormat format = { 0 };
+		static unsigned int pos_id, n1_id, n2_id;
+		if (format.attrib_ct == 0) {
+			pos_id = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+			n1_id = VertexFormat_add_attrib(&format, "N1", COMP_F32, 3, KEEP_FLOAT);
+			n2_id = VertexFormat_add_attrib(&format, "N2", COMP_F32, 3, KEEP_FLOAT);
+		}
+
+		/* Vertices */
+		VertexBuffer *vbo = VertexBuffer_create_with_format(&format);
+		VertexBuffer_allocate_data(vbo, 12 * 2);
+
+		for (int i = 0; i < 12; i++) {
+			const float *co1 = bone_box_verts[bone_box_wire[i * 2]];
+			const float *co2 = bone_box_verts[bone_box_wire[i * 2 + 1]];
+			const float *n1 = bone_box_solid_normals[bone_box_wire_adjacent_face[i * 2]];
+			const float *n2 = bone_box_solid_normals[bone_box_wire_adjacent_face[i * 2 + 1]];
+			add_fancy_edge(vbo, pos_id, n1_id, n2_id, &v_idx, co1, co2, n1, n2);
+		}
+
+		SHC.drw_bone_box_wire = Batch_create(PRIM_LINES, vbo, NULL);
+	}
+	return SHC.drw_bone_box_wire;
+}
+
+
+Batch *DRW_cache_bone_wire_wire_outline_get(void)
+{
+	if (!SHC.drw_bone_wire_wire) {
+		unsigned int v_idx = 0;
+
+		static VertexFormat format = { 0 };
+		static unsigned int pos_id, n1_id, n2_id;
+		if (format.attrib_ct == 0) {
+			pos_id = VertexFormat_add_attrib(&format, "pos", COMP_F32, 3, KEEP_FLOAT);
+			n1_id = VertexFormat_add_attrib(&format, "N1", COMP_F32, 3, KEEP_FLOAT);
+			n2_id = VertexFormat_add_attrib(&format, "N2", COMP_F32, 3, KEEP_FLOAT);
+		}
+
+		/* Vertices */
+		VertexBuffer *vbo = VertexBuffer_create_with_format(&format);
+		VertexBuffer_allocate_data(vbo, 2);
+
+		const float co1[3] = {0.0f, 0.0f, 0.0f};
+		const float co2[3] = {0.0f, 1.0f, 0.0f};
+		const float n[3] = {1.0f, 0.0f, 0.0f};
+		add_fancy_edge(vbo, pos_id, n1_id, n2_id, &v_idx, co1, co2, n, n);
+
+		SHC.drw_bone_wire_wire = Batch_create(PRIM_LINES, vbo, NULL);
+	}
+	return SHC.drw_bone_wire_wire;
+}
+
+
 Batch *DRW_cache_bone_point_get(void)
 {
 	if (!SHC.drw_bone_point) {
@@ -1544,6 +1724,13 @@ Batch *DRW_cache_single_vert_get(void)
 /** \name Meshes
  * \{ */
 
+Batch *DRW_cache_mesh_surface_overlay_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_all_triangles(me);
+}
+
 void DRW_cache_mesh_wire_overlay_get(
         Object *ob,
         Batch **r_tris, Batch **r_ledges, Batch **r_lverts)
@@ -1552,9 +1739,9 @@ void DRW_cache_mesh_wire_overlay_get(
 
 	Mesh *me = ob->data;
 
-	*r_tris = BKE_mesh_batch_cache_get_overlay_triangles(me);
-	*r_ledges = BKE_mesh_batch_cache_get_overlay_loose_edges(me);
-	*r_lverts = BKE_mesh_batch_cache_get_overlay_loose_verts(me);
+	*r_tris = DRW_mesh_batch_cache_get_overlay_triangles(me);
+	*r_ledges = DRW_mesh_batch_cache_get_overlay_loose_edges(me);
+	*r_lverts = DRW_mesh_batch_cache_get_overlay_loose_verts(me);
 }
 
 Batch *DRW_cache_face_centers_get(Object *ob)
@@ -1563,7 +1750,7 @@ Batch *DRW_cache_face_centers_get(Object *ob)
 
 	Mesh *me = ob->data;
 
-	return BKE_mesh_batch_cache_get_overlay_facedots(me);
+	return DRW_mesh_batch_cache_get_overlay_facedots(me);
 }
 
 Batch *DRW_cache_mesh_wire_outline_get(Object *ob)
@@ -1571,7 +1758,7 @@ Batch *DRW_cache_mesh_wire_outline_get(Object *ob)
 	BLI_assert(ob->type == OB_MESH);
 
 	Mesh *me = ob->data;
-	return BKE_mesh_batch_cache_get_fancy_edges(me);
+	return DRW_mesh_batch_cache_get_fancy_edges(me);
 }
 
 Batch *DRW_cache_mesh_surface_get(Object *ob)
@@ -1579,7 +1766,32 @@ Batch *DRW_cache_mesh_surface_get(Object *ob)
 	BLI_assert(ob->type == OB_MESH);
 
 	Mesh *me = ob->data;
-	return BKE_mesh_batch_cache_get_triangles_with_normals(me);
+	return DRW_mesh_batch_cache_get_triangles_with_normals(me);
+}
+
+Batch *DRW_cache_mesh_surface_weights_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_triangles_with_normals_and_weights(me, ob->actdef - 1);
+}
+
+Batch *DRW_cache_mesh_surface_vert_colors_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_triangles_with_normals_and_vert_colors(me);
+}
+
+/* Return list of batches */
+Batch **DRW_cache_mesh_surface_shaded_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_surface_shaded(me);
 }
 
 Batch *DRW_cache_mesh_surface_verts_get(Object *ob)
@@ -1587,7 +1799,15 @@ Batch *DRW_cache_mesh_surface_verts_get(Object *ob)
 	BLI_assert(ob->type == OB_MESH);
 
 	Mesh *me = ob->data;
-	return BKE_mesh_batch_cache_get_points_with_normals(me);
+	return DRW_mesh_batch_cache_get_points_with_normals(me);
+}
+
+Batch *DRW_cache_mesh_edges_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_all_edges(me);
 }
 
 Batch *DRW_cache_mesh_verts_get(Object *ob)
@@ -1595,7 +1815,31 @@ Batch *DRW_cache_mesh_verts_get(Object *ob)
 	BLI_assert(ob->type == OB_MESH);
 
 	Mesh *me = ob->data;
-	return BKE_mesh_batch_cache_get_all_verts(me);
+	return DRW_mesh_batch_cache_get_all_verts(me);
+}
+
+Batch *DRW_cache_mesh_edges_paint_overlay_get(Object *ob, bool use_wire, bool use_sel, bool use_theme)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_weight_overlay_edges(me, use_wire, use_sel, use_theme);
+}
+
+Batch *DRW_cache_mesh_faces_weight_overlay_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_weight_overlay_faces(me);
+}
+
+Batch *DRW_cache_mesh_verts_weight_overlay_get(Object *ob)
+{
+	BLI_assert(ob->type == OB_MESH);
+
+	Mesh *me = ob->data;
+	return DRW_mesh_batch_cache_get_weight_overlay_verts(me);
 }
 
 /** \} */
@@ -1610,7 +1854,7 @@ Batch *DRW_cache_curve_edge_wire_get(Object *ob)
 	BLI_assert(ob->type == OB_CURVE);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_wire_edge(cu, ob->curve_cache);
+	return DRW_curve_batch_cache_get_wire_edge(cu, ob->curve_cache);
 }
 
 Batch *DRW_cache_curve_edge_normal_get(Object *ob, float normal_size)
@@ -1618,7 +1862,7 @@ Batch *DRW_cache_curve_edge_normal_get(Object *ob, float normal_size)
 	BLI_assert(ob->type == OB_CURVE);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_normal_edge(cu, ob->curve_cache, normal_size);
+	return DRW_curve_batch_cache_get_normal_edge(cu, ob->curve_cache, normal_size);
 }
 
 Batch *DRW_cache_curve_edge_overlay_get(Object *ob)
@@ -1626,7 +1870,7 @@ Batch *DRW_cache_curve_edge_overlay_get(Object *ob)
 	BLI_assert(ob->type == OB_CURVE);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_overlay_edges(cu);
+	return DRW_curve_batch_cache_get_overlay_edges(cu);
 }
 
 Batch *DRW_cache_curve_vert_overlay_get(Object *ob)
@@ -1634,7 +1878,7 @@ Batch *DRW_cache_curve_vert_overlay_get(Object *ob)
 	BLI_assert(ob->type == OB_CURVE);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_overlay_verts(cu);
+	return DRW_curve_batch_cache_get_overlay_verts(cu);
 }
 
 Batch *DRW_cache_curve_surface_get(Object *ob)
@@ -1642,7 +1886,7 @@ Batch *DRW_cache_curve_surface_get(Object *ob)
 	BLI_assert(ob->type == OB_CURVE);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_triangles_with_normals(cu, ob->curve_cache);
+	return DRW_curve_batch_cache_get_triangles_with_normals(cu, ob->curve_cache);
 }
 
 /** \} */
@@ -1657,7 +1901,7 @@ Batch *DRW_cache_text_edge_wire_get(Object *ob)
 	BLI_assert(ob->type == OB_FONT);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_wire_edge(cu, ob->curve_cache);
+	return DRW_curve_batch_cache_get_wire_edge(cu, ob->curve_cache);
 }
 
 Batch *DRW_cache_text_surface_get(Object *ob)
@@ -1667,21 +1911,21 @@ Batch *DRW_cache_text_surface_get(Object *ob)
 	if (cu->editfont && (cu->flag & CU_FAST)) {
 		return NULL;
 	}
-	return BKE_curve_batch_cache_get_triangles_with_normals(cu, ob->curve_cache);
+	return DRW_curve_batch_cache_get_triangles_with_normals(cu, ob->curve_cache);
 }
 
 Batch *DRW_cache_text_cursor_overlay_get(Object *ob)
 {
 	BLI_assert(ob->type == OB_FONT);
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_overlay_cursor(cu);
+	return DRW_curve_batch_cache_get_overlay_cursor(cu);
 }
 
 Batch *DRW_cache_text_select_overlay_get(Object *ob)
 {
 	BLI_assert(ob->type == OB_FONT);
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_overlay_select(cu);
+	return DRW_curve_batch_cache_get_overlay_select(cu);
 }
 
 /** \} */
@@ -1696,7 +1940,7 @@ Batch *DRW_cache_surf_surface_get(Object *ob)
 	BLI_assert(ob->type == OB_SURF);
 
 	struct Curve *cu = ob->data;
-	return BKE_curve_batch_cache_get_triangles_with_normals(cu, ob->curve_cache);
+	return DRW_curve_batch_cache_get_triangles_with_normals(cu, ob->curve_cache);
 }
 
 /** \} */
@@ -1711,7 +1955,7 @@ Batch *DRW_cache_lattice_verts_get(Object *ob)
 	BLI_assert(ob->type == OB_LATTICE);
 
 	struct Lattice *lt = ob->data;
-	return BKE_lattice_batch_cache_get_all_verts(lt);
+	return DRW_lattice_batch_cache_get_all_verts(lt);
 }
 
 Batch *DRW_cache_lattice_wire_get(Object *ob)
@@ -1719,7 +1963,7 @@ Batch *DRW_cache_lattice_wire_get(Object *ob)
 	BLI_assert(ob->type == OB_LATTICE);
 
 	struct Lattice *lt = ob->data;
-	return BKE_lattice_batch_cache_get_all_edges(lt);
+	return DRW_lattice_batch_cache_get_all_edges(lt);
 }
 
 Batch *DRW_cache_lattice_vert_overlay_get(Object *ob)
@@ -1727,15 +1971,7 @@ Batch *DRW_cache_lattice_vert_overlay_get(Object *ob)
 	BLI_assert(ob->type == OB_LATTICE);
 
 	struct Lattice *lt = ob->data;
-	return BKE_lattice_batch_cache_get_overlay_verts(lt);
+	return DRW_lattice_batch_cache_get_overlay_verts(lt);
 }
 
 /** \} */
-
-
-#if 0 /* TODO */
-struct Batch *DRW_cache_surface_material_get(Object *ob, int nr) {
-	/* TODO */
-	return NULL;
-}
-#endif

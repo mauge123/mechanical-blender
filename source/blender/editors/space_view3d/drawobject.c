@@ -62,10 +62,10 @@
 #include "BKE_global.h"
 #include "BKE_image.h"
 #include "BKE_key.h"
+#include "BKE_layer.h"
 #include "BKE_lattice.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
-#include "BKE_mesh_render.h"
 #include "BKE_material.h"
 #include "BKE_mball.h"
 #include "BKE_modifier.h"
@@ -114,6 +114,8 @@
 #include "BLF_api.h"
 
 #include "view3d_intern.h"  /* bad level include */
+
+#include "../../draw/intern/draw_cache_impl.h"  /* bad level include (temporary) */
 
 /* prototypes */
 static void imm_draw_box(const float vec[8][3], bool solid, unsigned pos);
@@ -896,7 +898,7 @@ void view3d_cached_text_draw_add(const float co[3],
 	memcpy(vos->str, str, alloc_len);
 }
 
-void view3d_cached_text_draw_end(View3D *v3d, ARegion *ar, bool depth_write, float mat[4][4])
+void view3d_cached_text_draw_end(View3D *v3d, ARegion *ar, bool depth_write)
 {
 	RegionView3D *rv3d = ar->regiondata;
 	ViewCachedString *vos;
@@ -906,9 +908,6 @@ void view3d_cached_text_draw_end(View3D *v3d, ARegion *ar, bool depth_write, flo
 
 	/* project first and test */
 	for (vos = g_v3d_strings[g_v3d_string_level]; vos; vos = vos->next) {
-		if (mat && !(vos->flag & V3D_CACHE_TEXT_WORLDSPACE))
-			mul_m4_v3(mat, vos->vec);
-
 		if (ED_view3d_project_short_ex(ar,
 		                               (vos->flag & V3D_CACHE_TEXT_GLOBALSPACE) ? rv3d->persmat : rv3d->persmatob,
 		                               (vos->flag & V3D_CACHE_TEXT_LOCALCLIP) != 0,
@@ -943,10 +942,12 @@ void view3d_cached_text_draw_end(View3D *v3d, ARegion *ar, bool depth_write, flo
 			glDepthMask(GL_FALSE);
 		}
 		
+		const int font_id = BLF_default();
+
 		for (vos = g_v3d_strings[g_v3d_string_level]; vos; vos = vos->next) {
 			if (vos->sco[0] != IS_CLIPPED) {
 				if (col_pack_prev != vos->col.pack) {
-					//glColor3ubv(vos->col.ub);
+					BLF_color3ubv(font_id, vos->col.ub);
 					col_pack_prev = vos->col.pack;
 				}
 
@@ -4690,7 +4691,7 @@ static void draw_em_fancy_new(Scene *UNUSED(scene), ARegion *UNUSED(ar), View3D 
                               Object *UNUSED(ob), Mesh *me, BMEditMesh *UNUSED(em), DerivedMesh *UNUSED(cageDM), DerivedMesh *UNUSED(finalDM), const char UNUSED(dt))
 {
 	/* for now... something simple! */
-	Batch *surface = BKE_mesh_batch_cache_get_all_triangles(me);
+	Batch *surface = DRW_mesh_batch_cache_get_all_triangles(me);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
@@ -4725,7 +4726,7 @@ static void draw_em_fancy_new(Scene *UNUSED(scene), ARegion *UNUSED(ar), View3D 
 
 	if (GLEW_VERSION_3_2) {
 #if 0
-		Batch *overlay = BKE_mesh_batch_cache_get_overlay_edges(me);
+		Batch *overlay = DRW_mesh_batch_cache_get_overlay_edges(me);
 		Batch_set_builtin_program(overlay, GPU_SHADER_EDGES_OVERLAY);
 		Batch_Uniform2f(overlay, "viewportSize", ar->winx, ar->winy);
 		Batch_draw(overlay);
@@ -4744,7 +4745,7 @@ static void draw_em_fancy_new(Scene *UNUSED(scene), ARegion *UNUSED(ar), View3D 
 #endif
 	}
 	else {
-		Batch *edges = BKE_mesh_batch_cache_get_all_edges(me);
+		Batch *edges = DRW_mesh_batch_cache_get_all_edges(me);
 		Batch_set_builtin_program(edges, GPU_SHADER_3D_UNIFORM_COLOR);
 		Batch_Uniform4f(edges, "color", 0.0f, 0.0f, 0.0f, 1.0f);
 		glEnable(GL_LINE_SMOOTH);
@@ -4806,7 +4807,7 @@ static void draw_mesh_object_outline_new(View3D *v3d, RegionView3D *rv3d, Object
 		UI_GetThemeColor4fv((is_active ? TH_ACTIVE : TH_SELECT), outline_color);
 
 #if 1 /* new version that draws only silhouette edges */
-		Batch *fancy_edges = BKE_mesh_batch_cache_get_fancy_edges(me);
+		Batch *fancy_edges = DRW_mesh_batch_cache_get_fancy_edges(me);
 
 		if (rv3d->persp == RV3D_ORTHO) {
 			Batch_set_builtin_program(fancy_edges, GPU_SHADER_EDGES_FRONT_BACK_ORTHO);
@@ -5349,7 +5350,7 @@ static void draw_mesh_fancy_new(Scene *scene, SceneLayer *sl, ARegion *ar, View3
 
 #if 1 /* fancy wireframes */
 
-		Batch *fancy_edges = BKE_mesh_batch_cache_get_fancy_edges(me);
+		Batch *fancy_edges = DRW_mesh_batch_cache_get_fancy_edges(me);
 
 		if (rv3d->persp == RV3D_ORTHO) {
 			Batch_set_builtin_program(fancy_edges, GPU_SHADER_EDGES_FRONT_BACK_ORTHO);
@@ -8038,7 +8039,7 @@ static void draw_editfont(Scene *scene, SceneLayer *sl, View3D *v3d, RegionView3
 	draw_editfont_textcurs(rv3d, ef->textcurs);
 
 	if (cu->flag & CU_FAST) {
-		cpack(0xFFFFFF);
+		imm_cpack(0xFFFFFF);
 		set_inverted_drawing(1);
 		drawDispList(scene, sl, v3d, rv3d, base, OB_WIRE, dflag, ob_wire_col);
 		set_inverted_drawing(0);
@@ -9121,7 +9122,6 @@ void draw_object(Scene *scene, SceneLayer *sl, ARegion *ar, View3D *v3d, Base *b
 	Object *ob = base->object;
 	Curve *cu;
 	RegionView3D *rv3d = ar->regiondata;
-	unsigned int col = 0;
 	unsigned char _ob_wire_col[4];            /* dont initialize this */
 	const unsigned char *ob_wire_col = NULL;  /* dont initialize this, use NULL crashes as a way to find invalid use */
 	bool zbufoff = false, is_paint = false, empty_object = false;
@@ -9487,12 +9487,6 @@ afterdraw:
 	{
 		ParticleSystem *psys;
 
-		if ((dflag & DRAW_CONSTCOLOR) == 0) {
-			/* for visibility, also while wpaint */
-			if (col || (base->flag & BASE_SELECTED)) {
-				cpack(0xFFFFFF);
-			}
-		}
 		//glDepthMask(GL_FALSE);
 
 		gpuLoadMatrix(rv3d->viewmat);
@@ -9510,12 +9504,11 @@ afterdraw:
 			draw_new_particle_system(scene, v3d, rv3d, base, psys, dt, dflag);
 		}
 		invert_m4_m4(ob->imat, ob->obmat);
-		view3d_cached_text_draw_end(v3d, ar, 0, NULL);
+		view3d_cached_text_draw_end(v3d, ar, 0);
 
 		gpuMultMatrix(ob->obmat);
 		
 		//glDepthMask(GL_TRUE);
-		if (col) cpack(col);
 	}
 
 	/* draw edit particles last so that they can draw over child particles */
@@ -9704,7 +9697,7 @@ afterdraw:
 	
 	/* return warning, this is cached text draw */
 	invert_m4_m4(ob->imat, ob->obmat);
-	view3d_cached_text_draw_end(v3d, ar, 1, NULL);
+	view3d_cached_text_draw_end(v3d, ar, 1);
 	/* return warning, clear temp flag */
 	v3d->flag2 &= ~V3D_SHOW_SOLID_MATCAP;
 	
@@ -9777,13 +9770,16 @@ afterdraw:
 			draw_hooks(ob, pos);
 
 		/* help lines and so */
-		if (ob != scene->obedit && ob->parent && (ob->parent->lay & v3d->lay)) {
-			setlinestyle(3);
-			immBegin(PRIM_LINES, 2);
-			immVertex3fv(pos, ob->obmat[3]);
-			immVertex3fv(pos, ob->orig);
-			immEnd();
-			setlinestyle(0);
+		if (ob != scene->obedit && ob->parent) {
+			Base *base_parent = BKE_scene_layer_base_find(sl, ob->parent);
+			if ((base_parent->flag & BASE_VISIBLED) != 0) {
+				setlinestyle(3);
+				immBegin(PRIM_LINES, 2);
+				immVertex3fv(pos, ob->obmat[3]);
+				immVertex3fv(pos, ob->orig);
+				immEnd();
+				setlinestyle(0);
+			}
 		}
 
 		/* Drawing the constraint lines */
@@ -10080,8 +10076,6 @@ static void bbs_mesh_solid__drawCenter(void *userData, int index, const float ce
 static void bbs_mesh_solid_EM(BMEditMesh *em, Scene *scene, View3D *v3d,
                               Object *ob, DerivedMesh *dm, bool use_faceselect)
 {
-	cpack(0);
-
 	if (use_faceselect) {
 		dm->drawMappedFaces(dm, bbs_mesh_solid__setSolidDrawOptions, NULL, NULL, em->bm, DM_DRAW_SKIP_HIDDEN | DM_DRAW_SELECT_USE_EDITMODE);
 
@@ -10196,8 +10190,9 @@ static void bbs_mesh_solid_verts(Scene *scene, Object *ob)
 
 static void bbs_mesh_solid_faces(Scene *scene, Object *ob)
 {
-	DerivedMesh *dm = mesh_get_derived_final(scene, ob, scene->customdata_mask);
 	Mesh *me = ob->data;
+#if defined(WITH_LEGACY_OPENGL)
+	DerivedMesh *dm = mesh_get_derived_final(scene, ob, scene->customdata_mask);
 	
 	DM_update_materials(dm, ob);
 
@@ -10207,6 +10202,18 @@ static void bbs_mesh_solid_faces(Scene *scene, Object *ob)
 		dm->drawMappedFaces(dm, bbs_mesh_solid__setDrawOpts, NULL, NULL, me, 0);
 
 	dm->release(dm);
+#else
+	UNUSED_VARS(scene, bbs_mesh_solid_hide__setDrawOpts, bbs_mesh_solid__setDrawOpts);
+	Batch *batch;
+	if ((me->editflag & ME_EDIT_PAINT_FACE_SEL)) {
+		batch = DRW_mesh_batch_cache_get_triangles_with_select_id(me, true);
+	}
+	else {
+		batch = DRW_mesh_batch_cache_get_triangles_with_select_id(me, false);
+	}
+	Batch_set_builtin_program(batch, GPU_SHADER_3D_FLAT_COLOR_U32);
+	Batch_draw(batch);
+#endif
 }
 
 void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *ob)
@@ -10250,8 +10257,8 @@ void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, Objec
 				bbs_mesh_wire(em, dm, bm_solidoffs);
 				bm_wireoffs = bm_solidoffs + em->bm->totedge;
 
-				/* we draw verts if vert select mode or if in transform (for snap). */
-				if ((ts->selectmode & SCE_SELECT_VERTEX) || (G.moving & G_TRANSFORM_EDIT)) {
+				/* we draw verts if vert select mode. */
+				if (ts->selectmode & SCE_SELECT_VERTEX) {
 					bbs_mesh_verts(em, dm, bm_wireoffs);
 					bm_vertoffs = bm_wireoffs + em->bm->totvert;
 				}

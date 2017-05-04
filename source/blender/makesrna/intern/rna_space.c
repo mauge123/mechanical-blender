@@ -852,7 +852,7 @@ static int rna_SpaceView3D_viewport_shade_get(PointerRNA *ptr)
 	View3D *v3d = (View3D *)ptr->data;
 	int drawtype = v3d->drawtype;
 
-	if (drawtype == OB_RENDER && !(type && type->view_draw))
+	if (drawtype == OB_RENDER && !(type && type->render_to_view))
 		return OB_SOLID;
 
 	return drawtype;
@@ -881,8 +881,8 @@ static EnumPropertyItem *rna_SpaceView3D_viewport_shade_itemf(bContext *UNUSED(C
 	RNA_enum_items_add_value(&item, &totitem, rna_enum_viewport_shade_items, OB_SOLID);
 	RNA_enum_items_add_value(&item, &totitem, rna_enum_viewport_shade_items, OB_TEXTURE);
 	RNA_enum_items_add_value(&item, &totitem, rna_enum_viewport_shade_items, OB_MATERIAL);
-
-	if (type && type->view_draw)
+	
+	if (type && type->render_to_view)
 		RNA_enum_items_add_value(&item, &totitem, rna_enum_viewport_shade_items, OB_RENDER);
 
 	RNA_enum_item_end(&item, &totitem);
@@ -1421,10 +1421,11 @@ static void rna_SpaceDopeSheetEditor_action_set(PointerRNA *ptr, PointerRNA valu
 	}
 }
 
-static void rna_SpaceDopeSheetEditor_action_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_SpaceDopeSheetEditor_action_update(Main *bmain, bContext *C, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	SpaceAction *saction = (SpaceAction *)(ptr->data);
-	Object *obact = (scene->basact) ? scene->basact->object : NULL;
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *obact = OBACT_NEW;
 
 	/* we must set this action to be the one used by active object (if not pinned) */
 	if (obact /* && saction->pin == 0*/) {
@@ -1496,11 +1497,12 @@ static void rna_SpaceDopeSheetEditor_action_update(Main *bmain, Scene *scene, Po
 	}
 }
 
-static void rna_SpaceDopeSheetEditor_mode_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
+static void rna_SpaceDopeSheetEditor_mode_update(Main *UNUSED(bmain), bContext *C, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	SpaceAction *saction = (SpaceAction *)(ptr->data);
-	Object *obact = (scene->basact) ? scene->basact->object : NULL;
-
+	SceneLayer *sl = CTX_data_scene_layer(C);
+	Object *obact = OBACT_NEW;
+	
 	/* special exceptions for ShapeKey Editor mode */
 	if (saction->mode == SACTCONT_SHAPEKEY) {
 		Key *key = BKE_key_from_object(obact);
@@ -3646,6 +3648,7 @@ static void rna_def_space_dopesheet(BlenderRNA *brna)
 	RNA_def_property_pointer_funcs(prop, NULL, "rna_SpaceDopeSheetEditor_action_set", NULL,
 								   "rna_Action_actedit_assign_poll");
 	RNA_def_property_ui_text(prop, "Action", "Action displayed and edited in this space");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 	RNA_def_property_update(prop, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, "rna_SpaceDopeSheetEditor_action_update");
 
 	/* mode */
@@ -3653,6 +3656,7 @@ static void rna_def_space_dopesheet(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "mode");
 	RNA_def_property_enum_items(prop, mode_items);
 	RNA_def_property_ui_text(prop, "Mode", "Editing context being displayed");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_DOPESHEET, "rna_SpaceDopeSheetEditor_mode_update");
 
 	/* display */

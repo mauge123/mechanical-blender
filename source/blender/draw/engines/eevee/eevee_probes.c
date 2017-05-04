@@ -29,7 +29,7 @@
 
 #include "DRW_render.h"
 
-#include "eevee.h"
+#include "eevee_engine.h"
 #include "eevee_private.h"
 #include "GPU_texture.h"
 #include "GPU_glew.h"
@@ -133,10 +133,6 @@ void EEVEE_refresh_probe(EEVEE_Data *vedata)
 	EEVEE_StorageList *stl = vedata->stl;
 	EEVEE_ProbesInfo *pinfo = stl->probes;
 
-	const bContext *C = DRW_get_context();
-	Scene *scene = CTX_data_scene(C);
-	World *world = scene->world;
-
 	float projmat[4][4];
 
 	/* 1 - Render to cubemap target using geometry shader. */
@@ -147,19 +143,8 @@ void EEVEE_refresh_probe(EEVEE_Data *vedata)
 		mul_m4_m4m4(pinfo->probemat[i], projmat, cubefacemat[i]);
 	}
 
-	/* Debug Tex : Use World 1st Tex Slot */
-	if (world && world->mtex[0]) {
-		MTex *mtex = world->mtex[0];
-		if (mtex && mtex->tex) {
-			Tex *tex = mtex->tex;
-			if (tex->ima) {
-				pinfo->backgroundtex = GPU_texture_from_blender(tex->ima, &tex->iuser, GL_TEXTURE_2D, true, 0.0, 0);
-
-				DRW_framebuffer_bind(fbl->probe_fb);
-				DRW_draw_pass(psl->probe_background);
-			}
-		}
-	}
+	DRW_framebuffer_bind(fbl->probe_fb);
+	DRW_draw_pass(psl->probe_background);
 
 	/* 2 - Let gpu create Mipmaps for Filtered Importance Sampling. */
 	/* Bind next framebuffer to be able to write to probe_rt. */

@@ -195,12 +195,6 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
                 description="Pause all viewport preview renders",
                 default=False,
                 )
-        cls.preview_active_layer = BoolProperty(
-                name="Preview Active Layer",
-                description="Preview active render layer in viewport",
-                default=False,
-                )
-
         cls.aa_samples = IntProperty(
                 name="AA Samples",
                 description="Number of antialiasing samples to render for each pixel",
@@ -695,7 +689,7 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
             update=devices_update_callback
             )
 
-        cls.debug_opencl_kernel_single_program = BoolProperty(name="Single Program", default=False, update=devices_update_callback);
+        cls.debug_opencl_kernel_single_program = BoolProperty(name="Single Program", default=True, update=devices_update_callback);
 
         cls.debug_use_opencl_debug = BoolProperty(name="Debug OpenCL", default=False)
 
@@ -1166,6 +1160,39 @@ class CyclesCurveRenderSettings(bpy.types.PropertyGroup):
     def unregister(cls):
         del bpy.types.Scene.cycles_curves
 
+class CyclesRenderLayerSettings(bpy.types.PropertyGroup):
+    @classmethod
+    def register(cls):
+        bpy.types.SceneRenderLayer.cycles = PointerProperty(
+                name="Cycles SceneRenderLayer Settings",
+                description="Cycles SceneRenderLayer Settings",
+                type=cls,
+                )
+        cls.pass_debug_bvh_traversed_nodes = BoolProperty(
+                name="Debug BVH Traversed Nodes",
+                description="Store Debug BVH Traversed Nodes pass",
+                default=False,
+                )
+        cls.pass_debug_bvh_traversed_instances = BoolProperty(
+                name="Debug BVH Traversed Instances",
+                description="Store Debug BVH Traversed Instances pass",
+                default=False,
+                )
+        cls.pass_debug_bvh_intersections = BoolProperty(
+                name="Debug BVH Intersections",
+                description="Store Debug BVH Intersections",
+                default=False,
+                )
+        cls.pass_debug_ray_bounces = BoolProperty(
+                name="Debug Ray Bounces",
+                description="Store Debug Ray Bounces pass",
+                default=False,
+                )
+
+    @classmethod
+    def unregister(cls):
+        del bpy.types.SceneRenderLayer.cycles
+
 
 class CyclesCurveSettings(bpy.types.PropertyGroup):
     @classmethod
@@ -1297,14 +1324,14 @@ class CyclesPreferences(bpy.types.AddonPreferences):
         row = layout.row()
 
         if self.compute_device_type == 'CUDA' and cuda_devices:
-            col = row.column(align=True)
+            box = row.box()
             for device in cuda_devices:
-                col.prop(device, "use", text=device.name, toggle=True)
+                box.prop(device, "use", text=device.name)
 
         if self.compute_device_type == 'OPENCL' and opencl_devices:
-            col = row.column(align=True)
+            box = row.box()
             for device in opencl_devices:
-                col.prop(device, "use", text=device.name, toggle=True)
+                box.prop(device, "use", text=device.name)
 
 
     def draw(self, context):
@@ -1324,6 +1351,7 @@ def register():
     bpy.utils.register_class(CyclesCurveSettings)
     bpy.utils.register_class(CyclesDeviceSettings)
     bpy.utils.register_class(CyclesPreferences)
+    bpy.utils.register_class(CyclesRenderLayerSettings)
 
 
 def unregister():
@@ -1339,3 +1367,4 @@ def unregister():
     bpy.utils.unregister_class(CyclesCurveSettings)
     bpy.utils.unregister_class(CyclesDeviceSettings)
     bpy.utils.unregister_class(CyclesPreferences)
+    bpy.utils.unregister_class(CyclesRenderLayerSettings)

@@ -1632,13 +1632,19 @@ static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 	bConstraint *con;
 	bPoseChannel *parchan;
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+	const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 
-	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+	immBindBuiltinProgram(GPU_SHADER_3D_LINE_DASHED_COLOR);
+
+	float viewport_size[4];
+	glGetFloatv(GL_VIEWPORT, viewport_size);
+	immUniform2f("viewport_size", viewport_size[2], viewport_size[3]);
+
+	immUniform1i("num_colors", 0);  /* "simple" mode */
 	immUniformColor4fv(fcolor);
+	immUniform1f("dash_width", 6.0f);
+	immUniform1f("dash_factor", 0.5f);
 
-	setlinestyle(3);
 	for (con = pchan->constraints.first; con; con = con->next) {
 		if (con->enforce == 0.0f)
 			continue;
@@ -1672,8 +1678,8 @@ static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 
 				if (parchan) {
 					immBegin(PRIM_LINES, 2);
-					immVertex3fv(pos, ik_tip);
-					immVertex3fv(pos, parchan->pose_head);
+					immVertex3fv(shdr_pos, ik_tip);
+					immVertex3fv(shdr_pos, parchan->pose_head);
 					immEnd();
 				}
 				
@@ -1698,15 +1704,15 @@ static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 				/* Only draw line in case our chain is more than one bone long! */
 				if (parchan != pchan) { /* XXX revise the breaking conditions to only stop at the tail? */
 					immBegin(PRIM_LINES, 2);
-					immVertex3fv(pos, ik_tip);
-					immVertex3fv(pos, parchan->pose_head);
+					immVertex3fv(shdr_pos, ik_tip);
+					immVertex3fv(shdr_pos, parchan->pose_head);
 					immEnd();
 				}
 				break;
 			}
 		}
 	}
-	setlinestyle(0);
+
 	immUnbindProgram();
 }
 
@@ -2201,23 +2207,28 @@ static void draw_pose_bones(Scene *scene, SceneLayer *sl, View3D *v3d, ARegion *
 						 * - only if V3D_HIDE_HELPLINES is enabled...
 						 */
 						if ((do_dashed & DASH_HELP_LINES) && ((bone->flag & BONE_CONNECTED) == 0)) {
-							VertexFormat *format = immVertexFormat();
-							unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+							const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 
-							immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+							immBindBuiltinProgram(GPU_SHADER_3D_LINE_DASHED_COLOR);
+
+							float viewport_size[4];
+							glGetFloatv(GL_VIEWPORT, viewport_size);
+							immUniform2f("viewport_size", viewport_size[2], viewport_size[3]);
+
+							immUniform1i("num_colors", 0);  /* "simple" mode */
+							immUniformColor4fv(fcolor);
+							immUniform1f("dash_width", 6.0f);
+							immUniform1f("dash_factor", 0.5f);
 
 							if (arm->flag & ARM_POSEMODE) {
 								GPU_select_load_id(index & 0xFFFF);  /* object tag, for bordersel optim */
-								UI_GetThemeColor4fv(TH_WIRE, fcolor);
-								immUniformColor4fv(fcolor);
+								immUniformThemeColor(TH_WIRE);
 							}
 
-							setlinestyle(3);
 							immBegin(PRIM_LINES, 2);
-							immVertex3fv(pos, pchan->pose_head);
-							immVertex3fv(pos, pchan->parent->pose_tail);
+							immVertex3fv(shdr_pos, pchan->parent->pose_tail);
+							immVertex3fv(shdr_pos, pchan->pose_head);
 							immEnd();
-							setlinestyle(0);
 
 							immUnbindProgram();
 						}
@@ -2501,21 +2512,25 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, const short dt)
 				
 				/* offset to parent */
 				if (eBone->parent) {
-					VertexFormat *format = immVertexFormat();
-					unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 3, KEEP_FLOAT);
+					const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
 
 					GPU_select_load_id(-1);  /* -1 here is OK! */
 
-					immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-					UI_GetThemeColor4fv(TH_WIRE_EDIT, fcolor);
-					immUniformColor4fv(fcolor);
-					
-					setlinestyle(3);
+					immBindBuiltinProgram(GPU_SHADER_3D_LINE_DASHED_COLOR);
+
+					float viewport_size[4];
+					glGetFloatv(GL_VIEWPORT, viewport_size);
+					immUniform2f("viewport_size", viewport_size[2], viewport_size[3]);
+
+					immUniform1i("num_colors", 0);  /* "simple" mode */
+					immUniformThemeColor(TH_WIRE_EDIT);
+					immUniform1f("dash_width", 6.0f);
+					immUniform1f("dash_factor", 0.5f);
+
 					immBegin(PRIM_LINES, 2);
-					immVertex3fv(pos, eBone->head);
-					immVertex3fv(pos, eBone->parent->tail);
+					immVertex3fv(shdr_pos, eBone->parent->tail);
+					immVertex3fv(shdr_pos, eBone->head);
 					immEnd();
-					setlinestyle(0);
 
 					immUnbindProgram();
 				}

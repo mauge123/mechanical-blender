@@ -63,9 +63,7 @@ class SimpleImportTest(unittest.TestCase):
         self.assertEqual(objects['Cube_003'], objects['Cube_005'].parent)
         self.assertEqual(objects['Cube_003'], objects['Cube_006'].parent)
 
-    def DISABLED_test_select_after_import(self):
-        self.fail('FIXME: Disabled until https://developer.blender.org/T51261 is fixed')
-
+    def test_select_after_import(self):
         # Add a sphere, so that there is something in the scene, selected, and active,
         # before we do the Alembic import.
         bpy.ops.mesh.primitive_uv_sphere_add()
@@ -86,6 +84,78 @@ class SimpleImportTest(unittest.TestCase):
         # All cubes should be selected, but the sphere shouldn't be.
         for ob in bpy.data.objects:
             self.assertEqual('Cube' in ob.name, ob.select_get())
+
+    def test_change_path_constraint(self):
+        import math
+
+        fname = 'cube-rotating1.abc'
+        abc = self.testdir / fname
+        relpath = bpy.path.relpath(str(abc))
+
+        res = bpy.ops.wm.alembic_import(filepath=str(abc), as_background_job=False)
+        self.assertEqual({'FINISHED'}, res)
+        cube = bpy.context.active_object
+
+        # Check that the file loaded ok.
+        bpy.context.scene.frame_set(10)
+        x, y, z = cube.matrix_world.to_euler('XYZ')
+        self.assertAlmostEqual(x, 0)
+        self.assertAlmostEqual(y, 0)
+        self.assertAlmostEqual(z, math.pi / 2, places=5)
+
+        # Change path from absolute to relative. This should not break the animation.
+        bpy.context.scene.frame_set(1)
+        bpy.data.cache_files[fname].filepath = relpath
+        bpy.context.scene.frame_set(10)
+
+        x, y, z = cube.matrix_world.to_euler('XYZ')
+        self.assertAlmostEqual(x, 0)
+        self.assertAlmostEqual(y, 0)
+        self.assertAlmostEqual(z, math.pi / 2, places=5)
+
+        # Replace the Alembic file; this should apply new animation.
+        bpy.data.cache_files[fname].filepath = relpath.replace('1.abc', '2.abc')
+        bpy.context.scene.update()
+
+        x, y, z = cube.matrix_world.to_euler('XYZ')
+        self.assertAlmostEqual(x, math.pi / 2, places=5)
+        self.assertAlmostEqual(y, 0)
+        self.assertAlmostEqual(z, 0)
+
+    def test_change_path_modifier(self):
+        import math
+
+        fname = 'animated-mesh.abc'
+        abc = self.testdir / fname
+        relpath = bpy.path.relpath(str(abc))
+
+        res = bpy.ops.wm.alembic_import(filepath=str(abc), as_background_job=False)
+        self.assertEqual({'FINISHED'}, res)
+        cube = bpy.context.active_object
+
+        # Check that the file loaded ok.
+        bpy.context.scene.frame_set(6)
+        self.assertAlmostEqual(-1, cube.data.vertices[0].co.x)
+        self.assertAlmostEqual(-1, cube.data.vertices[0].co.y)
+        self.assertAlmostEqual(0.5905638933181763, cube.data.vertices[0].co.z)
+
+        # Change path from absolute to relative. This should not break the animation.
+        bpy.context.scene.frame_set(1)
+        bpy.data.cache_files[fname].filepath = relpath
+        bpy.context.scene.frame_set(6)
+
+        self.assertAlmostEqual(1, cube.data.vertices[3].co.x)
+        self.assertAlmostEqual(1, cube.data.vertices[3].co.y)
+        self.assertAlmostEqual(0.5905638933181763, cube.data.vertices[3].co.z)
+
+    def test_import_long_names(self):
+        # This file contains very long names. The longest name is 4047 chars.
+        bpy.ops.wm.alembic_import(
+            filepath=str(self.testdir / "long-names.abc"),
+            as_background_job=False)
+
+        self.assertIn('Cube', bpy.data.objects)
+        self.assertEqual('CubeShape', bpy.data.objects['Cube'].data.name)
 
 
 def main():

@@ -43,6 +43,7 @@
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
+#include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -350,22 +351,28 @@ static void draw_marker(
 	if (flag & DRAW_MARKERS_LINES)
 #endif
 	{
-		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
-		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
-		setlinestyle(3);
-		
+		VertexFormat *format = immVertexFormat();
+		uint pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+
+		immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
+
+		float viewport_size[4];
+		glGetFloatv(GL_VIEWPORT, viewport_size);
+		immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+
 		if (marker->flag & SELECT) {
-			immUniformColor4ub(255, 255, 255, 96);
+			immUniformColor4f(1.0f, 1.0f, 1.0f, 0.38f);
 		}
 		else {
-			immUniformColor4ub(0, 0, 0, 96);
+			immUniformColor4f(0.0f, 0.0f, 0.0f, 0.38f);
 		}
+		immUniform1f("dash_width", 6.0f);
+		immUniform1f("dash_factor", 0.5f);
 
 		immBegin(PRIM_LINES, 2);
 		immVertex2f(pos, xpos + 0.5f, 12.0f);
 		immVertex2f(pos, xpos + 0.5f, (v2d->cur.ymax + 12.0f) * yscale);
 		immEnd();
-		setlinestyle(0);
 
 		immUnbindProgram();
 	}
@@ -1135,7 +1142,8 @@ static int ed_marker_select(bContext *C, const wmEvent *event, bool extend, bool
 
 	if (camera) {
 		Scene *scene = CTX_data_scene(C);
-		BaseLegacy *base;
+		SceneLayer *sl = CTX_data_scene_layer(C);
+		Base *base;
 		TimeMarker *marker;
 		int sel = 0;
 		
@@ -1152,11 +1160,11 @@ static int ed_marker_select(bContext *C, const wmEvent *event, bool extend, bool
 		for (marker = markers->first; marker; marker = marker->next) {
 			if (marker->camera) {
 				if (marker->frame == cfra) {
-					base = BKE_scene_base_find(scene, marker->camera);
+					base = BKE_scene_layer_base_find(sl, marker->camera);
 					if (base) {
-						ED_base_object_select(base, sel);
+						ED_object_base_select(base, sel);
 						if (sel)
-							ED_base_object_activate(C, base);
+							ED_object_base_activate(C, base);
 					}
 				}
 			}

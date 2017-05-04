@@ -397,6 +397,14 @@ void ED_node_shader_default(const bContext *C, ID *id)
 			Material *ma = (Material *)id;
 			ma->nodetree = ntree;
 
+			if (BKE_scene_uses_blender_eevee(scene)) {
+				out = nodeAddStaticNode(C, ntree, SH_NODE_OUTPUT_METALLIC);
+				out->locx = 300.0f; out->locy = 300.0f;
+				nodeSetActive(ntree, out);
+				ntreeUpdateTree(CTX_data_main(C), ntree);
+				return;
+			}
+
 			if (BKE_scene_use_new_shading_nodes(scene)) {
 				output_type = SH_NODE_OUTPUT_MATERIAL;
 				shader_type = SH_NODE_BSDF_DIFFUSE;
@@ -505,8 +513,6 @@ void ED_node_composit_default(const bContext *C, struct Scene *sce)
 	nodeAddLink(sce->nodetree, in, fromsock, out, tosock);
 	
 	ntreeUpdateTree(CTX_data_main(C), sce->nodetree);
-	
-	// XXX ntreeCompositForceHidden(sce->nodetree);
 }
 
 /* assumes nothing being done in ntree yet, sets the default in/out node */
@@ -584,14 +590,6 @@ void snode_set_context(const bContext *C)
 	
 	if (snode->nodetree != ntree || snode->id != id || snode->from != from || snode->treepath.last == NULL) {
 		ED_node_tree_start(snode, ntree, id, from);
-	}
-	
-	/* XXX Legacy hack to update render layer node outputs.
-	 * This should be handled by the depsgraph eventually ...
-	 */
-	if (ED_node_is_compositor(snode) && snode->nodetree) {
-		/* update output sockets based on available layers */
-		ntreeCompositForceHidden(snode->nodetree);
 	}
 }
 

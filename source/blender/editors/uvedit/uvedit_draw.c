@@ -71,7 +71,7 @@
 
 #include "uvedit_intern.h"
 
-static void draw_uvs_lineloop_bmface(BMFace *efa, const int cd_loop_uv_offset, unsigned int pos);
+static void draw_uvs_lineloop_bmface(BMFace *efa, const int cd_loop_uv_offset, const uint shdr_pos);
 
 void ED_image_draw_cursor(ARegion *ar, const float cursor[2])
 {
@@ -85,67 +85,56 @@ void ED_image_draw_cursor(ARegion *ar, const float cursor[2])
 
 	gpuTranslate2fv(cursor);
 
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
-	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+	immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
 
-	imm_cpack(0xFFFFFF);
+	float viewport_size[4];
+	glGetFloatv(GL_VIEWPORT, viewport_size);
+	immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
 
-	immBegin(PRIM_LINE_LOOP, 4);
-	immVertex2f(pos, -0.05f * x_fac, 0.0f);
-	immVertex2f(pos, 0.0f, 0.05f * y_fac);
-	immVertex2f(pos, 0.05f * x_fac, 0.0f);
-	immVertex2f(pos, 0.0f, -0.05f * y_fac);
-	immEnd();
-
-	setlinestyle(4);
-	imm_cpack(0xFF);
-
-	/* drawing individual segments, because the stipple pattern
-	 * gets messed up when drawing a continuous loop */
-	immBegin(PRIM_LINES, 8);
-	immVertex2f(pos, -0.05f * x_fac, 0.0f);
-	immVertex2f(pos, 0.0f, 0.05f * y_fac);
-	immVertex2f(pos, 0.0f, 0.05f * y_fac);
-	immVertex2f(pos, 0.05f * x_fac, 0.0f);
-	immVertex2f(pos, 0.05f * x_fac, 0.0f);
-	immVertex2f(pos, 0.0f, -0.05f * y_fac);
-	immVertex2f(pos, 0.0f, -0.05f * y_fac);
-	immVertex2f(pos, -0.05f * x_fac, 0.0f);
-	immEnd();
-
-	setlinestyle(0);
-	imm_cpack(0x0);
+	immUniform1i("num_colors", 2);  /* "advanced" mode */
+	immUniformArray4fv("colors", (float *)(float[][4]){{1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, 2);
+	immUniform1f("dash_width", 8.0f);
 
 	immBegin(PRIM_LINES, 8);
-	immVertex2f(pos, -0.020f * x_fac, 0.0f);
-	immVertex2f(pos, -0.1f * x_fac, 0.0f);
-	immVertex2f(pos, 0.1f * x_fac, 0.0f);
-	immVertex2f(pos, 0.020f * x_fac, 0.0f);
-	immVertex2f(pos, 0.0f, -0.020f * y_fac);
-	immVertex2f(pos, 0.0f, -0.1f * y_fac);
-	immVertex2f(pos, 0.0f, 0.1f * y_fac);
-	immVertex2f(pos, 0.0f, 0.020f * y_fac);
+
+	immVertex2f(shdr_pos, -0.05f * x_fac, 0.0f);
+	immVertex2f(shdr_pos, 0.0f, 0.05f * y_fac);
+
+	immVertex2f(shdr_pos, 0.0f, 0.05f * y_fac);
+	immVertex2f(shdr_pos, 0.05f * x_fac, 0.0f);
+
+	immVertex2f(shdr_pos, 0.05f * x_fac, 0.0f);
+	immVertex2f(shdr_pos, 0.0f, -0.05f * y_fac);
+
+	immVertex2f(shdr_pos, 0.0f, -0.05f * y_fac);
+	immVertex2f(shdr_pos, -0.05f * x_fac, 0.0f);
+
 	immEnd();
 
-	setlinestyle(1);
-	imm_cpack(0xFFFFFF);
+	immUniformArray4fv("colors", (float *)(float[][4]){{1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}, 2);
+	immUniform1f("dash_width", 2.0f);
 
 	immBegin(PRIM_LINES, 8);
-	immVertex2f(pos, -0.020f * x_fac, 0.0f);
-	immVertex2f(pos, -0.1f * x_fac, 0.0f);
-	immVertex2f(pos, 0.1f * x_fac, 0.0f);
-	immVertex2f(pos, 0.020f * x_fac, 0.0f);
-	immVertex2f(pos, 0.0f, -0.020f * y_fac);
-	immVertex2f(pos, 0.0f, -0.1f * y_fac);
-	immVertex2f(pos, 0.0f, 0.1f * y_fac);
-	immVertex2f(pos, 0.0f, 0.020f * y_fac);
+
+	immVertex2f(shdr_pos, -0.020f * x_fac, 0.0f);
+	immVertex2f(shdr_pos, -0.1f * x_fac, 0.0f);
+
+	immVertex2f(shdr_pos, 0.1f * x_fac, 0.0f);
+	immVertex2f(shdr_pos, 0.020f * x_fac, 0.0f);
+
+	immVertex2f(shdr_pos, 0.0f, -0.020f * y_fac);
+	immVertex2f(shdr_pos, 0.0f, -0.1f * y_fac);
+
+	immVertex2f(shdr_pos, 0.0f, 0.1f * y_fac);
+	immVertex2f(shdr_pos, 0.0f, 0.020f * y_fac);
+
 	immEnd();
 
 	immUnbindProgram();
 
 	gpuTranslate2f(-cursor[0], -cursor[1]);
-	setlinestyle(0);
 }
 
 static int draw_uvs_face_check(Scene *scene)
@@ -397,7 +386,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 	BLI_buffer_free(&tf_uvorig_buf);
 }
 
-static void draw_uvs_lineloop_bmface(BMFace *efa, const int cd_loop_uv_offset, unsigned int pos)
+static void draw_uvs_lineloop_bmface(BMFace *efa, const int cd_loop_uv_offset, const uint shdr_pos)
 {
 	BMIter liter;
 	BMLoop *l;
@@ -407,7 +396,7 @@ static void draw_uvs_lineloop_bmface(BMFace *efa, const int cd_loop_uv_offset, u
 
 	BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 		luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-		immVertex2fv(pos, luv->uv);
+		immVertex2fv(shdr_pos, luv->uv);
 	}
 
 	immEnd();
@@ -553,7 +542,7 @@ static void draw_uvs_texpaint(SpaceImage *sima, Scene *scene, SceneLayer *sl, Ob
 
 	ma = give_current_material(ob, ob->actcol);
 
-	if (me->mtpoly) {
+	if (me->mloopuv) {
 		MPoly *mpoly = me->mpoly;
 		MLoopUV *mloopuv, *mloopuv_base;
 		int a, b;
@@ -746,9 +735,18 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 
 	switch (sima->dt_uv) {
 		case SI_UVDT_DASH:
-			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		{
+			const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
 
-			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+			immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
+
+			float viewport_size[4];
+			glGetFloatv(GL_VIEWPORT, viewport_size);
+			immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+
+			immUniform1i("num_colors", 2);  /* "advanced" mode */
+			immUniformArray4fv("colors", (float *)(float[][4]){{0.56f, 0.56f, 0.56f, 1.0f}, {0.07f, 0.07f, 0.07f, 1.0f}}, 2);
+			immUniform1f("dash_width", 4.0f);
 
 			BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 				if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
@@ -756,22 +754,14 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 				tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
 
 				if (tf) {
-					imm_cpack(0x111111);
-
-					draw_uvs_lineloop_bmface(efa, cd_loop_uv_offset, pos);
-
-					setlinestyle(2);
-					imm_cpack(0x909090);
-
-					draw_uvs_lineloop_bmface(efa, cd_loop_uv_offset, pos);
-
-					setlinestyle(0);
+					draw_uvs_lineloop_bmface(efa, cd_loop_uv_offset, shdr_pos);
 				}
 			}
 
 			immUnbindProgram();
 
 			break;
+		}
 		case SI_UVDT_BLACK: /* black/white */
 		case SI_UVDT_WHITE:
 			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);

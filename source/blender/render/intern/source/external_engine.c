@@ -49,6 +49,8 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 
+#include "DEG_depsgraph.h"
+
 #include "RNA_access.h"
 
 #ifdef WITH_PYTHON
@@ -65,13 +67,14 @@
 #include "renderpipeline.h"
 #include "render_types.h"
 #include "render_result.h"
+#include "rendercore.h"
 
 /* Render Engine Types */
 
 static RenderEngineType internal_render_type = {
 	NULL, NULL,
-	"BLENDER_RENDER", N_("Blender Render"), RE_INTERNAL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	"BLENDER_RENDER", N_("Blender Render"), RE_INTERNAL | RE_USE_LEGACY_PIPELINE,
+	NULL, NULL, NULL, NULL, NULL, NULL, render_internal_update_passes, NULL, NULL,
 	{NULL, NULL, NULL}
 };
 
@@ -79,8 +82,8 @@ static RenderEngineType internal_render_type = {
 
 static RenderEngineType internal_game_type = {
 	NULL, NULL,
-	"BLENDER_GAME", N_("Blender Game"), RE_INTERNAL | RE_GAME,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	"BLENDER_GAME", N_("Blender Game"), RE_INTERNAL | RE_GAME | RE_USE_LEGACY_PIPELINE,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	{NULL, NULL, NULL}
 };
 
@@ -125,7 +128,8 @@ void RE_engines_register(Main *bmain, RenderEngineType *render_type)
 		DRW_engine_register(render_type->draw_engine);
 	}
 	if (render_type->collection_settings_create) {
-		BKE_layer_collection_engine_settings_callback_register(bmain, render_type->idname, render_type->collection_settings_create);
+		BKE_layer_collection_engine_settings_callback_register(
+		            bmain, render_type->idname, render_type->collection_settings_create);
 	}
 	BLI_addtail(&R_engines, render_type);
 }
@@ -144,7 +148,7 @@ RenderEngineType *RE_engines_find(const char *idname)
 bool RE_engine_is_external(Render *re)
 {
 	RenderEngineType *type = RE_engines_find(re->r.engine);
-	return (type && type->render);
+	return (type && type->render_to_image);
 }
 
 /* Create, Free */
@@ -202,7 +206,8 @@ static RenderPart *get_part_from_result(Render *re, RenderResult *result)
 	return NULL;
 }
 
-RenderResult *RE_engine_begin_result(RenderEngine *engine, int x, int y, int w, int h, const char *layername, const char *viewname)
+RenderResult *RE_engine_begin_result(
+        RenderEngine *engine, int x, int y, int w, int h, const char *layername, const char *viewname)
 {
 	Render *re = engine->re;
 	RenderResult *result;
@@ -231,6 +236,8 @@ RenderResult *RE_engine_begin_result(RenderEngine *engine, int x, int y, int w, 
 
 	/* can be NULL if we CLAMP the width or height to 0 */
 	if (result) {
+		render_result_clone_passes(re, result, viewname);
+
 		RenderPart *pa;
 
 		/* Copy EXR tile settings, so pipeline knows whether this is a result
@@ -262,6 +269,17 @@ void RE_engine_update_result(RenderEngine *engine, RenderResult *result)
 		result->renlay = result->layers.first; /* weak, draws first layer always */
 		re->display_update(re->duh, result, NULL);
 	}
+}
+
+void RE_engine_add_pass(RenderEngine *engine, const char *name, int channels, const char *chan_id, const char *layername)
+{
+	Render *re = engine->re;
+
+	if (!re || !re->result) {
+		return;
+	}
+
+	render_result_add_pass(re->result, name, channels, chan_id, layername, NULL);
 }
 
 void RE_engine_end_result(RenderEngine *engine, RenderResult *result, int cancel, int merge_results)
@@ -414,7 +432,8 @@ float RE_engine_get_camera_shift_x(RenderEngine *engine, Object *camera, int use
 	return BKE_camera_multiview_shift_x(re ? &re->r : NULL, camera, re->viewname);
 }
 
-void RE_engine_get_camera_model_matrix(RenderEngine *engine, Object *camera, int use_spherical_stereo, float *r_modelmat)
+void RE_engine_get_camera_model_matrix(
+        RenderEngine *engine, Object *camera, int use_spherical_stereo, float *r_modelmat)
 {
 	Render *re = engine->re;
 
@@ -491,8 +510,9 @@ RenderData *RE_engine_get_render_data(Render *re)
 }
 
 /* Bake */
-void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Scene *scene)
+void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Depsgraph *graph, Scene *scene)
 {
+	re->depsgraph = graph;
 	re->scene = scene;
 	re->main = bmain;
 	render_copy_renderdata(&re->r, &scene->r);
@@ -542,10 +562,21 @@ bool RE_bake_engine(
 
 	/* update is only called so we create the engine.session */
 	if (type->update)
-		type->update(engine, re->main, re->scene);
+		type->update(engine, re->main, re->depsgraph, re->scene);
 
-	if (type->bake)
-		type->bake(engine, re->scene, object, pass_type, pass_filter, object_id, pixel_array, num_pixels, depth, result);
+	if (type->bake) {
+		type->bake(
+		            engine,
+		            re->scene,
+		            object,
+		            pass_type,
+		            pass_filter,
+		            object_id,
+		            pixel_array,
+		            num_pixels,
+		            depth,
+		            result);
+	}
 
 	engine->tile_x = 0;
 	engine->tile_y = 0;
@@ -599,7 +630,7 @@ int RE_engine_render(Render *re, int do_all)
 	bool persistent_data = (re->r.mode & R_PERSISTENT_DATA) != 0;
 
 	/* verify if we can render */
-	if (!type->render)
+	if (!type->render_to_image)
 		return 0;
 	if ((re->r.scemode & R_BUTS_PREVIEW) && !(type->flag & RE_USE_PREVIEW))
 		return 0;
@@ -682,16 +713,18 @@ int RE_engine_render(Render *re, int do_all)
 	if (re->result->do_exr_tile)
 		render_result_exr_file_begin(re);
 
-	if (type->update)
-		type->update(engine, re->main, re->scene);
+	if (type->update) {
+		type->update(engine, re->main, re->depsgraph, re->scene);
+	}
 
 	/* Clear UI drawing locks. */
 	if (re->draw_lock) {
 		re->draw_lock(re->dlh, 0);
 	}
 
-	if (type->render)
-		type->render(engine, re->scene);
+	if (type->render_to_image) {
+		type->render_to_image(engine, re->depsgraph);
+	}
 
 	engine->tile_x = 0;
 	engine->tile_y = 0;
@@ -734,3 +767,16 @@ int RE_engine_render(Render *re, int do_all)
 	return 1;
 }
 
+void RE_engine_register_pass(struct RenderEngine *engine, struct Scene *scene, struct SceneRenderLayer *srl,
+                             const char *name, int UNUSED(channels), const char *UNUSED(chanid), int type)
+{
+	/* The channel information is currently not used, but is part of the API in case it's needed in the future. */
+
+	if (!(scene && srl && engine)) {
+		return;
+	}
+
+	if (scene->nodetree) {
+		ntreeCompositRegisterPass(scene->nodetree, scene, srl, name, type);
+	}
+}
