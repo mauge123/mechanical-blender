@@ -1152,9 +1152,11 @@ static void surfacedeformModifier_do(ModifierData *md, float (*vertexCos)[3], un
 	}
 
 	/* Actual vertex location update starts here */
-	SDefDeformData data = {.bind_verts = smd->verts,
-		                   .targetCos = MEM_mallocN(sizeof(float[3]) * tnumverts, "SDefTargetVertArray"),
-		                   .vertexCos = vertexCos};
+	SDefDeformData data = {
+		.bind_verts = smd->verts,
+		.targetCos = MEM_mallocN(sizeof(float[3]) * tnumverts, "SDefTargetVertArray"),
+		.vertexCos = vertexCos,
+	};
 
 	if (data.targetCos != NULL) {
 		bool tdm_vert_alloc;
@@ -1195,7 +1197,7 @@ static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 {
 	SurfaceDeformModifierData *smd = (SurfaceDeformModifierData *)md;
 
-	return !smd->target;
+	return !smd->target && !(smd->verts && !(smd->flags & MOD_SDEF_BIND));
 }
 
 ModifierTypeInfo modifierType_SurfaceDeform = {

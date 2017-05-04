@@ -83,6 +83,8 @@ ExportSettings::ExportSettings()
     , export_vcols(false)
     , export_face_sets(false)
     , export_vweigths(false)
+    , export_hair(true)
+    , export_particles(true)
     , apply_subdiv(false)
     , use_subdiv_schema(false)
     , export_child_hairs(true)
@@ -106,7 +108,7 @@ static bool object_is_smoke_sim(Object *ob)
 	return false;
 }
 
-static bool object_is_shape(Object *ob)
+static bool object_type_is_exportable(Object *ob)
 {
 	switch (ob->type) {
 		case OB_MESH:
@@ -115,6 +117,7 @@ static bool object_is_shape(Object *ob)
 			}
 
 			return true;
+		case OB_EMPTY:
 		case OB_CURVE:
 		case OB_SURF:
 		case OB_CAMERA:
@@ -385,7 +388,7 @@ void AbcExporter::exploreTransform(EvaluationContext *eval_ctx, Object *ob, Obje
 		return;
 	}
 
-	if (object_is_shape(ob)) {
+	if (object_type_is_exportable(ob)) {
 		createTransformWriter(ob, parent, dupliObParent);
 	}
 
@@ -525,9 +528,32 @@ void AbcExporter::exploreObject(EvaluationContext *eval_ctx, Object *ob, Object 
 	free_object_duplilist(lb);
 }
 
+void AbcExporter::createParticleSystemsWriters(Object *ob, AbcTransformWriter *xform)
+{
+	if (!m_settings.export_hair && !m_settings.export_particles) {
+		return;
+	}
+
+	ParticleSystem *psys = static_cast<ParticleSystem *>(ob->particlesystem.first);
+
+	for (; psys; psys = psys->next) {
+		if (!psys_check_enabled(ob, psys, G.is_rendering) || !psys->part) {
+			continue;
+		}
+
+		if (m_settings.export_hair && psys->part->type == PART_HAIR) {
+			m_settings.export_child_hairs = true;
+			m_shapes.push_back(new AbcHairWriter(m_scene, ob, xform, m_shape_sampling_index, m_settings, psys));
+		}
+		else if (m_settings.export_particles && psys->part->type == PART_EMITTER) {
+			m_shapes.push_back(new AbcPointsWriter(m_scene, ob, xform, m_shape_sampling_index, m_settings, psys));
+		}
+	}
+}
+
 void AbcExporter::createShapeWriter(Object *ob, Object *dupliObParent)
 {
-	if (!object_is_shape(ob)) {
+	if (!object_type_is_exportable(ob)) {
 		return;
 	}
 
@@ -547,21 +573,7 @@ void AbcExporter::createShapeWriter(Object *ob, Object *dupliObParent)
 		return;
 	}
 
-	ParticleSystem *psys = static_cast<ParticleSystem *>(ob->particlesystem.first);
-
-	for (; psys; psys = psys->next) {
-		if (!psys_check_enabled(ob, psys, G.is_rendering) || !psys->part) {
-			continue;
-		}
-
-		if (psys->part->type == PART_HAIR) {
-			m_settings.export_child_hairs = true;
-			m_shapes.push_back(new AbcHairWriter(m_scene, ob, xform, m_shape_sampling_index, m_settings, psys));
-		}
-		else if (psys->part->type == PART_EMITTER) {
-			m_shapes.push_back(new AbcPointsWriter(m_scene, ob, xform, m_shape_sampling_index, m_settings, psys));
-		}
-	}
+	createParticleSystemsWriters(ob, xform);
 
 	switch (ob->type) {
 		case OB_MESH:
