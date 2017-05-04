@@ -4,8 +4,8 @@
  */
 
 
-#define MECHANICAL_DEC_PRECISION 1000
-#define MECHANICAL_DEC_PRECISION_SQ 1000000
+#define MECHANICAL_DEC_PRECISION 100
+#define MECHANICAL_DEC_PRECISION_SQ 10000
 
 
 #include "prec_math.h"
@@ -116,4 +116,3 @@ int eq_ff_prec(const float fa, const float fb)
 
 	return (a == b);
 }
-

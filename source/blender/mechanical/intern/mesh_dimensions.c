@@ -15,6 +15,8 @@
 #include "mesh_dimensions.h"
 #include "mechanical_utils.h"
 
+#include "MEM_guardedalloc.h"
+
 
 static void set_dimension_start_end(BMDim *edm);
 
@@ -222,7 +224,7 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 }
 
 static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center,
-                                       float *axis, float value, int constraints, float *constraint_axis) {
+                                       float *axis, float value, int constraints) {
 	float rot[3], delta[3], r[3], p[3];
 	BMVert *v,*v2;
 	BMFace *f;
@@ -238,26 +240,20 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center,
 	add_v3_v3v3(eve->co, rot, center);
 
 	if (constraints & DIM_ALLOW_SLIDE_CONSTRAINT) {
-		if (constraint_axis) {
-			if (isect_line_plane_v3(r, center, eve->co, p, constraint_axis)){
-				copy_v3_v3(eve->co,r);
-			}
-		} else {
-			// DIM_TYPE_ANGLE_3P
-			// DIM_TYPE_ANGLE_4P
-			BM_ITER_MESH (f, &iterv, bm, BM_FACES_OF_MESH) {
-				BM_ITER_ELEM (v, &iterf, f, BM_VERTS_OF_FACE) {
-					if (v == eve) {
-						if (perpendicular_v3_v3(axis, f->no)) {
-							if (!parallel_v3u_v3u(dir,f->no)) {
-								if (!point_on_axis(center,axis,eve->co)) {
-									// Fin a vertex on face not matching eve
-									BM_ITER_ELEM (v2, &iterf2, f, BM_VERTS_OF_FACE) {
-										if (v2 != eve) break;
-									}
-									if (isect_line_plane_v3(r, center, eve->co, v2->co, f->no)){
-										copy_v3_v3(eve->co,r);
-									}
+		// DIM_TYPE_ANGLE_3P
+		// DIM_TYPE_ANGLE_4P
+		BM_ITER_MESH (f, &iterv, bm, BM_FACES_OF_MESH) {
+			BM_ITER_ELEM (v, &iterf, f, BM_VERTS_OF_FACE) {
+				if (v == eve) {
+					if (perpendicular_v3_v3(axis, f->no)) {
+						if (!parallel_v3u_v3u(dir,f->no)) {
+							if (!point_on_axis(center,axis,eve->co)) {
+								// Fin a vertex on face not matching eve
+								BM_ITER_ELEM (v2, &iterf2, f, BM_VERTS_OF_FACE) {
+									if (v2 != eve) break;
+								}
+								if (isect_line_plane_v3(r, center, eve->co, v2->co, f->no)){
+									copy_v3_v3(eve->co,r);
 								}
 							}
 						}
@@ -266,7 +262,6 @@ static void apply_dimension_angle_exec(BMesh *bm, BMVert *eve, float *center,
 			}
 		}
 	}
-
 }
 
 static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constraints) {
@@ -275,13 +270,6 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 
 	float p[3], r[3];
 	float d_dir[3]; // Dimension dir
-
-	float constraint_axis[3];
-	float *p_constraint_axis = NULL;
-	float ccenter[3],ccenter1[3],ccenter2[3]; // Centers coordinates
-	float r_constraint, r_constraint_c;
-
-	bool has_axis = false;
 
 	BMIter iter;
 	BMVert* eve;
@@ -325,78 +313,20 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 		tag_vertexs_on_plane(bm, p, d_dir);
 	}
 
-	if (edm->mdim->axis > 0) {
-
-		/*int i_ofs =  (edm->mdim->dim_type ==  DIM_TYPE_ANGLE_3P_CON) ? 3 : 4;
-		float *t = (edm->mdim->dir == DIM_DIR_RIGHT) ? edm->v[2]->co : edm->v[0]->co;
-
-		if (center_of_3_points (ccenter, edm->v[i_ofs]->co, edm->v[i_ofs+1]->co, edm->v[i_ofs+2]->co))
-		{
-			float rcenter1[3],rcenter2[3]; // Vector radius on centers
-
-			normal_tri_v3(constraint_axis,edm->v[i_ofs]->co, edm->v[i_ofs+1]->co, edm->v[i_ofs+2]->co);
-
-			v_perpendicular_to_axis(ccenter1, ccenter, t, constraint_axis);
-			sub_v3_v3v3(ccenter1, t, ccenter1);
-
-			sub_v3_v3v3(rcenter1,ccenter1, t);
-			r_constraint = len_v3(rcenter1);
-			normalize_v3(rcenter1);
-
-			v_perpendicular_to_axis (ccenter2, ccenter1, edm->mdim->center, constraint_axis);
-			sub_v3_v3v3(ccenter2, edm->mdim->center, ccenter2);
-
-			sub_v3_v3v3(rcenter2,ccenter2,edm->mdim->center);
-			r_constraint_c = len_v3(rcenter2);
-			normalize_v3(rcenter2);
-
-			// Invert constraint center radi if v rcenter1 and rcenter2 are opposite
-			r_constraint_c *= dot_v3v3(rcenter1,rcenter2);
-
-			p_constraint_axis = constraint_axis;
-			has_axis = true;
-
-		}*/
-
-		/*if (constraints & DIM_CONCENTRIC_CONSTRAINT && has_axis) {
-			BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-				float delta = fabs(point_dist_to_axis (ccenter1, constraint_axis,eve->co));
-				if ((delta - r_constraint)< DIM_CONSTRAINT_PRECISION &&
-					point_on_plane(t,constraint_axis,eve->co))
-				{
-					BM_elem_flag_enable(eve, BM_ELEM_TAG);
-				}
-			}
-
-		}*/
-	}
-
-
 	// Untag dimensions vertex
 	untag_dimension_necessary_verts(edm);
 
-	if (!has_axis) {
-		// Untag vertex not in plane
-		BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
-			if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
-				if (!point_on_plane (edm->mdim->center,d_dir,eve->co)) {
-					BM_elem_flag_disable(eve, BM_ELEM_TAG);
-				}
-			}
-		}
-	}
-
 	if (edm->mdim->dir == DIM_DIR_RIGHT) {
-		apply_dimension_angle_exec(bm,edm->v[2],edm->mdim->center, axis,d,constraints, p_constraint_axis);
+		apply_dimension_angle_exec(bm,edm->v[2],edm->mdim->center, axis,d,constraints);
 		if (edm->mdim->dim_type == DIM_TYPE_ANGLE_4P){
-			apply_dimension_angle_exec(bm, edm->v[3],edm->mdim->center, axis,d,constraints, p_constraint_axis);
+			apply_dimension_angle_exec(bm, edm->v[3],edm->mdim->center, axis,d,constraints);
 		}
 	}
 	if (edm->mdim->dir == DIM_DIR_LEFT) {
 		d = d*(-1);
-		apply_dimension_angle_exec(bm, edm->v[0],edm->mdim->center, axis, d,constraints, p_constraint_axis);
+		apply_dimension_angle_exec(bm, edm->v[0],edm->mdim->center, axis, d,constraints);
 		if (edm->mdim->dim_type == DIM_TYPE_ANGLE_4P){
-			apply_dimension_angle_exec(bm, edm->v[1],edm->mdim->center, axis,d, constraints, p_constraint_axis);
+			apply_dimension_angle_exec(bm, edm->v[1],edm->mdim->center, axis,d, constraints);
 		}
 	}
 
@@ -407,43 +337,88 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(eve, BM_ELEM_TAG)) {
 
-			if (has_axis && (fabs(point_dist_to_axis (ccenter1, constraint_axis,eve->co) - r_constraint))< DIM_CONSTRAINT_OVERRIDE)
-			{
-				float naxis[3];
+			sub_v3_v3v3(v,eve->co, edm->mdim->center);
 
-				sub_v3_v3v3(v,eve->co, ccenter2);
-				v_perpendicular_to_axis(ncenter,ccenter2,v,constraint_axis);
-				normalize_v3(ncenter);
-				// r_constraint_c has sign
-				mul_v3_fl(ncenter,r_constraint_c);
-				add_v3_v3(ncenter,ccenter2);
-				if (edm->mdim->dir == DIM_DIR_LEFT) {
-					normal_tri_v3(naxis,ccenter1,ccenter2,ncenter);
-				} else {
-					normal_tri_v3(naxis,ccenter2,ccenter1,ncenter);
-				}
+			project_v3_v3v3(ncenter,v, axis);
+			add_v3_v3(ncenter,edm->mdim->center);
 
-				apply_dimension_angle_exec(bm, eve,ncenter, naxis,d,constraints, p_constraint_axis);
+			apply_dimension_angle_exec(bm, eve,ncenter, axis, d, constraints);
 
-			} else {
-
-				sub_v3_v3v3(v,eve->co, edm->mdim->center);
-	
-				project_v3_v3v3(ncenter,v, axis);
-				add_v3_v3(ncenter,edm->mdim->center);
-	
-				apply_dimension_angle_exec(bm, eve,ncenter, axis,d,constraints, p_constraint_axis);
-			}
-	
 			// Reset tag
 			BM_elem_flag_disable(eve, BM_ELEM_TAG);
 		}
 	}
 }
 
+static void apply_dimension_concentric_constraint (BMesh *bm, BMDim *edm, float *v_in){
+	float constraint_axis[3], r_original[3], r_modified[3];
+	float rad[3], r_rad[3];
+	float c_original[3], c_modified[3];
+	float h[3];
+	float r1, r2;
+	float n[3];
+	BMVert *eve;
+	BMIter iter;
+	BMReference *erf = BM_reference_at_index_find(bm, edm->mdim->axis-1);
+	BLI_assert(erf->type == BM_REFERENCE_TYPE_AXIS);
+	sub_v3_v3v3(constraint_axis,erf->v1, erf->v2);
+	normalize_v3(constraint_axis);
+
+	tag_vertexs_affected_by_dimension(bm,edm);
+
+	for (int i=0;i<edm->totverts;i++){
+		if (!equals_v3v3(&v_in[i*3],edm->v[i]->co)) {
+			// Changed apply changes on concetric
+			v_perpendicular_to_axis (r_original, &v_in[i*3], erf->v1, constraint_axis);
+			add_v3_v3v3(c_original, &v_in[i*3], r_original);
+			normal_tri_v3(n,edm->v[i]->co, &v_in[i*3], c_original);
+			if (perpendicular_v3_v3(n,constraint_axis)) {
+				v_perpendicular_to_axis (r_modified, edm->v[i]->co, erf->v1, constraint_axis);
+				add_v3_v3v3(c_modified,edm->v[i]->co, r_modified);
+				r1 = len_v3(r_original);
+				r2 = len_v3(r_modified);
+				sub_v3_v3v3(h,c_modified, c_original);
+
+				BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+					if (!BM_elem_flag_test_bool(eve, BM_ELEM_TAG)) {
+						if (point_on_plane_prec(eve->co,constraint_axis,c_original)) {
+							// OK
+							v_perpendicular_to_axis (rad, eve->co, erf->v1, constraint_axis);
+							if (fabs(len_v3(rad) - r1) < DIM_CONSTRAINT_PRECISION) {
+								mul_v3_fl(rad,-1);
+								copy_v3_v3(r_rad,rad);
+								normalize_v3_length(r_rad,r2);
+								add_v3_v3(r_rad, h);
+								sub_v3_v3(r_rad, rad);
+								add_v3_v3(eve->co, r_rad);
+							}
+						}
+					}
+				}
+			}
+		}
+
+	}
+
+	// Disable all:  some enabled verts may not be part on dim vertices (eg, selected ones)
+	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
+		BM_elem_flag_disable(eve, BM_ELEM_TAG);
+	}
+}
+
 void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts) {
 
 	int constraints = (edm->mdim->constraints & DIM_CONSTRAINT_OVERRIDE) ? edm->mdim->constraints : ts->dimension_constraints;
+	float *v_in = NULL;
+
+
+	if (edm->mdim->axis > 0 &&  (constraints & DIM_CONCENTRIC_CONSTRAINT)) {
+		v_in = MEM_callocN(sizeof(float)*3*edm->totverts, "Original Coordinates");
+		for (int i=0;i<edm->totverts;i++){
+			copy_v3_v3(&v_in[i*3],edm->v[i]->co);
+		}
+	}
+
 
 	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
@@ -461,6 +436,11 @@ void apply_dimension_value (BMesh *bm, BMDim *edm, float value, ToolSettings *ts
 			break;
 		default:
 			BLI_assert(0);
+	}
+
+	if ((constraints & DIM_CONCENTRIC_CONSTRAINT) &&  (edm->mdim->axis > 0)) {
+		apply_dimension_concentric_constraint (bm, edm, v_in);
+		MEM_freeN (v_in);
 	}
 
 	BM_mesh_normals_update(bm);

@@ -154,6 +154,8 @@ void project_v3_v3v3_prec(float out[3], const float p[3], const float v_proj[3])
 	out[0] = mul * v_proj[0];
 	out[1] = mul * v_proj[1];
 	out[2] = mul * v_proj[2];
+
+	ensure_v3_prec(out);
 }
 
 
@@ -162,7 +164,7 @@ float point_dist_to_plane_prec (float *c, float *a, float *p){
 	float r[3],m[3];
 	sub_v3_v3v3_prec(r,p,c);
 	project_v3_v3v3_prec(m,r,a);
-	return len_v3(m);
+	return ensure_f_prec(len_v3(m));
 }
 
 float point_dist_to_axis (float *c, float *a, float *p) {
