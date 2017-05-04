@@ -2017,7 +2017,6 @@ void set_dimension_direction (BMDim *edm, void *context) {
 		case DIM_TYPE_LINEAR:
 		case DIM_TYPE_ANGLE_3P:
 		case DIM_TYPE_ANGLE_4P:
-		case DIM_TYPE_ANGLE_3P_CON:
 			switch (edm->mdim->dir_flag) {
 				case DIM_DIR_AUTO:
 					ED_view3d_project_float_object(vc->ar,edm->mdim->start, screen_co_start, flag);

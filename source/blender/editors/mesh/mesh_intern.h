@@ -97,9 +97,7 @@ void MESH_OT_mechanical_dimension_linear_add(struct wmOperatorType *ot);
 void MESH_OT_mechanical_dimension_diameter_add(struct wmOperatorType *ot);
 void MESH_OT_mechanical_dimension_radius_add(struct wmOperatorType *ot);
 void MESH_OT_mechanical_dimension_angle_3p_add(struct wmOperatorType *ot);
-void MESH_OT_mechanical_dimension_angle_4p_add(struct wmOperatorType *ot);
-void MESH_OT_mechanical_dimension_angle_3p_con_add(struct wmOperatorType *ot);
-void MESH_OT_mechanical_dimension_data_select(struct wmOperatorType *ot);
+void MESH_OT_mechanical_dimension_angle_4p_add(struct wmOperatorType *ot);void MESH_OT_mechanical_dimension_data_select(struct wmOperatorType *ot);
 void MESH_OT_mechanical_dimension_data_reset(struct wmOperatorType *ot);
 void MESH_OT_mechanical_dimension_data_set(struct wmOperatorType *ot);
 #endif

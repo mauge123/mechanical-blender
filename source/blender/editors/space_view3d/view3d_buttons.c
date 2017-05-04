@@ -357,7 +357,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				                     &ptr,prop,0, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
 				UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 
-				if (ELEM(edm_sel->mdim->dim_type, DIM_TYPE_ANGLE_3P, DIM_TYPE_ANGLE_3P_CON)){
+				if (edm_sel->mdim->dim_type == DIM_TYPE_ANGLE_3P){
 					// Specific angle settings
 					prop = RNA_struct_find_property(&ptr, "dimension_angle_complementary");
 					uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
