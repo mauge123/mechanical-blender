@@ -68,7 +68,7 @@
 #include "drawings_intern.h"  /* own include */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void drawings_header_region_init(wmWindowManager *wm, ARegion *ar)
+static void drawings_header_region_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	//wmKeyMap *keymap = WM_keymap_find(wm->defaultconf, "3D View Generic", SPACE_VIEW3D, 0);
 	//WM_event_add_keymap_handler(&ar->handlers, keymap);
@@ -81,7 +81,7 @@ static void drawings_header_region_draw(const bContext *C, ARegion *ar)
 	ED_region_header(C, ar);
 }
 
-static void drawings_header_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)
+static void drawings_header_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *UNUSED(ar), wmNotifier *UNUSED(wmn))
 {
 	/* context changes */
 
@@ -98,7 +98,7 @@ static void drawings_main_region_draw(const bContext *C, ARegion *ar)
 	wmWindow *win = CTX_wm_window(C);
 	View2DScrollers *scrollers;
 	View2D *v2d = &ar->v2d;
-	Scene *scene = CTX_data_scene(C);
+	// Scene *scene = CTX_data_scene(C);
 	SpaceDrawings *dwg = CTX_wm_space_drawings(C);
 
 
@@ -156,9 +156,9 @@ static void drawings_main_region_draw(const bContext *C, ARegion *ar)
 
 /* ******************** default callbacks for view3d space ***************** */
 
-static SpaceLink *drawings_new(const bContext *C)
+static SpaceLink *drawings_new(const bContext *UNUSED(C))
 {
-	Scene *scene = CTX_data_scene(C);
+	// Scene *scene = CTX_data_scene(C);
 	ARegion *ar;
 
 	SpaceDrawings *dwg;
@@ -233,12 +233,14 @@ static SpaceLink *drawings_new(const bContext *C)
 }
 
 
+const char *drawing_context_dir[] = {"edit_drawing", NULL};
+
 static int drawings_context(const bContext *C, const char *member, bContextDataResult *result)
 {
 	SpaceDrawings *sdwg = CTX_wm_space_drawings(C);
 
 	if (CTX_data_dir(member)) {
-		CTX_data_dir_set(result, "edit_drawing");
+		CTX_data_dir_set(result, drawing_context_dir);
 		return 1;
 	}
 	else if (CTX_data_equals(member, "edit_drawing")) {
@@ -251,7 +253,7 @@ static int drawings_context(const bContext *C, const char *member, bContextDataR
 
 
 /* Initialize main region, setting handlers. */
-static void drawings_main_region_init(wmWindowManager *wm, ARegion *ar)
+static void drawings_main_region_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_CUSTOM, ar->winx, ar->winy);
 }
