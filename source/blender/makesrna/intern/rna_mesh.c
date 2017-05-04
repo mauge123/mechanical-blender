@@ -1886,9 +1886,18 @@ static void rna_MDim_set_value(PointerRNA *ptr, const float value)
 {
 	MDim *mdim = ptr->data;
 	mdim->value = value;
+	// Setting the value from drivers does not call the update
 	DAG_id_tag_update(&mdim->ob->id, OB_RECALC_OB | OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT , &mdim->ob->id);
 }
+
+static void rna_MDim_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	MDim *mdim = ptr->data;
+	DAG_id_tag_update(&mdim->ob->id, OB_RECALC_OB | OB_RECALC_DATA);
+}
+
+
 
 // WITH MECHANICAL MESH_REFERENCE_OBJECTS
 static EnumPropertyItem reference_axis_items[] = {
@@ -3881,16 +3890,18 @@ static void rna_def_dimension(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "value");
 	RNA_def_property_ui_text(prop, "Value", "Dimension value");
 	RNA_def_property_float_funcs (prop, NULL, "rna_MDim_set_value" , NULL );
+	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
 
 	prop = RNA_def_property(srna, "direction", PROP_ENUM , PROP_NONE);
 	RNA_def_property_enum_sdna(prop,  NULL, "dir_flag");
 	RNA_def_property_enum_items(prop, rna_enum_dimension_directions);
 	RNA_def_property_ui_text(prop, "Direction", "Dimension Direction");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
 
 	prop = RNA_def_property(srna, "dimension_angle_complementary", PROP_BOOLEAN , PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "dimension_flag", DIMENSION_FLAG_ANGLE_COMPLEMENTARY);
 	RNA_def_property_ui_text(prop, "Complementary Angle", "Sets the complementary angle");
-
+	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
 }
 
 void RNA_def_mesh(BlenderRNA *brna)

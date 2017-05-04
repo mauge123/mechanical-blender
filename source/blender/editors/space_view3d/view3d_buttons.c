@@ -405,6 +405,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 					}
 					edm->mdim->dpos_fact = tfp->dim_txt_pos;
 					edm->mdim->constraints = tfp->dim_constraints;
+					dimension_data_update(edm);
 				}
 			}
 		}
