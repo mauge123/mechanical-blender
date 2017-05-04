@@ -267,7 +267,6 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 							case DIM_TYPE_RADIUS:
 							case DIM_TYPE_ANGLE_3P:
 							case DIM_TYPE_ANGLE_4P:
-							case DIM_TYPE_ANGLE_3P_CON:
 								copy_v3_v3(edm->mdim->fpos,edm->mdim->center);
 								sub_v3_v3(edm->mdim->fpos,edm->mdim->tpos);
 								mul_v3_fl(edm->mdim->fpos,-1.0f);

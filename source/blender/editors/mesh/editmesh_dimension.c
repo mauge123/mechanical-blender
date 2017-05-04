@@ -187,7 +187,6 @@ static EnumPropertyItem dim_type_items[] = {
 	{DIM_TYPE_RADIUS, "radius", 0, "Radius", "Radius Dimension"},
     {DIM_TYPE_ANGLE_3P, "angle3p", 0, "Angle3P", "3 Points Angle dimension"},
     {DIM_TYPE_ANGLE_4P, "angle4p", 0, "Angle4P", "4 Points Angle dimension"},
-    {DIM_TYPE_ANGLE_3P_CON, "angle3pcon", 0, "Angle3PCon", "3 Points concetrinc Angle dimension"},
     {0, NULL, 0, NULL, NULL}
 };
 
@@ -289,24 +288,6 @@ void MESH_OT_mechanical_dimension_angle_4p_add(wmOperatorType *ot)
 
 	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_ANGLE_4P,"dimension type","dimension type");
 }
-
-void MESH_OT_mechanical_dimension_angle_3p_con_add(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Add 3 Points Concentric Angle Dimension";
-	ot->description = "Adds a concetrinc angle dimension on mesh from 3 points";
-	ot->idname = "MESH_OT_mechanical_dimension_angle_3p_con_add";
-
-	/* api callbacks */
-	ot->exec = mechanical_add_dimension_exec;
-	ot->poll = ED_operator_editmesh;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-
-	ot->prop = RNA_def_enum(ot->srna,"dim_type",dim_type_items,DIM_TYPE_ANGLE_3P_CON,"dimension type","dimension type");
-}
-
 
 void MESH_OT_mechanical_dimension_data_select(wmOperatorType *ot)
 {
