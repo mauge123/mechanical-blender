@@ -14,6 +14,7 @@
 
 #include "mesh_dimensions.h"
 #include "mechanical_utils.h"
+#include "prec_math.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -347,11 +348,17 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	}
 }
 
+/**
+ * @brief apply_dimension_concentric_constraint
+ * @param bm
+ * @param edm
+ * @param v_in
+ * @see http://www.mechanicalblender.org/modules/static/doc/apply_dimension_concentric_constraint.svg
+ */
 static void apply_dimension_concentric_constraint (BMesh *bm, BMDim *edm, float *v_in){
 	float constraint_axis[3], r_original[3], r_modified[3];
 	float rad[3], r_rad[3];
 	float c_original[3], c_modified[3];
-	float h[3];
 	float r1, r2;
 	float n[3];
 	int i =0;
@@ -372,27 +379,22 @@ static void apply_dimension_concentric_constraint (BMesh *bm, BMDim *edm, float 
 			// Changed apply changes on concetric
 			v_perpendicular_to_axis (r_original, &v_in[i*3], erf->v1, constraint_axis);
 			add_v3_v3v3(c_original, &v_in[i*3], r_original);
-			normal_tri_v3(n,eve1->co, &v_in[i*3], c_original);
-			// point_on_plane, covers the case on perpendicular translation to axis
-			if (perpendicular_v3_v3(n,constraint_axis) || point_on_plane_prec(&v_in[i*3], constraint_axis, eve1->co)) {
+			normal_tri_v3(n,erf->v1, erf->v2, &v_in[i*3]);
+			if (point_on_plane_prec(erf->v1, n, eve1->co)) {
 				v_perpendicular_to_axis (r_modified, eve1->co, erf->v1, constraint_axis);
 				add_v3_v3v3(c_modified,eve1->co, r_modified);
 				r1 = len_v3(r_original);
 				r2 = len_v3(r_modified);
-				sub_v3_v3v3(h,c_modified, c_original);
 
 				BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
 					if (!BM_elem_flag_test_bool(eve, BM_ELEM_TAG)) {
 						if (point_on_plane_prec(eve->co,constraint_axis,c_original)) {
 							// OK
 							v_perpendicular_to_axis (rad, eve->co, erf->v1, constraint_axis);
-							if (fabs(len_v3(rad) - r1) < DIM_CONSTRAINT_PRECISION) {
-								mul_v3_fl(rad,-1);
+							if (eq_ff_prec(len_v3(rad), r1)) {
 								copy_v3_v3(r_rad,rad);
-								normalize_v3_length(r_rad,r2);
-								add_v3_v3(r_rad, h);
-								sub_v3_v3(r_rad, rad);
-								add_v3_v3(eve->co, r_rad);
+								normalize_v3_length(r_rad,-r2);
+								add_v3_v3v3(eve->co, c_modified, r_rad);
 							}
 						}
 					}
