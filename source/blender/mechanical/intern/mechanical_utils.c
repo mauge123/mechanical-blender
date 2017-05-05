@@ -188,7 +188,7 @@ bool point_on_plane (float *c, float *a, float *p) {
 
 
 bool point_on_plane_prec (float *c, float *a, float *p) {
-	return (point_dist_to_plane_prec(c,a,p) == 0.0);
+	return (point_dist_to_plane_prec(c,a,p) < 0.1);
 }
 
 
