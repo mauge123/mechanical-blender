@@ -61,6 +61,11 @@ EnumPropertyItem rna_enum_mesh_delimit_mode_items[] = {
 	{0, NULL, 0, NULL, NULL},
 };
 
+
+static EnumPropertyItem dimension_transform_orientation_items[] = {
+	{0, "GLOBAL", 0, "Global", "use world space axis"},
+	{1, "LOCAL", 0, "Local", "use object local space axis"},
+};
 #ifdef RNA_RUNTIME
 
 #include "DNA_scene_types.h"
@@ -1717,6 +1722,45 @@ static int rna_Mesh_tot_dim_get(PointerRNA *ptr)
 	return me->edit_btmesh ? me->edit_btmesh->bm->totdimsel : 0;
 }
 
+EnumPropertyItem *rna_DimensionTransformOrientation_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	Scene *scene = NULL;
+	ListBase *transform_spaces;
+	TransformOrientation *ts = NULL;
+	EnumPropertyItem tmp = {0, "", 0, "", ""};
+	EnumPropertyItem *item = NULL;
+	int i = 2, totitem = 0;
+
+	RNA_enum_items_add(&item, &totitem, dimension_transform_orientation_items);
+
+	if (ptr->type == &RNA_SpaceView3D)
+		scene = ((bScreen *)ptr->id.data)->scene;
+	else
+		scene = CTX_data_scene(C);  /* can't use scene from ptr->id.data because that enum is also used by operators */
+
+	if (scene) {
+		transform_spaces = &scene->transform_spaces;
+		ts = transform_spaces->first;
+	}
+
+	if (ts) {
+		RNA_enum_item_add_separator(&item, &totitem);
+
+		for (; ts; ts = ts->next) {
+			tmp.identifier = ts->name;
+			tmp.name = ts->name;
+			tmp.value = i++;
+			RNA_enum_item_add(&item, &totitem, &tmp);
+		}
+	}
+
+	RNA_enum_item_end(&item, &totitem);
+	*r_free = true;
+
+	return item;
+}
+
+
 //WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
 static int rna_Mesh_tot_ref_get(PointerRNA *ptr)
 {
@@ -1909,6 +1953,24 @@ static void rna_MDim_set_value(PointerRNA *ptr, const float value)
 	// Setting the value from drivers does not call the update
 	DAG_id_tag_update(&mdim->ob->id, OB_RECALC_OB | OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT , &mdim->ob->id);
+}
+
+static float rna_MDim_get_value(PointerRNA *ptr)
+{
+	MDim *mdim = ptr->data;
+	float value;
+	switch (mdim->dim_type) {
+		case DIM_TYPE_LINEAR:
+			value = len_v3v3 (mdim->start, mdim->end);
+			break;
+		case DIM_TYPE_DIAMETER:
+		case DIM_TYPE_RADIUS:
+		case DIM_TYPE_ANGLE_3P:
+		case DIM_TYPE_ANGLE_4P:
+			value = mdim->value;
+			break;
+	}
+	return value;
 }
 
 static void rna_MDim_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
@@ -3893,9 +3955,16 @@ static void rna_def_dimension(BlenderRNA *brna)
 
 	static EnumPropertyItem rna_enum_dimension_directions[] = {
 		{DIM_DIR_LEFT, "Left", 0, "LEFT", "Affect left side"},
-		{DIM_DIR_RIGHT, "Rigth", 0, "RIGHT", "Affect right side"},
-	    {DIM_DIR_BOTH, "Both", 0, "BOTH", "Affect both sides"},
-	    {DIM_DIR_AUTO, "Auto", 0, "AUTO", "Affect depending on mouse input"},
+		{DIM_DIR_RIGHT, "Right", 0, "RIGHT", "Affect right side"},
+		{DIM_DIR_BOTH, "Both", 0, "BOTH", "Affect both sides"},
+		{DIM_DIR_AUTO, "Auto", 0, "AUTO", "Affect depending on mouse input"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem rna_enum_transform_oritentation_items[] = {
+		{DIM_TS_PLANE_X, "plane yz", 0, "PLANE_X", "use plane yz of trasnform orientation"},
+		{DIM_TS_PLANE_Y, "plane xz", 0, "PLANE_Y", "use plane xz of trasnform orientation"},
+		{DIM_TS_PLANE_Z, "plane xy", 0, "PLANE_Z", "use plane xy of trasnform orientation"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -3909,7 +3978,7 @@ static void rna_def_dimension(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "value", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "value");
 	RNA_def_property_ui_text(prop, "Value", "Dimension value");
-	RNA_def_property_float_funcs (prop, NULL, "rna_MDim_set_value" , NULL );
+	RNA_def_property_float_funcs (prop, "rna_MDim_get_value", "rna_MDim_set_value" , NULL );
 	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
 
 	prop = RNA_def_property(srna, "direction", PROP_ENUM , PROP_NONE);
@@ -3922,6 +3991,26 @@ static void rna_def_dimension(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "dimension_flag", DIMENSION_FLAG_ANGLE_COMPLEMENTARY);
 	RNA_def_property_ui_text(prop, "Complementary Angle", "Sets the complementary angle");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
+
+
+	prop = RNA_def_property(srna, "dimension_aligned", PROP_BOOLEAN , PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dimension_flag", DIMENSION_FLAG_TS_ALIGNED);
+	RNA_def_property_ui_text(prop, "Aligned", "Align dimension to Transform Orientation");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
+
+	prop = RNA_def_property(srna, "transform_orientation", PROP_ENUM , PROP_NONE);
+	RNA_def_property_enum_sdna(prop,  NULL, "ts");
+	RNA_def_property_enum_items(prop, dimension_transform_orientation_items);
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DimensionTransformOrientation_itemf");
+	RNA_def_property_ui_text(prop, "Transform Orientation", "Transformation orientation");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
+
+	prop = RNA_def_property(srna, "transform_orientation_plane", PROP_ENUM , PROP_NONE);
+	RNA_def_property_enum_sdna(prop,  NULL, "ts_plane");
+	RNA_def_property_enum_items(prop, rna_enum_transform_oritentation_items);
+	RNA_def_property_ui_text(prop, "Transform Orientation Plane", "Plane to use");
+	RNA_def_property_update(prop, NC_OBJECT, "rna_MDim_update");
+
 }
 
 void RNA_def_mesh(BlenderRNA *brna)

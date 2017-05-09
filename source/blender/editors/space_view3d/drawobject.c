@@ -105,6 +105,7 @@
 #include "ED_types.h"
 
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
 #include "mechanical_utils.h"
 
 #include "UI_resources.h"
@@ -2856,21 +2857,28 @@ static void get_dimension_theme_values (int selected, unsigned char *r_lines, un
  * @param fpos
  * @param dpos_fact
  * @param selected
+ * @param normal  plane normal, mdim->edm->ts z vect
  *
- * OUTPUT params
- *
- * @param start
- * @param end
- * @param txt_pos
  */
-static void draw_linear_dimension (float* p1, float *p2, float *start, float *end, float *txt_pos, int selected)
+static void draw_linear_dimension (
+        float* p1_co, float *p2_co,
+        float *start, float *end, float *txt_pos, int selected,
+        float *normal)
 {
 
 	float w,h;
+	float p1[3], p2[3];
 	char numstr[32]; /* Stores the measurement display text here */
 	unsigned char col[4], tcol[4]; /* color of the text to draw */
 
+	copy_v3_v3(p1,p1_co);
+	copy_v3_v3(p2,p2_co);
+
 	get_dimension_theme_values(selected, col, tcol);
+
+	if (normal) {
+		project_v3_plane(p2,normal,p1);
+	}
 
 	glColor3ubv(col);
 	glPointSize(2);
@@ -2883,6 +2891,12 @@ static void draw_linear_dimension (float* p1, float *p2, float *start, float *en
 
 	glBegin(GL_LINES);
 	{
+		glVertex3fv(p1_co);
+		glVertex3fv(p1);
+
+		glVertex3fv(p2_co);
+		glVertex3fv(p2);
+
 		glVertex3fv(p1);
 		glVertex3fv(start);
 
@@ -2895,7 +2909,7 @@ static void draw_linear_dimension (float* p1, float *p2, float *start, float *en
 	glEnd();
 
 	//draw dimension length
-	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(p1,p2));
+	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
 	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
@@ -3033,7 +3047,8 @@ static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 								   mdm->start,
 								   mdm->end,
 								   mdm->dpos,
-								   false);
+								   false,
+									NULL);
 			break;
 		case DIM_TYPE_DIAMETER:
 			draw_diameter_dimension(mdm->start, mdm->end, mdm->dpos, false);
@@ -3101,9 +3116,14 @@ static bool check_dim_visibility(BMDim *edm, RegionView3D *rv3d, Object *obedit)
  * /Brief Draw dimensions in EditMode
  *
 */
-static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
+static void draw_em_dim(BMEditMesh *em, BMDim *edm, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
+	float normal[3];
 	if(check_dim_visibility(edm, rv3d, obedit)){
+
+		if (edm->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED) {
+			get_dimension_transform_orientation_plane(normal, edm,scene);
+		}
 
 		switch (edm->mdim->dim_type) {
 			case DIM_TYPE_LINEAR:
@@ -3113,7 +3133,8 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 				    edm->mdim->start,
 				    edm->mdim->end,
 				    edm->mdim->dpos,
-				    BM_elem_flag_test(edm, BM_ELEM_SELECT));
+				    BM_elem_flag_test(edm, BM_ELEM_SELECT),
+				    edm->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED ? normal : NULL);
 				draw_dimension_direction_points(edm);
 
 			break;
@@ -3146,12 +3167,12 @@ static void draw_em_dim(BMDim *edm, RegionView3D *rv3d, Object *obedit)
 }
 
 
-static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Scene *UNUSED(scene))
+static void draw_em_dims(BMEditMesh *em, RegionView3D *rv3d, Object *obedit, Scene *scene)
 {
 	BMIter iter;
 	BMDim *edm;
 	BM_ITER_MESH(edm, &iter, em->bm, BM_DIMS_OF_MESH) {
-		draw_em_dim (edm, rv3d, obedit);
+		draw_em_dim (em, edm, rv3d, obedit, scene);
 	}
 }
 

@@ -100,9 +100,14 @@ typedef struct {
 	float dim_txt_pos;
 	int constraints;
 	int dim_constraints;
-	char dim_axis_name[255];
 #endif
 } TransformProperties;
+
+typedef struct {
+	BMDim *edm;
+	int reference_type;
+	char reference_name[255];
+} ReferenceSearchArg;
 
 /* Helper function to compute a median changed value,
  * when the value should be clamped in [0.0, 1.0].
@@ -206,10 +211,13 @@ static int v3d_mesh_constraints_buts(BMDim *edm, int totdim, uiBlock *block,int 
 }
 
 
+
+
 /* generic  search invoke */
-static void dimension_find_cb(const struct bContext *C, void *UNUSED(arg), const char *str, uiSearchItems *items)
+static void reference_find_cb(const struct bContext *C, void *arg, const char *str, uiSearchItems *items)
 {
 	Scene *scene = NULL;
+	ReferenceSearchArg *search_arg = arg;
 
 	scene = CTX_data_scene(C);
 
@@ -224,8 +232,12 @@ static void dimension_find_cb(const struct bContext *C, void *UNUSED(arg), const
 			if(em){
 				BMReference *erf = NULL;
 				BMIter iter;
+
+				// Add empty item, allowing reset the value
+				UI_search_item_add(items, "", NULL, 0);
+
 				BM_ITER_MESH (erf, &iter, em->bm, BM_REFERENCES_OF_MESH) {
-					if (erf->type == BM_REFERENCE_TYPE_AXIS) {
+					if (erf->type == search_arg->reference_type) {
 						if (BLI_strcasestr(erf->name, str)) {
 							char name[256];
 
@@ -241,22 +253,34 @@ static void dimension_find_cb(const struct bContext *C, void *UNUSED(arg), const
 }
 
 
-static void dimension_axis_set_cb(bContext *C, void *name_v, void *UNUSED(arg2))
+static void dimension_search_set_cb(bContext *C, void *arg1, void *UNUSED(arg2))
 {
-	// Arg2 comes from ui_searchbox_apply
+	// arg2 comes from ui_searchbox_apply
+	ReferenceSearchArg *search_arg = arg1;
 	Scene *scene = CTX_data_scene(C);
 	Object *ob = OBACT;
-	char *name = name_v;
 	BMDim *edm;
 	BLI_assert(ob->type == OB_MESH);
 	Mesh *me = ob->data;
 	BMEditMesh *em = me->edit_btmesh;
 	BMesh *bm = em->bm;
 	BMIter iter;
+	int *ptr;
 	if (bm->totdimsel) {
 		BM_ITER_MESH(edm, &iter, bm, BM_DIMS_OF_MESH) {
 			if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
-				edm->mdim->axis = (name[0] ? BM_elem_index_get(BM_reference_find_by_name(bm, name))+1 : 0);
+				switch (search_arg->reference_type) {
+					case BM_REFERENCE_TYPE_AXIS:
+						ptr = &edm->mdim->axis;
+						break;
+					default:
+						BLI_assert(false);
+				}
+				if (search_arg->reference_name[0]) {
+					*ptr = BM_elem_index_get(BM_reference_find_by_name(bm, search_arg->reference_name))+1;
+				} else {
+					*ptr = 0;
+				}
 			}
 	    }
 	}
@@ -272,6 +296,8 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 	ToolSettings *ts = scene->toolsettings;
 	BMDim *edm_sel;
 	BMReference *axis = NULL;
+	static ReferenceSearchArg arg_axis = {NULL, BM_REFERENCE_TYPE_AXIS, ""};
+
 	uiBut *but;
 
 	totdim = 0;
@@ -294,7 +320,8 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 				if (BM_elem_flag_test(edm, BM_ELEM_SELECT)) {
 					totdim++;
 					edm_sel = edm;
-					axis = BM_reference_at_index_find(bm,edm->mdim->axis-1);
+					axis = BM_reference_at_index_find(bm,edm->mdim->axis - 1);
+					arg_axis.edm = edm;
 				}
 		    }
 		}
@@ -321,27 +348,6 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 			uiDefButC(block, UI_BTYPE_TEXT, 0, "Name: ",0, yi -= buth + but_margin, 200, buth,
 				edm_sel->mdim->id.name+2, 0, 50, 0, 0, TIP_("Dimension name"));
 
-
-			/* Dimension default dir */
-			prop = RNA_struct_find_property(&ptr, "direction");
-			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
-
-			/* Dimension Axis */
-			//prop = RNA_struct_find_property(&ptr, "dimension_axis");
-			//uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
-			if (axis) {
-				BLI_strncpy(tfp->dim_axis_name,axis->name,255);
-			} else {
-				tfp->dim_axis_name[0] = '\0';
-			}
-			but = uiDefSearchBut(block, tfp->dim_axis_name, 0, ICON_VIEWZOOM, 2550, 0, yi -= buth + but_margin, 200, buth, 0, 0, "Reference Axis");
-			UI_but_func_search_set(but, NULL, dimension_find_cb, edm_sel->mdim, NULL, NULL);
-			/**
-			 * UGLY: arg2 cannot be used as is overrided on ui_searchbox_apply
-			 */
-			UI_but_func_set(but,dimension_axis_set_cb, tfp->dim_axis_name, NULL);
-
-
 			if (totdim == 1) {
 				// Only one dimension
 
@@ -364,6 +370,43 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 					&tfp->dimension_value, 0.0f, lim, 1, 2, TIP_("Dimension Value"));
 				UI_but_unit_type_set(but, PROP_UNIT_LENGTH);
 			}
+
+
+			/* Dimension default dir */
+			prop = RNA_struct_find_property(&ptr, "direction");
+			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+
+
+			yi-=buth;
+
+			prop = RNA_struct_find_property(&ptr, "dimension_aligned");
+			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+
+
+			UI_block_lock_set(block, !(edm_sel->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED), "Algined dimension");
+			prop = RNA_struct_find_property(&ptr, "transform_orientation");
+			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+
+
+			prop = RNA_struct_find_property(&ptr, "transform_orientation_plane");
+			uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+			UI_block_lock_clear(block);
+
+
+			yi-=buth;
+
+			/* Dimension Axis */
+			//prop = RNA_struct_find_property(&ptr, "dimension_axis");
+			//uiDefAutoButR(block, &ptr, prop, 0, NULL, ICON_NONE, 0, yi -= buth + but_margin, 200, buth);
+			if (axis) {
+				BLI_strncpy(arg_axis.reference_name, axis->name, 255);
+			}
+			but = uiDefSearchBut(block, &arg_axis.reference_name[0], 0, ICON_VIEWZOOM, 2550, 0, yi -= buth + but_margin, 200, buth, 0, 0, "Reference Axis");
+			UI_but_func_search_set(but, NULL, reference_find_cb, &arg_axis, NULL, NULL);
+			/**
+			 * UGLY: arg2 cannot be used as is overrided on ui_searchbox_apply
+			 */
+			UI_but_func_set(but,dimension_search_set_cb, &arg_axis, NULL);
 
 
 			tfp->dim_txt_pos= edm_sel->mdim->dpos_fact;
@@ -405,7 +448,7 @@ static void v3d_mesh_dimensions_buts(Scene *scene, uiLayout *layout, View3D *v3d
 					}
 					edm->mdim->dpos_fact = tfp->dim_txt_pos;
 					edm->mdim->constraints = tfp->dim_constraints;
-					dimension_data_update(edm);
+					dimension_data_update(em->bm, edm, scene);
 				}
 			}
 		}

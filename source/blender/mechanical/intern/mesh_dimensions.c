@@ -1,6 +1,7 @@
 
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
+#include "BLI_listbase.h"
 
 #include "DNA_mesh_types.h"
 
@@ -13,13 +14,14 @@
 #include "bmesh.h"
 
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
 #include "mechanical_utils.h"
 #include "prec_math.h"
 
 #include "MEM_guardedalloc.h"
 
 
-static void set_dimension_start_end(BMDim *edm);
+static void set_dimension_start_end(BMesh *bm, BMDim *edm, Scene *scene);
 
 bool valid_constraint_setting(BMDim *edm, int constraint) {
 	bool ret = false;
@@ -42,7 +44,8 @@ float get_dimension_value(BMDim *edm){
 	float v=0;
 	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
-			v = len_v3v3(edm->v[0]->co, edm->v[1]->co);
+			//v = len_v3v3(edm->v[0]->co, edm->v[1]->co);
+			v = len_v3v3(edm->mdim->start, edm->mdim->end);
 			break;
 		case DIM_TYPE_DIAMETER:
 			v = len_v3v3(edm->v[0]->co, edm->mdim->center)*2;
@@ -152,21 +155,25 @@ static void apply_dimension_radius_from_center(BMesh *bm, BMDim *edm, float valu
  * @param value
  * @param r_res  The vector of translation
  */
-static void apply_dimension_linear_value_exec( float *a, float *b, float value, float *r_res){
-	float vect [3];
-	float prev[3];
-	copy_v3_v3(prev,a);
+static void apply_dimension_linear_value_exec( float *a, float *b, float value, float *r_res, const float dir[]){
+	float proj[3], vect[3];
+	float r_value;
+
 	sub_v3_v3v3(vect,a,b);
-	normalize_v3(vect);
-	mul_v3_fl(vect,value);
-	add_v3_v3v3(a,b, vect);
-	sub_v3_v3v3(r_res, a, prev);
+
+	project_v3_v3v3(proj,vect,dir);
+	r_value = value - len_v3(proj);
+
+	copy_v3_v3(r_res, dir);
+	mul_v3_fl(r_res,r_value);
+
+	add_v3_v3v3(a,a, r_res);
 }
 
 
 static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int constraints) {
 
-	float v[3];
+	float v[3], n[3];
 
 	BMIter iter;
 	BMVert* eve;
@@ -194,7 +201,7 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 		} else if (edm->mdim->dir == DIM_DIR_RIGHT) {
 			copy_v3_v3(p, edm->v[1]->co);
 		}
-		sub_v3_v3v3(d_dir,edm->v[0]->co,edm->v[1]->co);
+		sub_v3_v3v3(d_dir,edm->mdim->end,edm->mdim->start);
 		normalize_v3(d_dir);
 		tag_vertexs_on_coplanar_faces(bm, p, d_dir);
 		tag_vertexs_on_plane(bm, p , d_dir);
@@ -202,12 +209,14 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 	// Untag dimensions vertex
 	untag_dimension_necessary_verts(edm);
 
+		sub_v3_v3v3(n, edm->mdim->end, edm->mdim->start);
+		normalize_v3(n);
 
 	// Update Dimension Verts
 	if(edm->mdim->dir == DIM_DIR_RIGHT){
-		apply_dimension_linear_value_exec(edm->v[1]->co,edm->v[0]->co, value, v);
+		apply_dimension_linear_value_exec(edm->v[1]->co,edm->v[0]->co, value, v, n);
 	}else if(edm->mdim->dir== DIM_DIR_LEFT){
-		apply_dimension_linear_value_exec(edm->v[0]->co,edm->v[1]->co, value, v);
+		apply_dimension_linear_value_exec(edm->v[0]->co,edm->v[1]->co, value, v, n);
 	}
 
 	// Update related Verts
@@ -329,7 +338,7 @@ static void apply_dimension_angle(BMesh *bm, BMDim *edm, float value, int constr
 	}
 
 	// To get correct dimension value in case of nexts steps (BOTH SIDES)
-	set_dimension_start_end(edm);
+	set_dimension_start_end(bm, edm, NULL);
 
 	//Rotate tagged points against axis
 	BM_ITER_MESH (eve, &iter, bm, BM_VERTS_OF_MESH) {
@@ -554,11 +563,25 @@ static void set_dimension_radius_start_end(BMDim* edm) {
 	copy_v3_v3(edm->mdim->start, edm->mdim->center);
 }
 
-static void set_dimension_start_end(BMDim *edm) {
+static void set_dimension_start_end(BMesh *UNUSED(bm), BMDim *edm, Scene *scene) {
+
 	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
 			add_v3_v3v3(edm->mdim->start,edm->mdim->fpos, edm->v[0]->co);
 			add_v3_v3v3(edm->mdim->end, edm->mdim->fpos, edm->v[1]->co);
+
+			if (scene && edm->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED) {
+				float normal[3], perp[3], pos[3];
+				get_dimension_transform_orientation_plane(normal, edm, scene);
+
+				cross_v3_v3v3(perp, normal, edm->mdim->fpos);
+				normalize_v3(perp);
+
+				sub_v3_v3v3(pos,edm->mdim->end, edm->mdim->start);
+				project_v3_v3v3(pos,pos,perp);
+				add_v3_v3v3(edm->mdim->end, edm->mdim->start, pos);
+			}
+
 			break;
 		case DIM_TYPE_DIAMETER:
 			set_dimension_diameter_start_end(edm);
@@ -622,25 +645,57 @@ static void ensure_fpos_on_plane (BMDim *edm){
 	sub_v3_v3(edm->mdim->fpos,edm->mdim->center);
 }
 
-void dimension_data_update (BMDim *edm) {
+void dimension_data_update (BMesh *bm, BMDim *edm, Scene *scene) {
 	float axis[3], v1[3],v2[3], l;
 
 	edm->mdim->value_pr = edm->mdim->value;
 
 	switch (edm->mdim->dim_type) {
 		case DIM_TYPE_LINEAR:
-			// Set dimension always perpendicular to edge
-			l = len_v3(edm->mdim->fpos);
-			sub_v3_v3v3(axis, edm->v[0]->co, edm->v[1]->co);
-			normalize_v3(axis);
-			project_v3_v3v3(v1,edm->mdim->fpos,axis);
-			sub_v3_v3(edm->mdim->fpos,v1);
-			normalize_v3(edm->mdim->fpos);
-			mul_v3_fl (edm->mdim->fpos, l);
 
+			if (scene) {
+				if (edm->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED) {
+					float n[3], zero[3]={0}, mat[3][3];
+					float x[3],y[3],z[3];
+					float lx, ly, lz;
+
+					get_dimension_transform_orientation_plane(n,edm,scene);
+					project_v3_plane(edm->mdim->fpos,n,zero);
+
+					//set on axis
+					get_dimension_transform_orientation_matrix (mat, edm, scene);
+
+					project_v3_v3v3(x,edm->mdim->fpos,mat[0]);
+					project_v3_v3v3(y,edm->mdim->fpos,mat[1]);
+					project_v3_v3v3(z,edm->mdim->fpos,mat[2]);
+
+					lx = len_squared_v3(x);
+					ly = len_squared_v3(y);
+					lz = len_squared_v3(z);
+
+					if (lx > ly && lx > lz) {
+						copy_v3_v3(edm->mdim->fpos, x);
+					} else if (ly > lx && ly > lz) {
+						copy_v3_v3(edm->mdim->fpos, y);
+					} else if (lz > lx && lz > ly) {
+						copy_v3_v3(edm->mdim->fpos, z);
+					}
+
+				} else {
+					// Set dimension always perpendicular to edge
+					l = len_v3(edm->mdim->fpos);
+					sub_v3_v3v3(axis, edm->v[0]->co, edm->v[1]->co);
+					normalize_v3(axis);
+					project_v3_v3v3(v1,edm->mdim->fpos,axis);
+					sub_v3_v3(edm->mdim->fpos,v1);
+					normalize_v3(edm->mdim->fpos);
+					mul_v3_fl (edm->mdim->fpos, l);
+				}
+			}
 
 			// Baseline
-			set_dimension_start_end(edm);
+			set_dimension_start_end(bm, edm, scene);
+
 
 			// Set txt pos acording pos factor
 			sub_v3_v3v3(edm->mdim->dpos, edm->mdim->end, edm->mdim->start);
@@ -651,7 +706,7 @@ void dimension_data_update (BMDim *edm) {
 		case DIM_TYPE_DIAMETER:
 			set_dimension_center(edm);
 			ensure_fpos_on_plane(edm);
-			set_dimension_start_end(edm);
+			set_dimension_start_end(bm, edm, scene);
 
 
 			// Set txt pos acording pos factor
@@ -663,7 +718,7 @@ void dimension_data_update (BMDim *edm) {
 			set_dimension_center(edm);
 			ensure_fpos_on_plane(edm);
 
-			set_dimension_start_end(edm); // First
+			set_dimension_start_end(bm, edm, scene); // First
 
 			// Set txt pos acording pos factor
 			sub_v3_v3v3(edm->mdim->dpos, edm->mdim->end, edm->mdim->center);
@@ -675,7 +730,7 @@ void dimension_data_update (BMDim *edm) {
 			ensure_fpos_on_plane(edm);
 
 			set_dimension_center(edm);  // First
-			set_dimension_start_end(edm);
+			set_dimension_start_end(bm, edm, scene);
 
 			// Set txt pos acording pos factor
 			sub_v3_v3v3(v1,edm->mdim->start,edm->mdim->center);
@@ -693,5 +748,37 @@ void dimension_data_update (BMDim *edm) {
 			break;
 		default:
 			BLI_assert(0);
+	}
+}
+
+void get_dimension_transform_orientation_matrix (float mat[][3], BMDim *edm, Scene *scene) {
+	if (edm->mdim->ts ==  0) {
+		// Global
+		copy_m3_m4(mat,edm->mdim->ob->imat);
+
+	} else if (edm->mdim->ts == 1) {
+		// Object
+		unit_m3(mat);
+	} else {
+		TransformOrientation *ts = BLI_findlink(&scene->transform_spaces, edm->mdim->ts-2);
+		copy_m3_m3(mat, ts->mat);
+	}
+}
+
+void get_dimension_transform_orientation_plane (float normal[3], BMDim *edm, Scene *scene) {
+	float mat[3][3];
+
+	get_dimension_transform_orientation_matrix(mat, edm, scene);
+
+	switch (edm->mdim->ts_plane) {
+		case DIM_TS_PLANE_X:
+			copy_v3_v3(normal,mat[0]);
+			break;
+		case DIM_TS_PLANE_Y:
+			copy_v3_v3(normal,mat[1]);
+			break;
+		case DIM_TS_PLANE_Z:
+			copy_v3_v3(normal,mat[2]);
+			break;
 	}
 }

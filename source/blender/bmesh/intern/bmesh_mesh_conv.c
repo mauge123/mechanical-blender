@@ -406,6 +406,11 @@ void BM_mesh_bm_from_me(
 
 	bm->elem_index_dirty &= ~BM_VERT; /* added in order, clear dirty flag */
 
+#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
+	// Needed to be filled before dimensions, index relationships
+	BM_references_from_me_references(bm,me);
+#endif
+
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (me->totdim) {
 		dtable = MEM_mallocN(sizeof(void *) * me->totdim, "mesh to bmesh dtable");
@@ -435,16 +440,12 @@ void BM_mesh_bm_from_me(
 				BM_dim_select_set(bm, d, true);
 			}
 
-			dimension_data_update(d);
+			dimension_data_update(bm, d, NULL);
 		}
 
 		bm->elem_index_dirty &= ~BM_DIM; /* added in order, clear dirty flag */
 	}
 #endif
-#ifdef WITH_MECHANICAL_MESH_REFERENCE_OBJECTS
-	BM_references_from_me_references(bm,me);
-#endif
-
 
 	if (!me->totedge) {
 		MEM_freeN(vtable);

@@ -27,7 +27,10 @@ int get_necessary_dimension_verts(int dim_type);
 
 void get_dimension_mid(float mid[3],BMDim *edm);
 void get_dimension_plane(float v[3], float p[3], BMDim *edm);
-void dimension_data_update(BMDim *edm);
+void get_dimension_transform_orientation_plane (float normal[3], BMDim *edm, Scene *scene);
+void get_dimension_transform_orientation_matrix (float mat[][3], BMDim *edm, Scene *scene);
+
+void dimension_data_update(BMesh *bm, BMDim *edm, Scene *scene);
 
 void set_dimension_center(BMDim *edm);
 
