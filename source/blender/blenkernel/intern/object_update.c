@@ -69,6 +69,7 @@
 
 #include "mechanical_geometry.h"
 #include "mesh_dimensions.h"
+#include "mesh_references.h"
 
 #ifdef WITH_LEGACY_DEPSGRAPH
 #  define DEBUG_PRINT if (!DEG_depsgraph_use_legacy() && G.debug & G_DEBUG_DEPSGRAPH) printf
@@ -274,7 +275,7 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 								BLI_assert(0);
 						}
 					}
-					dimension_data_update(edm);
+					dimension_data_update(em->bm, edm, scene);
 				}
 			}
 			if (temp_em) {

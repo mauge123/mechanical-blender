@@ -184,8 +184,8 @@ void bmo_create_dimension_exec(BMesh *bm, BMOperator *op)
 		MEM_freeN (v_arr);
 	}
 
-	mdm->value = get_dimension_value (d);
-	dimension_data_update(d);
+	mdm->value = get_dimension_value(d);
+	dimension_data_update(bm, d, NULL);
 
 	BM_elem_flag_enable(d, BM_ELEM_SELECT);
 

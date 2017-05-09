@@ -75,7 +75,13 @@ typedef struct MVert {
 // SELECT			(1 << 0)
 
 // MDim::dimension_flag
-#define DIMENSION_FLAG_ANGLE_COMPLEMENTARY (1 << 0)
+#define DIMENSION_FLAG_ANGLE_COMPLEMENTARY  (1 << 0)
+#define DIMENSION_FLAG_TS_ALIGNED			(1 << 1)
+
+// MDim::ts_plane
+#define DIM_TS_PLANE_X 0
+#define DIM_TS_PLANE_Y 1
+#define DIM_TS_PLANE_Z 2
 
 typedef struct MDim {
 	ID id;
@@ -86,17 +92,22 @@ typedef struct MDim {
 	unsigned int *v; /* Array of vertexs */
 
 	int totverts;
-	int dim_type;
+
+	short dim_type;
+	short ts_plane;
+
 	int constraints; //Overrided automatic constraints
 	int axis; // Mesh Reference: Axis index
+	int ts; // Transform_orientation index
+
 
 	// Dimension position, used for select
 	float dpos[3];
 	float dpos_fact;
 
 	// Linear Dimension
-	int dir;  // Direction, to which side the value should be modified
-	int dir_flag; //Wich direction to use
+	short dir;  // Direction, to which side the value should be modified
+	short dir_flag; //Wich direction to use
 	float end[3], start[3];  //Points of base line
 
 	// Diameter Dimension
