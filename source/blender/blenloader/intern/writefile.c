@@ -3978,6 +3978,7 @@ static bool write_file_handle(
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 				case ID_DM:
 					write_dim(wd, (MDim *)id);
+					break;
 #endif
 				default:
 					/* Should never be reached. */
