@@ -673,6 +673,11 @@ static Base *rna_Scene_object_link(Scene *scene, bContext *C, ReportList *report
 	/* slows down importers too much, run scene.update() */
 	/* DAG_srelations_tag_update(G.main); */
 
+// WITH_MECHANICAL_GEOMETRY
+	if (ob->type == OB_MESH) {
+		ob->geom_enabled = (U.flag & USER_MESH_GEOMETRY_ENABLE) != 0;
+	}
+
 	WM_main_add_notifier(NC_SCENE | ND_OB_ACTIVE, scene);
 
 	return base;
