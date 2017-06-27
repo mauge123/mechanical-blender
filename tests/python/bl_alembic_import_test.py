@@ -31,7 +31,7 @@ import bpy
 args = None
 
 
-class SimpleImportTest(unittest.TestCase):
+class AbstractAlembicTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.testdir = args.testdir
@@ -43,6 +43,18 @@ class SimpleImportTest(unittest.TestCase):
         # Make sure we always start with a known-empty file.
         bpy.ops.wm.open_mainfile(filepath=str(self.testdir / "empty.blend"))
 
+    def assertAlmostEqualFloatArray(self, actual, expect, places=6, delta=None):
+        """Asserts that the arrays of floats are almost equal."""
+
+        self.assertEqual(len(actual), len(expect),
+                         'Actual array has %d items, expected %d' % (len(actual), len(expect)))
+
+        for idx, (act, exp) in enumerate(zip(actual, expect)):
+            self.assertAlmostEqual(act, exp, places=places, delta=delta,
+                                   msg='%f != %f at index %d' % (act, exp, idx))
+
+
+class SimpleImportTest(AbstractAlembicTest):
     def test_import_cube_hierarchy(self):
         res = bpy.ops.wm.alembic_import(
             filepath=str(self.testdir / "cubes-hierarchy.abc"),
@@ -117,6 +129,9 @@ class SimpleImportTest(unittest.TestCase):
         bpy.data.cache_files[fname].filepath = relpath.replace('1.abc', '2.abc')
         bpy.context.scene.update()
 
+        if args.with_legacy_depsgraph:
+            bpy.context.scene.frame_set(10)
+
         x, y, z = cube.matrix_world.to_euler('XYZ')
         self.assertAlmostEqual(x, math.pi / 2, places=5)
         self.assertAlmostEqual(y, 0)
@@ -158,17 +173,51 @@ class SimpleImportTest(unittest.TestCase):
         self.assertEqual('CubeShape', bpy.data.objects['Cube'].data.name)
 
 
+class VertexColourImportTest(AbstractAlembicTest):
+    def test_import_from_houdini(self):
+        # Houdini saved "face-varying", and as RGB.
+        res = bpy.ops.wm.alembic_import(
+            filepath=str(self.testdir / "vertex-colours-houdini.abc"),
+            as_background_job=False)
+        self.assertEqual({'FINISHED'}, res)
+
+        ob = bpy.context.active_object
+        layer = ob.data.vertex_colors['Cf']  # MeshLoopColorLayer
+
+        # Test some known-good values.
+        self.assertAlmostEqualFloatArray(layer.data[0].color, (0, 0, 0))
+        self.assertAlmostEqualFloatArray(layer.data[98].color, (0.9019607, 0.4745098, 0.2666666))
+        self.assertAlmostEqualFloatArray(layer.data[99].color, (0.8941176, 0.4705882, 0.2627451))
+
+    def test_import_from_blender(self):
+        # Blender saved per-vertex, and as RGBA.
+        res = bpy.ops.wm.alembic_import(
+            filepath=str(self.testdir / "vertex-colours-blender.abc"),
+            as_background_job=False)
+        self.assertEqual({'FINISHED'}, res)
+
+        ob = bpy.context.active_object
+        layer = ob.data.vertex_colors['Cf']  # MeshLoopColorLayer
+
+        # Test some known-good values.
+        self.assertAlmostEqualFloatArray(layer.data[0].color, (1.0, 0.0156862, 0.3607843))
+        self.assertAlmostEqualFloatArray(layer.data[98].color, (0.0941176, 0.1215686, 0.9137254))
+        self.assertAlmostEqualFloatArray(layer.data[99].color, (0.1294117, 0.3529411, 0.7529411))
+
+
 def main():
     global args
     import argparse
 
     if '--' in sys.argv:
-        argv = [sys.argv[0]] + sys.argv[sys.argv.index('--')+1:]
+        argv = [sys.argv[0]] + sys.argv[sys.argv.index('--') + 1:]
     else:
         argv = sys.argv
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--testdir', required=True, type=pathlib.Path)
+    parser.add_argument('--with-legacy-depsgraph', default=False,
+                        type=lambda v: v in {'ON', 'YES', 'TRUE'})
     args, remaining = parser.parse_known_args(argv)
 
     unittest.main(argv=remaining)

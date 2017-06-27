@@ -70,6 +70,10 @@ public:
 		delete split_kernel;
 	}
 
+	virtual bool show_samples() const {
+		return true;
+	}
+
 	virtual bool load_kernels(const DeviceRequestedFeatures& requested_features,
 	                          vector<OpenCLDeviceBase::OpenCLProgram*> &programs)
 	{
@@ -100,7 +104,7 @@ public:
 		else if(task->type == DeviceTask::SHADER) {
 			shader(*task);
 		}
-		else if(task->type == DeviceTask::PATH_TRACE) {
+		else if(task->type == DeviceTask::RENDER) {
 			RenderTile tile;
 
 			/* Copy dummy KernelGlobals related to OpenCL from kernel_globals.h to
@@ -123,27 +127,40 @@ public:
 
 			/* Keep rendering tiles until done. */
 			while(task->acquire_tile(this, tile)) {
-				split_kernel->path_trace(task,
-				                         tile,
-				                         kgbuffer,
-				                         *const_mem_map["__data"]);
+				if(tile.task == RenderTile::PATH_TRACE) {
+					assert(tile.task == RenderTile::PATH_TRACE);
+					split_kernel->path_trace(task,
+					                         tile,
+					                         kgbuffer,
+					                         *const_mem_map["__data"]);
 
-				/* Complete kernel execution before release tile. */
-				/* This helps in multi-device render;
-				 * The device that reaches the critical-section function
-				 * release_tile waits (stalling other devices from entering
-				 * release_tile) for all kernels to complete. If device1 (a
-				 * slow-render device) reaches release_tile first then it would
-				 * stall device2 (a fast-render device) from proceeding to render
-				 * next tile.
-				 */
-				clFinish(cqCommandQueue);
+					/* Complete kernel execution before release tile. */
+					/* This helps in multi-device render;
+					 * The device that reaches the critical-section function
+					 * release_tile waits (stalling other devices from entering
+					 * release_tile) for all kernels to complete. If device1 (a
+					 * slow-render device) reaches release_tile first then it would
+					 * stall device2 (a fast-render device) from proceeding to render
+					 * next tile.
+					 */
+					clFinish(cqCommandQueue);
+				}
+				else if(tile.task == RenderTile::DENOISE) {
+					tile.sample = tile.start_sample + tile.num_samples;
+					denoise(tile, *task);
+					task->update_progress(&tile, tile.w*tile.h);
+				}
 
 				task->release_tile(tile);
 			}
 
 			mem_free(kgbuffer);
 		}
+	}
+
+	bool is_split_kernel()
+	{
+		return true;
 	}
 
 protected:
@@ -159,17 +176,62 @@ protected:
 	friend class OpenCLSplitKernelFunction;
 };
 
+struct CachedSplitMemory {
+	int id;
+	device_memory *split_data;
+	device_memory *ray_state;
+	device_ptr *rng_state;
+	device_memory *queue_index;
+	device_memory *use_queues_flag;
+	device_memory *work_pools;
+	device_ptr *buffer;
+};
+
 class OpenCLSplitKernelFunction : public SplitKernelFunction {
 public:
 	OpenCLDeviceSplitKernel* device;
 	OpenCLDeviceBase::OpenCLProgram program;
+	CachedSplitMemory& cached_memory;
+	int cached_id;
 
-	OpenCLSplitKernelFunction(OpenCLDeviceSplitKernel* device) : device(device) {}
-	~OpenCLSplitKernelFunction() { program.release(); }
+	OpenCLSplitKernelFunction(OpenCLDeviceSplitKernel* device, CachedSplitMemory& cached_memory) :
+			device(device), cached_memory(cached_memory), cached_id(cached_memory.id-1)
+	{
+	}
+
+	~OpenCLSplitKernelFunction()
+	{
+		program.release();
+	}
 
 	virtual bool enqueue(const KernelDimensions& dim, device_memory& kg, device_memory& data)
 	{
-		device->kernel_set_args(program(), 0, kg, data);
+		if(cached_id != cached_memory.id) {
+			cl_uint start_arg_index =
+				device->kernel_set_args(program(),
+					            0,
+					            kg,
+					            data,
+					            *cached_memory.split_data,
+					            *cached_memory.ray_state,
+					            *cached_memory.rng_state);
+
+/* TODO(sergey): Avoid map lookup here. */
+#define KERNEL_TEX(type, ttype, name) \
+				device->set_kernel_arg_mem(program(), &start_arg_index, #name);
+#include "kernel/kernel_textures.h"
+#undef KERNEL_TEX
+
+			start_arg_index +=
+				device->kernel_set_args(program(),
+					            start_arg_index,
+					            *cached_memory.queue_index,
+					            *cached_memory.use_queues_flag,
+					            *cached_memory.work_pools,
+					            *cached_memory.buffer);
+
+			cached_id = cached_memory.id;
+		}
 
 		device->ciErr = clEnqueueNDRangeKernel(device->cqCommandQueue,
 		                                       program(),
@@ -196,6 +258,7 @@ public:
 
 class OpenCLSplitKernel : public DeviceSplitKernel {
 	OpenCLDeviceSplitKernel *device;
+	CachedSplitMemory cached_memory;
 public:
 	explicit OpenCLSplitKernel(OpenCLDeviceSplitKernel *device) : DeviceSplitKernel(device), device(device) {
 	}
@@ -203,7 +266,7 @@ public:
 	virtual SplitKernelFunction* get_split_kernel_function(string kernel_name,
 	                                                       const DeviceRequestedFeatures& requested_features)
 	{
-		OpenCLSplitKernelFunction* kernel = new OpenCLSplitKernelFunction(device);
+		OpenCLSplitKernelFunction* kernel = new OpenCLSplitKernelFunction(device, cached_memory);
 
 		bool single_program = OpenCLInfo::use_single_program();
 		kernel->program =
@@ -331,6 +394,15 @@ public:
 			device->opencl_error(message);
 			return false;
 		}
+
+		cached_memory.split_data = &split_data;
+		cached_memory.ray_state = &ray_state;
+		cached_memory.rng_state = &rtile.rng_state;
+		cached_memory.queue_index = &queue_index;
+		cached_memory.use_queues_flag = &use_queues_flag;
+		cached_memory.work_pools = &work_pool_wgs;
+		cached_memory.buffer = &rtile.buffer;
+		cached_memory.id++;
 
 		return true;
 	}

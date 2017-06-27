@@ -766,7 +766,9 @@ static void screen_test_scale(bScreen *sc, int winsize_x, int winsize_y)
 				/* lower edge */
 				const int yval = sa->v2->vec.y - headery_init;
 				se = screen_findedge(sc, sa->v4, sa->v1);
-				select_connected_scredge(sc, se);
+				if (se != NULL) {
+					select_connected_scredge(sc, se);
+				}
 				for (sv = sc->vertbase.first; sv; sv = sv->next) {
 					if (sv != sa->v2 && sv != sa->v3) {
 						if (sv->flag) {
@@ -779,7 +781,9 @@ static void screen_test_scale(bScreen *sc, int winsize_x, int winsize_y)
 				/* upper edge */
 				const int yval = sa->v1->vec.y + headery_init;
 				se = screen_findedge(sc, sa->v2, sa->v3);
-				select_connected_scredge(sc, se);
+				if (se != NULL) {
+					select_connected_scredge(sc, se);
+				}
 				for (sv = sc->vertbase.first; sv; sv = sv->next) {
 					if (sv != sa->v1 && sv != sa->v4) {
 						if (sv->flag) {
@@ -1758,7 +1762,7 @@ bool ED_screen_delete_scene(bContext *C, Scene *scene)
 
 	BKE_libblock_remap(bmain, scene, newscene, ID_REMAP_SKIP_INDIRECT_USAGE | ID_REMAP_SKIP_NEVER_NULL_USAGE);
 
-	BKE_libblock_free(bmain, scene);
+	BKE_libblock_free_us(bmain, scene);
 
 	return true;
 }
@@ -1922,7 +1926,6 @@ ScrArea *ED_screen_state_toggle(bContext *C, wmWindow *win, ScrArea *sa, const s
 
 		ED_screen_set(C, sc);
 
-		BKE_screen_free(oldscreen);
 		BKE_libblock_free(CTX_data_main(C), oldscreen);
 
 		/* After we've restored back to SCREENNORMAL, we have to wait with
@@ -2166,10 +2169,11 @@ void ED_update_for_newframe(Main *bmain, Scene *scene, int UNUSED(mute))
 	/* update animated texture nodes */
 	{
 		Tex *tex;
-		for (tex = bmain->tex.first; tex; tex = tex->id.next)
+		for (tex = bmain->tex.first; tex; tex = tex->id.next) {
 			if (tex->use_nodes && tex->nodetree) {
 				ntreeTexTagAnimated(tex->nodetree);
 			}
+		}
 	}
 	
 }

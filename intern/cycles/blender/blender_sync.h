@@ -68,7 +68,8 @@ public:
 	               const char *layer = 0);
 	void sync_render_layers(BL::SpaceView3D& b_v3d, const char *layer);
 	array<Pass> sync_render_passes(BL::RenderLayer& b_rlay,
-	                               BL::SceneRenderLayer& b_srlay);
+	                               BL::SceneRenderLayer& b_srlay,
+	                               const SessionParams &session_params);
 	void sync_integrator();
 	void sync_camera(BL::RenderSettings& b_render,
 	                 BL::Object& b_override,
@@ -96,6 +97,7 @@ public:
 	                                      int width, int height);
 
 	static PassType get_pass_type(BL::RenderPass& b_pass);
+	static int get_denoising_pass(BL::RenderPass& b_pass);
 
 private:
 	/* sync */

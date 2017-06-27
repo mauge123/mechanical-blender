@@ -75,9 +75,28 @@ ccl_device_noinline bool kernel_split_branched_path_volume_indirect_light_iter(K
 			branched_state->next_sample = j+1;
 			branched_state->num_samples = num_samples;
 
+			/* Attempting to share too many samples is slow for volumes as it causes us to
+			 * loop here more and have many calls to kernel_volume_integrate which evaluates
+			 * shaders. The many expensive shader evaluations cause the work load to become
+			 * unbalanced and many threads to become idle in this kernel. Limiting the
+			 * number of shared samples here helps quite a lot.
+			 */
+			if(branched_state->shared_sample_count < 2) {
+				if(kernel_split_branched_indirect_start_shared(kg, ray_index)) {
+					continue;
+				}
+			}
+
 			return true;
 		}
 #  endif
+	}
+
+	branched_state->next_sample = num_samples;
+
+	branched_state->waiting_on_shared_samples = (branched_state->shared_sample_count > 0);
+	if(branched_state->waiting_on_shared_samples) {
+		return true;
 	}
 
 	kernel_split_branched_path_indirect_loop_end(kg, ray_index);
@@ -118,15 +137,14 @@ ccl_device void kernel_do_volume(KernelGlobals *kg)
 	PathRadiance *L = &kernel_split_state.path_radiance[ray_index];
 	ccl_global PathState *state = &kernel_split_state.path_state[ray_index];
 
-	ccl_global float3 *throughput = &kernel_split_state.throughput[ray_index];
-	ccl_global Ray *ray = &kernel_split_state.ray[ray_index];
-	RNG rng = kernel_split_state.rng[ray_index];
-	ccl_global Intersection *isect = &kernel_split_state.isect[ray_index];
-	ShaderData *sd = &kernel_split_state.sd[ray_index];
-	ShaderData *emission_sd = &kernel_split_state.sd_DL_shadow[ray_index];
-
 	if(IS_STATE(ray_state, ray_index, RAY_ACTIVE) ||
 	   IS_STATE(ray_state, ray_index, RAY_HIT_BACKGROUND)) {
+		ccl_global float3 *throughput = &kernel_split_state.throughput[ray_index];
+		ccl_global Ray *ray = &kernel_split_state.ray[ray_index];
+		RNG rng = kernel_split_state.rng[ray_index];
+		ccl_global Intersection *isect = &kernel_split_state.isect[ray_index];
+		ShaderData *sd = &kernel_split_state.sd[ray_index];
+		ShaderData *emission_sd = &kernel_split_state.sd_DL_shadow[ray_index];
 
 		bool hit = ! IS_STATE(ray_state, ray_index, RAY_HIT_BACKGROUND);
 

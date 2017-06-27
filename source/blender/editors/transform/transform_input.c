@@ -136,12 +136,11 @@ static void InputTrackBall(TransInfo *UNUSED(t), MouseInput *mi, const double mv
 	output[1] *= mi->factor;
 }
 
-static void InputHorizontalRatio(TransInfo *t, MouseInput *UNUSED(mi), const double mval[2], float output[3])
+static void InputHorizontalRatio(TransInfo *t, MouseInput *mi, const double mval[2], float output[3])
 {
 	const int winx = t->ar ? t->ar->winx : 1;
-	const double pad = winx / 10;
 
-	output[0] = (mval[0] - pad) / (winx - 2 * pad);
+	output[0] = ((mval[0] - mi->imval[0]) / winx) * 2.0f;
 }
 
 static void InputHorizontalAbsolute(TransInfo *t, MouseInput *mi, const double mval[2], float output[3])
@@ -154,12 +153,11 @@ static void InputHorizontalAbsolute(TransInfo *t, MouseInput *mi, const double m
 	output[0] = dot_v3v3(t->viewinv[0], vec) * 2.0f;
 }
 
-static void InputVerticalRatio(TransInfo *t, MouseInput *UNUSED(mi), const double mval[2], float output[3])
+static void InputVerticalRatio(TransInfo *t, MouseInput *mi, const double mval[2], float output[3])
 {
 	const int winy = t->ar ? t->ar->winy : 1;
-	const double pad = winy / 10;
 
-	output[0] = (mval[1] - pad) / (winy - 2 * pad);
+	output[0] = ((mval[1] - mi->imval[1]) / winy) * 2.0f;
 }
 
 static void InputVerticalAbsolute(TransInfo *t, MouseInput *mi, const double mval[2], float output[3])
@@ -237,7 +235,7 @@ static void InputAngle(TransInfo *UNUSED(t), MouseInput *mi, const double mval[2
 	/* use doubles here, to make sure a "1.0" (no rotation) doesn't become 9.999999e-01, which gives 0.02 for acos */
 	double deler = (((dx1 * dx1 + dy1 * dy1) +
 	                 (dx2 * dx2 + dy2 * dy2) -
-	                 (dx3 * dx3 + dy3 * dy3)) / (2.0 * ((A * B) ? (A * B) : 1.0)));
+	                 (dx3 * dx3 + dy3 * dy3)) / (2.0 * (((A * B) != 0.0) ? (A * B) : 1.0)));
 	/* ((A * B) ? (A * B) : 1.0) this takes care of potential divide by zero errors */
 
 	float dphi;
@@ -370,7 +368,6 @@ void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode)
 			t->helpline = HLP_TRACKBALL;
 			break;
 		case INPUT_HORIZONTAL_RATIO:
-			mi->factor = (float)(mi->center[0] - mi->imval[0]);
 			mi->apply = InputHorizontalRatio;
 			t->helpline = HLP_HARROW;
 			break;

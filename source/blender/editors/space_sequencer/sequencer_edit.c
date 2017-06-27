@@ -562,7 +562,7 @@ int seq_effect_find_selected(Scene *scene, Sequence *activeseq, int type, Sequen
 			}
 			if (seq1 == NULL) seq1 = seq2;
 			if (seq3 == NULL) seq3 = seq2;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case 2:
 			if (seq1 == NULL || seq2 == NULL) {
 				*error_str = N_("2 selected sequence strips are needed");
@@ -3351,6 +3351,9 @@ static int sequencer_swap_data_exec(bContext *C, wmOperator *op)
 
 	if (seq_act->sound) BKE_sound_add_scene_sound_defaults(scene, seq_act);
 	if (seq_other->sound) BKE_sound_add_scene_sound_defaults(scene, seq_other);
+
+	BKE_sequence_invalidate_cache(scene, seq_act);
+	BKE_sequence_invalidate_cache(scene, seq_other);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
 

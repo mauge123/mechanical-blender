@@ -68,6 +68,8 @@ std::ostream& operator <<(std::ostream &os,
 	   << string_from_bool(requested_features.use_transparent) << std::endl;
 	os << "Use Principled BSDF: "
 	   << string_from_bool(requested_features.use_principled) << std::endl;
+	os << "Use Denoising: "
+	   << string_from_bool(requested_features.use_denoising) << std::endl;
 	return os;
 }
 
@@ -400,6 +402,18 @@ void Device::free_memory()
 	need_devices_update = true;
 	types.free_memory();
 	devices.free_memory();
+}
+
+
+device_sub_ptr::device_sub_ptr(Device *device, device_memory& mem, int offset, int size, MemoryType type)
+ : device(device)
+{
+	ptr = device->mem_alloc_sub_ptr(mem, offset, size, type);
+}
+
+device_sub_ptr::~device_sub_ptr()
+{
+	device->mem_free_sub_ptr(ptr);
 }
 
 CCL_NAMESPACE_END

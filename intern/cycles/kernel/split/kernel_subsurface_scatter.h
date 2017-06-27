@@ -169,6 +169,7 @@ ccl_device_noinline bool kernel_split_branched_path_subsurface_indirect_light_it
 				                                                          ray_index,
 				                                                          num_samples_inv,
 				                                                          bssrdf_sd,
+				                                                          false,
 				                                                          false))
 				{
 					branched_state->ss_next_closure = i;
@@ -185,6 +186,13 @@ ccl_device_noinline bool kernel_split_branched_path_subsurface_indirect_light_it
 		}
 
 		branched_state->ss_next_sample = 0;
+	}
+
+	branched_state->ss_next_closure = sd->num_closure;
+
+	branched_state->waiting_on_shared_samples = (branched_state->shared_sample_count > 0);
+	if(branched_state->waiting_on_shared_samples) {
+		return true;
 	}
 
 	kernel_split_branched_path_indirect_loop_end(kg, ray_index);
@@ -217,30 +225,32 @@ ccl_device void kernel_subsurface_scatter(KernelGlobals *kg)
 
 #ifdef __SUBSURFACE__
 	ccl_global char *ray_state = kernel_split_state.ray_state;
-	ccl_global PathState *state = &kernel_split_state.path_state[ray_index];
-	PathRadiance *L = &kernel_split_state.path_radiance[ray_index];
-	RNG rng = kernel_split_state.rng[ray_index];
-	ccl_global Ray *ray = &kernel_split_state.ray[ray_index];
-	ccl_global float3 *throughput = &kernel_split_state.throughput[ray_index];
-	ccl_global SubsurfaceIndirectRays *ss_indirect = &kernel_split_state.ss_rays[ray_index];
-	ShaderData *sd = &kernel_split_state.sd[ray_index];
-	ShaderData *emission_sd = &kernel_split_state.sd_DL_shadow[ray_index];
 
 	if(IS_STATE(ray_state, ray_index, RAY_ACTIVE)) {
+		ccl_global PathState *state = &kernel_split_state.path_state[ray_index];
+		PathRadiance *L = &kernel_split_state.path_radiance[ray_index];
+		RNG rng = kernel_split_state.rng[ray_index];
+		ccl_global Ray *ray = &kernel_split_state.ray[ray_index];
+		ccl_global float3 *throughput = &kernel_split_state.throughput[ray_index];
+		ccl_global SubsurfaceIndirectRays *ss_indirect = &kernel_split_state.ss_rays[ray_index];
+		ShaderData *sd = &kernel_split_state.sd[ray_index];
+		ShaderData *emission_sd = &kernel_split_state.sd_DL_shadow[ray_index];
+
 		if(sd->flag & SD_BSSRDF) {
 
 #ifdef __BRANCHED_PATH__
 			if(!kernel_data.integrator.branched) {
 #endif
 				if(kernel_path_subsurface_scatter(kg,
-					                              sd,
-					                              emission_sd,
-					                              L,
-					                              state,
-					                              &rng,
-					                              ray,
-					                              throughput,
-					                              ss_indirect)) {
+				                                  sd,
+				                                  emission_sd,
+				                                  L,
+				                                  state,
+				                                  &rng,
+				                                  ray,
+				                                  throughput,
+				                                  ss_indirect))
+				{
 					kernel_split_path_end(kg, ray_index);
 				}
 #ifdef __BRANCHED_PATH__
@@ -255,21 +265,20 @@ ccl_device void kernel_subsurface_scatter(KernelGlobals *kg)
 				/* do bssrdf scatter step if we picked a bssrdf closure */
 				if(sc) {
 					uint lcg_state = lcg_state_init(&rng, state->rng_offset, state->sample, 0x68bc21eb);
-
 					float bssrdf_u, bssrdf_v;
 					path_state_rng_2D(kg,
-						              &rng,
-						              state,
-						              PRNG_BSDF_U,
-						              &bssrdf_u, &bssrdf_v);
+					                  &rng,
+					                  state,
+					                  PRNG_BSDF_U,
+					                  &bssrdf_u, &bssrdf_v);
 					subsurface_scatter_step(kg,
-						                    sd,
-						                    state,
-						                    state->flag,
-						                    sc,
-						                    &lcg_state,
-						                    bssrdf_u, bssrdf_v,
-						                    false);
+					                        sd,
+					                        state,
+					                        state->flag,
+					                        sc,
+					                        &lcg_state,
+					                        bssrdf_u, bssrdf_v,
+					                        false);
 				}
 			}
 			else {

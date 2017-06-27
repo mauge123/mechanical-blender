@@ -90,7 +90,8 @@ EnumPropertyItem rna_enum_exr_codec_items[] = {
 	{R_IMF_EXR_CODEC_B44, "B44", 0, "B44 (lossy)", ""},
 	{R_IMF_EXR_CODEC_B44A, "B44A", 0, "B44A (lossy)", ""},
 	{R_IMF_EXR_CODEC_DWAA, "DWAA", 0, "DWAA (lossy)", ""},
-	{R_IMF_EXR_CODEC_DWAB, "DWAB", 0, "DWAB (lossy)", ""},
+	/* NOTE: Commented out for until new OpenEXR is released, see T50673. */
+	/* {R_IMF_EXR_CODEC_DWAB, "DWAB", 0, "DWAB (lossy)", ""}, */
 	{0, NULL, 0, NULL, NULL}
 };
 #endif
@@ -1756,7 +1757,7 @@ static void rna_SceneRenderLayer_pass_update(Main *bmain, Scene *activescene, Po
 
 static void rna_SceneRenderLayer_update_render_passes(ID *id)
 {
-	Scene *scene = (Scene*) id;
+	Scene *scene = (Scene *)id;
 	if (scene->nodetree)
 		ntreeCompositUpdateRLayers(scene->nodetree);
 }
@@ -1839,7 +1840,7 @@ static void object_simplify_update(Object *ob)
 	}
 }
 
-static void rna_Scene_use_simplify_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+static void rna_Scene_use_simplify_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Scene *sce = ptr->id.data;
 	Scene *sce_iter;
@@ -1850,6 +1851,7 @@ static void rna_Scene_use_simplify_update(Main *bmain, Scene *UNUSED(scene), Poi
 		object_simplify_update(base->object);
 	
 	WM_main_add_notifier(NC_GEOM | ND_DATA, NULL);
+	DAG_id_tag_update(&scene->id, 0);
 }
 
 static void rna_Scene_simplify_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
@@ -7061,7 +7063,7 @@ static void rna_def_display_safe_areas(BlenderRNA *brna)
 	RNA_def_property_array(prop, 2);
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_float_array_default(prop, default_title);
-	RNA_def_property_ui_text(prop, "Title Safe margins", "Safe area for text and graphics");
+	RNA_def_property_ui_text(prop, "Title Safe Margins", "Safe area for text and graphics");
 	RNA_def_property_update(prop, NC_SCENE | ND_DRAW_RENDER_VIEWPORT, NULL);
 
 	prop = RNA_def_property(srna, "action", PROP_FLOAT, PROP_XYZ);
@@ -7071,7 +7073,6 @@ static void rna_def_display_safe_areas(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Action Safe Margins", "Safe area for general elements");
 	RNA_def_property_update(prop, NC_SCENE | ND_DRAW_RENDER_VIEWPORT, NULL);
-
 
 	prop = RNA_def_property(srna, "title_center", PROP_FLOAT, PROP_XYZ);
 	RNA_def_property_float_sdna(prop, NULL, "title_center");

@@ -403,7 +403,7 @@ void math_modulo(float val1, float val2, out float outval)
 
 	/* change sign to match C convention, mod in GLSL will take absolute for negative numbers,
 	 * see https://www.opengl.org/sdk/docs/man/html/mod.xhtml */
-	outval = (val1 > 0.0) ? outval : -outval;
+	outval = (val1 > 0.0) ? outval : outval - val2;
 }
 
 void math_abs(float val1, out float outval)
@@ -2621,7 +2621,7 @@ void node_bsdf_toon(vec4 color, float size, float tsmooth, vec3 N, out vec4 resu
 
 void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_radius, vec4 subsurface_color, float metallic, float specular,
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
-	float clearcoat_gloss, float ior, float transparency, float refraction_roughness, vec3 N, vec3 CN, vec3 T, vec3 I, out vec4 result)
+	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I, out vec4 result)
 {
 	/* ambient light */
 	// TODO: set ambient light to an appropriate value
@@ -2630,7 +2630,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	float eta = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;
 
 	/* set the viewing vector */
-	vec3 V = -normalize(I);
+	vec3 V = (gl_ProjectionMatrix[3][3] == 0.0) ? -normalize(I) : vec3(0.0, 0.0, 1.0);
 
 	/* get the tangent */
 	vec3 Tangent = T;
@@ -2725,7 +2725,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 			//float FH = schlick_fresnel(LdotH);
 
 			// clearcoat (ior = 1.5 -> F0 = 0.04)
-			float Dr = GTR1(CNdotH, mix(0.1, 0.001, clearcoat_gloss));
+			float Dr = GTR1(CNdotH, sqr(clearcoat_roughness));
 			float Fr = fresnel_dielectric_cos(LdotH, 1.5); //mix(0.04, 1.0, FH);
 			float Gr = smithG_GGX(CNdotL, 0.25) * smithG_GGX(CNdotV, 0.25);
 
@@ -3032,10 +3032,10 @@ vec2 calc_brick_texture(vec3 p, float mortar_size, float mortar_smooth, float bi
 	float tint = clamp((integer_noise((rownum << 16) + (bricknum & 0xFFFF)) + bias), 0.0, 1.0);
 
 	float min_dist = min(min(x, y), min(brick_width - x, row_height - y));
-	if(min_dist >= mortar_size) {
+	if (min_dist >= mortar_size) {
 		return vec2(tint, 0.0);
 	}
-	else if(mortar_smooth == 0.0) {
+	else if (mortar_smooth == 0.0) {
 		return vec2(tint, 1.0);
 	}
 	else {
