@@ -43,6 +43,7 @@
 #include "DNA_mask_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_scene_types.h"  /* PET modes */
+#include "DNA_workspace_types.h"
 
 #include "BLI_alloca.h"
 #include "BLI_utildefines.h"
@@ -63,8 +64,11 @@
 #include "BKE_unit.h"
 #include "BKE_mask.h"
 #include "BKE_report.h"
+
 #include "BKE_DerivedMesh.h"
 #include "BKE_cdderivedmesh.h"
+
+#include "BKE_workspace.h"
 
 #include "BIF_glutil.h"
 
@@ -1941,20 +1945,20 @@ typedef enum {
 } ArrowDirection;
 
 #define POS_INDEX 0
-/* NOTE: this --^ is a bit hackish, but simplifies VertexFormat usage among functions
+/* NOTE: this --^ is a bit hackish, but simplifies Gwn_VertFormat usage among functions
  * private to this file  - merwin
  */
 
 static void drawArrow(ArrowDirection d, short offset, short length, short size)
 {
-	immBegin(PRIM_LINES, 6);
+	immBegin(GWN_PRIM_LINES, 6);
 
 	switch (d) {
 		case LEFT:
 			offset = -offset;
 			length = -length;
 			size = -size;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case RIGHT:
 			immVertex2f(POS_INDEX, offset, 0);
 			immVertex2f(POS_INDEX, offset + length, 0);
@@ -1968,7 +1972,7 @@ static void drawArrow(ArrowDirection d, short offset, short length, short size)
 			offset = -offset;
 			length = -length;
 			size = -size;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case UP:
 			immVertex2f(POS_INDEX, 0, offset);
 			immVertex2f(POS_INDEX, 0, offset + length);
@@ -1984,12 +1988,12 @@ static void drawArrow(ArrowDirection d, short offset, short length, short size)
 
 static void drawArrowHead(ArrowDirection d, short size)
 {
-	immBegin(PRIM_LINES, 4);
+	immBegin(GWN_PRIM_LINES, 4);
 
 	switch (d) {
 		case LEFT:
 			size = -size;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case RIGHT:
 			immVertex2f(POS_INDEX, 0, 0);
 			immVertex2f(POS_INDEX, -size, -size);
@@ -1999,7 +2003,7 @@ static void drawArrowHead(ArrowDirection d, short size)
 
 		case DOWN:
 			size = -size;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case UP:
 			immVertex2f(POS_INDEX, 0, 0);
 			immVertex2f(POS_INDEX, -size, -size);
@@ -2017,7 +2021,7 @@ static void drawArc(float size, float angle_start, float angle_end, int segments
 	float angle;
 	int a;
 
-	immBegin(PRIM_LINE_STRIP, segments + 1);
+	immBegin(GWN_PRIM_LINE_STRIP, segments + 1);
 
 	for (angle = angle_start, a = 0; a < segments; angle += delta, a++) {
 		immVertex2f(POS_INDEX, cosf(angle) * size, sinf(angle) * size);
@@ -2060,7 +2064,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 
 		/* Dashed lines first. */
 		if (ELEM(t->helpline, HLP_SPRING, HLP_ANGLE)) {
-			const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			const uint shdr_pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 			UNUSED_VARS_NDEBUG(shdr_pos); /* silence warning */
 			BLI_assert(shdr_pos == POS_INDEX);
@@ -2078,7 +2082,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 			immUniform1f("dash_width", 6.0f);
 			immUniform1f("dash_factor", 0.5f);
 
-			immBegin(PRIM_LINES, 2);
+			immBegin(GWN_PRIM_LINES, 2);
 			immVertex2fv(POS_INDEX, cent);
 			immVertex2f(POS_INDEX, (float)t->mval[0], (float)t->mval[1]);
 			immEnd();
@@ -2087,7 +2091,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 		}
 
 		/* And now, solid lines. */
-		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 		UNUSED_VARS_NDEBUG(pos); /* silence warning */
 		BLI_assert(pos == POS_INDEX);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -2386,6 +2390,10 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 				View3D *v3d = t->view;
 
 				v3d->twmode = t->current_orientation;
+
+				BLI_assert(((v3d->custom_orientation_index == -1) && (t->custom_orientation == NULL)) ||
+				           (BKE_workspace_transform_orientation_get_index(
+				                    CTX_wm_workspace(C), t->custom_orientation) == v3d->custom_orientation_index));
 			}
 		}
 	}
@@ -2405,15 +2413,20 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 	}
 
 	if ((prop = RNA_struct_find_property(op->ptr, "constraint_axis"))) {
-		/* constraint orientation can be global, event if user selects something else
-		 * so use the orientation in the constraint if set
-		 * */
-		if (t->con.mode & CON_APPLY) {
-			RNA_enum_set(op->ptr, "constraint_orientation", t->con.orientation);
+		/* constraint orientation can be global, even if user selects something else
+		 * so use the orientation in the constraint if set */
+		short orientation = (t->con.mode & CON_APPLY) ? t->con.orientation : t->current_orientation;
+
+		if (orientation == V3D_MANIP_CUSTOM) {
+			WorkSpace *workspace = CTX_wm_workspace(C);
+			const int custom_orientation_index = BKE_workspace_transform_orientation_get_index(
+			                                       workspace, t->custom_orientation);
+
+			/* Maybe we need a t->con.custom_orientation? Seems like it would always match t->custom_orientation. */
+			orientation = V3D_MANIP_CUSTOM + custom_orientation_index;
+			BLI_assert(orientation >= V3D_MANIP_CUSTOM);
 		}
-		else {
-			RNA_enum_set(op->ptr, "constraint_orientation", t->current_orientation);
-		}
+		RNA_enum_set(op->ptr, "constraint_orientation", orientation);
 
 		if (t->con.mode & CON_APPLY) {
 			if (t->con.mode & CON_AXIS0) {
@@ -3589,20 +3602,14 @@ static void Bend(TransInfo *t, const int UNUSED(mval[2]))
 /** \name Transform Shear
  * \{ */
 
-static void postInputShear(TransInfo *UNUSED(t), float values[3])
-{
-	mul_v3_fl(values, 0.05f);
-}
-
 static void initShear(TransInfo *t)
 {
 	t->mode = TFM_SHEAR;
 	t->transform = applyShear;
 	t->handleEvent = handleEventShear;
 
-	setInputPostFct(&t->mouse, postInputShear);
-	initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_ABSOLUTE);
-
+	initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_RATIO);
+	
 	t->idx_max = 0;
 	t->num.idx_max = 0;
 	t->snap[0] = 0.0f;
@@ -3623,24 +3630,24 @@ static eRedrawFlag handleEventShear(TransInfo *t, const wmEvent *event)
 	if (event->type == MIDDLEMOUSE && event->val == KM_PRESS) {
 		/* Use custom.mode.data pointer to signal Shear direction */
 		if (t->custom.mode.data == NULL) {
-			initMouseInputMode(t, &t->mouse, INPUT_VERTICAL_ABSOLUTE);
+			initMouseInputMode(t, &t->mouse, INPUT_VERTICAL_RATIO);
 			t->custom.mode.data = (void *)1;
 		}
 		else {
-			initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_ABSOLUTE);
+			initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_RATIO);
 			t->custom.mode.data = NULL;
 		}
 
 		status = TREDRAW_HARD;
 	}
 	else if (event->type == XKEY && event->val == KM_PRESS) {
-		initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_ABSOLUTE);
+		initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_RATIO);
 		t->custom.mode.data = NULL;
 
 		status = TREDRAW_HARD;
 	}
 	else if (event->type == YKEY && event->val == KM_PRESS) {
-		initMouseInputMode(t, &t->mouse, INPUT_VERTICAL_ABSOLUTE);
+		initMouseInputMode(t, &t->mouse, INPUT_VERTICAL_RATIO);
 		t->custom.mode.data = (void *)1;
 
 		status = TREDRAW_HARD;
@@ -4807,7 +4814,7 @@ static void headerTranslation(TransInfo *t, const float vec[3], char str[UI_MAX_
 		bUnit_AsString(distvec, sizeof(distvec), dist * t->scene->unit.scale_length, 4, t->scene->unit.system,
 					   B_UNIT_LENGTH, do_split, false);
 	}
-	else if (dist > 1e10f || dist < -1e10f)  {
+	else if (dist > 1e10f || dist < -1e10f) {
 		/* prevent string buffer overflow */
 		BLI_snprintf(distvec, NUM_STR_REP_LEN, "%.4e", dist);
 	}
@@ -5477,7 +5484,7 @@ static void initPushPull(TransInfo *t)
 
 static void applyPushPull(TransInfo *t, const int UNUSED(mval[2]))
 {
-	float vec[3], axis[3];
+	float vec[3], axis_global[3];
 	float distance;
 	int i;
 	char str[UI_MAX_DRAW_STR];
@@ -5505,7 +5512,7 @@ static void applyPushPull(TransInfo *t, const int UNUSED(mval[2]))
 	}
 
 	if (t->con.applyRot && t->con.mode & CON_APPLY) {
-		t->con.applyRot(t, NULL, axis, NULL);
+		t->con.applyRot(t, NULL, axis_global, NULL);
 	}
 
 	for (i = 0; i < t->total; i++, td++) {
@@ -5517,7 +5524,11 @@ static void applyPushPull(TransInfo *t, const int UNUSED(mval[2]))
 
 		sub_v3_v3v3(vec, t->center, td->center);
 		if (t->con.applyRot && t->con.mode & CON_APPLY) {
+			float axis[3];
+			copy_v3_v3(axis, axis_global);
 			t->con.applyRot(t, td, axis, NULL);
+
+			mul_m3_v3(td->smtx, axis);
 			if (isLockConstraint(t)) {
 				float dvec[3];
 				project_v3_v3v3(dvec, vec, axis);
@@ -6081,7 +6092,7 @@ static void slide_origdata_interp_data_vert(
 	float v_proj[3][3];
 
 	if (do_loop_weight || do_loop_mdisps) {
-		project_plane_v3_v3v3(v_proj[1], sv->co_orig_3d, v_proj_axis);
+		project_plane_normalized_v3_v3v3(v_proj[1], sv->co_orig_3d, v_proj_axis);
 	}
 
 	// BM_ITER_ELEM (l, &liter, sv->v, BM_LOOPS_OF_VERT) {
@@ -6115,19 +6126,19 @@ static void slide_origdata_interp_data_vert(
 			/* In the unlikely case that we're next to a zero length edge - walk around the to the next.
 			 * Since we only need to check if the vertex is in this corner,
 			 * its not important _which_ loop - as long as its not overlapping 'sv->co_orig_3d', see: T45096. */
-			project_plane_v3_v3v3(v_proj[0], co_prev, v_proj_axis);
+			project_plane_normalized_v3_v3v3(v_proj[0], co_prev, v_proj_axis);
 			while (UNLIKELY(((co_prev_ok = (len_squared_v3v3(v_proj[1], v_proj[0]) > eps)) == false) &&
 							((l_prev = l_prev->prev) != l->next)))
 			{
 				co_prev = slide_origdata_orig_vert_co(sod, l_prev->v);
-				project_plane_v3_v3v3(v_proj[0], co_prev, v_proj_axis);
+				project_plane_normalized_v3_v3v3(v_proj[0], co_prev, v_proj_axis);
 			}
-			project_plane_v3_v3v3(v_proj[2], co_next, v_proj_axis);
+			project_plane_normalized_v3_v3v3(v_proj[2], co_next, v_proj_axis);
 			while (UNLIKELY(((co_next_ok = (len_squared_v3v3(v_proj[1], v_proj[2]) > eps)) == false) &&
 							((l_next = l_next->next) != l->prev)))
 			{
 				co_next = slide_origdata_orig_vert_co(sod, l_next->v);
-				project_plane_v3_v3v3(v_proj[2], co_next, v_proj_axis);
+				project_plane_normalized_v3_v3v3(v_proj[2], co_next, v_proj_axis);
 			}
 
 			if (co_prev_ok && co_next_ok) {
@@ -7380,7 +7391,7 @@ static void drawEdgeSlide(TransInfo *t)
 			gpuPushMatrix();
 			gpuMultMatrix(t->obedit->obmat);
 
-			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+			unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 3, GWN_FETCH_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
@@ -7397,7 +7408,7 @@ static void drawEdgeSlide(TransInfo *t)
 
 				glLineWidth(line_size);
 				immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
-				immBeginAtMost(PRIM_LINES, 4);
+				immBeginAtMost(GWN_PRIM_LINES, 4);
 				if (curr_sv->v_side[0]) {
 					immVertex3fv(pos, curr_sv->v_side[0]->co);
 					immVertex3fv(pos, curr_sv->v_co_orig);
@@ -7410,7 +7421,7 @@ static void drawEdgeSlide(TransInfo *t)
 
 				immUniformThemeColorShadeAlpha(TH_SELECT, -30, alpha_shade);
 				glPointSize(ctrl_size);
-				immBegin(PRIM_POINTS, 1);
+				immBegin(GWN_PRIM_POINTS, 1);
 				if (sld->flipped) {
 					if (curr_sv->v_side[1]) immVertex3fv(pos, curr_sv->v_side[1]->co);
 				}
@@ -7421,7 +7432,7 @@ static void drawEdgeSlide(TransInfo *t)
 
 				immUniformThemeColorShadeAlpha(TH_SELECT, 255, alpha_shade);
 				glPointSize(guide_size);
-				immBegin(PRIM_POINTS, 1);
+				immBegin(GWN_PRIM_POINTS, 1);
 				interp_line_v3_v3v3v3(co_mark, co_b, curr_sv->v_co_orig, co_a, fac);
 				immVertex3fv(pos, co_mark);
 				immEnd();
@@ -7435,7 +7446,7 @@ static void drawEdgeSlide(TransInfo *t)
 
 					glLineWidth(line_size);
 					immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
-					immBegin(PRIM_LINES, sld->totsv * 2);
+					immBegin(GWN_PRIM_LINES, sld->totsv * 2);
 
 					sv = sld->sv;
 					for (i = 0; i < sld->totsv; i++, sv++) {
@@ -7994,12 +8005,12 @@ static void drawVertSlide(TransInfo *t)
 
 			glLineWidth(line_size);
 
-			const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+			const uint shdr_pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 3, GWN_FETCH_FLOAT);
 			 
 			immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 			immUniformThemeColorShadeAlpha(TH_EDGE_SELECT, 80, alpha_shade);
 
-			immBegin(PRIM_LINES, sld->totsv * 2);
+			immBegin(GWN_PRIM_LINES, sld->totsv * 2);
 			if (is_clamp) {
 				sv = sld->sv;
 				for (i = 0; i < sld->totsv; i++, sv++) {
@@ -8025,7 +8036,7 @@ static void drawVertSlide(TransInfo *t)
 
 			glPointSize(ctrl_size);
 
-			immBegin(PRIM_POINTS, 1);
+			immBegin(GWN_PRIM_POINTS, 1);
 			immVertex3fv(shdr_pos, (sld->flipped && sld->use_even) ?
 			            curr_sv->co_link_orig_3d[curr_sv->co_link_curr] :
 			            curr_sv->co_orig_3d);
@@ -8068,7 +8079,7 @@ static void drawVertSlide(TransInfo *t)
 				immUniform1f("dash_width", 6.0f);
 				immUniform1f("dash_factor", 0.5f);
 
-				immBegin(PRIM_LINES, 2);
+				immBegin(GWN_PRIM_LINES, 2);
 				immVertex3fv(shdr_pos, curr_sv->co_orig_3d);
 				immVertex3fv(shdr_pos, co_dest_3d);
 				immEnd();

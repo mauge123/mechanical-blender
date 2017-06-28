@@ -62,14 +62,15 @@ typedef struct GPUTexture GPUTexture;
  * specification. */
 typedef enum GPUTextureFormat {
 	/* Formats texture & renderbuffer */
+	GPU_RGBA32F,
 	GPU_RGBA16F,
 	GPU_RGBA8,
 	GPU_RG32F,
 	GPU_RG16F,
+	GPU_R32F,
 	GPU_R16F,
 	GPU_R8,
 #if 0
-	GPU_RGBA32F,
 	GPU_RGBA32I,
 	GPU_RGBA32UI,
 	GPU_RGBA16,
@@ -85,7 +86,6 @@ typedef enum GPUTextureFormat {
 	GPU_RG8,
 	GPU_RG8I,
 	GPU_RG8UI,
-	GPU_R32F,
 	GPU_R32I,
 	GPU_R32UI,
 	GPU_R16I,
@@ -97,11 +97,11 @@ typedef enum GPUTextureFormat {
 
 	/* Special formats texture & renderbuffer */
 #if 0
-	GPU_R11F_G11F_B10F,
 	GPU_RGB10_A2,
 	GPU_RGB10_A2UI,
 	GPU_DEPTH32F_STENCIL8,
 #endif
+	GPU_R11F_G11F_B10F,
 	GPU_DEPTH24_STENCIL8,
 
 	/* Texture only format */
@@ -181,7 +181,7 @@ int GPU_texture_bound_number(GPUTexture *tex);
 void GPU_texture_generate_mipmap(GPUTexture *tex);
 void GPU_texture_compare_mode(GPUTexture *tex, bool use_compare);
 void GPU_texture_filter_mode(GPUTexture *tex, bool use_filter);
-void GPU_texture_mipmap_mode(GPUTexture *tex, bool use_mipmap);
+void GPU_texture_mipmap_mode(GPUTexture *tex, bool use_mipmap, bool use_filter);
 void GPU_texture_wrap_mode(GPUTexture *tex, bool use_repeat);
 
 struct GPUFrameBuffer *GPU_texture_framebuffer(GPUTexture *tex);
@@ -191,6 +191,7 @@ void GPU_texture_framebuffer_set(GPUTexture *tex, struct GPUFrameBuffer *fb, int
 int GPU_texture_target(const GPUTexture *tex);
 int GPU_texture_width(const GPUTexture *tex);
 int GPU_texture_height(const GPUTexture *tex);
+int GPU_texture_format(const GPUTexture *tex);
 bool GPU_texture_depth(const GPUTexture *tex);
 bool GPU_texture_stencil(const GPUTexture *tex);
 int GPU_texture_opengl_bindcode(const GPUTexture *tex);

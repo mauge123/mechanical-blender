@@ -40,6 +40,11 @@
 extern struct GPUUniformBuffer *globals_ubo; /* draw_common.c */
 extern struct GlobalsUboStorage ts; /* draw_common.c */
 
+extern char datatoc_paint_wire_vert_glsl[];
+extern char datatoc_paint_wire_frag_glsl[];
+extern char datatoc_paint_vert_frag_glsl[];
+extern char datatoc_common_globals_lib_glsl[];
+
 /* *********** LISTS *********** */
 
 typedef struct PAINT_WEIGHT_PassList {
@@ -65,7 +70,8 @@ typedef struct PAINT_WEIGHT_Data {
 
 static struct {
 	struct GPUShader *weight_face_shader;
-	struct GPUShader *flat_overlay_shader;
+	struct GPUShader *wire_overlay_shader;
+	struct GPUShader *face_overlay_shader;
 	struct GPUShader *vert_overlay_shader;
 	int actdef;
 } e_data = {NULL}; /* Engine data */
@@ -83,22 +89,32 @@ static void PAINT_WEIGHT_engine_init(void *UNUSED(vedata))
 {
 	const DRWContextState *draw_ctx = DRW_context_state_get();
 
-	if (e_data.actdef != draw_ctx->sl->basact->object->actdef) {
-		e_data.actdef = draw_ctx->sl->basact->object->actdef;
+	if (e_data.actdef != draw_ctx->obact->actdef) {
+		e_data.actdef = draw_ctx->obact->actdef;
 
-		BKE_mesh_batch_cache_dirty(draw_ctx->sl->basact->object->data, BKE_MESH_BATCH_DIRTY_PAINT);
+		BKE_mesh_batch_cache_dirty(draw_ctx->obact->data, BKE_MESH_BATCH_DIRTY_NOCHECK);
 	}
 
 	if (!e_data.weight_face_shader) {
 		e_data.weight_face_shader = GPU_shader_get_builtin_shader(GPU_SHADER_SIMPLE_LIGHTING_SMOOTH_COLOR_ALPHA);
 	}
 
-	if (!e_data.flat_overlay_shader) {
-		e_data.flat_overlay_shader = GPU_shader_get_builtin_shader(GPU_SHADER_3D_FLAT_COLOR);
+	if (!e_data.wire_overlay_shader) {
+		e_data.wire_overlay_shader = DRW_shader_create_with_lib(
+		        datatoc_paint_wire_vert_glsl, NULL,
+		        datatoc_paint_wire_frag_glsl,
+		        datatoc_common_globals_lib_glsl, "#define WEIGHT_MODE\n");
+	}
+
+	if (!e_data.face_overlay_shader) {
+		e_data.face_overlay_shader = GPU_shader_get_builtin_shader(GPU_SHADER_3D_UNIFORM_COLOR);
 	}
 
 	if (!e_data.vert_overlay_shader) {
-		e_data.vert_overlay_shader = GPU_shader_get_builtin_shader(GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR);
+		e_data.vert_overlay_shader = DRW_shader_create_with_lib(
+		        datatoc_paint_wire_vert_glsl, NULL,
+		        datatoc_paint_vert_frag_glsl,
+		        datatoc_common_globals_lib_glsl, NULL);
 	}
 }
 
@@ -116,7 +132,9 @@ static void PAINT_WEIGHT_cache_init(void *vedata)
 
 	{
 		/* Create a pass */
-		psl->weight_faces = DRW_pass_create("Weight Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
+		psl->weight_faces = DRW_pass_create(
+		        "Weight Pass",
+		        DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
 
 		stl->g_data->fweights_shgrp = DRW_shgroup_create(e_data.weight_face_shader, psl->weight_faces);
 
@@ -128,19 +146,28 @@ static void PAINT_WEIGHT_cache_init(void *vedata)
 	}
 
 	{
-		psl->wire_overlay = DRW_pass_create("Wire Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
+		psl->wire_overlay = DRW_pass_create(
+		        "Wire Pass",
+		        DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
 
-		stl->g_data->lwire_shgrp = DRW_shgroup_create(e_data.flat_overlay_shader, psl->wire_overlay);
+		stl->g_data->lwire_shgrp = DRW_shgroup_create(e_data.wire_overlay_shader, psl->wire_overlay);
 	}
 
 	{
-		psl->face_overlay = DRW_pass_create("Wire Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS | DRW_STATE_BLEND);
+		psl->face_overlay = DRW_pass_create(
+		        "Face Mask Pass",
+		        DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS | DRW_STATE_BLEND);
 
-		stl->g_data->face_shgrp = DRW_shgroup_create(e_data.flat_overlay_shader, psl->face_overlay);
+		stl->g_data->face_shgrp = DRW_shgroup_create(e_data.face_overlay_shader, psl->face_overlay);
+
+		static float col[4] = {1.0f, 1.0f, 1.0f, 0.2f};
+		DRW_shgroup_uniform_vec4(stl->g_data->face_shgrp, "color", col, 1);
 	}
 
 	{
-		psl->vert_overlay = DRW_pass_create("Wire Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
+		psl->vert_overlay = DRW_pass_create(
+		        "Vert Mask Pass",
+		        DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
 
 		stl->g_data->vert_shgrp = DRW_shgroup_create(e_data.vert_overlay_shader, psl->vert_overlay);
 	}
@@ -150,30 +177,31 @@ static void PAINT_WEIGHT_cache_populate(void *vedata, Object *ob)
 {
 	PAINT_WEIGHT_StorageList *stl = ((PAINT_WEIGHT_Data *)vedata)->stl;
 	const DRWContextState *draw_ctx = DRW_context_state_get();
-	SceneLayer *sl = draw_ctx->sl;
 
-	if (ob->type == OB_MESH && ob == sl->basact->object) {
-		IDProperty *ces_mode_pw = BKE_object_collection_engine_get(ob, COLLECTION_MODE_PAINT_WEIGHT, "");
+	if ((ob->type == OB_MESH) && (ob == draw_ctx->obact)) {
+		IDProperty *ces_mode_pw = BKE_layer_collection_engine_evaluated_get(ob, COLLECTION_MODE_PAINT_WEIGHT, "");
 		bool use_wire = BKE_collection_engine_property_value_get_bool(ces_mode_pw, "use_wire");
-		char flag = ((Mesh *)ob->data)->editflag;
-		struct Batch *geom;
+		const Mesh *me = ob->data;
+		const bool use_face_sel = (me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
+		const bool use_vert_sel = (me->editflag & ME_EDIT_PAINT_VERT_SEL) != 0;
+		struct Gwn_Batch *geom;
 
 		world_light = BKE_collection_engine_property_value_get_bool(ces_mode_pw, "use_shading") ? 0.5f : 1.0f;
 
 		geom = DRW_cache_mesh_surface_weights_get(ob);
 		DRW_shgroup_call_add(stl->g_data->fweights_shgrp, geom, ob->obmat);
 
-		if (flag & ME_EDIT_PAINT_FACE_SEL || use_wire) {
-			geom = DRW_cache_mesh_edges_paint_overlay_get(ob, use_wire, flag & ME_EDIT_PAINT_FACE_SEL, false);
+		if (use_face_sel || use_wire) {
+			geom = DRW_cache_mesh_edges_paint_overlay_get(ob, use_wire, use_face_sel);
 			DRW_shgroup_call_add(stl->g_data->lwire_shgrp, geom, ob->obmat);
 		}
 
-		if (flag & ME_EDIT_PAINT_FACE_SEL) {
+		if (use_face_sel) {
 			geom = DRW_cache_mesh_faces_weight_overlay_get(ob);
 			DRW_shgroup_call_add(stl->g_data->face_shgrp, geom, ob->obmat);
 		}
 
-		if (flag & ME_EDIT_PAINT_VERT_SEL) {
+		if (use_vert_sel) {
 			geom = DRW_cache_mesh_verts_weight_overlay_get(ob);
 			DRW_shgroup_call_add(stl->g_data->vert_shgrp, geom, ob->obmat);
 		}
@@ -192,6 +220,8 @@ static void PAINT_WEIGHT_draw_scene(void *vedata)
 
 static void PAINT_WEIGHT_engine_free(void)
 {
+	DRW_SHADER_FREE_SAFE(e_data.wire_overlay_shader);
+	DRW_SHADER_FREE_SAFE(e_data.vert_overlay_shader);
 }
 
 void PAINT_WEIGHT_collection_settings_create(IDProperty *properties)

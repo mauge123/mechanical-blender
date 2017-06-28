@@ -31,6 +31,8 @@
 #ifndef __ED_VIEW3D_H__
 #define __ED_VIEW3D_H__
 
+#include "DNA_screen_types.h"
+
 /* ********* exports for space_view3d/ module ********** */
 struct ARegion;
 struct BMEdge;
@@ -71,6 +73,8 @@ struct GPUFX;
 struct GPUOffScreen;
 struct GPUFXSettings;
 enum eGPUFXFlags;
+
+struct TransformOrientation;
 
 /* for derivedmesh drawing callbacks, for view3d_select, .... */
 typedef struct ViewContext {
@@ -272,8 +276,9 @@ void ED_view3d_calc_camera_border_size(
         const struct Scene *scene, const struct ARegion *ar,
         const struct View3D *v3d, const struct RegionView3D *rv3d,
         float r_size[2]);
-bool ED_view3d_calc_render_border(struct Scene *scene, struct View3D *v3d,
-                                  struct ARegion *ar, struct rcti *rect);
+bool ED_view3d_calc_render_border(
+        const struct Scene *scene, struct View3D *v3d,
+        struct ARegion *ar, struct rcti *rect);
 
 void ED_view3d_clipping_calc_from_boundbox(float clip[6][4], const struct BoundBox *clipbb, const bool is_flip);
 void ED_view3d_clipping_calc(struct BoundBox *bb, float planes[4][4],
@@ -364,6 +369,8 @@ int ED_view3d_scene_layer_set(int lay, const int *values, int *active);
 struct RV3DMatrixStore *ED_view3d_mats_rv3d_backup(struct RegionView3D *rv3d);
 void                    ED_view3d_mats_rv3d_restore(struct RegionView3D *rv3d, struct RV3DMatrixStore *rv3dmat);
 
+void  ED_draw_object_facemap(struct Scene *scene, struct Object *ob, const float col[4], const int facemap);
+
 bool ED_view3d_context_activate(struct bContext *C);
 void ED_view3d_draw_offscreen_init(struct Scene *scene, struct SceneLayer *sl, struct View3D *v3d);
 void ED_view3d_draw_offscreen(
@@ -371,6 +378,9 @@ void ED_view3d_draw_offscreen(
         float winmat[4][4], bool do_bgpic, bool do_sky, bool is_persp, const char *viewname,
         struct GPUFX *fx, struct GPUFXSettings *fx_settings,
         struct GPUOffScreen *ofs);
+void ED_view3d_draw_setup_view(
+        struct wmWindow *win, struct Scene *scene, struct ARegion *ar, struct View3D *v3d,
+        float viewmat[4][4], float winmat[4][4], const struct rcti *rect);
 
 struct ImBuf *ED_view3d_draw_offscreen_imbuf(
         struct Scene *scene, struct SceneLayer *sl, struct View3D *v3d, struct ARegion *ar, int sizex, int sizey,
@@ -385,7 +395,9 @@ struct ImBuf *ED_view3d_draw_offscreen_imbuf_simple(
 
 struct BaseLegacy *ED_view3d_give_base_under_cursor(struct bContext *C, const int mval[2]);
 void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar, bool do_clip);
-void ED_view3d_update_viewmat(struct Scene *scene, struct View3D *v3d, struct ARegion *ar, float viewmat[4][4], float winmat[4][4]);
+void ED_view3d_update_viewmat(
+        struct Scene *scene, struct View3D *v3d, struct ARegion *ar,
+        float viewmat[4][4], float winmat[4][4], const struct rcti *rect);
 bool ED_view3d_quat_from_axis_view(const char view, float quat[4]);
 char ED_view3d_quat_to_axis_view(const float quat[4], const float epsilon);
 char ED_view3d_lock_view_from_index(int index);
@@ -398,7 +410,7 @@ bool ED_view3d_lock_ucs(TransformOrientation *ts, struct RegionView3D *rv3d);
 #endif
 
 uint64_t ED_view3d_datamask(const struct Scene *scene, const struct View3D *v3d);
-uint64_t ED_view3d_screen_datamask(const struct bScreen *screen);
+uint64_t ED_view3d_screen_datamask(const struct Scene *scene, const struct bScreen *screen);
 
 bool ED_view3d_offset_lock_check(const struct View3D *v3d, const struct RegionView3D *rv3d);
 

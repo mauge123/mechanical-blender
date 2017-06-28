@@ -58,6 +58,7 @@
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
+#include "DNA_lightprobe_types.h"
 #include "DNA_property_types.h"
 #include "DNA_rigidbody_types.h"
 
@@ -103,9 +104,11 @@
 #include "BKE_multires.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
+#include "BKE_object_facemap.h"
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
+#include "BKE_lightprobe.h"
 #include "BKE_property.h"
 #include "BKE_rigidbody.h"
 #include "BKE_sca.h"
@@ -360,7 +363,16 @@ void BKE_object_free_derived_caches(Object *ob)
 		ob->derivedDeform->release(ob->derivedDeform);
 		ob->derivedDeform = NULL;
 	}
-	
+
+	if (ob->mesh_evaluated != NULL) {
+		/* Evaluated mesh points to edit mesh, but does not own it. */
+		ob->mesh_evaluated->edit_btmesh = NULL;
+		BKE_mesh_free(ob->mesh_evaluated);
+		BKE_libblock_free_data(&ob->mesh_evaluated->id, false);
+		MEM_freeN(ob->mesh_evaluated);
+		ob->mesh_evaluated = NULL;
+	}
+
 	BKE_object_free_curve_cache(ob);
 }
 
@@ -422,6 +434,7 @@ void BKE_object_free(Object *ob)
 	MEM_SAFE_FREE(ob->bb);
 
 	BLI_freelistN(&ob->defbase);
+	BLI_freelistN(&ob->fmaps);
 	if (ob->pose) {
 		BKE_pose_free_ex(ob->pose, false);
 		ob->pose = NULL;
@@ -452,7 +465,17 @@ void BKE_object_free(Object *ob)
 	}
 	GPU_lamp_free(ob);
 
-	DRW_object_engine_data_free(ob);
+	for (ObjectEngineData *oed = ob->drawdata.first; oed; oed = oed->next) {
+		if (oed->storage) {
+			if (oed->free) {
+				oed->free(oed->storage);
+			}
+			MEM_freeN(oed->storage);
+		}
+	}
+	BLI_freelistN(&ob->drawdata);
+
+	ob->deg_update_flag = 0;
 
 	BKE_sculptsession_free(ob);
 
@@ -590,6 +613,7 @@ void *BKE_object_obdata_add_from_type(Main *bmain, int type, const char *name)
 		case OB_LATTICE:   return BKE_lattice_add(bmain, name);
 		case OB_ARMATURE:  return BKE_armature_add(bmain, name);
 		case OB_SPEAKER:   return BKE_speaker_add(bmain, name);
+		case OB_LIGHTPROBE:return BKE_lightprobe_add(bmain, name);
 		case OB_EMPTY:     return NULL;
 		default:
 			printf("%s: Internal error, bad type: %d\n", __func__, type);
@@ -703,14 +727,7 @@ Object *BKE_object_add(
 
 	ob->data = BKE_object_obdata_add_from_type(bmain, type, name);
 
-	lc = BKE_layer_collection_active(sl);
-
-	if (lc == NULL) {
-		BLI_assert(BLI_listbase_count_ex(&sl->layer_collections, 1) == 0);
-		/* when there is no collection linked to this SceneLayer, create one */
-		SceneCollection *sc = BKE_collection_add(scene, NULL, NULL);
-		lc = BKE_collection_link(sl, sc);
-	}
+	lc = BKE_layer_collection_get_active_ensure(scene, sl);
 
 	BKE_collection_object_add(scene, lc->scene_collection, ob);
 
@@ -901,7 +918,7 @@ SoftBody *copy_softbody(const SoftBody *sb, bool copy_caches)
 	return sbn;
 }
 
-BulletSoftBody *copy_bulletsoftbody(BulletSoftBody *bsb)
+BulletSoftBody *copy_bulletsoftbody(const BulletSoftBody *bsb)
 {
 	BulletSoftBody *bsbn;
 
@@ -962,6 +979,7 @@ ParticleSystem *BKE_object_copy_particlesystem(ParticleSystem *psys)
 	psysn->effectors = NULL;
 	psysn->tree = NULL;
 	psysn->bvhtree = NULL;
+	psysn->batch_cache = NULL;
 	
 	BLI_listbase_clear(&psysn->pathcachebufs);
 	BLI_listbase_clear(&psysn->childcachebufs);
@@ -1033,7 +1051,7 @@ void BKE_object_copy_softbody(Object *ob_dst, const Object *ob_src)
 	}
 }
 
-static void copy_object_pose(Object *obn, Object *ob)
+static void copy_object_pose(Object *obn, const Object *ob)
 {
 	bPoseChannel *chan;
 	
@@ -1066,7 +1084,7 @@ static void copy_object_pose(Object *obn, Object *ob)
 	}
 }
 
-static void copy_object_lod(Object *obn, Object *ob)
+static void copy_object_lod(Object *obn, const Object *ob)
 {
 	BLI_duplicatelist(&obn->lodlevels, &ob->lodlevels);
 
@@ -1117,7 +1135,7 @@ void BKE_object_transform_copy(Object *ob_tar, const Object *ob_src)
 	copy_v3_v3(ob_tar->size, ob_src->size);
 }
 
-Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
+Object *BKE_object_copy_ex(Main *bmain, const Object *ob, bool copy_caches)
 {
 	Object *obn;
 	ModifierData *md;
@@ -1157,6 +1175,7 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
 			BKE_pose_rebuild(obn, obn->data);
 	}
 	defgroup_copy_list(&obn->defbase, &ob->defbase);
+	BKE_object_facemap_copy_list(&obn->fmaps, &ob->fmaps);
 	BKE_constraints_copy(&obn->constraints, &ob->constraints, true);
 
 	obn->mode = OB_MODE_OBJECT;
@@ -1207,7 +1226,7 @@ Object *BKE_object_copy_ex(Main *bmain, Object *ob, bool copy_caches)
 }
 
 /* copy objects, will re-initialize cached simulation data */
-Object *BKE_object_copy(Main *bmain, Object *ob)
+Object *BKE_object_copy(Main *bmain, const Object *ob)
 {
 	return BKE_object_copy_ex(bmain, ob, false);
 }
@@ -1285,10 +1304,10 @@ static void armature_set_id_extern(Object *ob)
 	unsigned int lay = arm->layer_protected;
 	
 	for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
-		if (!(pchan->bone->layer & lay))
+		if (!(pchan->bone->layer & lay)) {
 			id_lib_extern((ID *)pchan->custom);
+		}
 	}
-			
 }
 
 void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
@@ -2821,14 +2840,7 @@ int BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc,
 	switch (GS(((ID *)ob->data)->name)) {
 		case ID_ME:
 		{
-			Mesh *me = ob->data;
-			if (me->bb == NULL || (me->bb->flag & BOUNDBOX_DIRTY)) {
-				BKE_mesh_texspace_calc(me);
-			}
-			if (r_texflag) *r_texflag = &me->texflag;
-			if (r_loc) *r_loc = me->loc;
-			if (r_size) *r_size = me->size;
-			if (r_rot) *r_rot = me->rot;
+			BKE_mesh_texspace_get_reference((Mesh *)ob->data, r_texflag, r_loc, r_rot, r_size);
 			break;
 		}
 		case ID_CU:

@@ -74,12 +74,12 @@ bDeformGroup *BKE_defgroup_new(Object *ob, const char *name)
 	BLI_addtail(&ob->defbase, defgroup);
 	defgroup_unique_name(defgroup, ob);
 
-	BKE_mesh_batch_cache_dirty(ob->data, BKE_MESH_BATCH_DIRTY_PAINT);
+	BKE_mesh_batch_cache_dirty(ob->data, BKE_MESH_BATCH_DIRTY_NOCHECK);
 
 	return defgroup;
 }
 
-void defgroup_copy_list(ListBase *outbase, ListBase *inbase)
+void defgroup_copy_list(ListBase *outbase, const ListBase *inbase)
 {
 	bDeformGroup *defgroup, *defgroupn;
 
@@ -91,7 +91,7 @@ void defgroup_copy_list(ListBase *outbase, ListBase *inbase)
 	}
 }
 
-bDeformGroup *defgroup_duplicate(bDeformGroup *ingroup)
+bDeformGroup *defgroup_duplicate(const bDeformGroup *ingroup)
 {
 	bDeformGroup *outgroup;
 

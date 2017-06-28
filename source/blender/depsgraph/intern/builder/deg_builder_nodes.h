@@ -49,6 +49,7 @@ struct MTex;
 struct MovieClip;
 struct bNodeTree;
 struct Object;
+struct Probe;
 struct bPoseChannel;
 struct bConstraint;
 struct Scene;
@@ -61,8 +62,6 @@ namespace DEG {
 
 struct Depsgraph;
 struct DepsNode;
-struct RootDepsNode;
-struct SubgraphDepsNode;
 struct IDDepsNode;
 struct TimeSourceDepsNode;
 struct ComponentDepsNode;
@@ -74,32 +73,30 @@ struct DepsgraphNodeBuilder {
 
 	void begin_build(Main *bmain);
 
-	RootDepsNode *add_root_node();
+	ID *get_cow_id(const ID *id_orig) const;
+
 	IDDepsNode *add_id_node(ID *id);
-	TimeSourceDepsNode *add_time_source(ID *id);
+	TimeSourceDepsNode *add_time_source();
 
 	ComponentDepsNode *add_component_node(ID *id,
 	                                      eDepsNode_Type comp_type,
 	                                      const char *comp_name = "");
 
 	OperationDepsNode *add_operation_node(ComponentDepsNode *comp_node,
-	                                      eDepsOperation_Type optype,
-	                                      DepsEvalOperationCb op,
+	                                      const DepsEvalOperationCb& op,
 	                                      eDepsOperation_Code opcode,
 	                                      const char *name = "",
 	                                      int name_tag = -1);
 	OperationDepsNode *add_operation_node(ID *id,
 	                                      eDepsNode_Type comp_type,
 	                                      const char *comp_name,
-	                                      eDepsOperation_Type optype,
-	                                      DepsEvalOperationCb op,
+	                                      const DepsEvalOperationCb& op,
 	                                      eDepsOperation_Code opcode,
 	                                      const char *name = "",
 	                                      int name_tag = -1);
 	OperationDepsNode *add_operation_node(ID *id,
 	                                      eDepsNode_Type comp_type,
-	                                      eDepsOperation_Type optype,
-	                                      DepsEvalOperationCb op,
+	                                      const DepsEvalOperationCb& op,
 	                                      eDepsOperation_Code opcode,
 	                                      const char *name = "",
 	                                      int name_tag = -1);
@@ -125,7 +122,6 @@ struct DepsgraphNodeBuilder {
 	                                       int name_tag = -1);
 
 	void build_scene(Main *bmain, Scene *scene);
-	SubgraphDepsNode *build_subgraph(Group *group);
 	void build_group(Scene *scene, Group *group);
 	void build_object(Scene *scene, Object *ob);
 	void build_object_transform(Scene *scene, Object *ob);
@@ -161,6 +157,7 @@ struct DepsgraphNodeBuilder {
 	void build_cachefile(CacheFile *cache_file);
 	void build_mask(Mask *mask);
 	void build_movieclip(MovieClip *clip);
+	void build_lightprobe(Object *object);
 
 	struct LayerCollectionState {
 		int index;

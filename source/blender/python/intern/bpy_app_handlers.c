@@ -59,8 +59,6 @@ static PyStructSequence_Field app_cb_info_fields[] = {
 	{(char *)"load_post",         (char *)"on loading a new blend file (after)"},
 	{(char *)"save_pre",          (char *)"on saving a blend file (before)"},
 	{(char *)"save_post",         (char *)"on saving a blend file (after)"},
-	{(char *)"scene_update_pre",  (char *)"on updating the scenes data (before)"},
-	{(char *)"scene_update_post", (char *)"on updating the scenes data (after)"},
 	{(char *)"game_pre",          (char *)"on starting the game engine"},
 	{(char *)"game_post",         (char *)"on ending the game engine"},
 	{(char *)"version_update",    (char *)"on ending the versioning code"},
@@ -126,7 +124,7 @@ static PyObject *bpy_app_handlers_persistent_new(PyTypeObject *UNUSED(type), PyO
 /* dummy type because decorators can't be PyCFunctions */
 static PyTypeObject BPyPersistent_Type = {
 
-#if defined(_MSC_VER) || defined(FREE_WINDOWS)
+#if defined(_MSC_VER)
 	PyVarObject_HEAD_INIT(NULL, 0)
 #else
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -206,7 +204,7 @@ PyObject *BPY_app_handlers_struct(void)
 {
 	PyObject *ret;
 
-#if defined(_MSC_VER) || defined(FREE_WINDOWS)
+#if defined(_MSC_VER)
 	BPyPersistent_Type.ob_base.ob_base.ob_type = &PyType_Type;
 #endif
 

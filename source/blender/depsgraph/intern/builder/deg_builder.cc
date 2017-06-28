@@ -30,9 +30,6 @@
 
 #include "intern/builder/deg_builder.h"
 
-// TODO(sergey): Use own wrapper over STD.
-#include <stack>
-
 #include "DNA_anim_types.h"
 #include "DNA_object_types.h"
 #include "DNA_ID.h"
@@ -43,12 +40,6 @@
 #include "intern/depsgraph.h"
 #include "intern/depsgraph_types.h"
 #include "intern/nodes/deg_node.h"
-#include "intern/nodes/deg_node_component.h"
-#include "intern/nodes/deg_node_operation.h"
-
-#include "util/deg_util_foreach.h"
-
-#include <cstdio>
 
 namespace DEG {
 
@@ -59,7 +50,8 @@ void deg_graph_build_finalize(Depsgraph *graph)
 	 */
 	GHASH_FOREACH_BEGIN(IDDepsNode *, id_node, graph->id_hash)
 	{
-		ID *id = id_node->id;
+		ID *id = id_node->id_orig;
+		id_node->finalize_build(graph);
 		if ((id->tag & LIB_TAG_ID_RECALC_ALL)) {
 			id_node->tag_update(graph);
 		}
@@ -69,7 +61,11 @@ void deg_graph_build_finalize(Depsgraph *graph)
 				id_node->tag_update(graph);
 			}
 		}
-		id_node->finalize_build();
+		/* XXX: This is only so we've got proper COW IDs after rebuild. */
+		/* TODO(sergey): Ideally we'll need to copy evaluated CoW from previous
+		 * depsgraph, so we don't need to re-tag anything what we already have.
+		 */
+		id_node->tag_update(graph);
 	}
 	GHASH_FOREACH_END();
 }

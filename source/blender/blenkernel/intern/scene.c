@@ -93,6 +93,7 @@
 #include "BKE_sequencer.h"
 #include "BKE_sound.h"
 #include "BKE_unit.h"
+#include "BKE_workspace.h"
 #include "BKE_world.h"
 
 #include "DEG_depsgraph.h"
@@ -254,14 +255,12 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		scen->theDag = NULL;
 		scen->depsgraph = NULL;
 		scen->obedit = NULL;
-		scen->stats = NULL;
 		scen->fps_info = NULL;
 
 		if (sce->rigidbody_world)
 			scen->rigidbody_world = BKE_rigidbody_world_copy(sce->rigidbody_world);
 
 		BLI_duplicatelist(&(scen->markers), &(sce->markers));
-		BLI_duplicatelist(&(scen->transform_spaces), &(sce->transform_spaces));
 		BLI_duplicatelist(&(scen->r.layers), &(sce->r.layers));
 		BLI_duplicatelist(&(scen->r.views), &(sce->r.views));
 		BKE_keyingsets_copy(&(scen->keyingsets), &(sce->keyingsets));
@@ -314,30 +313,39 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		/* recursively creates a new SceneCollection tree */
 		scene_collection_copy(mcn, mc);
 
+		IDPropertyTemplate val = {0};
 		BLI_duplicatelist(&scen->render_layers, &sce->render_layers);
 		SceneLayer *new_sl = scen->render_layers.first;
 		for (SceneLayer *sl = sce->render_layers.first; sl; sl = sl->next) {
+			new_sl->stats = NULL;
+			new_sl->properties_evaluated = NULL;
+			new_sl->properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
+			IDP_MergeGroup(new_sl->properties, sl->properties, true);
 
 			/* we start fresh with no overrides and no visibility flags set
 			 * instead of syncing both trees we simply unlink and relink the scene collection */
 			BLI_listbase_clear(&new_sl->layer_collections);
 			BLI_listbase_clear(&new_sl->object_bases);
+			BLI_listbase_clear(&new_sl->drawdata);
 			layer_collections_recreate(new_sl, &sl->layer_collections, mcn, mc);
 
-			if (sl->basact) {
-				Object *active_ob = sl->basact->object;
-				for (Base *base = new_sl->object_bases.first; base; base = base->next) {
-					if (base->object == active_ob) {
-						new_sl->basact = base;
-						break;
-					}
+			Object *active_ob = OBACT_NEW;
+			Base *new_base = new_sl->object_bases.first;
+			for (Base *base = sl->object_bases.first; base; base = base->next) {
+				new_base->flag = base->flag;
+				new_base->flag_legacy = base->flag_legacy;
+
+				if (new_base->object == active_ob) {
+					new_sl->basact = new_base;
 				}
+
+				new_base = new_base->next;
 			}
 			new_sl = new_sl->next;
 		}
 
-		IDPropertyTemplate val = {0};
 		scen->collection_properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
+		scen->layer_properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
 	}
 
 	/* copy color management settings */
@@ -455,6 +463,9 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		if (sce->collection_properties) {
 			IDP_MergeGroup(scen->collection_properties, sce->collection_properties, true);
 		}
+		if (sce->layer_properties) {
+			IDP_MergeGroup(scen->layer_properties, sce->layer_properties, true);
+		}
 	}
 
 	return scen;
@@ -474,7 +485,7 @@ void BKE_scene_make_local(Main *bmain, Scene *sce, const bool lib_local)
 }
 
 /** Free (or release) any data used by this scene (does not free the scene itself). */
-void BKE_scene_free(Scene *sce)
+void BKE_scene_free_ex(Scene *sce, const bool do_id_user)
 {
 	SceneRenderLayer *srl;
 
@@ -526,10 +537,9 @@ void BKE_scene_free(Scene *sce)
 	}
 
 	BLI_freelistN(&sce->markers);
-	BLI_freelistN(&sce->transform_spaces);
 	BLI_freelistN(&sce->r.layers);
 	BLI_freelistN(&sce->r.views);
-	
+
 	if (sce->toolsettings) {
 		if (sce->toolsettings->vpaint) {
 			BKE_paint_free(&sce->toolsettings->vpaint->paint);
@@ -565,8 +575,7 @@ void BKE_scene_free(Scene *sce)
 	DEG_scene_graph_free(sce);
 	if (sce->depsgraph)
 		DEG_graph_free(sce->depsgraph);
-	
-	MEM_SAFE_FREE(sce->stats);
+
 	MEM_SAFE_FREE(sce->fps_info);
 
 	BKE_sound_destroy_scene(sce);
@@ -576,22 +585,36 @@ void BKE_scene_free(Scene *sce)
 	BKE_previewimg_free(&sce->preview);
 	curvemapping_free_data(&sce->r.mblur_shutter_curve);
 
-	for (SceneLayer *sl = sce->render_layers.first; sl; sl = sl->next) {
+	for (SceneLayer *sl = sce->render_layers.first, *sl_next; sl; sl = sl_next) {
+		sl_next = sl->next;
+
+		BLI_remlink(&sce->render_layers, sl);
 		BKE_scene_layer_free(sl);
 	}
-	BLI_freelistN(&sce->render_layers);
 
 	/* Master Collection */
-	BKE_collection_master_free(sce);
+	BKE_collection_master_free(sce, do_id_user);
 	MEM_freeN(sce->collection);
 	sce->collection = NULL;
 
-	/* Runtime Engine Data */
+	/* LayerCollection engine settings. */
 	if (sce->collection_properties) {
 		IDP_FreeProperty(sce->collection_properties);
 		MEM_freeN(sce->collection_properties);
 		sce->collection_properties = NULL;
 	}
+
+	/* Render engine setting. */
+	if (sce->layer_properties) {
+		IDP_FreeProperty(sce->layer_properties);
+		MEM_freeN(sce->layer_properties);
+		sce->layer_properties = NULL;
+	}
+}
+
+void BKE_scene_free(Scene *sce)
+{
+	return BKE_scene_free_ex(sce, true);
 }
 
 void BKE_scene_init(Scene *sce)
@@ -795,7 +818,7 @@ void BKE_scene_init(Scene *sce)
 	sce->r.ffcodecdata.audio_bitrate = 192;
 	sce->r.ffcodecdata.audio_channels = 2;
 
-	BLI_strncpy(sce->r.engine, RE_engine_id_BLENDER_RENDER, sizeof(sce->r.engine));
+	BLI_strncpy(sce->r.engine, RE_engine_id_BLENDER_EEVEE, sizeof(sce->r.engine));
 
 	sce->audio.distance_model = 2.0f;
 	sce->audio.doppler_factor = 1.0f;
@@ -847,7 +870,7 @@ void BKE_scene_init(Scene *sce)
 	sce->gm.angulardeactthreshold = 1.0f;
 	sce->gm.deactivationtime = 0.0f;
 
-	sce->gm.flag = GAME_DISPLAY_LISTS;
+	sce->gm.flag = 0;
 	sce->gm.matmode = GAME_MAT_MULTITEX;
 
 	sce->gm.obstacleSimulation = OBSTSIMULATION_NONE;
@@ -946,9 +969,13 @@ void BKE_scene_init(Scene *sce)
 	sce->collection = MEM_callocN(sizeof(SceneCollection), "Master Collection");
 	BLI_strncpy(sce->collection->name, "Master Collection", sizeof(sce->collection->name));
 
+	/* Engine settings */
 	IDPropertyTemplate val = {0};
 	sce->collection_properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
 	BKE_layer_collection_engine_settings_create(sce->collection_properties);
+
+	sce->layer_properties = IDP_New(IDP_GROUP, &val, ROOT_PROP);
+	BKE_scene_layer_engine_settings_create(sce->layer_properties);
 
 	BKE_scene_layer_add(sce, "Render Layer");
 }
@@ -987,7 +1014,7 @@ BaseLegacy *BKE_scene_base_find(Scene *scene, Object *ob)
 /**
  * Sets the active scene, mainly used when running in background mode (``--scene`` command line argument).
  * This is also called to set the scene directly, bypassing windowing code.
- * Otherwise #ED_screen_set_scene is used when changing scenes by the user.
+ * Otherwise #WM_window_change_active_scene is used when changing scenes by the user.
  */
 void BKE_scene_set_background(Main *bmain, Scene *scene)
 {
@@ -1425,8 +1452,8 @@ static bool check_rendered_viewport_visible(Main *bmain)
 	wmWindowManager *wm = bmain->wm.first;
 	wmWindow *window;
 	for (window = wm->windows.first; window != NULL; window = window->next) {
-		bScreen *screen = window->screen;
-		Scene *scene = screen->scene;
+		const bScreen *screen = BKE_workspace_active_screen_get(window->workspace_hook);
+		Scene *scene = window->scene;
 		ScrArea *area;
 		RenderEngineType *type = RE_engines_find(scene->r.engine);
 		if ((type->draw_engine != NULL) || (type->render_to_view == NULL)) {
@@ -1477,9 +1504,6 @@ void BKE_scene_update_tagged(EvaluationContext *eval_ctx, Main *bmain, Scene *sc
 {
 	Scene *sce_iter;
 
-	/* keep this first */
-	BLI_callback_exec(bmain, &scene->id, BLI_CB_EVT_SCENE_UPDATE_PRE);
-
 	/* (re-)build dependency graph if needed */
 	for (sce_iter = scene; sce_iter; sce_iter = sce_iter->set) {
 		DEG_scene_relations_update(bmain, sce_iter);
@@ -1524,9 +1548,6 @@ void BKE_scene_update_tagged(EvaluationContext *eval_ctx, Main *bmain, Scene *sc
 			BKE_animsys_evaluate_animdata(scene, &scene->id, adt, ctime, 0);
 	}
 
-	/* notify editors and python about recalc */
-	BLI_callback_exec(bmain, &scene->id, BLI_CB_EVT_SCENE_UPDATE_POST);
-
 	/* Inform editors about possible changes. */
 	DEG_ids_check_recalc(bmain, scene, false);
 
@@ -1544,7 +1565,6 @@ void BKE_scene_update_for_newframe(EvaluationContext *eval_ctx, Main *bmain, Sce
 
 	/* keep this first */
 	BLI_callback_exec(bmain, &sce->id, BLI_CB_EVT_FRAME_CHANGE_PRE);
-	BLI_callback_exec(bmain, &sce->id, BLI_CB_EVT_SCENE_UPDATE_PRE);
 
 	/* update animated image textures for particles, modifiers, gpu, etc,
 	 * call this at the start so modifiers with textures don't lag 1 frame */
@@ -1580,7 +1600,6 @@ void BKE_scene_update_for_newframe(EvaluationContext *eval_ctx, Main *bmain, Sce
 	BKE_sound_update_scene(bmain, sce);
 
 	/* notify editors and python about recalc */
-	BLI_callback_exec(bmain, &sce->id, BLI_CB_EVT_SCENE_UPDATE_POST);
 	BLI_callback_exec(bmain, &sce->id, BLI_CB_EVT_FRAME_CHANGE_POST);
 
 	/* Inform editors about possible changes. */
@@ -1689,7 +1708,7 @@ bool BKE_scene_remove_render_view(Scene *scene, SceneRenderView *srv)
 
 int get_render_subsurf_level(const RenderData *r, int lvl, bool for_render)
 {
-	if (r->mode & R_SIMPLIFY)  {
+	if (r->mode & R_SIMPLIFY) {
 		if (for_render)
 			return min_ii(r->simplify_subsurf_render, lvl);
 		else
@@ -1746,6 +1765,9 @@ Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 
 		/* for the first loop we should get the layer from context */
 		SceneLayer *sl = BKE_scene_layer_context_active((*sce_iter));
+		/* TODO For first scene (non-background set), we should pass the render layer as argument.
+		 * In some cases we want it to be the workspace one, in other the scene one. */
+		TODO_LAYER;
 
 		if (sl->object_bases.first) {
 			return (Base *)sl->object_bases.first;

@@ -115,9 +115,9 @@ static void wm_method_draw_stereo3d_interlace(wmWindow *win)
 	float halfx = GLA_PIXEL_OFS;
 	float halfy = GLA_PIXEL_OFS;
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int texcoord = VertexFormat_add_attrib(format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int texcoord = GWN_vertformat_attr_add(format, "texCoord", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_IMAGE_INTERLACE);
 
@@ -132,7 +132,7 @@ static void wm_method_draw_stereo3d_interlace(wmWindow *win)
 
 	immUniform1i("interlace_id", interlace_gpu_id_from_type(interlace_type));
 
-	immBegin(PRIM_TRIANGLE_FAN, 4);
+	immBegin(GWN_PRIM_TRI_FAN, 4);
 
 	immAttrib2f(texcoord, halfx, halfy);
 	immVertex2f(pos, 0.0f, 0.0f);
@@ -199,9 +199,9 @@ static void wm_method_draw_stereo3d_sidebyside(wmWindow *win)
 	int soffx;
 	bool cross_eyed = (win->stereo3d_format->flag & S3D_SIDEBYSIDE_CROSSEYED) != 0;
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int texcoord = VertexFormat_add_attrib(format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int texcoord = GWN_vertformat_attr_add(format, "texCoord", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	for (view = 0; view < 2; view ++) {
 		drawdata = BLI_findlink(&win->drawdata, (view * 2) + 1);
@@ -242,7 +242,7 @@ static void wm_method_draw_stereo3d_sidebyside(wmWindow *win)
 		immUniform1f("alpha", 1.0f);
 		immUniform1i("image", 0); /* default GL_TEXTURE0 unit */
 
-		immBegin(PRIM_TRIANGLE_FAN, 4);
+		immBegin(GWN_PRIM_TRI_FAN, 4);
 
 		immAttrib2f(texcoord, halfx, halfy);
 		immVertex2f(pos, soffx, 0.0f);
@@ -272,9 +272,9 @@ static void wm_method_draw_stereo3d_topbottom(wmWindow *win)
 	int view;
 	int soffy;
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int texcoord = VertexFormat_add_attrib(format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int texcoord = GWN_vertformat_attr_add(format, "texCoord", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	for (view = 0; view < 2; view ++) {
 		drawdata = BLI_findlink(&win->drawdata, (view * 2) + 1);
@@ -312,7 +312,7 @@ static void wm_method_draw_stereo3d_topbottom(wmWindow *win)
 		immUniform1f("alpha", 1.0f);
 		immUniform1i("image", 0); /* default GL_TEXTURE0 unit */
 
-		immBegin(PRIM_TRIANGLE_FAN, 4);
+		immBegin(GWN_PRIM_TRI_FAN, 4);
 
 		immAttrib2f(texcoord, halfx, halfy);
 		immVertex2f(pos, 0.0f, soffy);
@@ -373,7 +373,8 @@ static bool wm_stereo3d_is_fullscreen_required(eStereoDisplayMode stereo_display
 
 bool WM_stereo3d_enabled(wmWindow *win, bool skip_stereo3d_check)
 {
-	bScreen *screen = win->screen;
+	const bScreen *screen = WM_window_get_active_screen(win);
+	const Scene *scene = WM_window_get_active_scene(win);
 
 	/* some 3d methods change the window arrangement, thus they shouldn't
 	 * toggle on/off just because there is no 3d elements being drawn */
@@ -381,7 +382,7 @@ bool WM_stereo3d_enabled(wmWindow *win, bool skip_stereo3d_check)
 		return GHOST_GetWindowState(win->ghostwin) == GHOST_kWindowStateFullScreen;
 	}
 
-	if ((skip_stereo3d_check == false) && (ED_screen_stereo3d_required(screen) == false)) {
+	if ((skip_stereo3d_check == false) && (ED_screen_stereo3d_required(screen, scene) == false)) {
 		return false;
 	}
 
@@ -508,7 +509,7 @@ int wm_stereo3d_set_exec(bContext *C, wmOperator *op)
 	    prev_display_mode != win_src->stereo3d_format->display_mode)
 	{
 		/* in case the hardward supports pageflip but not the display */
-		if ((win_dst = wm_window_copy_test(C, win_src))) {
+		if ((win_dst = wm_window_copy_test(C, win_src, false))) {
 			/* pass */
 		}
 		else {
@@ -518,14 +519,16 @@ int wm_stereo3d_set_exec(bContext *C, wmOperator *op)
 		}
 	}
 	else if (win_src->stereo3d_format->display_mode == S3D_DISPLAY_PAGEFLIP) {
-		/* ED_screen_duplicate() can't handle other cases yet T44688 */
-		if (win_src->screen->state != SCREENNORMAL) {
+		const bScreen *screen = WM_window_get_active_screen(win_src);
+
+		/* ED_workspace_layout_duplicate() can't handle other cases yet T44688 */
+		if (screen->state != SCREENNORMAL) {
 			BKE_report(op->reports, RPT_ERROR,
 			           "Failed to switch to Time Sequential mode when in fullscreen");
 			ok = false;
 		}
 		/* pageflip requires a new window to be created with the proper OS flags */
-		else if ((win_dst = wm_window_copy_test(C, win_src))) {
+		else if ((win_dst = wm_window_copy_test(C, win_src, false))) {
 			if (wm_stereo3d_quadbuffer_supported()) {
 				BKE_report(op->reports, RPT_INFO, "Quad-buffer window successfully created");
 			}

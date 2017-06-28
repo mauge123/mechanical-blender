@@ -108,7 +108,7 @@ void KX_SoundActuator::play()
 	case KX_SOUNDACT_LOOPBIDIRECTIONAL:
 	case KX_SOUNDACT_LOOPBIDIRECTIONAL_STOP:
 		sound = AUD_Sound_pingpong(sound);
-		// fall through
+		ATTR_FALLTHROUGH;
 	case KX_SOUNDACT_LOOPEND:
 	case KX_SOUNDACT_LOOPSTOP:
 		loop = true;
@@ -124,7 +124,7 @@ void KX_SoundActuator::play()
 	AUD_Device_free(device);
 
 	// in case of pingpong, we have to free the sound
-	if(sound != m_sound)
+	if (sound != m_sound)
 		AUD_Sound_free(sound);
 
 	if (m_handle != NULL) {

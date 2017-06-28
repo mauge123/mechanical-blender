@@ -41,6 +41,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_lamp_types.h"
+#include "DNA_workspace_types.h"
 
 #include "BLI_math.h"
 #include "BLI_listbase.h"
@@ -59,6 +60,7 @@
 #include "BKE_property.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_workspace.h"
 #include "BKE_library.h"
 #include "BKE_deform.h"
 
@@ -110,7 +112,12 @@ void ED_base_object_activate(bContext *C, BaseLegacy *base)
 	BASACT = base;
 	
 	if (base) {
-		
+#ifdef USE_WORKSPACE_MODE
+		WorkSpace *workspace = CTX_wm_workspace(C);
+
+		BKE_workspace_object_mode_set(workspace, base->object->mode);
+#endif
+
 		/* XXX old signals, remember to handle notifiers now! */
 		//		select_actionchannel_by_name(base->object->action, "Object", 1);
 		

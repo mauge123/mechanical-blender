@@ -85,10 +85,9 @@ DECLARE_SPLIT_KERNEL_FUNCTION(subsurface_scatter)
 DECLARE_SPLIT_KERNEL_FUNCTION(direct_lighting)
 DECLARE_SPLIT_KERNEL_FUNCTION(shadow_blocked_ao)
 DECLARE_SPLIT_KERNEL_FUNCTION(shadow_blocked_dl)
+DECLARE_SPLIT_KERNEL_FUNCTION(enqueue_inactive)
 DECLARE_SPLIT_KERNEL_FUNCTION(next_iteration_setup)
 DECLARE_SPLIT_KERNEL_FUNCTION(indirect_subsurface)
 DECLARE_SPLIT_KERNEL_FUNCTION(buffer_update)
-
-void KERNEL_FUNCTION_FULL_NAME(register_functions)(void(*reg)(const char* name, void* func));
 
 #undef KERNEL_ARCH

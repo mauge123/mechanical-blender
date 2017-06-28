@@ -62,6 +62,7 @@
 #include "DNA_mask_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
+#include "DNA_lightprobe_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_speaker_types.h"
@@ -72,6 +73,7 @@
 #include "DNA_world_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_drawing_types.h"
+#include "DNA_workspace_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -118,6 +120,7 @@
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 #include "BKE_packedFile.h"
+#include "BKE_lightprobe.h"
 #include "BKE_sound.h"
 #include "BKE_speaker.h"
 #include "BKE_scene.h"
@@ -308,7 +311,7 @@ void BKE_id_expand_local(Main *bmain, ID *id)
 /**
  * Ensure new (copied) ID is fully made local.
  */
-void BKE_id_copy_ensure_local(Main *bmain, ID *old_id, ID *new_id)
+void BKE_id_copy_ensure_local(Main *bmain, const ID *old_id, ID *new_id)
 {
 	if (ID_IS_LINKED_DATABLOCK(old_id)) {
 		BKE_id_expand_local(bmain, new_id);
@@ -420,6 +423,9 @@ bool id_make_local(Main *bmain, ID *id, const bool test, const bool lib_local)
 		case ID_SPK:
 			if (!test) BKE_speaker_make_local(bmain, (Speaker *)id, lib_local);
 			return true;
+		case ID_LP:
+			if (!test) BKE_lightprobe_make_local(bmain, (LightProbe *)id, lib_local);
+			return true;
 		case ID_WO:
 			if (!test) BKE_world_make_local(bmain, (World *)id, lib_local);
 			return true;
@@ -473,7 +479,11 @@ bool id_make_local(Main *bmain, ID *id, const bool test, const bool lib_local)
 		case ID_CF:
 			if (!test) BKE_cachefile_make_local(bmain, (CacheFile *)id, lib_local);
 			return true;
+		case ID_WS:
 		case ID_SCR:
+			/* A bit special: can be appended but not linked. Return false
+			 * since supporting make-local doesn't make much sense. */
+			return false;
 		case ID_LI:
 		case ID_KE:
 		case ID_WM:
@@ -491,7 +501,7 @@ bool id_make_local(Main *bmain, ID *id, const bool test, const bool lib_local)
  * Invokes the appropriate copy method for the block and returns the result in
  * newid, unless test. Returns true if the block can be copied.
  */
-bool id_copy(Main *bmain, ID *id, ID **newid, bool test)
+bool id_copy(Main *bmain, const ID *id, ID **newid, bool test)
 {
 	if (!test) {
 		*newid = NULL;
@@ -530,6 +540,9 @@ bool id_copy(Main *bmain, ID *id, ID **newid, bool test)
 			return true;
 		case ID_SPK:
 			if (!test) *newid = (ID *)BKE_speaker_copy(bmain, (Speaker *)id);
+			return true;
+		case ID_LP:
+			if (!test) *newid = (ID *)BKE_lightprobe_copy(bmain, (LightProbe *)id);
 			return true;
 		case ID_CA:
 			if (!test) *newid = (ID *)BKE_camera_copy(bmain, (Camera *)id);
@@ -582,6 +595,7 @@ bool id_copy(Main *bmain, ID *id, ID **newid, bool test)
 		case ID_CF:
 			if (!test) *newid = (ID *)BKE_cachefile_copy(bmain, (CacheFile *)id);
 			return true;
+		case ID_WS:
 		case ID_SCE:
 		case ID_LI:
 		case ID_SCR:
@@ -669,6 +683,8 @@ ListBase *which_libbase(Main *mainlib, short type)
 			return &(mainlib->text);
 		case ID_SPK:
 			return &(mainlib->speaker);
+		case ID_LP:
+			return &(mainlib->lightprobe);
 		case ID_SO:
 			return &(mainlib->sound);
 		case ID_GR:
@@ -703,6 +719,8 @@ ListBase *which_libbase(Main *mainlib, short type)
 			return &(mainlib->dimensions);
 		case ID_DW:
 			return &(mainlib->drawings);
+		case ID_WS:
+			return &(mainlib->workspaces);
 	}
 	return NULL;
 }
@@ -841,6 +859,7 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[INDEX_ID_BR]  = &(main->brush);
 	lb[INDEX_ID_PA]  = &(main->particle);
 	lb[INDEX_ID_SPK] = &(main->speaker);
+	lb[INDEX_ID_LP]  = &(main->lightprobe);
 
 	lb[INDEX_ID_WO]  = &(main->world);
 	lb[INDEX_ID_MC]  = &(main->movieclip);
@@ -848,6 +867,7 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[INDEX_ID_OB]  = &(main->object);
 	lb[INDEX_ID_LS]  = &(main->linestyle); /* referenced by scenes */
 	lb[INDEX_ID_SCE] = &(main->scene);
+	lb[INDEX_ID_WS]  = &(main->workspaces); /* before wm, so it's freed after it! */
 	lb[INDEX_ID_WM]  = &(main->wm);
 	lb[INDEX_ID_MSK] = &(main->mask);
 // WITH_MECHANICAL
@@ -871,123 +891,76 @@ int set_listbasepointers(Main *main, ListBase **lb)
  * **************************** */
 
 /**
+ * Get allocation size fo a given datablock type and optionally allocation name.
+ */
+size_t BKE_libblock_get_alloc_info(short type, const char **name)
+{
+#define CASE_RETURN(id_code, type)  \
+	case id_code:                   \
+		do {                        \
+			if (name != NULL) {     \
+				*name = #type;      \
+			}                       \
+			return sizeof(type);    \
+		} while(0)
+
+	switch ((ID_Type)type) {
+		CASE_RETURN(ID_SCE, Scene);
+		CASE_RETURN(ID_LI,  Library);
+		CASE_RETURN(ID_OB,  Object);
+		CASE_RETURN(ID_ME,  Mesh);
+		CASE_RETURN(ID_CU,  Curve);
+		CASE_RETURN(ID_MB,  MetaBall);
+		CASE_RETURN(ID_MA,  Material);
+		CASE_RETURN(ID_TE,  Tex);
+		CASE_RETURN(ID_IM,  Image);
+		CASE_RETURN(ID_LT,  Lattice);
+		CASE_RETURN(ID_LA,  Lamp);
+		CASE_RETURN(ID_CA,  Camera);
+		CASE_RETURN(ID_IP,  Ipo);
+		CASE_RETURN(ID_KE,  Key);
+		CASE_RETURN(ID_WO,  World);
+		CASE_RETURN(ID_SCR, bScreen);
+		CASE_RETURN(ID_VF,  VFont);
+		CASE_RETURN(ID_TXT, Text);
+		CASE_RETURN(ID_SPK, Speaker);
+		CASE_RETURN(ID_LP,  LightProbe);
+		CASE_RETURN(ID_SO,  bSound);
+		CASE_RETURN(ID_GR,  Group);
+		CASE_RETURN(ID_AR,  bArmature);
+		CASE_RETURN(ID_AC,  bAction);
+		CASE_RETURN(ID_NT,  bNodeTree);
+		CASE_RETURN(ID_BR,  Brush);
+		CASE_RETURN(ID_PA,  ParticleSettings);
+		CASE_RETURN(ID_WM,  wmWindowManager);
+		CASE_RETURN(ID_GD,  bGPdata);
+		CASE_RETURN(ID_MC,  MovieClip);
+		CASE_RETURN(ID_MSK, Mask);
+		CASE_RETURN(ID_LS,  FreestyleLineStyle);
+		CASE_RETURN(ID_PAL, Palette);
+		CASE_RETURN(ID_PC,  PaintCurve);
+		CASE_RETURN(ID_CF,  CacheFile);
+		CASE_RETURN(ID_WS,  WorkSpace);
+		CASE_RETURN(ID_DM, MDim);
+		CASE_RETURN(ID_DW, Drawing);
+	}
+	return 0;
+#undef CASE_RETURN
+}
+
+/**
  * Allocates and returns memory of the right size for the specified block type,
  * initialized to zero.
  */
 void *BKE_libblock_alloc_notest(short type)
 {
-	ID *id = NULL;
-	
-	switch ((ID_Type)type) {
-		case ID_SCE:
-			id = MEM_callocN(sizeof(Scene), "scene");
-			break;
-		case ID_LI:
-			id = MEM_callocN(sizeof(Library), "library");
-			break;
-		case ID_OB:
-			id = MEM_callocN(sizeof(Object), "object");
-			break;
-		case ID_ME:
-			id = MEM_callocN(sizeof(Mesh), "mesh");
-			break;
-		case ID_CU:
-			id = MEM_callocN(sizeof(Curve), "curve");
-			break;
-		case ID_MB:
-			id = MEM_callocN(sizeof(MetaBall), "mball");
-			break;
-		case ID_MA:
-			id = MEM_callocN(sizeof(Material), "mat");
-			break;
-		case ID_TE:
-			id = MEM_callocN(sizeof(Tex), "tex");
-			break;
-		case ID_IM:
-			id = MEM_callocN(sizeof(Image), "image");
-			break;
-		case ID_LT:
-			id = MEM_callocN(sizeof(Lattice), "latt");
-			break;
-		case ID_LA:
-			id = MEM_callocN(sizeof(Lamp), "lamp");
-			break;
-		case ID_CA:
-			id = MEM_callocN(sizeof(Camera), "camera");
-			break;
-		case ID_IP:
-			id = MEM_callocN(sizeof(Ipo), "ipo");
-			break;
-		case ID_KE:
-			id = MEM_callocN(sizeof(Key), "key");
-			break;
-		case ID_WO:
-			id = MEM_callocN(sizeof(World), "world");
-			break;
-		case ID_SCR:
-			id = MEM_callocN(sizeof(bScreen), "screen");
-			break;
-		case ID_VF:
-			id = MEM_callocN(sizeof(VFont), "vfont");
-			break;
-		case ID_TXT:
-			id = MEM_callocN(sizeof(Text), "text");
-			break;
-		case ID_SPK:
-			id = MEM_callocN(sizeof(Speaker), "speaker");
-			break;
-		case ID_SO:
-			id = MEM_callocN(sizeof(bSound), "sound");
-			break;
-		case ID_GR:
-			id = MEM_callocN(sizeof(Group), "group");
-			break;
-		case ID_AR:
-			id = MEM_callocN(sizeof(bArmature), "armature");
-			break;
-		case ID_AC:
-			id = MEM_callocN(sizeof(bAction), "action");
-			break;
-		case ID_NT:
-			id = MEM_callocN(sizeof(bNodeTree), "nodetree");
-			break;
-		case ID_BR:
-			id = MEM_callocN(sizeof(Brush), "brush");
-			break;
-		case ID_PA:
-			id = MEM_callocN(sizeof(ParticleSettings), "ParticleSettings");
-			break;
-		case ID_WM:
-			id = MEM_callocN(sizeof(wmWindowManager), "Window manager");
-			break;
-		case ID_GD:
-			id = MEM_callocN(sizeof(bGPdata), "Grease Pencil");
-			break;
-		case ID_MC:
-			id = MEM_callocN(sizeof(MovieClip), "Movie Clip");
-			break;
-		case ID_MSK:
-			id = MEM_callocN(sizeof(Mask), "Mask");
-			break;
-		case ID_LS:
-			id = MEM_callocN(sizeof(FreestyleLineStyle), "Freestyle Line Style");
-			break;
-		case ID_PAL:
-			id = MEM_callocN(sizeof(Palette), "Palette");
-			break;
-		case ID_PC:
-			id = MEM_callocN(sizeof(PaintCurve), "Paint Curve");
-			break;
-		case ID_CF:
-			id = MEM_callocN(sizeof(CacheFile), "Cache File");
-			break;
-		case ID_DM:
-			id = MEM_callocN(sizeof(MDim), "Dimension");
-			break;
-		case ID_DW:
-			id = MEM_callocN(sizeof(Drawing), "Drawing");
+	const char *name;
+	size_t size = BKE_libblock_get_alloc_info(type, &name);
+	if (size != 0) {
+		return MEM_callocN(size, name);
 	}
-	return id;
+	BLI_assert(!"Request to allocate unknown data type");
+	return NULL;
 }
 
 /**
@@ -1063,6 +1036,9 @@ void BKE_libblock_init_empty(ID *id)
 			break;
 		case ID_SPK:
 			BKE_speaker_init((Speaker *)id);
+			break;
+		case ID_LP:
+			BKE_lightprobe_init((LightProbe *)id);
 			break;
 		case ID_CA:
 			BKE_camera_init((Camera *)id);
@@ -1156,7 +1132,7 @@ void BKE_libblock_copy_data(ID *id, const ID *id_from, const bool do_action)
 }
 
 /* used everywhere in blenkernel */
-void *BKE_libblock_copy(Main *bmain, ID *id)
+void *BKE_libblock_copy(Main *bmain, const ID *id)
 {
 	ID *idn;
 	size_t idn_len;
@@ -1178,7 +1154,7 @@ void *BKE_libblock_copy(Main *bmain, ID *id)
 	return idn;
 }
 
-void *BKE_libblock_copy_nolib(ID *id, const bool do_action)
+void *BKE_libblock_copy_nolib(const ID *id, const bool do_action)
 {
 	ID *idn;
 	size_t idn_len;
@@ -1740,10 +1716,19 @@ static void library_make_local_copying_check(ID *id, GSet *loop_tags, MainIDRela
 	for (; entry != NULL; entry = entry->next) {
 		ID *par_id = (ID *)entry->id_pointer;  /* used_to_user stores ID pointer, not pointer to ID pointer... */
 
-		/* Shapekeys are considered 'private' to their owner ID here, and never tagged (since they cannot be linked),
-		 * so we have to switch effective parent to their owner. */
-		if (GS(par_id->name) == ID_KE) {
-			par_id = ((Key *)par_id)->from;
+		/* Our oh-so-beloved 'from' pointers... */
+		if (entry->usage_flag & IDWALK_CB_LOOPBACK) {
+			/* We totally disregard Object->proxy_from 'usage' here, this one would only generate fake positives. */
+			if (GS(par_id->name) == ID_OB) {
+				BLI_assert(((Object *)par_id)->proxy_from == (Object *)id);
+				continue;
+			}
+
+			/* Shapekeys are considered 'private' to their owner ID here, and never tagged (since they cannot be linked),
+			 * so we have to switch effective parent to their owner. */
+			if (GS(par_id->name) == ID_KE) {
+				par_id = ((Key *)par_id)->from;
+			}
 		}
 
 		if (par_id->lib == NULL) {
@@ -2136,9 +2121,26 @@ void BKE_library_make_local(
 
 #ifdef DEBUG_TIME
 	printf("Step 6: Try to find circle dependencies between indirectly-linked-only datablocks: Done.\n");
-	TIMEIT_END(make_local);
+	TIMEIT_VALUE_PRINT(make_local);
 #endif
 
+#endif
+
+	/* This is probably more of a hack than something we should do here, but...
+	 * Issue is, the whole copying + remapping done in complex cases above may leave pose channels of armatures
+	 * in complete invalid state (more precisely, the bone pointers of the pchans - very crappy cross-datablocks
+	 * relationship), se we tag it to be fully recomputed, but this does not seems to be enough in some cases,
+	 * and evaluation code ends up trying to evaluate a not-yet-updated armature object's deformations.
+	 * Try "make all local" in 04_01_H.lighting.blend from Agent327 without this, e.g. */
+	for (Object *ob = bmain->object.first; ob; ob = ob->id.next) {
+		if (ob->data != NULL && ob->type == OB_ARMATURE && ob->pose != NULL && ob->pose->flag & POSE_RECALC) {
+			BKE_pose_rebuild(ob, ob->data);
+		}
+	}
+
+#ifdef DEBUG_TIME
+	printf("Hack: Forcefully rebuild armature object poses: Done.\n");
+	TIMEIT_VALUE_PRINT(make_local);
 #endif
 
 	BKE_main_id_clear_newpoins(bmain);

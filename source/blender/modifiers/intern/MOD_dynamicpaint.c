@@ -37,6 +37,7 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_dynamicpaint.h"
 #include "BKE_layer.h"
+#include "BKE_library.h"
 #include "BKE_library_query.h"
 #include "BKE_modifier.h"
 
@@ -58,6 +59,15 @@ static void copyData(ModifierData *md, ModifierData *target)
 	DynamicPaintModifierData *tpmd = (DynamicPaintModifierData *)target;
 	
 	dynamicPaint_Modifier_copy(pmd, tpmd);
+
+	if (tpmd->canvas) {
+		for (DynamicPaintSurface *surface = tpmd->canvas->surfaces.first; surface; surface = surface->next) {
+			id_us_plus((ID *)surface->init_texture);
+		}
+	}
+	if (tpmd->brush) {
+		id_us_plus((ID *)tpmd->brush->mat);
+	}
 }
 
 static void freeData(ModifierData *md)
@@ -78,7 +88,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 			if (surface->format == MOD_DPAINT_SURFACE_F_IMAGESEQ || 
 			    surface->init_color_type == MOD_DPAINT_INITIAL_TEXTURE)
 			{
-				dataMask |= CD_MASK_MLOOPUV | CD_MASK_MTEXPOLY;
+				dataMask |= CD_MASK_MLOOPUV;
 			}
 			/* mcol */
 			if (surface->type == MOD_DPAINT_SURFACE_T_PAINT ||
@@ -95,7 +105,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 
 	if (pmd->brush) {
 		if (pmd->brush->flags & MOD_DPAINT_USE_MATERIAL) {
-			dataMask |= CD_MASK_MLOOPUV | CD_MASK_MTEXPOLY;
+			dataMask |= CD_MASK_MLOOPUV;
 		}
 	}
 	return dataMask;

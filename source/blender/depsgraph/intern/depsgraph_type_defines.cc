@@ -32,12 +32,11 @@
 
 #include <cstdlib>  // for BLI_assert()
 
-extern "C" {
+
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 
 #include "DEG_depsgraph.h"
-} /* extern "C" */
 
 #include "intern/nodes/deg_node.h"
 #include "intern/nodes/deg_node_component.h"
@@ -67,7 +66,9 @@ static GHash *_depsnode_typeinfo_registry = NULL;
 void deg_register_node_typeinfo(DepsNodeFactory *factory)
 {
 	BLI_assert(factory != NULL);
-	BLI_ghash_insert(_depsnode_typeinfo_registry, SET_INT_IN_POINTER(factory->type()), factory);
+	BLI_ghash_insert(_depsnode_typeinfo_registry,
+	                 SET_INT_IN_POINTER(factory->type()),
+	                 factory);
 }
 
 /* Getters ------------------------------------------------- */
@@ -76,7 +77,8 @@ void deg_register_node_typeinfo(DepsNodeFactory *factory)
 DepsNodeFactory *deg_get_node_factory(const eDepsNode_Type type)
 {
 	/* look up type - at worst, it doesn't exist in table yet, and we fail */
-	return (DepsNodeFactory *)BLI_ghash_lookup(_depsnode_typeinfo_registry, SET_INT_IN_POINTER(type));
+	return (DepsNodeFactory *)BLI_ghash_lookup(_depsnode_typeinfo_registry,
+	                                           SET_INT_IN_POINTER(type));
 }
 
 /* Get typeinfo for provided node */
@@ -98,23 +100,17 @@ static const char *stringify_opcode(eDepsOperation_Code opcode)
 #define STRINGIFY_OPCODE(name) case DEG_OPCODE_##name: return #name
 		STRINGIFY_OPCODE(OPERATION);
 		STRINGIFY_OPCODE(PLACEHOLDER);
-		STRINGIFY_OPCODE(NOOP);
 		STRINGIFY_OPCODE(ANIMATION);
 		STRINGIFY_OPCODE(DRIVER);
-		//STRINGIFY_OPCODE(PROXY);
 		STRINGIFY_OPCODE(TRANSFORM_LOCAL);
 		STRINGIFY_OPCODE(TRANSFORM_PARENT);
 		STRINGIFY_OPCODE(TRANSFORM_CONSTRAINTS);
-		//STRINGIFY_OPCODE(TRANSFORM_CONSTRAINTS_INIT);
-		//STRINGIFY_OPCODE(TRANSFORM_CONSTRAINT);
-		//STRINGIFY_OPCODE(TRANSFORM_CONSTRAINTS_DONE);
 		STRINGIFY_OPCODE(RIGIDBODY_REBUILD);
 		STRINGIFY_OPCODE(RIGIDBODY_SIM);
 		STRINGIFY_OPCODE(TRANSFORM_RIGIDBODY);
 		STRINGIFY_OPCODE(TRANSFORM_FINAL);
 		STRINGIFY_OPCODE(OBJECT_UBEREVAL);
 		STRINGIFY_OPCODE(GEOMETRY_UBEREVAL);
-		STRINGIFY_OPCODE(GEOMETRY_MODIFIER);
 		STRINGIFY_OPCODE(GEOMETRY_PATH);
 		STRINGIFY_OPCODE(POSE_INIT);
 		STRINGIFY_OPCODE(POSE_DONE);
@@ -123,9 +119,6 @@ static const char *stringify_opcode(eDepsOperation_Code opcode)
 		STRINGIFY_OPCODE(BONE_LOCAL);
 		STRINGIFY_OPCODE(BONE_POSE_PARENT);
 		STRINGIFY_OPCODE(BONE_CONSTRAINTS);
-		//STRINGIFY_OPCODE(BONE_CONSTRAINTS_INIT);
-		//STRINGIFY_OPCODE(BONE_CONSTRAINT);
-		//STRINGIFY_OPCODE(BONE_CONSTRAINTS_DONE);
 		STRINGIFY_OPCODE(BONE_READY);
 		STRINGIFY_OPCODE(BONE_DONE);
 		STRINGIFY_OPCODE(PSYS_EVAL);
@@ -133,6 +126,8 @@ static const char *stringify_opcode(eDepsOperation_Code opcode)
 		STRINGIFY_OPCODE(SCENE_LAYER_INIT);
 		STRINGIFY_OPCODE(SCENE_LAYER_EVAL);
 		STRINGIFY_OPCODE(SCENE_LAYER_DONE);
+
+		STRINGIFY_OPCODE(COPY_ON_WRITE);
 
 		case DEG_NUM_OPCODES: return "SpecialCase";
 #undef STRINGIFY_OPCODE

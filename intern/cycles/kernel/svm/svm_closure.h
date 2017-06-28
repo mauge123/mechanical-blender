@@ -79,14 +79,14 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 #ifdef __PRINCIPLED__
 		case CLOSURE_BSDF_PRINCIPLED_ID: {
 			uint specular_offset, roughness_offset, specular_tint_offset, anisotropic_offset, sheen_offset,
-				sheen_tint_offset, clearcoat_offset, clearcoat_gloss_offset, eta_offset, transparency_offset,
-				anisotropic_rotation_offset, refraction_roughness_offset;
+				sheen_tint_offset, clearcoat_offset, clearcoat_roughness_offset, eta_offset, transmission_offset,
+				anisotropic_rotation_offset, transmission_roughness_offset;
 			uint4 data_node2 = read_node(kg, offset);
 
 			float3 T = stack_load_float3(stack, data_node.y);
 			decode_node_uchar4(data_node.z, &specular_offset, &roughness_offset, &specular_tint_offset, &anisotropic_offset);
-			decode_node_uchar4(data_node.w, &sheen_offset, &sheen_tint_offset, &clearcoat_offset, &clearcoat_gloss_offset);
-			decode_node_uchar4(data_node2.x, &eta_offset, &transparency_offset, &anisotropic_rotation_offset, &refraction_roughness_offset);
+			decode_node_uchar4(data_node.w, &sheen_offset, &sheen_tint_offset, &clearcoat_offset, &clearcoat_roughness_offset);
+			decode_node_uchar4(data_node2.x, &eta_offset, &transmission_offset, &anisotropic_rotation_offset, &transmission_roughness_offset);
 
 			// get Disney principled parameters
 			float metallic = param1;
@@ -98,10 +98,10 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 			float sheen = stack_load_float(stack, sheen_offset);
 			float sheen_tint = stack_load_float(stack, sheen_tint_offset);
 			float clearcoat = stack_load_float(stack, clearcoat_offset);
-			float clearcoat_gloss = stack_load_float(stack, clearcoat_gloss_offset);
-			float transparency = stack_load_float(stack, transparency_offset);
+			float clearcoat_roughness = stack_load_float(stack, clearcoat_roughness_offset);
+			float transmission = stack_load_float(stack, transmission_offset);
 			float anisotropic_rotation = stack_load_float(stack, anisotropic_rotation_offset);
-			float refraction_roughness = stack_load_float(stack, refraction_roughness_offset);
+			float transmission_roughness = stack_load_float(stack, transmission_roughness_offset);
 			float eta = fmaxf(stack_load_float(stack, eta_offset), 1e-5f);
 
 			ClosureType distribution = stack_valid(data_node2.y) ? (ClosureType) data_node2.y : CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID;
@@ -118,10 +118,10 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 			float fresnel = fresnel_dielectric_cos(cosNO, ior);
 
 			// calculate weights of the diffuse and specular part
-			float diffuse_weight = (1.0f - saturate(metallic)) * (1.0f - saturate(transparency));
+			float diffuse_weight = (1.0f - saturate(metallic)) * (1.0f - saturate(transmission));
 			
-			float transp = saturate(transparency) * (1.0f - saturate(metallic));
-			float specular_weight = (1.0f - transp);
+			float final_transmission = saturate(transmission) * (1.0f - saturate(metallic));
+			float specular_weight = (1.0f - final_transmission);
 
 			// get the base color
 			uint4 data_base_color = read_node(kg, offset);
@@ -141,8 +141,8 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 			float3 weight = sd->svm_closure_weight * mix_weight;
 
 #ifdef __SUBSURFACE__
-			float3 albedo = subsurface_color * subsurface + base_color * (1.0f - subsurface);
-			float3 subsurf_weight = weight * albedo * diffuse_weight;
+			float3 mixed_ss_base_color = subsurface_color * subsurface + base_color * (1.0f - subsurface);
+			float3 subsurf_weight = weight * mixed_ss_base_color * diffuse_weight;
 			float subsurf_sample_weight = fabsf(average(subsurf_weight));
 
 			/* disable in case of diffuse ancestor, can't see it well then and
@@ -150,6 +150,11 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 			 * getting lower and lower */
 			if(path_flag & PATH_RAY_DIFFUSE_ANCESTOR) {
 				subsurface = 0.0f;
+
+				/* need to set the base color in this case such that the
+				 * rays get the correctly mixed color after transmitting
+				 * the object */
+				base_color = mixed_ss_base_color;
 			}
 
 			/* diffuse */
@@ -181,7 +186,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 						bssrdf->sample_weight = subsurf_sample_weight;
 						bssrdf->radius = radius.x;
 						bssrdf->texture_blur = texture_blur;
-						bssrdf->albedo = albedo.x;
+						bssrdf->albedo = subsurface_color.x;
 						bssrdf->sharpness = sharpness;
 						bssrdf->N = N;
 						bssrdf->roughness = roughness;
@@ -195,7 +200,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 						bssrdf->sample_weight = subsurf_sample_weight;
 						bssrdf->radius = radius.y;
 						bssrdf->texture_blur = texture_blur;
-						bssrdf->albedo = albedo.y;
+						bssrdf->albedo = subsurface_color.y;
 						bssrdf->sharpness = sharpness;
 						bssrdf->N = N;
 						bssrdf->roughness = roughness;
@@ -209,7 +214,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 						bssrdf->sample_weight = subsurf_sample_weight;
 						bssrdf->radius = radius.z;
 						bssrdf->texture_blur = texture_blur;
-						bssrdf->albedo = albedo.z;
+						bssrdf->albedo = subsurface_color.z;
 						bssrdf->sharpness = sharpness;
 						bssrdf->N = N;
 						bssrdf->roughness = roughness;
@@ -287,9 +292,9 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 
 						/* setup bsdf */
 						if(distribution == CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID || roughness <= 0.075f) /* use single-scatter GGX */
-							sd->flag |= bsdf_microfacet_ggx_aniso_fresnel_setup(bsdf);
+							sd->flag |= bsdf_microfacet_ggx_aniso_fresnel_setup(bsdf, sd);
 						else /* use multi-scatter GGX */
-							sd->flag |= bsdf_microfacet_multi_ggx_aniso_fresnel_setup(bsdf);
+							sd->flag |= bsdf_microfacet_multi_ggx_aniso_fresnel_setup(bsdf, sd);
 					}
 				}
 #ifdef __CAUSTICS_TRICKS__
@@ -300,8 +305,8 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 #ifdef __CAUSTICS_TRICKS__
 			if(kernel_data.integrator.caustics_reflective || kernel_data.integrator.caustics_refractive || (path_flag & PATH_RAY_DIFFUSE) == 0) {
 #endif
-				if(transp > CLOSURE_WEIGHT_CUTOFF) {
-					float3 glass_weight = weight * transp;
+				if(final_transmission > CLOSURE_WEIGHT_CUTOFF) {
+					float3 glass_weight = weight * final_transmission;
 					float3 cspec0 = base_color * specular_tint + make_float3(1.0f, 1.0f, 1.0f) * (1.0f - specular_tint);
 
 					if(roughness <= 5e-2f || distribution == CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID) { /* use single-scatter GGX */
@@ -327,7 +332,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 								bsdf->extra->cspec0 = cspec0;
 
 								/* setup bsdf */
-								sd->flag |= bsdf_microfacet_ggx_fresnel_setup(bsdf);
+								sd->flag |= bsdf_microfacet_ggx_fresnel_setup(bsdf, sd);
 							}
 						}
 
@@ -342,12 +347,12 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 								bsdf->N = N;
 
 								if(distribution == CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID)
-									refraction_roughness = 1.0f - (1.0f - refl_roughness) * (1.0f - refraction_roughness);
+									transmission_roughness = 1.0f - (1.0f - refl_roughness) * (1.0f - transmission_roughness);
 								else
-									refraction_roughness = refl_roughness;
+									transmission_roughness = refl_roughness;
 
-								bsdf->alpha_x = refraction_roughness * refraction_roughness;
-								bsdf->alpha_y = refraction_roughness * refraction_roughness;
+								bsdf->alpha_x = transmission_roughness * transmission_roughness;
+								bsdf->alpha_y = transmission_roughness * transmission_roughness;
 								bsdf->ior = ior;
 
 								/* setup bsdf */
@@ -372,7 +377,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 							bsdf->extra->cspec0 = cspec0;
 
 							/* setup bsdf */
-							sd->flag |= bsdf_microfacet_multi_ggx_glass_fresnel_setup(bsdf);
+							sd->flag |= bsdf_microfacet_multi_ggx_glass_fresnel_setup(bsdf, sd);
 						}
 					}
 				}
@@ -393,14 +398,14 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 						bsdf->ior = 1.5f;
 						bsdf->extra = extra;
 
-						bsdf->alpha_x = 0.1f * (1.0f - clearcoat_gloss) + 0.001f * clearcoat_gloss;
-						bsdf->alpha_y = 0.1f * (1.0f - clearcoat_gloss) + 0.001f * clearcoat_gloss;
+						bsdf->alpha_x = clearcoat_roughness * clearcoat_roughness;
+						bsdf->alpha_y = clearcoat_roughness * clearcoat_roughness;
 
 						bsdf->extra->cspec0 = make_float3(0.04f, 0.04f, 0.04f);
 						bsdf->extra->clearcoat = clearcoat;
 
 						/* setup bsdf */
-						sd->flag |= bsdf_microfacet_ggx_clearcoat_setup(bsdf);
+						sd->flag |= bsdf_microfacet_ggx_clearcoat_setup(bsdf, sd);
 					}
 				}
 #ifdef __CAUSTICS_TRICKS__
@@ -444,6 +449,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 			ShaderClosure *bsdf = bsdf_alloc(sd, sizeof(ShaderClosure), weight);
 
 			if(bsdf) {
+				bsdf->N = N;
 				sd->flag |= bsdf_transparent_setup(bsdf);
 			}
 			break;
@@ -678,6 +684,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 #ifdef __CAUSTICS_TRICKS__
 			if(!kernel_data.integrator.caustics_reflective && (path_flag & PATH_RAY_DIFFUSE))
 				break;
+			ATTR_FALLTHROUGH;
 #endif
 		case CLOSURE_BSDF_DIFFUSE_TOON_ID: {
 			float3 weight = sd->svm_closure_weight * mix_weight;
@@ -704,6 +711,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg, ShaderData *sd, float *
 				ShaderClosure *bsdf = bsdf_alloc(sd, sizeof(ShaderClosure), weight);
 
 				if(bsdf) {
+					bsdf->N = N;
 					/* todo: giving a fixed weight here will cause issues when
 					 * mixing multiple BSDFS. energy will not be conserved and
 					 * the throughput can blow up after multiple bounces. we

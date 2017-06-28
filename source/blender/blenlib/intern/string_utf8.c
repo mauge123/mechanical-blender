@@ -167,7 +167,7 @@ utf8_error:
 /**
  * Remove any invalid utf-8 byte (taking into account multi-bytes sequence of course).
  *
- * @return number of stripped bytes.
+ * \return number of stripped bytes.
  */
 int BLI_utf8_invalid_strip(char *str, size_t length)
 {
@@ -205,11 +205,11 @@ int BLI_utf8_invalid_strip(char *str, size_t length)
 		while (*src != '\0' && (utf8_size = utf8_skip_data[*src]) < maxncpy) {\
 			maxncpy -= utf8_size;                                             \
 			switch (utf8_size) {                                              \
-				case 6: *dst ++ = *src ++;                                    \
-				case 5: *dst ++ = *src ++;                                    \
-				case 4: *dst ++ = *src ++;                                    \
-				case 3: *dst ++ = *src ++;                                    \
-				case 2: *dst ++ = *src ++;                                    \
+				case 6: *dst ++ = *src ++; ATTR_FALLTHROUGH;                  \
+				case 5: *dst ++ = *src ++; ATTR_FALLTHROUGH;                  \
+				case 4: *dst ++ = *src ++; ATTR_FALLTHROUGH;                  \
+				case 3: *dst ++ = *src ++; ATTR_FALLTHROUGH;                  \
+				case 2: *dst ++ = *src ++; ATTR_FALLTHROUGH;                  \
 				case 1: *dst ++ = *src ++;                                    \
 			}                                                                 \
 		}                                                                     \

@@ -43,6 +43,7 @@ struct wmEvent;
 struct wmKeyConfig;
 struct wmKeyMap;
 struct wmOperatorType;
+struct WorkSpace;
 struct Main;
 struct SnapObjectContext;
 struct SnapObjectParams;
@@ -139,7 +140,7 @@ void BIF_createTransformOrientation(struct bContext *C, struct ReportList *repor
                                     const bool activate, const bool overwrite);
 #endif
 void BIF_selectTransformOrientation(struct bContext *C, struct TransformOrientation *ts);
-void BIF_selectTransformOrientationValue(struct bContext *C, int orientation);
+void BIF_selectTransformOrientationValue(struct View3D *v3d, int orientation);
 
 void ED_getTransformOrientationMatrix(const struct bContext *C, float orientation_mat[3][3], const short around);
 
@@ -167,12 +168,10 @@ void Transform_Properties(struct wmOperatorType *ot, int flags);
 
 void TRANSFORM_WGT_manipulator(struct wmManipulatorGroupType *wgt);
 
-void TRANSFORM_WGT_object(struct wmManipulatorGroupType *wgt);
-
-bool WIDGETGROUP_manipulator2d_poll(const struct bContext *C, struct wmManipulatorGroupType *wgrouptype);
-void WIDGETGROUP_manipulator2d_init(const struct bContext *C, struct wmManipulatorGroup *wgroup);
-void WIDGETGROUP_manipulator2d_refresh(const struct bContext *C, struct wmManipulatorGroup *wgroup);
-void WIDGETGROUP_manipulator2d_draw_prepare(const struct bContext *C, struct wmManipulatorGroup *wgroup);
+bool ED_widgetgroup_manipulator2d_poll(const struct bContext *C, struct wmManipulatorGroupType *wgt);
+void ED_widgetgroup_manipulator2d_setup(const struct bContext *C, struct wmManipulatorGroup *mgroup);
+void ED_widgetgroup_manipulator2d_refresh(const struct bContext *C, struct wmManipulatorGroup *mgroup);
+void ED_widgetgroup_manipulator2d_draw_prepare(const struct bContext *C, struct wmManipulatorGroup *mgroup);
 
 
 /* Snapping */

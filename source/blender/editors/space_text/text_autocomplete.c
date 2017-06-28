@@ -328,7 +328,7 @@ static int text_autocomplete_modal(bContext *C, wmOperator *op, const wmEvent *e
 					if (tools & TOOL_SUGG_LIST) {
 						texttool_suggest_clear();
 					}
-					if (tools & TOOL_DOCUMENT)  {
+					if (tools & TOOL_DOCUMENT) {
 						texttool_docs_clear();
 						doc_scroll = 0;
 					}
@@ -455,7 +455,7 @@ static int text_autocomplete_modal(bContext *C, wmOperator *op, const wmEvent *e
 			break;
 		case PAGEDOWNKEY:
 			scroll = SUGG_LIST_SIZE - 1;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case WHEELDOWNMOUSE:
 		case DOWNARROWKEY:
 			if (event->val == KM_PRESS) {
@@ -489,7 +489,7 @@ static int text_autocomplete_modal(bContext *C, wmOperator *op, const wmEvent *e
 			break;
 		case PAGEUPKEY:
 			scroll = SUGG_LIST_SIZE - 1;
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case WHEELUPMOUSE:
 		case UPARROWKEY:
 			if (event->val == KM_PRESS) {

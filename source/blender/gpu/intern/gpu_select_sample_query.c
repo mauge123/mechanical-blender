@@ -69,8 +69,6 @@ typedef struct GPUQueryState {
 	char mode;
 	unsigned int index;
 	int oldhits;
-	/* OpenGL attrib bits */
-	struct GPUStateValues attribs;
 } GPUQueryState;
 
 static GPUQueryState g_query_state = {0};
@@ -98,7 +96,7 @@ void gpu_select_query_begin(
 	g_query_state.id = MEM_mallocN(g_query_state.num_of_queries * sizeof(*g_query_state.id), "gpu selection ids");
 	glGenQueries(g_query_state.num_of_queries, g_query_state.queries);
 
-	gpuSaveState(&g_query_state.attribs, GPU_DEPTH_BUFFER_BIT | GPU_VIEWPORT_BIT);
+	gpuPushAttrib(GPU_DEPTH_BUFFER_BIT | GPU_VIEWPORT_BIT);
 	/* disable writing to the framebuffer */
 	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
@@ -146,13 +144,17 @@ bool gpu_select_query_load_id(unsigned int id)
 	g_query_state.active_query++;
 	g_query_state.query_issued = true;
 
-	if (g_query_state.mode == GPU_SELECT_NEAREST_SECOND_PASS && g_query_state.index < g_query_state.oldhits) {
-		if (g_query_state.buffer[g_query_state.index][3] == id) {
-			g_query_state.index++;
-			return true;
-		}
-		else {
-			return false;
+	if (g_query_state.mode == GPU_SELECT_NEAREST_SECOND_PASS) {
+		/* Second pass should never run if first pass fails, can read past 'bufsize' in this case. */
+		BLI_assert(g_query_state.oldhits != -1);
+		if (g_query_state.index < g_query_state.oldhits) {
+			if (g_query_state.buffer[g_query_state.index][3] == id) {
+				g_query_state.index++;
+				return true;
+			}
+			else {
+				return false;
+			}
 		}
 	}
 
@@ -206,7 +208,7 @@ unsigned int gpu_select_query_end(void)
 	glDeleteQueries(g_query_state.num_of_queries, g_query_state.queries);
 	MEM_freeN(g_query_state.queries);
 	MEM_freeN(g_query_state.id);
-	gpuRestoreState(&g_query_state.attribs);
+	gpuPopAttrib();
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
 	return hits;

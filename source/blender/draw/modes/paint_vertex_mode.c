@@ -38,18 +38,17 @@
 extern struct GPUUniformBuffer *globals_ubo; /* draw_common.c */
 extern struct GlobalsUboStorage ts; /* draw_common.c */
 
+extern char datatoc_paint_wire_vert_glsl[];
+extern char datatoc_paint_wire_frag_glsl[];
+extern char datatoc_common_globals_lib_glsl[];
+
 /* *********** LISTS *********** */
 
 typedef struct PAINT_VERTEX_PassList {
 	struct DRWPass *vcolor_faces;
 	struct DRWPass *wire_overlay;
+	struct DRWPass *face_overlay;
 } PAINT_VERTEX_PassList;
-
-typedef struct PAINT_VERTEX_FramebufferList {
-} PAINT_VERTEX_FramebufferList;
-
-typedef struct PAINT_VERTEX_TextureList {
-} PAINT_VERTEX_TextureList;
 
 typedef struct PAINT_VERTEX_StorageList {
 	struct PAINT_VERTEX_PrivateData *g_data;
@@ -57,8 +56,8 @@ typedef struct PAINT_VERTEX_StorageList {
 
 typedef struct PAINT_VERTEX_Data {
 	void *engine_type; /* Required */
-	PAINT_VERTEX_FramebufferList *fbl;
-	PAINT_VERTEX_TextureList *txl;
+	DRWViewportEmptyList *fbl;
+	DRWViewportEmptyList *txl;
 	PAINT_VERTEX_PassList *psl;
 	PAINT_VERTEX_StorageList *stl;
 } PAINT_VERTEX_Data;
@@ -68,11 +67,13 @@ typedef struct PAINT_VERTEX_Data {
 static struct {
 	struct GPUShader *vcolor_face_shader;
 	struct GPUShader *wire_overlay_shader;
+	struct GPUShader *face_overlay_shader;
 } e_data = {NULL}; /* Engine data */
 
 typedef struct PAINT_VERTEX_PrivateData {
 	DRWShadingGroup *fvcolor_shgrp;
 	DRWShadingGroup *lwire_shgrp;
+	DRWShadingGroup *face_shgrp;
 } PAINT_VERTEX_PrivateData; /* Transient data */
 
 /* *********** FUNCTIONS *********** */
@@ -84,7 +85,14 @@ static void PAINT_VERTEX_engine_init(void *UNUSED(vedata))
 	}
 
 	if (!e_data.wire_overlay_shader) {
-		e_data.wire_overlay_shader = GPU_shader_get_builtin_shader(GPU_SHADER_3D_FLAT_COLOR);
+		e_data.wire_overlay_shader = DRW_shader_create_with_lib(
+		        datatoc_paint_wire_vert_glsl, NULL,
+		        datatoc_paint_wire_frag_glsl,
+		        datatoc_common_globals_lib_glsl, "#define VERTEX_MODE\n");
+	}
+
+	if (!e_data.face_overlay_shader) {
+		e_data.face_overlay_shader = GPU_shader_get_builtin_shader(GPU_SHADER_3D_UNIFORM_COLOR);
 	}
 }
 
@@ -118,28 +126,42 @@ static void PAINT_VERTEX_cache_init(void *vedata)
 
 		stl->g_data->lwire_shgrp = DRW_shgroup_create(e_data.wire_overlay_shader, psl->wire_overlay);
 	}
+
+	{
+		psl->face_overlay = DRW_pass_create("Face Mask Pass", DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS | DRW_STATE_BLEND);
+
+		stl->g_data->face_shgrp = DRW_shgroup_create(e_data.face_overlay_shader, psl->face_overlay);
+
+		static float col[4] = {1.0f, 1.0f, 1.0f, 0.2f};
+		DRW_shgroup_uniform_vec4(stl->g_data->face_shgrp, "color", col, 1);
+	}
 }
 
 static void PAINT_VERTEX_cache_populate(void *vedata, Object *ob)
 {
 	PAINT_VERTEX_StorageList *stl = ((PAINT_VERTEX_Data *)vedata)->stl;
 	const DRWContextState *draw_ctx = DRW_context_state_get();
-	SceneLayer *sl = draw_ctx->sl;
 
-	if (ob->type == OB_MESH && ob == sl->basact->object) {
-		IDProperty *ces_mode_pw = BKE_object_collection_engine_get(ob, COLLECTION_MODE_PAINT_VERTEX, "");
+	if ((ob->type == OB_MESH) && (ob == draw_ctx->obact)) {
+		IDProperty *ces_mode_pw = BKE_layer_collection_engine_evaluated_get(ob, COLLECTION_MODE_PAINT_VERTEX, "");
 		bool use_wire = BKE_collection_engine_property_value_get_bool(ces_mode_pw, "use_wire");
-		char flag = ((Mesh *)ob->data)->editflag;
-		struct Batch *geom;
+		const Mesh *me = ob->data;
+		const bool use_face_sel = (me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
+		struct Gwn_Batch *geom;
 
 		world_light = BKE_collection_engine_property_value_get_bool(ces_mode_pw, "use_shading") ? 0.5f : 1.0f;
 
 		geom = DRW_cache_mesh_surface_vert_colors_get(ob);
 		DRW_shgroup_call_add(stl->g_data->fvcolor_shgrp, geom, ob->obmat);
 
-		if (flag & ME_EDIT_PAINT_FACE_SEL || use_wire) {
-			geom = DRW_cache_mesh_edges_paint_overlay_get(ob, use_wire, flag & ME_EDIT_PAINT_FACE_SEL, true);
+		if (use_face_sel || use_wire) {
+			geom = DRW_cache_mesh_edges_paint_overlay_get(ob, use_wire, use_face_sel);
 			DRW_shgroup_call_add(stl->g_data->lwire_shgrp, geom, ob->obmat);
+		}
+
+		if (use_face_sel) {
+			geom = DRW_cache_mesh_faces_weight_overlay_get(ob);
+			DRW_shgroup_call_add(stl->g_data->face_shgrp, geom, ob->obmat);
 		}
 	}
 }
@@ -149,11 +171,13 @@ static void PAINT_VERTEX_draw_scene(void *vedata)
 	PAINT_VERTEX_PassList *psl = ((PAINT_VERTEX_Data *)vedata)->psl;
 
 	DRW_draw_pass(psl->vcolor_faces);
+	DRW_draw_pass(psl->face_overlay);
 	DRW_draw_pass(psl->wire_overlay);
 }
 
 static void PAINT_VERTEX_engine_free(void)
 {
+	DRW_SHADER_FREE_SAFE(e_data.wire_overlay_shader);
 }
 
 void PAINT_VERTEX_collection_settings_create(IDProperty *properties)

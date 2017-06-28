@@ -878,7 +878,7 @@ static hash_key key_from_chunk_ref(
 {
 	/* in C, will fill in a reusable array */
 	BChunk *chunk = cref->link;
-	BLI_assert(info->accum_read_ahead_bytes * info->chunk_stride);
+	BLI_assert((info->accum_read_ahead_bytes * info->chunk_stride) != 0);
 
 	if (info->accum_read_ahead_bytes <= chunk->data_len) {
 		hash_key key;
@@ -1560,7 +1560,7 @@ BArrayState *BLI_array_store_state_add(
         const void *data, const size_t data_len,
         const BArrayState *state_reference)
 {
-    /* ensure we're aligned to the stride */
+	/* ensure we're aligned to the stride */
 	BLI_assert((data_len % bs->info.chunk_stride) == 0);
 
 #ifdef USE_PARANOID_CHECKS

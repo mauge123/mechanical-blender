@@ -151,6 +151,7 @@ MINLINE void negate_v3_short(short r[3]);
 MINLINE void negate_v3_db(double r[3]);
 
 MINLINE void invert_v2(float r[2]);
+MINLINE void invert_v3(float r[3]);
 
 MINLINE void abs_v2(float r[2]);
 MINLINE void abs_v2_v2(float r[2], const float a[2]);
@@ -286,6 +287,8 @@ float angle_v3v3(const float a[3], const float b[3]) ATTR_WARN_UNUSED_RESULT;
 float angle_v3v3v3(const float a[3], const float b[3], const float c[3]) ATTR_WARN_UNUSED_RESULT;
 float cos_v3v3v3(const float p1[3], const float p2[3], const float p3[3]) ATTR_WARN_UNUSED_RESULT;
 float cos_v2v2v2(const float p1[2], const float p2[2], const float p3[2]) ATTR_WARN_UNUSED_RESULT;
+float angle_on_axis_v3v3_v3(const float v1[3], const float v2[3], const float axis[3]) ATTR_WARN_UNUSED_RESULT;
+float angle_signed_on_axis_v3v3_v3(const float v1[3], const float v2[3], const float axis[3]) ATTR_WARN_UNUSED_RESULT;
 float angle_normalized_v3v3(const float v1[3], const float v2[3]) ATTR_WARN_UNUSED_RESULT;
 float angle_on_axis_v3v3v3_v3(const float v1[3], const float v2[3], const float v3[3], const float axis[3]) ATTR_WARN_UNUSED_RESULT;
 float angle_signed_on_axis_v3v3v3_v3(const float v1[3], const float v2[3], const float v3[3], const float axis[3]) ATTR_WARN_UNUSED_RESULT;
@@ -299,6 +302,8 @@ void project_v2_v2v2(float out[2], const float p[2], const float v_proj[2]);
 void project_v3_v3v3(float out[3], const float p[3], const float v_proj[3]);
 void project_plane_v3_v3v3(float out[3], const float p[3], const float v_plane[3]);
 void project_plane_v2_v2v2(float out[2], const float p[2], const float v_plane[2]);
+void project_plane_normalized_v3_v3v3(float out[3], const float p[3], const float v_plane[3]);
+void project_plane_normalized_v2_v2v2(float out[2], const float p[2], const float v_plane[2]);
 void project_v3_plane(float out[3], const float plane_no[3], const float plane_co[3]);
 void reflect_v3_v3v3(float out[3], const float vec[3], const float normal[3]);
 void ortho_basis_v3v3_v3(float r_n1[3], float r_n2[3], const float n[3]);
@@ -321,6 +326,7 @@ void print_vn(const char *str, const float v[], const int n);
 #define print_v4_id(v) print_v4(STRINGIFY(v), v)
 #define print_vn_id(v, n) print_vn(STRINGIFY(v), v, n)
 
+MINLINE void normal_float_to_short_v2(short r[2], const float n[2]);
 MINLINE void normal_short_to_float_v3(float r[3], const short n[3]);
 MINLINE void normal_float_to_short_v3(short r[3], const float n[3]);
 

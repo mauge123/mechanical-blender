@@ -351,8 +351,8 @@ static void draw_marker(
 	if (flag & DRAW_MARKERS_LINES)
 #endif
 	{
-		VertexFormat *format = immVertexFormat();
-		uint pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		Gwn_VertFormat *format = immVertexFormat();
+		uint pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
 
@@ -369,7 +369,7 @@ static void draw_marker(
 		immUniform1f("dash_width", 6.0f);
 		immUniform1f("dash_factor", 0.5f);
 
-		immBegin(PRIM_LINES, 2);
+		immBegin(GWN_PRIM_LINES, 2);
 		immVertex2f(pos, xpos + 0.5f, 12.0f);
 		immVertex2f(pos, xpos + 0.5f, (v2d->cur.ymax + 12.0f) * yscale);
 		immEnd();
@@ -452,7 +452,7 @@ void ED_markers_draw(const bContext *C, int flag)
 	v2d = UI_view2d_fromcontext(C);
 
 	if (flag & DRAW_MARKERS_MARGIN) {
-		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		const unsigned char shade[4] = {0, 0, 0, 16};
@@ -859,7 +859,7 @@ static void ed_marker_move_apply(bContext *C, wmOperator *op)
 	BKE_scene_camera_switch_update(scene);
 
 	if (camera != scene->camera) {
-		BKE_screen_view3d_scene_sync(sc);
+		BKE_screen_view3d_scene_sync(sc, scene);
 		WM_event_add_notifier(C, NC_SCENE | NA_EDITED, scene);
 	}
 #endif
@@ -906,7 +906,8 @@ static int ed_marker_move_modal(bContext *C, wmOperator *op, const wmEvent *even
 					ed_marker_move_cancel(C, op);
 					return OPERATOR_CANCELLED;
 				}
-			/* else continue; <--- see if release event should be caught for tweak-end */
+				/* else continue; <--- see if release event should be caught for tweak-end */
+				ATTR_FALLTHROUGH;
 
 			case RETKEY:
 			case PADENTER:
@@ -1549,7 +1550,7 @@ static int ed_marker_camera_bind_exec(bContext *C, wmOperator *UNUSED(op))
 
 	/* camera may have changes */
 	BKE_scene_camera_switch_update(scene);
-	BKE_screen_view3d_scene_sync(sc);
+	BKE_screen_view3d_scene_sync(sc, scene);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_MARKERS, NULL);
 	WM_event_add_notifier(C, NC_ANIMATION | ND_MARKERS, NULL);

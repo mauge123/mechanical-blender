@@ -51,7 +51,6 @@
 
 #include "BKE_animsys.h"
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_idcode.h"
 #include "BKE_layer.h"
@@ -64,6 +63,8 @@
 #include "BKE_scene.h"
 #include "BKE_material.h"
 #include "BKE_group.h"
+
+#include "DEG_depsgraph_build.h"
 
 #include "../blenloader/BLO_readfile.h"
 
@@ -492,7 +493,7 @@ static int outliner_id_remap_exec(bContext *C, wmOperator *op)
 	BKE_main_lib_objects_recalc_all(bmain);
 
 	/* recreate dependency graph to include new objects */
-	DAG_scene_relations_rebuild(bmain, scene);
+	DEG_scene_relations_rebuild(bmain, scene);
 
 	/* free gpu materials, some materials depend on existing objects, such as lamps so freeing correctly refreshes */
 	GPU_materials_free();
@@ -1845,7 +1846,7 @@ static int outliner_orphans_purge_invoke(bContext *C, wmOperator *op, const wmEv
 {
 	/* present a prompt to informing users that this change is irreversible */
 	return WM_operator_confirm_message(C, op,
-	                                   "Purging unused data-blocks cannot be undone. "
+	                                   "Purging unused data-blocks cannot be undone and saves to current .blend file. "
 	                                   "Click here to proceed...");
 }
 
@@ -1867,7 +1868,8 @@ void OUTLINER_OT_orphans_purge(wmOperatorType *ot)
 	/* identifiers */
 	ot->idname = "OUTLINER_OT_orphans_purge";
 	ot->name = "Purge All";
-	ot->description = "Clear all orphaned data-blocks without any users from the file (cannot be undone)";
+	ot->description = "Clear all orphaned data-blocks without any users from the file "
+	                  "(cannot be undone, saves to current .blend file)";
 	
 	/* callbacks */
 	ot->invoke = outliner_orphans_purge_invoke;
@@ -1904,7 +1906,7 @@ static int parent_drop_exec(bContext *C, wmOperator *op)
 
 	ED_object_parent_set(op->reports, bmain, scene, ob, par, partype, false, false, NULL);
 
-	DAG_relations_tag_update(bmain);
+	DEG_relations_tag_update(bmain);
 	WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, NULL);
 	WM_event_add_notifier(C, NC_OBJECT | ND_PARENT, NULL);
 
@@ -1941,7 +1943,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 		ob = (Object *)BKE_libblock_find_name(ID_OB, childname);
 		BKE_collection_object_add(scene, sc, ob);
 
-		DAG_relations_tag_update(bmain);
+		DEG_relations_tag_update(bmain);
 		WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
 	}
 	else if (te) {
@@ -1977,7 +1979,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
 		if ((par->type != OB_ARMATURE) && (par->type != OB_CURVE) && (par->type != OB_LATTICE)) {
 			if (ED_object_parent_set(op->reports, bmain, scene, ob, par, partype, false, false, NULL)) {
-				DAG_relations_tag_update(bmain);
+				DEG_relations_tag_update(bmain);
 				WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, NULL);
 				WM_event_add_notifier(C, NC_OBJECT | ND_PARENT, NULL);
 			}
@@ -2105,7 +2107,7 @@ static int parent_clear_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSE
 
 	ED_object_parent_clear(ob, RNA_enum_get(op->ptr, "type"));
 
-	DAG_relations_tag_update(bmain);
+	DEG_relations_tag_update(bmain);
 	WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, NULL);
 	WM_event_add_notifier(C, NC_OBJECT | ND_PARENT, NULL);
 	return OPERATOR_FINISHED;
@@ -2180,7 +2182,7 @@ static int scene_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 			}
 		}
 
-		DAG_relations_tag_update(bmain);
+		DEG_relations_tag_update(bmain);
 
 		WM_main_add_notifier(NC_SCENE | ND_OB_SELECT, scene);
 

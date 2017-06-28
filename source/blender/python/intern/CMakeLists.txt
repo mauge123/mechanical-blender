@@ -55,6 +55,7 @@ set(SRC
 	bpy_app_handlers.c
 	bpy_app_ocio.c
 	bpy_app_oiio.c
+	bpy_app_opensubdiv.c
 	bpy_app_openvdb.c
 	bpy_app_sdl.c
 	bpy_app_translations.c
@@ -64,6 +65,7 @@ set(SRC
 	bpy_intern_string.c
 	bpy_library_load.c
 	bpy_library_write.c
+	bpy_manipulator_wrap.c
 	bpy_operator.c
 	bpy_operator_wrap.c
 	bpy_path.c
@@ -74,6 +76,7 @@ set(SRC
 	bpy_rna_callback.c
 	bpy_rna_driver.c
 	bpy_rna_id_collection.c
+	bpy_rna_manipulator.c
 	bpy_traceback.c
 	bpy_util.c
 	bpy_utils_previews.c
@@ -89,12 +92,14 @@ set(SRC
 	bpy_app_handlers.h
 	bpy_app_ocio.h
 	bpy_app_oiio.h
+	bpy_app_opensubdiv.h
 	bpy_app_openvdb.h
 	bpy_app_sdl.h
 	bpy_app_translations.h
 	bpy_driver.h
 	bpy_intern_string.h
 	bpy_library.h
+	bpy_manipulator_wrap.h
 	bpy_operator.h
 	bpy_operator_wrap.h
 	bpy_path.h
@@ -104,6 +109,7 @@ set(SRC
 	bpy_rna_callback.h
 	bpy_rna_driver.h
 	bpy_rna_id_collection.h
+	bpy_rna_manipulator.h
 	bpy_traceback.h
 	bpy_util.h
 	bpy_utils_previews.h
@@ -292,6 +298,13 @@ if(WITH_OPENIMAGEIO)
 	add_definitions(-DWITH_OPENIMAGEIO)
 	list(APPEND INC
 		../../imbuf/intern/oiio
+	)
+endif()
+
+if(WITH_OPENSUBDIV)
+	add_definitions(-DWITH_OPENSUBDIV)
+	list(APPEND INC
+		../../../../intern/opensubdiv
 	)
 endif()
 

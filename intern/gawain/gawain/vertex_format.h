@@ -13,71 +13,59 @@
 
 #include "common.h"
 
-#define MAX_VERTEX_ATTRIBS 16
-#define AVG_VERTEX_ATTRIB_NAME_LEN 11
-#define VERTEX_ATTRIB_NAMES_BUFFER_LEN ((AVG_VERTEX_ATTRIB_NAME_LEN + 1) * MAX_VERTEX_ATTRIBS)
-
-#if defined(WITH_GL_PROFILE_CORE) || defined(_WIN32)
-  // (GLEW_VERSION_3_3 || GLEW_ARB_vertex_type_2_10_10_10_rev)
-  //   ^-- this is only guaranteed on Windows right now, will be true on all platforms soon
-  #define USE_10_10_10 1
-#else
-  #define USE_10_10_10 0
-#endif
+#define GWN_VERT_ATTR_MAX_LEN 16
+#define MAX_ATTRIB_NAMES 3
+#define GWN_VERT_ATTR_NAME_AVERAGE_LEN 11
+#define GWN_VERT_ATTR_NAMES_BUF_LEN ((GWN_VERT_ATTR_NAME_AVERAGE_LEN + 1) * GWN_VERT_ATTR_MAX_LEN)
 
 typedef enum {
-	COMP_I8,
-	COMP_U8,
-	COMP_I16,
-	COMP_U16,
-	COMP_I32,
-	COMP_U32,
+	GWN_COMP_I8,
+	GWN_COMP_U8,
+	GWN_COMP_I16,
+	GWN_COMP_U16,
+	GWN_COMP_I32,
+	GWN_COMP_U32,
 
-	COMP_F32,
+	GWN_COMP_F32,
 
-#if USE_10_10_10
-	COMP_I10
-#endif
-} VertexCompType;
+	GWN_COMP_I10
+} Gwn_VertCompType;
 
 typedef enum {
-	KEEP_FLOAT,
-	KEEP_INT,
-	NORMALIZE_INT_TO_FLOAT, // 127 (ubyte) -> 0.5 (and so on for other int types)
-	CONVERT_INT_TO_FLOAT // 127 (any int type) -> 127.0
-} VertexFetchMode;
+	GWN_FETCH_FLOAT,
+	GWN_FETCH_INT,
+	GWN_FETCH_INT_TO_FLOAT_UNIT, // 127 (ubyte) -> 0.5 (and so on for other int types)
+	GWN_FETCH_INT_TO_FLOAT // 127 (any int type) -> 127.0
+} Gwn_VertFetchMode;
 
 typedef struct {
-	VertexCompType comp_type;
+	Gwn_VertCompType comp_type;
 	unsigned gl_comp_type;
 	unsigned comp_ct; // 1 to 4
 	unsigned sz; // size in bytes, 1 to 16
 	unsigned offset; // from beginning of vertex, in bytes
-	VertexFetchMode fetch_mode;
-	const char* name;
-} Attrib;
+	Gwn_VertFetchMode fetch_mode;
+	const char* name[MAX_ATTRIB_NAMES];
+	unsigned name_ct;
+} Gwn_VertAttr;
 
 typedef struct {
-	unsigned attrib_ct; // 0 to 16 (MAX_VERTEX_ATTRIBS)
+	unsigned attrib_ct; // 0 to 16 (GWN_VERT_ATTR_MAX_LEN)
+	unsigned name_ct; // total count of active vertex attrib
 	unsigned stride; // stride in bytes, 1 to 256
 	bool packed;
-	Attrib attribs[MAX_VERTEX_ATTRIBS]; // TODO: variable-size attribs array
-	char names[VERTEX_ATTRIB_NAMES_BUFFER_LEN];
+	Gwn_VertAttr attribs[GWN_VERT_ATTR_MAX_LEN]; // TODO: variable-size attribs array
+	char names[GWN_VERT_ATTR_NAMES_BUF_LEN];
 	unsigned name_offset;
-} VertexFormat;
+} Gwn_VertFormat;
 
-void VertexFormat_clear(VertexFormat*);
-void VertexFormat_copy(VertexFormat* dest, const VertexFormat* src);
+void GWN_vertformat_clear(Gwn_VertFormat*);
+void GWN_vertformat_copy(Gwn_VertFormat* dest, const Gwn_VertFormat* src);
 
-unsigned VertexFormat_add_attrib(VertexFormat*, const char* name, VertexCompType, unsigned comp_ct, VertexFetchMode);
-
-// Memory Management
-
-unsigned VertexBuffer_get_memory_usage(void);
+unsigned GWN_vertformat_attr_add(Gwn_VertFormat*, const char* name, Gwn_VertCompType, unsigned comp_ct, Gwn_VertFetchMode);
+void GWN_vertformat_alias_add(Gwn_VertFormat*, const char* alias);
 
 // format conversion
-
-#if USE_10_10_10
 
 typedef struct {
 	int x : 10;
@@ -87,5 +75,4 @@ typedef struct {
 } PackedNormal;
 
 PackedNormal convert_i10_v3(const float data[3]);
-
-#endif // USE_10_10_10
+PackedNormal convert_i10_s3(const short data[3]);

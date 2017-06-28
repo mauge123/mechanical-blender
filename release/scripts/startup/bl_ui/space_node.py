@@ -395,8 +395,7 @@ class NODE_PT_backdrop(Panel):
 
         col = layout.column(align=True)
         col.label(text="Offset:")
-        col.prop(snode, "backdrop_x", text="X")
-        col.prop(snode, "backdrop_y", text="Y")
+        col.prop(snode, "backdrop_offset", text="")
         col.operator("node.backimage_move", text="Move")
 
         layout.operator("node.backimage_fit", text="Fit")
@@ -428,7 +427,6 @@ class NODE_PT_quality(bpy.types.Panel):
         col.prop(tree, "use_groupnode_buffer")
         col.prop(tree, "use_two_pass")
         col.prop(tree, "use_viewer_border")
-        col.prop(snode, "show_highlight")
 
 
 class NODE_UL_interface_sockets(bpy.types.UIList):

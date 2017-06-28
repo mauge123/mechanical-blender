@@ -699,7 +699,7 @@ void    UI_but_func_search_set(
 int     UI_searchbox_size_y(void);
 int     UI_searchbox_size_x(void);
 /* check if a string is in an existing search box */
-int     UI_search_items_find_index(uiSearchItems *items, const char *name, const size_t offset);
+int     UI_search_items_find_index(uiSearchItems *items, const char *name);
 
 void    UI_block_func_handle_set(uiBlock *block, uiBlockHandleFunc func, void *arg);
 void    UI_block_func_butmenu_set(uiBlock *block, uiMenuHandleFunc func, void *arg);
@@ -912,6 +912,17 @@ void uiTemplateIDPreview(uiLayout *layout, struct bContext *C, struct PointerRNA
                          const char *newop, const char *openop, const char *unlinkop, int rows, int cols);
 void uiTemplateAnyID(uiLayout *layout, struct PointerRNA *ptr, const char *propname, 
                      const char *proptypename, const char *text);
+void uiTemplateSearch(
+        uiLayout *layout, struct bContext *C,
+        struct PointerRNA *ptr, const char *propname,
+        struct PointerRNA *searchptr, const char *searchpropname,
+        const char *newop, const char *unlinkop);
+void uiTemplateSearchPreview(
+        uiLayout *layout, struct bContext *C,
+        struct PointerRNA *ptr, const char *propname,
+        struct PointerRNA *searchptr, const char *searchpropname,
+        const char *newop, const char *unlinkop,
+        const int rows, const int cols);
 void uiTemplatePathBuilder(uiLayout *layout, struct PointerRNA *ptr, const char *propname, 
                            struct PointerRNA *root_ptr, const char *text);
 uiLayout *uiTemplateModifier(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr);

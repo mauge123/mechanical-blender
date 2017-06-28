@@ -149,7 +149,7 @@ void BKE_armature_make_local(Main *bmain, bArmature *arm, const bool lib_local)
 	BKE_id_make_local_generic(bmain, &arm->id, true, lib_local);
 }
 
-static void copy_bonechildren(Bone *newBone, Bone *oldBone, Bone *actBone, Bone **newActBone)
+static void copy_bonechildren(Bone *newBone, const Bone *oldBone, const Bone *actBone, Bone **newActBone)
 {
 	Bone *curBone, *newChildBone;
 
@@ -171,7 +171,7 @@ static void copy_bonechildren(Bone *newBone, Bone *oldBone, Bone *actBone, Bone 
 	}
 }
 
-bArmature *BKE_armature_copy(Main *bmain, bArmature *arm)
+bArmature *BKE_armature_copy(Main *bmain, const bArmature *arm)
 {
 	bArmature *newArm;
 	Bone *oldBone, *newBone;
@@ -979,6 +979,11 @@ void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm, float
 	/* in editmode, or not an armature */
 	if (arm->edbo || (armOb->pose == NULL)) {
 		return;
+	}
+
+	if ((armOb->pose->flag & POSE_RECALC) != 0) {
+		printf("ERROR! Trying to evaluate influence of armature '%s' which needs Pose recalc!", armOb->id.name);
+		BLI_assert(0);
 	}
 
 	invert_m4_m4(obinv, target->obmat);

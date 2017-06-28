@@ -180,11 +180,12 @@ static void halo_pixelstruct(HaloRen *har, RenderLayer **rlpp, int totsample, in
 				flarec= 0;
 
 				if (fullsample) {
-					for (sample=0; sample<totsample; sample++)
+					for (sample=0; sample<totsample; sample++) {
 						if (ps->mask & (1 << sample)) {
 							float *pass = RE_RenderLayerGetPass(rlpp[sample], RE_PASSNAME_COMBINED, R.viewname);
 							addalphaAddfacFloat(pass + od*4, col, har->add);
 						}
+					}
 				}
 				else {
 					fac= ((float)amountm)/(float)R.osa;
@@ -215,11 +216,12 @@ static void halo_pixelstruct(HaloRen *har, RenderLayer **rlpp, int totsample, in
 	}
 
 	if (fullsample) {
-		for (sample=0; sample<totsample; sample++)
+		for (sample=0; sample<totsample; sample++) {
 			if (!(mask & (1 << sample))) {
 				float *pass = RE_RenderLayerGetPass(rlpp[sample], RE_PASSNAME_COMBINED, R.viewname);
 				addalphaAddfacFloat(pass + od*4, col, har->add);
 			}
+		}
 	}
 	else {
 		col[0]= accol[0];
@@ -462,48 +464,48 @@ static void add_filt_passes(RenderLayer *rl, int curmask, int rectx, int offset,
 		float *fp, *col= NULL;
 		int pixsize= 3;
 		
-		if(STREQ(rpass->name, RE_PASSNAME_COMBINED)) {
+		if (STREQ(rpass->name, RE_PASSNAME_COMBINED)) {
 			add_filt_fmask(curmask, shr->combined, rpass->rect + 4*offset, rectx);
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_Z)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_Z)) {
 			fp = rpass->rect + offset;
 			*fp = shr->z;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_RGBA)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_RGBA)) {
 			col = shr->col;
 			pixsize = 4;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_EMIT)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_EMIT)) {
 			col = shr->emit;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_DIFFUSE)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_DIFFUSE)) {
 			col = shr->diff;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_SPEC)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_SPEC)) {
 			col = shr->spec;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_SHADOW)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_SHADOW)) {
 			col = shr->shad;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_AO)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_AO)) {
 			col = shr->ao;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_ENVIRONMENT)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_ENVIRONMENT)) {
 			col = shr->env;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_INDIRECT)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_INDIRECT)) {
 			col = shr->indirect;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_REFLECT)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_REFLECT)) {
 			col = shr->refl;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_REFRACT)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_REFRACT)) {
 			col = shr->refr;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_NORMAL)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_NORMAL)) {
 			col = shr->nor;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_UV)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_UV)) {
 			/* box filter only, gauss will screwup UV too much */
 			if (shi->totuv) {
 				float mult = (float)count_mask(curmask)/(float)R.osa;
@@ -513,7 +515,7 @@ static void add_filt_passes(RenderLayer *rl, int curmask, int rectx, int offset,
 				fp[2]+= mult;
 			}
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_INDEXOB)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_INDEXOB)) {
 			/* no filter */
 			if (shi->vlr) {
 				fp = rpass->rect + offset;
@@ -521,7 +523,7 @@ static void add_filt_passes(RenderLayer *rl, int curmask, int rectx, int offset,
 					*fp = (float)shi->obr->ob->index;
 			}
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_INDEXMA)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_INDEXMA)) {
 			/* no filter */
 			if (shi->vlr) {
 					fp = rpass->rect + offset;
@@ -529,12 +531,12 @@ static void add_filt_passes(RenderLayer *rl, int curmask, int rectx, int offset,
 							*fp = (float)shi->mat->index;
 			}
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_MIST)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_MIST)) {
 			/*  */
 			col = &shr->mist;
 			pixsize = 1;
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_VECTOR)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_VECTOR)) {
 			/* add minimum speed in pixel, no filter */
 			fp = rpass->rect + 4*offset;
 			if ( (ABS(shr->winspeed[0]) + ABS(shr->winspeed[1]))< (ABS(fp[0]) + ABS(fp[1])) ) {
@@ -546,7 +548,7 @@ static void add_filt_passes(RenderLayer *rl, int curmask, int rectx, int offset,
 				fp[3] = shr->winspeed[3];
 			}
 		}
-		else if(STREQ(rpass->name, RE_PASSNAME_RAYHITS)) {
+		else if (STREQ(rpass->name, RE_PASSNAME_RAYHITS)) {
 			/*  */
 			col = shr->rayhits;
 			pixsize= 4;

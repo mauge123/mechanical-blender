@@ -39,6 +39,8 @@
 #include "DNA_linestyle_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_drawing_types.h"
+#include "DNA_workspace_types.h"
+
 
 #include "DEG_depsgraph.h"
 
@@ -54,6 +56,7 @@
 #include "BKE_main.h"
 #include "BKE_screen.h"
 #include "BKE_sound.h"
+#include "BKE_workspace.h"
 
 #include "RNA_access.h"
 
@@ -70,6 +73,7 @@ struct bContext {
 	struct {
 		struct wmWindowManager *manager;
 		struct wmWindow *window;
+		struct WorkSpace *workspace;
 		struct bScreen *screen;
 		struct ScrArea *area;
 		struct ARegion *region;
@@ -631,6 +635,11 @@ wmWindow *CTX_wm_window(const bContext *C)
 	return ctx_wm_python_context_get(C, "window", &RNA_Window, C->wm.window);
 }
 
+WorkSpace *CTX_wm_workspace(const bContext *C)
+{
+	return ctx_wm_python_context_get(C, "workspace", &RNA_WorkSpace, C->wm.workspace);
+}
+
 bScreen *CTX_wm_screen(const bContext *C)
 {
 	return ctx_wm_python_context_get(C, "screen", &RNA_Screen, C->wm.screen);
@@ -840,9 +849,11 @@ void CTX_wm_manager_set(bContext *C, wmWindowManager *wm)
 void CTX_wm_window_set(bContext *C, wmWindow *win)
 {
 	C->wm.window = win;
-	C->wm.screen = (win) ? win->screen : NULL;
-	if (C->wm.screen)
-		C->data.scene = C->wm.screen->scene;
+	if (win) {
+		C->data.scene = win->scene;
+	}
+	C->wm.workspace = (win) ? BKE_workspace_active_get(win->workspace_hook) : NULL;
+	C->wm.screen = (win) ? BKE_workspace_active_screen_get(win->workspace_hook) : NULL;
 	C->wm.area = NULL;
 	C->wm.region = NULL;
 }
@@ -850,9 +861,6 @@ void CTX_wm_window_set(bContext *C, wmWindow *win)
 void CTX_wm_screen_set(bContext *C, bScreen *screen)
 {
 	C->wm.screen = screen;
-	if (C->wm.screen) {
-		CTX_data_scene_set(C, C->wm.screen->scene);
-	}
 	C->wm.area = NULL;
 	C->wm.region = NULL;
 }
@@ -942,7 +950,7 @@ LayerCollection *CTX_data_layer_collection(const bContext *C)
 	}
 
 	/* fallback */
-	return BKE_layer_collection_active(sl);
+	return BKE_layer_collection_get_active(sl);
 }
 
 SceneCollection *CTX_data_scene_collection(const bContext *C)
@@ -1003,7 +1011,7 @@ int CTX_data_mode_enum_ex(const Object *obedit, const Object *ob)
 int CTX_data_mode_enum(const bContext *C)
 {
 	Object *obedit = CTX_data_edit_object(C);
-	Object *obact = obedit ? CTX_data_active_object(C) : NULL;
+	Object *obact = obedit ? NULL : CTX_data_active_object(C);
 	return CTX_data_mode_enum_ex(obedit, obact);
 }
 

@@ -79,16 +79,11 @@ struct Depsgraph;
 struct DepsNode;
 struct DepsNodeHandle;
 struct RootDepsNode;
-struct SubgraphDepsNode;
 struct IDDepsNode;
 struct TimeSourceDepsNode;
 struct ComponentDepsNode;
 struct OperationDepsNode;
 struct RootPChanMap;
-
-struct RootKey {
-	RootKey();
-};
 
 struct TimeSourceKey
 {
@@ -178,19 +173,16 @@ struct DepsgraphRelationBuilder
 	template <typename KeyFrom, typename KeyTo>
 	void add_relation(const KeyFrom& key_from,
 	                  const KeyTo& key_to,
-	                  eDepsRelation_Type type,
 	                  const char *description);
 
 	template <typename KeyTo>
 	void add_relation(const TimeSourceKey& key_from,
 	                  const KeyTo& key_to,
-	                  eDepsRelation_Type type,
 	                  const char *description);
 
 	template <typename KeyType>
 	void add_node_handle_relation(const KeyType& key_from,
 	                              const DepsNodeHandle *handle,
-	                              eDepsRelation_Type type,
 	                              const char *description);
 
 	void build_scene(Main *bmain, Scene *scene);
@@ -231,9 +223,15 @@ struct DepsgraphRelationBuilder
 	void build_cachefile(CacheFile *cache_file);
 	void build_mask(Mask *mask);
 	void build_movieclip(MovieClip *clip);
+	void build_lightprobe(Object *object);
 
-	void add_collision_relations(const OperationKey &key, Scene *scene, Object *ob, Group *group, bool dupli, const char *name);
-	void add_forcefield_relations(const OperationKey &key, Scene *scene, Object *ob, ParticleSystem *psys, EffectorWeights *eff, bool add_absorption, const char *name);
+	void add_collision_relations(const OperationKey &key,
+	                             Scene *scene, Object *ob, Group *group,
+	                             bool dupli, const char *name);
+	void add_forcefield_relations(const OperationKey &key,
+	                              Scene *scene, Object *ob, ParticleSystem *psys,
+	                              EffectorWeights *eff,
+	                              bool add_absorption, const char *name);
 
 	struct LayerCollectionState {
 		int index;
@@ -249,11 +247,15 @@ struct DepsgraphRelationBuilder
 	                             LayerCollectionState *state);
 	void build_scene_layer_collections(Scene *scene);
 
+	void build_copy_on_write_relations();
+	void build_copy_on_write_relations(IDDepsNode *id_node);
+
 	template <typename KeyType>
 	OperationDepsNode *find_operation_node(const KeyType &key);
 
+	Depsgraph *getGraph();
+
 protected:
-	RootDepsNode *find_node(const RootKey &key) const;
 	TimeSourceDepsNode *find_node(const TimeSourceKey &key) const;
 	ComponentDepsNode *find_node(const ComponentKey &key) const;
 	OperationDepsNode *find_node(const OperationKey &key) const;
@@ -265,7 +267,6 @@ protected:
 	                       const char *description);
 	void add_operation_relation(OperationDepsNode *node_from,
 	                            OperationDepsNode *node_to,
-	                            eDepsRelation_Type type,
 	                            const char *description);
 
 	template <typename KeyType>
@@ -305,7 +306,6 @@ OperationDepsNode *DepsgraphRelationBuilder::find_operation_node(const KeyType& 
 template <typename KeyFrom, typename KeyTo>
 void DepsgraphRelationBuilder::add_relation(const KeyFrom &key_from,
                                             const KeyTo &key_to,
-                                            eDepsRelation_Type type,
                                             const char *description)
 {
 	DepsNode *node_from = find_node(key_from);
@@ -313,27 +313,27 @@ void DepsgraphRelationBuilder::add_relation(const KeyFrom &key_from,
 	OperationDepsNode *op_from = node_from ? node_from->get_exit_operation() : NULL;
 	OperationDepsNode *op_to = node_to ? node_to->get_entry_operation() : NULL;
 	if (op_from && op_to) {
-		add_operation_relation(op_from, op_to, type, description);
+		add_operation_relation(op_from, op_to, description);
 	}
 	else {
 		if (!op_from) {
 			/* XXX TODO handle as error or report if needed */
 			node_from = find_node(key_from);
-			fprintf(stderr, "add_relation(%d, %s) - Could not find op_from (%s)\n",
-			        type, description, key_from.identifier().c_str());
+			fprintf(stderr, "add_relation(%s) - Could not find op_from (%s)\n",
+			        description, key_from.identifier().c_str());
 		}
 		else {
-			fprintf(stderr, "add_relation(%d, %s) - Failed, but op_from (%s) was ok\n",
-			        type, description, key_from.identifier().c_str());
+			fprintf(stderr, "add_relation(%s) - Failed, but op_from (%s) was ok\n",
+			        description, key_from.identifier().c_str());
 		}
 		if (!op_to) {
 			/* XXX TODO handle as error or report if needed */
-			fprintf(stderr, "add_relation(%d, %s) - Could not find op_to (%s)\n",
-			        type, description, key_to.identifier().c_str());
+			fprintf(stderr, "add_relation(%s) - Could not find op_to (%s)\n",
+			        description, key_to.identifier().c_str());
 		}
 		else {
-			fprintf(stderr, "add_relation(%d, %s) - Failed, but op_to (%s) was ok\n",
-			        type, description, key_to.identifier().c_str());
+			fprintf(stderr, "add_relation(%s) - Failed, but op_to (%s) was ok\n",
+			        description, key_to.identifier().c_str());
 		}
 	}
 }
@@ -341,11 +341,8 @@ void DepsgraphRelationBuilder::add_relation(const KeyFrom &key_from,
 template <typename KeyTo>
 void DepsgraphRelationBuilder::add_relation(const TimeSourceKey &key_from,
                                             const KeyTo &key_to,
-                                            eDepsRelation_Type type,
                                             const char *description)
 {
-	(void)type;  /* Ignored in release builds. */
-	BLI_assert(type == DEPSREL_TYPE_TIME);
 	TimeSourceDepsNode *time_from = find_node(key_from);
 	DepsNode *node_to = find_node(key_to);
 	OperationDepsNode *op_to = node_to ? node_to->get_entry_operation() : NULL;
@@ -360,23 +357,22 @@ template <typename KeyType>
 void DepsgraphRelationBuilder::add_node_handle_relation(
         const KeyType &key_from,
         const DepsNodeHandle *handle,
-        eDepsRelation_Type type,
         const char *description)
 {
 	DepsNode *node_from = find_node(key_from);
 	OperationDepsNode *op_from = node_from ? node_from->get_exit_operation() : NULL;
 	OperationDepsNode *op_to = handle->node->get_entry_operation();
 	if (op_from && op_to) {
-		add_operation_relation(op_from, op_to, type, description);
+		add_operation_relation(op_from, op_to, description);
 	}
 	else {
 		if (!op_from) {
-			fprintf(stderr, "add_node_handle_relation(%d, %s) - Could not find op_from (%s)\n",
-			        type, description, key_from.identifier().c_str());
+			fprintf(stderr, "add_node_handle_relation(%s) - Could not find op_from (%s)\n",
+			        description, key_from.identifier().c_str());
 		}
 		if (!op_to) {
-			fprintf(stderr, "add_node_handle_relation(%d, %s) - Could not find op_to (%s)\n",
-			        type, description, key_from.identifier().c_str());
+			fprintf(stderr, "add_node_handle_relation(%s) - Could not find op_to (%s)\n",
+			        description, key_from.identifier().c_str());
 		}
 	}
 }

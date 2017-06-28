@@ -117,8 +117,8 @@ static void EDIT_METABALL_engine_init(void *vedata)
 
 	/* Init Framebuffers like this: order is attachment order (for color texs) */
 	/*
-	 * DRWFboTexture tex[2] = {{&txl->depth, DRW_BUF_DEPTH_24, 0},
-	 *                         {&txl->color, DRW_BUF_RGBA_8, DRW_TEX_FILTER}};
+	 * DRWFboTexture tex[2] = {{&txl->depth, DRW_TEX_DEPTH_24, 0},
+	 *                         {&txl->color, DRW_TEX_RGBA_8, DRW_TEX_FILTER}};
 	 */
 
 	/* DRW_framebuffer_init takes care of checking if
@@ -178,7 +178,7 @@ static void EDIT_METABALL_cache_populate(void *vedata, Object *ob)
 
 	if (ob->type == OB_MESH) {
 		/* Get geometry cache */
-		struct Batch *geom = DRW_cache_mesh_surface_get(ob);
+		struct Gwn_Batch *geom = DRW_cache_mesh_surface_get(ob);
 
 		/* Add geom to a shading group */
 		DRW_shgroup_call_add(stl->g_data->group, geom, ob->obmat);

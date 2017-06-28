@@ -108,17 +108,21 @@ static void gpu_mcol(unsigned int ucol)
 }
 
 void GPU_render_text(
-        MTexPoly *mtexpoly, int mode,
-        const char *textstr, int textlen, unsigned int *col,
+        int mode, const char *textstr, int textlen, unsigned int *col,
         const float *v_quad[4], const float *uv_quad[4],
         int glattrib)
 {
-	if ((mode & GEMAT_TEXT) && (textlen > 0) && mtexpoly->tpage) {
+	/* XXX, 2.8 removes texface */
+#if 0
+	Image *ima = mtexpoly->tpage;
+#else
+	Image *ima = NULL;
+#endif
+	if ((mode & GEMAT_TEXT) && (textlen > 0) && ima) {
 		const float *v1 = v_quad[0];
 		const float *v2 = v_quad[1];
 		const float *v3 = v_quad[2];
 		const float *v4 = v_quad[3];
-		Image *ima = (Image *)mtexpoly->tpage;
 		const size_t textlen_st = textlen;
 		float centerx, centery, sizex, sizey, transx, transy, movex, movey, advance;
 
@@ -134,9 +138,7 @@ void GPU_render_text(
 
 
 		/* color has been set */
-		if (mtexpoly->mode & TF_OBCOL)
-			col = NULL;
-		else if (!col)
+		if (!col)
 			glColor3f(1.0f, 1.0f, 1.0f);
 
 		gpuPushMatrix();
@@ -269,8 +271,7 @@ static struct GPUTextureState {
 	int alphablend;
 	float anisotropic;
 	int gpu_mipmap;
-	MTexPoly *lasttface;
-} GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, 0, -1, 1.0f, 0, NULL};
+} GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, 0, -1, 1.0f, 0};
 
 /* Mipmap settings */
 
@@ -392,48 +393,16 @@ static unsigned int *gpu_get_image_bindcode(Image *ima, GLenum textarget)
 	return bind;
 }
 
-void GPU_clear_tpage(bool force)
-{
-	if (GTS.lasttface == NULL && !force)
-		return;
-
-	GTS.lasttface = NULL;
-	GTS.curtile = 0;
-	GTS.curima = NULL;
-	if (GTS.curtilemode != 0) {
-#if SUPPORT_LEGACY_MATRIX
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity(); /* TEXTURE */
-		glMatrixMode(GL_MODELVIEW);
-#endif
-	}
-	GTS.curtilemode = 0;
-	GTS.curtileXRep = 0;
-	GTS.curtileYRep = 0;
-	GTS.alphablend = -1;
-
-	glDisable(GL_BLEND);
-	glDisable(GL_TEXTURE_GEN_S);
-	glDisable(GL_TEXTURE_GEN_T);
-	glDisable(GL_ALPHA_TEST);
-}
-
 static void gpu_set_alpha_blend(GPUBlendMode alphablend)
 {
 	if (alphablend == GPU_BLEND_SOLID) {
 		glDisable(GL_BLEND);
-#ifdef WITH_LEGACY_OPENGL
-		glDisable(GL_ALPHA_TEST);
-#endif
 		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 	else if (alphablend == GPU_BLEND_ADD) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
-#ifdef WITH_LEGACY_OPENGL
-		glDisable(GL_ALPHA_TEST);
-#endif
 		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 	}
 	else if (ELEM(alphablend, GPU_BLEND_ALPHA, GPU_BLEND_ALPHA_SORT)) {
@@ -446,58 +415,13 @@ static void gpu_set_alpha_blend(GPUBlendMode alphablend)
 		/* if U.glalphaclip == 1.0, some cards go bonkers...
 		 * turn off alpha test in this case */
 
-#ifdef WITH_LEGACY_OPENGL
-		/* added after 2.45 to clip alpha */
-		if (U.glalphaclip == 1.0f) {
-			glDisable(GL_ALPHA_TEST);
-		}
-		else {
-			glEnable(GL_ALPHA_TEST);
-			glAlphaFunc(GL_GREATER, U.glalphaclip);
-		}
-#endif
 	}
 	else if (alphablend == GPU_BLEND_CLIP) {
 		glDisable(GL_BLEND);
 		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-#ifdef WITH_LEGACY_OPENGL
-		glEnable(GL_ALPHA_TEST);
-		glAlphaFunc(GL_GREATER, 0.5f);
-#endif
 	}
 	else if (alphablend == GPU_BLEND_ALPHA_TO_COVERAGE) {
-#ifdef WITH_LEGACY_OPENGL
-		glEnable(GL_ALPHA_TEST);
-		glAlphaFunc(GL_GREATER, U.glalphaclip);
-#endif
 		glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-	}
-}
-
-static void gpu_verify_alpha_blend(int alphablend)
-{
-	/* verify alpha blending modes */
-	if (GTS.alphablend == alphablend)
-		return;
-
-	gpu_set_alpha_blend(alphablend);
-	GTS.alphablend = alphablend;
-}
-
-static void gpu_verify_reflection(Image *ima)
-{
-	if (ima && (ima->flag & IMA_REFLECT)) {
-		/* enable reflection mapping */
-		glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
-		glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
-
-		glEnable(GL_TEXTURE_GEN_S);
-		glEnable(GL_TEXTURE_GEN_T);
-	}
-	else {
-		/* disable reflection mapping */
-		glDisable(GL_TEXTURE_GEN_S);
-		glDisable(GL_TEXTURE_GEN_T);
 	}
 }
 
@@ -590,21 +514,6 @@ int GPU_verify_image(
 	    GTS.curtileYRep == GTS.tileYRep)
 	{
 		return (ima != NULL);
-	}
-
-	/* if tiling mode or repeat changed, change texture matrix to fit */
-	if (GTS.tilemode != GTS.curtilemode || GTS.curtileXRep != GTS.tileXRep ||
-	    GTS.curtileYRep != GTS.tileYRep)
-	{
-#if SUPPORT_LEGACY_MATRIX
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity(); /* TEXTURE */
-
-		if (ima && (ima->tpageflag & IMA_TILES))
-			glScalef(ima->xrep, ima->yrep, 0); /* TEXTURE */
-
-		glMatrixMode(GL_MODELVIEW);
-#endif
 	}
 
 	/* check if we have a valid image */
@@ -1056,58 +965,6 @@ void GPU_create_gl_tex_compressed(
 		GPU_create_gl_tex(bind, pix, NULL, x, y, textarget, mipmap, 0, ima);
 	}
 #endif
-}
-static void gpu_verify_repeat(Image *ima)
-{
-	/* set either clamp or repeat in X/Y */
-	if (ima->tpageflag & IMA_CLAMP_U)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	else
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-
-	if (ima->tpageflag & IMA_CLAMP_V)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	else
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-}
-
-int GPU_set_tpage(MTexPoly *mtexpoly, int mipmap, int alphablend)
-{
-	/* check if we need to clear the state */
-	if (mtexpoly == NULL) {
-		GPU_clear_tpage(false);
-		return 0;
-	}
-
-	Image *ima = mtexpoly->tpage;
-	GTS.lasttface = mtexpoly;
-
-	gpu_verify_alpha_blend(alphablend);
-	gpu_verify_reflection(ima);
-
-	if (GPU_verify_image(ima, NULL, GL_TEXTURE_2D, mtexpoly->tile, 1, mipmap, false)) {
-		GTS.curtile = GTS.tile;
-		GTS.curima = GTS.ima;
-		GTS.curtilemode = GTS.tilemode;
-		GTS.curtileXRep = GTS.tileXRep;
-		GTS.curtileYRep = GTS.tileYRep;
-	}
-	else {
-		GTS.curtile = 0;
-		GTS.curima = NULL;
-		GTS.curtilemode = 0;
-		GTS.curtileXRep = 0;
-		GTS.curtileYRep = 0;
-
-		return 0;
-	}
-
-	gpu_verify_repeat(ima);
-
-	/* Did this get lost in the image recode? */
-	/* BKE_image_tag_time(ima);*/
-
-	return 1;
 }
 
 /* these two functions are called on entering and exiting texture paint mode,
@@ -2104,15 +1961,6 @@ void GPU_end_object_materials(void)
 	GMS.gmatbuf = NULL;
 	GMS.alphablend = NULL;
 	GMS.two_sided_lighting = false;
-
-	/* resetting the texture matrix after the scaling needed for tiled textures */
-	if (GTS.tilemode) {
-#if SUPPORT_LEGACY_MATRIX
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity(); /* TEXTURE */
-		glMatrixMode(GL_MODELVIEW);
-#endif
-	}
 }
 
 /* Lights */
@@ -2271,13 +2119,6 @@ void GPU_state_init(void)
 
 	GPU_disable_program_point_size();
 
-#ifndef WITH_GL_PROFILE_CORE
-	/* TODO: remove this when we switch to core profile */
-	{
-		glEnable(GL_POINT_SPRITE);
-	}
-#endif
-
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	glDepthFunc(GL_LEQUAL);
@@ -2287,18 +2128,7 @@ void GPU_state_init(void)
 	glDisable(GL_COLOR_LOGIC_OP);
 	glDisable(GL_STENCIL_TEST);
 
-#ifdef WITH_LEGACY_OPENGL
-	glDisable(GL_ALPHA_TEST);
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-#endif
-
 	glDepthRange(0.0, 1.0);
-
-#if SUPPORT_LEGACY_MATRIX
-	glMatrixMode(GL_TEXTURE);
-	glLoadIdentity(); /* TEXTURE */
-	glMatrixMode(GL_MODELVIEW);
-#endif
 
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
@@ -2309,22 +2139,12 @@ void GPU_state_init(void)
 
 void GPU_enable_program_point_size(void)
 {
-#if defined(__APPLE__) && defined(WITH_LEGACY_OPENGL)
-	/* TODO: remove this when we switch to core profile */
-	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-#else
 	glEnable(GL_PROGRAM_POINT_SIZE);
-#endif
 }
 
 void GPU_disable_program_point_size(void)
 {
-#if defined(__APPLE__) && defined(WITH_LEGACY_OPENGL)
-	/* TODO: remove this when we switch to core profile */
-	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
-#else
 	glDisable(GL_PROGRAM_POINT_SIZE);
-#endif
 }
 
 #ifdef WITH_OPENSUBDIV
@@ -2501,66 +2321,110 @@ void GPU_select_to_index_array(unsigned int *col, const unsigned int size)
 #undef INDEX_BUF_ARRAY
 }
 
+#define STATE_STACK_DEPTH 16
+
+typedef struct {
+	eGPUAttribMask mask;
+
+	/* GL_ENABLE_BIT */
+	unsigned int is_blend : 1;
+	unsigned int is_cull_face : 1;
+	unsigned int is_depth_test : 1;
+	unsigned int is_dither : 1;
+	unsigned int is_lighting : 1;
+	unsigned int is_line_smooth : 1;
+	unsigned int is_color_logic_op : 1;
+	unsigned int is_multisample : 1;
+	unsigned int is_polygon_offset_line : 1;
+	unsigned int is_polygon_offset_fill : 1;
+	unsigned int is_polygon_smooth : 1;
+	unsigned int is_sample_alpha_to_coverage : 1;
+	unsigned int is_scissor_test : 1;
+	unsigned int is_stencil_test : 1;
+
+	bool is_clip_plane[6];
+
+	/* GL_DEPTH_BUFFER_BIT */
+	/* unsigned int is_depth_test : 1; */
+	int depth_func;
+	double depth_clear_value;
+	bool depth_write_mask;
+
+	/* GL_SCISSOR_BIT */
+	int scissor_box[4];
+	/* unsigned int is_scissor_test : 1; */
+
+	/* GL_VIEWPORT_BIT */
+	int viewport[4];
+	double near_far[2];
+}  GPUAttribValues;
+
+typedef struct {
+	GPUAttribValues attrib_stack[STATE_STACK_DEPTH];
+	unsigned int top;
+} GPUAttribStack;
+
+static GPUAttribStack state = {
+	.top = 0
+};
+
+#define AttribStack state
+#define Gwn_VertAttr state.attrib_stack[state.top]
+
 /**
  * Replacement for glPush/PopAttributes
  *
  * We don't need to cover all the options of legacy OpenGL
  * but simply the ones used by Blender.
  */
-void gpuSaveState(GPUStateValues *values, eGPUStateMask mask)
+void gpuPushAttrib(eGPUAttribMask mask)
 {
-	values->mask = mask;
+	Gwn_VertAttr.mask = mask;
 
 	if ((mask & GPU_DEPTH_BUFFER_BIT) != 0) {
-		values->is_depth_test = glIsEnabled(GL_DEPTH_TEST);
-		glGetIntegerv(GL_DEPTH_FUNC, &values->depth_func);
-		glGetDoublev(GL_DEPTH_CLEAR_VALUE, &values->depth_clear_value);
-		glGetBooleanv(GL_DEPTH_WRITEMASK, (GLboolean *)&values->depth_write_mask);
+		Gwn_VertAttr.is_depth_test = glIsEnabled(GL_DEPTH_TEST);
+		glGetIntegerv(GL_DEPTH_FUNC, &Gwn_VertAttr.depth_func);
+		glGetDoublev(GL_DEPTH_CLEAR_VALUE, &Gwn_VertAttr.depth_clear_value);
+		glGetBooleanv(GL_DEPTH_WRITEMASK, (GLboolean *)&Gwn_VertAttr.depth_write_mask);
 	}
 
 	if ((mask & GPU_ENABLE_BIT) != 0) {
-		values->is_blend = glIsEnabled(GL_BLEND);
+		Gwn_VertAttr.is_blend = glIsEnabled(GL_BLEND);
 
 		for (int i = 0; i < 6; i++) {
-			values->is_clip_plane[i] = glIsEnabled(GL_CLIP_PLANE0 + i);
+			Gwn_VertAttr.is_clip_plane[i] = glIsEnabled(GL_CLIP_PLANE0 + i);
 		}
 
-		values->is_cull_face = glIsEnabled(GL_CULL_FACE);
-		values->is_depth_test = glIsEnabled(GL_DEPTH_TEST);
-		values->is_dither = glIsEnabled(GL_DITHER);
-
-#ifdef WITH_LEGACY_OPENGL
-		values->is_alpha_test = glIsEnabled(GL_ALPHA_TEST);
-
-		for (int i = 0; i < 8; i++) {
-			values->is_light[i] = glIsEnabled(GL_LIGHT0 + i);
-		}
-#endif
-
-		values->is_line_smooth = glIsEnabled(GL_LINE_SMOOTH);
-		values->is_color_logic_op = glIsEnabled(GL_COLOR_LOGIC_OP);
-		values->is_multisample = glIsEnabled(GL_MULTISAMPLE);
-		values->is_polygon_offset_line = glIsEnabled(GL_POLYGON_OFFSET_LINE);
-		values->is_polygon_offset_fill = glIsEnabled(GL_POLYGON_OFFSET_FILL);
-		values->is_polygon_smooth = glIsEnabled(GL_POLYGON_SMOOTH);
-		values->is_sample_alpha_to_coverage = glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		values->is_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-		values->is_stencil_test = glIsEnabled(GL_STENCIL_TEST);
+		Gwn_VertAttr.is_cull_face = glIsEnabled(GL_CULL_FACE);
+		Gwn_VertAttr.is_depth_test = glIsEnabled(GL_DEPTH_TEST);
+		Gwn_VertAttr.is_dither = glIsEnabled(GL_DITHER);
+		Gwn_VertAttr.is_line_smooth = glIsEnabled(GL_LINE_SMOOTH);
+		Gwn_VertAttr.is_color_logic_op = glIsEnabled(GL_COLOR_LOGIC_OP);
+		Gwn_VertAttr.is_multisample = glIsEnabled(GL_MULTISAMPLE);
+		Gwn_VertAttr.is_polygon_offset_line = glIsEnabled(GL_POLYGON_OFFSET_LINE);
+		Gwn_VertAttr.is_polygon_offset_fill = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+		Gwn_VertAttr.is_polygon_smooth = glIsEnabled(GL_POLYGON_SMOOTH);
+		Gwn_VertAttr.is_sample_alpha_to_coverage = glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		Gwn_VertAttr.is_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+		Gwn_VertAttr.is_stencil_test = glIsEnabled(GL_STENCIL_TEST);
 	}
 
 	if ((mask & GPU_SCISSOR_BIT) != 0) {
-		values->is_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-		glGetIntegerv(GL_SCISSOR_BOX, (GLint *)&values->scissor_box);
+		Gwn_VertAttr.is_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+		glGetIntegerv(GL_SCISSOR_BOX, (GLint *)&Gwn_VertAttr.scissor_box);
 	}
 
 	if ((mask & GPU_VIEWPORT_BIT) != 0) {
-		glGetDoublev(GL_DEPTH_RANGE, (GLdouble *)&values->near_far);
-		glGetIntegerv(GL_VIEWPORT, (GLint *)&values->viewport);
+		glGetDoublev(GL_DEPTH_RANGE, (GLdouble *)&Gwn_VertAttr.near_far);
+		glGetIntegerv(GL_VIEWPORT, (GLint *)&Gwn_VertAttr.viewport);
 	}
 
 	if ((mask & GPU_BLEND_BIT) != 0) {
-		values->is_blend = glIsEnabled(GL_BLEND);
+		Gwn_VertAttr.is_blend = glIsEnabled(GL_BLEND);
 	}
+
+	BLI_assert(AttribStack.top < STATE_STACK_DEPTH);
+	AttribStack.top++;
 }
 
 static void restore_mask(GLenum cap, const bool value) {
@@ -2572,60 +2436,57 @@ static void restore_mask(GLenum cap, const bool value) {
 	}
 }
 
-void gpuRestoreState(GPUStateValues *values)
+void gpuPopAttrib(void)
 {
-	GLint mask = values->mask;
+	BLI_assert(AttribStack.top > 0);
+	AttribStack.top--;
+
+	GLint mask = Gwn_VertAttr.mask;
 
 	if ((mask & GPU_DEPTH_BUFFER_BIT) != 0) {
-		restore_mask(GL_DEPTH_TEST, values->is_depth_test);
-		glDepthFunc(values->depth_func);
-		glClearDepth(values->depth_clear_value);
-		glDepthMask(values->depth_write_mask);
+		restore_mask(GL_DEPTH_TEST, Gwn_VertAttr.is_depth_test);
+		glDepthFunc(Gwn_VertAttr.depth_func);
+		glClearDepth(Gwn_VertAttr.depth_clear_value);
+		glDepthMask(Gwn_VertAttr.depth_write_mask);
 	}
 
 	if ((mask & GPU_ENABLE_BIT) != 0) {
-		restore_mask(GL_BLEND, values->is_blend);
+		restore_mask(GL_BLEND, Gwn_VertAttr.is_blend);
 
 		for (int i = 0; i < 6; i++) {
-			restore_mask(GL_CLIP_PLANE0 + i, values->is_clip_plane[i]);
+			restore_mask(GL_CLIP_PLANE0 + i, Gwn_VertAttr.is_clip_plane[i]);
 		}
 
-		restore_mask(GL_CULL_FACE, values->is_cull_face);
-		restore_mask(GL_DEPTH_TEST, values->is_depth_test);
-		restore_mask(GL_DITHER, values->is_dither);
-
-#ifdef WITH_LEGACY_OPENGL
-		restore_mask(GL_ALPHA_TEST, values->is_alpha_test);
-
-		for (int i = 0; i < 8; i++) {
-			restore_mask(GL_LIGHT0 + i, values->is_light[i]);
-		}
-#endif
-
-		restore_mask(GL_LINE_SMOOTH, values->is_line_smooth);
-		restore_mask(GL_COLOR_LOGIC_OP, values->is_color_logic_op);
-		restore_mask(GL_MULTISAMPLE, values->is_multisample);
-		restore_mask(GL_POLYGON_OFFSET_LINE, values->is_polygon_offset_line);
-		restore_mask(GL_POLYGON_OFFSET_FILL, values->is_polygon_offset_fill);
-		restore_mask(GL_POLYGON_SMOOTH, values->is_polygon_smooth);
-		restore_mask(GL_SAMPLE_ALPHA_TO_COVERAGE, values->is_sample_alpha_to_coverage);
-		restore_mask(GL_SCISSOR_TEST, values->is_scissor_test);
-		restore_mask(GL_STENCIL_TEST, values->is_stencil_test);
+		restore_mask(GL_CULL_FACE, Gwn_VertAttr.is_cull_face);
+		restore_mask(GL_DEPTH_TEST, Gwn_VertAttr.is_depth_test);
+		restore_mask(GL_DITHER, Gwn_VertAttr.is_dither);
+		restore_mask(GL_LINE_SMOOTH, Gwn_VertAttr.is_line_smooth);
+		restore_mask(GL_COLOR_LOGIC_OP, Gwn_VertAttr.is_color_logic_op);
+		restore_mask(GL_MULTISAMPLE, Gwn_VertAttr.is_multisample);
+		restore_mask(GL_POLYGON_OFFSET_LINE, Gwn_VertAttr.is_polygon_offset_line);
+		restore_mask(GL_POLYGON_OFFSET_FILL, Gwn_VertAttr.is_polygon_offset_fill);
+		restore_mask(GL_POLYGON_SMOOTH, Gwn_VertAttr.is_polygon_smooth);
+		restore_mask(GL_SAMPLE_ALPHA_TO_COVERAGE, Gwn_VertAttr.is_sample_alpha_to_coverage);
+		restore_mask(GL_SCISSOR_TEST, Gwn_VertAttr.is_scissor_test);
+		restore_mask(GL_STENCIL_TEST, Gwn_VertAttr.is_stencil_test);
 	}
 
 	if ((mask & GPU_VIEWPORT_BIT) != 0) {
-		glViewport(values->viewport[0], values->viewport[1], values->viewport[2], values->viewport[3]);
-		glDepthRange(values->near_far[0], values->near_far[1]);
+		glViewport(Gwn_VertAttr.viewport[0], Gwn_VertAttr.viewport[1], Gwn_VertAttr.viewport[2], Gwn_VertAttr.viewport[3]);
+		glDepthRange(Gwn_VertAttr.near_far[0], Gwn_VertAttr.near_far[1]);
 	}
 
 	if ((mask & GPU_SCISSOR_BIT) != 0) {
-		restore_mask(GL_SCISSOR_TEST, values->is_scissor_test);
-		glScissor(values->scissor_box[0], values->scissor_box[1], values->scissor_box[2], values->scissor_box[3]);
+		restore_mask(GL_SCISSOR_TEST, Gwn_VertAttr.is_scissor_test);
+		glScissor(Gwn_VertAttr.scissor_box[0], Gwn_VertAttr.scissor_box[1], Gwn_VertAttr.scissor_box[2], Gwn_VertAttr.scissor_box[3]);
 	}
 
 	if ((mask & GPU_BLEND_BIT) != 0) {
-		restore_mask(GL_BLEND, values->is_blend);
+		restore_mask(GL_BLEND, Gwn_VertAttr.is_blend);
 	}
 }
+
+#undef Gwn_VertAttr
+#undef AttribStack
 
 /** \} */

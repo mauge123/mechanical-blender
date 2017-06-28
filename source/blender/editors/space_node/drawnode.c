@@ -748,7 +748,7 @@ static void node_shader_buts_geometry(uiLayout *layout, bContext *C, PointerRNA 
 	if (obptr.data && RNA_enum_get(&obptr, "type") == OB_MESH) {
 		PointerRNA dataptr = RNA_pointer_get(&obptr, "data");
 
-		uiItemPointerR(col, ptr, "uv_layer", &dataptr, "uv_textures", "", ICON_NONE);
+		uiItemPointerR(col, ptr, "uv_layer", &dataptr, "uv_layers", "", ICON_NONE);
 		uiItemPointerR(col, ptr, "color_layer", &dataptr, "vertex_colors", "", ICON_NONE);
 	}
 	else {
@@ -966,7 +966,7 @@ static void node_shader_buts_uvmap(uiLayout *layout, bContext *C, PointerRNA *pt
 
 		if (obptr.data && RNA_enum_get(&obptr, "type") == OB_MESH) {
 			PointerRNA dataptr = RNA_pointer_get(&obptr, "data");
-			uiItemPointerR(layout, ptr, "uv_map", &dataptr, "uv_textures", "", ICON_NONE);
+			uiItemPointerR(layout, ptr, "uv_map", &dataptr, "uv_layers", "", ICON_NONE);
 		}
 	}
 }
@@ -985,7 +985,7 @@ static void node_shader_buts_normal_map(uiLayout *layout, bContext *C, PointerRN
 
 		if (obptr.data && RNA_enum_get(&obptr, "type") == OB_MESH) {
 			PointerRNA dataptr = RNA_pointer_get(&obptr, "data");
-			uiItemPointerR(layout, ptr, "uv_map", &dataptr, "uv_textures", "", ICON_NONE);
+			uiItemPointerR(layout, ptr, "uv_map", &dataptr, "uv_layers", "", ICON_NONE);
 		}
 		else
 			uiItemR(layout, ptr, "uv_map", 0, "", 0);
@@ -1007,7 +1007,7 @@ static void node_shader_buts_tangent(uiLayout *layout, bContext *C, PointerRNA *
 
 		if (obptr.data && RNA_enum_get(&obptr, "type") == OB_MESH) {
 			PointerRNA dataptr = RNA_pointer_get(&obptr, "data");
-			uiItemPointerR(row, ptr, "uv_map", &dataptr, "uv_textures", "", ICON_NONE);
+			uiItemPointerR(row, ptr, "uv_map", &dataptr, "uv_layers", "", ICON_NONE);
 		}
 		else
 			uiItemR(row, ptr, "uv_map", 0, "", 0);
@@ -2157,14 +2157,14 @@ static void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNo
 		const float cx  = x + snode->zoom * backdropWidth * node->custom3;
 		const float cy = y + snode->zoom * backdropHeight * node->custom4;
 
-		VertexFormat *format = immVertexFormat();
-		unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+		Gwn_VertFormat *format = immVertexFormat();
+		unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		immUniformColor3f(1.0f, 1.0f, 1.0f);
 
-		immBegin(PRIM_LINES, 4);
+		immBegin(GWN_PRIM_LINES, 4);
 		immVertex2f(pos, cx - 25, cy - 25);
 		immVertex2f(pos, cx + 25, cy + 25);
 		immVertex2f(pos, cx + 25, cy - 25);
@@ -2202,14 +2202,14 @@ static void node_composit_backdrop_boxmask(SpaceNode *snode, ImBuf *backdrop, bN
 	y3 = cy - (-sine * -halveBoxWidth + cosine * -halveBoxHeight) * snode->zoom;
 	y4 = cy - (-sine * halveBoxWidth + cosine * -halveBoxHeight) * snode->zoom;
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor3f(1.0f, 1.0f, 1.0f);
 
-	immBegin(PRIM_LINE_LOOP, 4);
+	immBegin(GWN_PRIM_LINE_LOOP, 4);
 	immVertex2f(pos, x1, y1);
 	immVertex2f(pos, x2, y2);
 	immVertex2f(pos, x3, y3);
@@ -2246,14 +2246,14 @@ static void node_composit_backdrop_ellipsemask(SpaceNode *snode, ImBuf *backdrop
 	y3 = cy - (-sine * -halveBoxWidth + cosine * -halveBoxHeight) * snode->zoom;
 	y4 = cy - (-sine * halveBoxWidth + cosine * -halveBoxHeight) * snode->zoom;
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor3f(1.0f, 1.0f, 1.0f);
 
-	immBegin(PRIM_LINE_LOOP, 4);
+	immBegin(GWN_PRIM_LINE_LOOP, 4);
 	immVertex2f(pos, x1, y1);
 	immVertex2f(pos, x2, y2);
 	immVertex2f(pos, x3, y3);
@@ -2444,6 +2444,11 @@ static void node_composit_buts_sunbeams(uiLayout *layout, bContext *UNUSED(C), P
 {
 	uiItemR(layout, ptr, "source", UI_ITEM_R_EXPAND, "", ICON_NONE);
 	uiItemR(layout, ptr, "ray_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+}
+
+static void node_composit_buts_brightcontrast(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+	uiItemR(layout, ptr, "use_premultiply", 0, NULL, ICON_NONE);
 }
 
 /* only once called */
@@ -2673,6 +2678,8 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 		case CMP_NODE_SUNBEAMS:
 			ntype->draw_buttons = node_composit_buts_sunbeams;
 			break;
+		case CMP_NODE_BRIGHTCONTRAST:
+			ntype->draw_buttons = node_composit_buts_brightcontrast;
 	}
 }
 
@@ -3037,7 +3044,6 @@ static void std_node_socket_draw(bContext *C, uiLayout *layout, PointerRNA *ptr,
 	bNode *node = node_ptr->data;
 	bNodeSocket *sock = ptr->data;
 	int type = sock->typeinfo->type;
-	bool connected_to_virtual = (sock->link && (sock->link->fromsock->flag & SOCK_VIRTUAL));
 	/*int subtype = sock->typeinfo->subtype;*/
 	
 	/* XXX not nice, eventually give this node its own socket type ... */
@@ -3046,7 +3052,7 @@ static void std_node_socket_draw(bContext *C, uiLayout *layout, PointerRNA *ptr,
 		return;
 	}
 
-	if ((sock->in_out == SOCK_OUT) || ((sock->flag & SOCK_IN_USE) && !connected_to_virtual) || (sock->flag & SOCK_HIDE_VALUE)) {
+	if ((sock->in_out == SOCK_OUT) || (sock->flag & SOCK_IN_USE) || (sock->flag & SOCK_HIDE_VALUE)) {
 		node_socket_button_label(C, layout, ptr, node_ptr, text);
 		return;
 	}
@@ -3252,7 +3258,7 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 				              y + snode->zoom * viewer_border->ymin * ibuf->y,
 				              y + snode->zoom * viewer_border->ymax * ibuf->y);
 
-				unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+				unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 				immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 				immUniformThemeColor(TH_ACTIVE);
 
@@ -3401,7 +3407,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		}
 
 		if (do_triple || drawarrow || (!do_shaded)) {
-			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 		}
 
@@ -3409,7 +3415,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 			immUniformThemeColorShadeAlpha(th_col3, -80, -120);
 			glLineWidth(4.0f);
 
-			immBegin(PRIM_LINE_STRIP, (LINK_RESOL + 1));
+			immBegin(GWN_PRIM_LINE_STRIP, (LINK_RESOL + 1));
 
 			for (i = 0; i <= LINK_RESOL; i++) {
 				immVertex2fv(pos, coord_array[i]);
@@ -3418,7 +3424,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 			immEnd();
 
 			if (drawarrow) {
-				immBegin(PRIM_LINE_STRIP, 3);
+				immBegin(GWN_PRIM_LINE_STRIP, 3);
 				immVertex2fv(pos, arrow1);
 				immVertex2fv(pos, arrow);
 				immVertex2fv(pos, arrow2);
@@ -3431,7 +3437,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		if (drawarrow) {
 			immUniformThemeColorBlend(th_col1, th_col2, 0.5f);
 
-			immBegin(PRIM_LINE_STRIP, 3);
+			immBegin(GWN_PRIM_LINE_STRIP, 3);
 			immVertex2fv(pos, arrow1);
 			immVertex2fv(pos, arrow);
 			immVertex2fv(pos, arrow2);
@@ -3441,7 +3447,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		if (!do_shaded) {
 			immUniformThemeColor(th_col1);
 
-			immBegin(PRIM_LINE_STRIP, (LINK_RESOL + 1));
+			immBegin(GWN_PRIM_LINE_STRIP, (LINK_RESOL + 1));
 
 			for (i = 0; i <= LINK_RESOL; i++) {
 				immVertex2fv(pos, coord_array[i]);
@@ -3457,13 +3463,13 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 		if (do_shaded) {
 			unsigned char col[3];
 
-			VertexFormat *format = immVertexFormat();
-			pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-			unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+			Gwn_VertFormat *format = immVertexFormat();
+			pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+			unsigned int color = GWN_vertformat_attr_add(format, "color", GWN_COMP_U8, 3, GWN_FETCH_INT_TO_FLOAT_UNIT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
 
-			immBegin(PRIM_LINE_STRIP, (LINK_RESOL + 1));
+			immBegin(GWN_PRIM_LINE_STRIP, (LINK_RESOL + 1));
 
 			for (i = 0; i <= LINK_RESOL; i++) {
 				UI_GetThemeColorBlend3ubv(th_col1, th_col2, spline_step, col);
@@ -3488,7 +3494,6 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 {
 	bool do_shaded = false;
 	bool do_triple = false;
-	bool do_dashed = false;
 	int th_col1 = TH_WIRE_INNER, th_col2 = TH_WIRE_INNER, th_col3 = TH_WIRE;
 	
 	if (link->fromsock == NULL && link->tosock == NULL)
@@ -3505,8 +3510,6 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 			return;
 		if (link->fromsock->flag & SOCK_UNAVAIL)
 			return;
-		if ((link->fromsock->flag & SOCK_VIRTUAL) || (link->tosock->flag & SOCK_VIRTUAL))
-			do_dashed = true;
 
 		if (link->flag & NODE_LINK_VALID) {
 			/* special indicated link, on drop-node */
@@ -3528,15 +3531,13 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 		}
 	}
 
-	if (do_dashed) setlinestyle(3);
 	node_draw_link_bezier(v2d, snode, link, th_col1, do_shaded, th_col2, do_triple, th_col3);
-	if (do_dashed) setlinestyle(0);
 //	node_draw_link_straight(v2d, snode, link, th_col1, do_shaded, th_col2, do_triple, th_col3);
 }
 
 void ED_node_draw_snap(View2D *v2d, const float cent[2], float size, NodeBorder border, unsigned pos)
 {
-	immBegin(PRIM_LINES, 4);
+	immBegin(GWN_PRIM_LINES, 4);
 	
 	if (border & (NODE_LEFT | NODE_RIGHT)) {
 		immVertex2f(pos, cent[0], v2d->cur.ymin);

@@ -38,10 +38,10 @@
 
 #include "MEM_guardedalloc.h"
 
-extern "C" {
-#include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
+#include "BLI_blenlib.h"
 
+extern "C" {
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -49,10 +49,10 @@ extern "C" {
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+} /* extern "C" */
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
-} /* extern "C" */
 
 #include "intern/builder/deg_builder.h"
 #include "intern/builder/deg_builder_pchanmap.h"
@@ -78,11 +78,11 @@ void DepsgraphRelationBuilder::build_scene(Main *bmain, Scene *scene)
 	m_graph->scene = scene;
 
 	/* scene objects */
-	FOREACH_SCENE_OBJECT(scene, ob)
-	{
-		build_object(bmain, scene, ob);
+	for (SceneLayer *sl = (SceneLayer *)scene->render_layers.first; sl; sl = sl->next) {
+		for (Base *base = (Base *)sl->object_bases.first; base; base = base->next) {
+			build_object(bmain, scene, base->object);
+		}
 	}
-	FOREACH_SCENE_OBJECT_END
 
 	/* rigidbody */
 	if (scene->rigidbody_world) {
@@ -122,13 +122,14 @@ void DepsgraphRelationBuilder::build_scene(Main *bmain, Scene *scene)
 	/* Collections. */
 	build_scene_layer_collections(scene);
 
+	/* TODO(sergey): Do this flush on CoW object? */
 	for (Depsgraph::OperationNodes::const_iterator it_op = m_graph->operations.begin();
 	     it_op != m_graph->operations.end();
 	     ++it_op)
 	{
 		OperationDepsNode *node = *it_op;
 		IDDepsNode *id_node = node->owner->owner;
-		ID *id = id_node->id;
+		ID *id = id_node->id_orig;
 		if (GS(id->name) == ID_OB) {
 			Object *object = (Object *)id;
 			object->customdata_mask |= node->customdata_mask;

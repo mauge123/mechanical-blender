@@ -1,12 +1,13 @@
 
-mat4 ViewProjectionMatrixInverse;
-
 in vec2 pos;
 
 out vec3 varposition;
 out vec3 varnormal;
 out vec3 viewPosition;
+
+/* necessary for compilation*/
 out vec3 worldPosition;
+out vec3 worldNormal;
 
 void main()
 {

@@ -965,7 +965,7 @@ typedef struct GameData {
 #define GAME_SHOW_DEBUG_PROPS				(1 << 2)
 #define GAME_SHOW_FRAMERATE					(1 << 3)
 #define GAME_SHOW_PHYSICS					(1 << 4)
-#define GAME_DISPLAY_LISTS					(1 << 5)
+// #define GAME_DISPLAY_LISTS					(1 << 5)   /* deprecated */
 #define GAME_GLSL_NO_LIGHTS					(1 << 6)
 #define GAME_GLSL_NO_SHADERS				(1 << 7)
 #define GAME_GLSL_NO_SHADOWS				(1 << 8)
@@ -1296,18 +1296,6 @@ typedef enum eGP_Interpolate_Type {
 	GP_IPO_QUINT = 11,
 	GP_IPO_SINE = 12,
 } eGP_Interpolate_Type;
-
-
-/* *************************************************************** */
-/* Transform Orientations */
-
-typedef struct TransformOrientation {
-	struct TransformOrientation *next, *prev;
-	char name[64];	/* MAX_NAME */
-	float mat[3][3];
-// WITH_MECHANICAL_UCS
-	float origin[3];
-} TransformOrientation;
 
 /* *************************************************************** */
 /* Unified Paint Settings
@@ -1698,17 +1686,17 @@ typedef struct Scene {
 	struct Editing *ed;								/* sequence editor data is allocated here */
 	
 	struct ToolSettings *toolsettings;		/* default allocated now */
-	struct SceneStats *stats;				/* default allocated now */
+	void *pad2;
 	struct DisplaySafeAreas safe_areas;
 
 	/* migrate or replace? depends on some internal things... */
 	/* no, is on the right place (ton) */
 	struct RenderData r;
 	struct AudioData audio;
-	
+
 	ListBase markers;
-	ListBase transform_spaces;
-	
+	ListBase transform_spaces DNA_DEPRECATED;
+
 	void *sound_scene;
 	void *playback_handle;
 	void *sound_scrub_handle;
@@ -1762,6 +1750,8 @@ typedef struct Scene {
 	int pad4;
 
 	IDProperty *collection_properties;  /* settings to be overriden by layer collections */
+	IDProperty *layer_properties;  /* settings to be override by workspaces */
+
 	int pad5[2];
 
 	/* WITH_MECHANICAL_GEOMETRY */
@@ -1958,6 +1948,7 @@ enum {
 extern const char *RE_engine_id_BLENDER_RENDER;
 extern const char *RE_engine_id_BLENDER_GAME;
 extern const char *RE_engine_id_BLENDER_CLAY;
+extern const char *RE_engine_id_BLENDER_EEVEE;
 extern const char *RE_engine_id_CYCLES;
 
 /* **************** SCENE ********************* */

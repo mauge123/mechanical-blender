@@ -41,7 +41,8 @@
 #include "BKE_context.h"
 #include "BKE_movieclip.h"
 #include "BKE_tracking.h"
-#include "BKE_depsgraph.h"
+
+#include "DEG_depsgraph.h"
 
 #include "GPU_immediate.h"
 #include "GPU_matrix.h"
@@ -210,7 +211,7 @@ void clip_delete_track(bContext *C, MovieClip *clip, MovieTrackingTrack *track)
 		WM_event_add_notifier(C, NC_MOVIECLIP | ND_DISPLAY, clip);
 	}
 
-	DAG_id_tag_update(&clip->id, 0);
+	DEG_id_tag_update(&clip->id, 0);
 
 	if (has_bundle)
 		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
@@ -247,13 +248,13 @@ void clip_draw_cfra(SpaceClip *sc, ARegion *ar, Scene *scene)
 	View2D *v2d = &ar->v2d;
 	float x = (float)(sc->user.framenr * scene->r.framelen);
 
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColor(TH_CFRAME);
 	glLineWidth(2.0f);
 
-	immBegin(PRIM_LINES, 2);
+	immBegin(GWN_PRIM_LINES, 2);
 	immVertex2f(pos, x, v2d->cur.ymin);
 	immVertex2f(pos, x, v2d->cur.ymax);
 	immEnd();
@@ -282,7 +283,7 @@ void clip_draw_sfra_efra(View2D *v2d, Scene *scene)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformColor4f(0.0f, 0.0f, 0.0f, 0.4f);
@@ -296,7 +297,7 @@ void clip_draw_sfra_efra(View2D *v2d, Scene *scene)
 	/* thin lines where the actual frames are */
 	glLineWidth(1.0f);
 
-	immBegin(PRIM_LINES, 4);
+	immBegin(GWN_PRIM_LINES, 4);
 	immVertex2f(pos, (float)SFRA, v2d->cur.ymin);
 	immVertex2f(pos, (float)SFRA, v2d->cur.ymax);
 	immVertex2f(pos, (float)EFRA, v2d->cur.ymin);

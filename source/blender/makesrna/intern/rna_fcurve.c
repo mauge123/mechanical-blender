@@ -129,8 +129,10 @@ static StructRNA *rna_FModifierType_refine(struct PointerRNA *ptr)
 /* ****************************** */
 
 #include "BKE_fcurve.h"
-#include "BKE_depsgraph.h"
 #include "BKE_animsys.h"
+
+#include "DEG_depsgraph.h"
+#include "DEG_depsgraph_build.h"
 
 static void rna_ChannelDriver_update_data(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
@@ -140,20 +142,18 @@ static void rna_ChannelDriver_update_data(Main *bmain, Scene *scene, PointerRNA 
 	driver->flag &= ~DRIVER_FLAG_INVALID;
 	
 	/* TODO: this really needs an update guard... */
-	DAG_relations_tag_update(bmain);
+	DEG_relations_tag_update(bmain);
 
 #ifdef WITH_MECHANICAL_MESH_DIMENSIONS
 	if (GS(id->name) == ID_DM) {
 		MDim *mdim = (MDim*) id;
-		DAG_id_tag_update((ID*) mdim->ob, OB_RECALC_OB | OB_RECALC_DATA);
+		DEG_id_tag_update((ID*) mdim->ob, OB_RECALC_OB | OB_RECALC_DATA);
 	} else {
-		DAG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA);
+		DEG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA);
 	}
 #else
-	DAG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA);
-#endif
-
-	
+	DEG_id_tag_update(id, OB_RECALC_OB | OB_RECALC_DATA);
+#endif	
 	WM_main_add_notifier(NC_SCENE | ND_FRAME, scene);
 }
 
@@ -600,7 +600,7 @@ static void rna_FModifier_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poin
 {
 	ID *id = ptr->id.data;
 	AnimData *adt = BKE_animdata_from_id(id);
-	DAG_id_tag_update(id, (GS(id->name) == ID_OB) ? OB_RECALC_OB : OB_RECALC_DATA);
+	DEG_id_tag_update(id, (GS(id->name) == ID_OB) ? OB_RECALC_OB : OB_RECALC_DATA);
 	if (adt != NULL) {
 		adt->recalc |= ADT_RECALC_ANIM;
 	}

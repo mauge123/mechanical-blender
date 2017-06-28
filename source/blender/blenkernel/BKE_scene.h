@@ -52,11 +52,13 @@ struct SceneLayer;
 struct UnitSettings;
 struct Main;
 
-#define SCE_COPY_NEW        0
-#define SCE_COPY_EMPTY      1
-#define SCE_COPY_LINK_OB    2
-#define SCE_COPY_LINK_DATA  3
-#define SCE_COPY_FULL       4
+typedef enum eSceneCopyMethod {
+	SCE_COPY_NEW       = 0,
+	SCE_COPY_EMPTY     = 1,
+	SCE_COPY_LINK_OB   = 2,
+	SCE_COPY_LINK_DATA = 3,
+	SCE_COPY_FULL      = 4,
+} eSceneCopyMethod;
 
 /* Use as the contents of a 'for' loop: for (SETLOOPER(...)) { ... */
 #define SETLOOPER(_sce_basis, _sce_iter, _base)                               \
@@ -69,6 +71,7 @@ struct Base *_setlooper_base_step(struct Scene **sce_iter, struct Base *base);
 void free_avicodecdata(struct AviCodecData *acd);
 void free_qtcodecdata(struct QuicktimeCodecData *acd);
 
+void BKE_scene_free_ex(struct Scene *sce, const bool do_id_user);
 void BKE_scene_free(struct Scene *sce);
 void BKE_scene_init(struct Scene *sce);
 struct Scene *BKE_scene_add(struct Main *bmain, const char *name);

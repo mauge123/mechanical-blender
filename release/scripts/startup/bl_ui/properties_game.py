@@ -343,7 +343,7 @@ class RENDER_PT_game_stereo(RenderButtonsPanel, Panel):
         stereo_mode = gs.stereo
 
         # stereo options:
-        layout.prop(gs, "stereo", expand=True)
+        layout.row().prop(gs, "stereo", expand=True)
 
         # stereo:
         if stereo_mode == 'STEREO':
@@ -392,7 +392,7 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
 
         gs = context.scene.game_settings
 
-        layout.prop(gs, "material_mode", expand=True)
+        layout.row().prop(gs, "material_mode", expand=True)
 
         if gs.material_mode == 'GLSL':
             split = layout.split()
@@ -422,10 +422,8 @@ class RENDER_PT_game_system(RenderButtonsPanel, Panel):
         col = row.column()
         col.prop(gs, "use_frame_rate")
         col.prop(gs, "use_restrict_animation_updates")
-        col.prop(gs, "use_material_caching")
         col = row.column()
-        col.prop(gs, "use_display_lists")
-        col.active = gs.raster_storage != 'VERTEX_BUFFER_OBJECT'
+        col.prop(gs, "use_material_caching")
 
         row = layout.row()
         row.prop(gs, "vsync")

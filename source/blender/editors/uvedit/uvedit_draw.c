@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -85,7 +87,7 @@ void ED_image_draw_cursor(ARegion *ar, const float cursor[2])
 
 	gpuTranslate2fv(cursor);
 
-	const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	const uint shdr_pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
 
@@ -97,7 +99,7 @@ void ED_image_draw_cursor(ARegion *ar, const float cursor[2])
 	immUniformArray4fv("colors", (float *)(float[][4]){{1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}, 2);
 	immUniform1f("dash_width", 8.0f);
 
-	immBegin(PRIM_LINES, 8);
+	immBegin(GWN_PRIM_LINES, 8);
 
 	immVertex2f(shdr_pos, -0.05f * x_fac, 0.0f);
 	immVertex2f(shdr_pos, 0.0f, 0.05f * y_fac);
@@ -116,7 +118,7 @@ void ED_image_draw_cursor(ARegion *ar, const float cursor[2])
 	immUniformArray4fv("colors", (float *)(float[][4]){{1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}, 2);
 	immUniform1f("dash_width", 2.0f);
 
-	immBegin(PRIM_LINES, 8);
+	immBegin(GWN_PRIM_LINES, 8);
 
 	immVertex2f(shdr_pos, -0.020f * x_fac, 0.0f);
 	immVertex2f(shdr_pos, -0.1f * x_fac, 0.0f);
@@ -163,7 +165,7 @@ static void draw_uvs_shadow(Object *obedit)
 
 	const int cd_loop_uv_offset = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
 
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -177,20 +179,18 @@ static void draw_uvs_shadow(Object *obedit)
 	immUnbindProgram();
 }
 
-static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTexPoly *activetf)
+static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, const BMFace *efa_act)
 {
 	BMesh *bm = em->bm;
 	BMFace *efa;
 	BMLoop *l;
 	BMIter iter, liter;
-	MTexPoly *tf;
 	MLoopUV *luv;
 	Image *ima = sima->image;
 	float aspx, aspy, col[4];
 	int i;
 
 	const int cd_loop_uv_offset  = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
-	const int cd_poly_tex_offset = CustomData_get_offset(&bm->pdata, CD_MTEXPOLY);
 
 	BLI_buffer_declare_static(vec2f, tf_uv_buf, BLI_BUFFER_NOP, BM_DEFAULT_NGON_STACK_SIZE);
 	BLI_buffer_declare_static(vec2f, tf_uvorig_buf, BLI_BUFFER_NOP, BM_DEFAULT_NGON_STACK_SIZE);
@@ -206,7 +206,6 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 				const int efa_len = efa->len;
 				float (*tf_uv)[2]     = (float (*)[2])BLI_buffer_reinit_data(&tf_uv_buf,     vec2f, efa_len);
 				float (*tf_uvorig)[2] = (float (*)[2])BLI_buffer_reinit_data(&tf_uvorig_buf, vec2f, efa_len);
-				tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
 
 				BM_ITER_ELEM_INDEX (l, &liter, efa, BM_LOOPS_OF_FACE, i) {
 					luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
@@ -218,17 +217,18 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 				totarea += BM_face_calc_area(efa);
 				totuvarea += area_poly_v2((const float (*)[2])tf_uv, efa->len);
 				
-				if (uvedit_face_visible_test(scene, ima, efa, tf)) {
+				if (uvedit_face_visible_test(scene, ima, efa)) {
 					BM_elem_flag_enable(efa, BM_ELEM_TAG);
 				}
 				else {
-					if (tf == activetf)
-						activetf = NULL;
+					if (efa == efa_act) {
+						efa_act = NULL;
+					}
 					BM_elem_flag_disable(efa, BM_ELEM_TAG);
 				}
 			}
 
-			unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -240,7 +240,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 
 				BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 					if (BM_elem_flag_test(efa, BM_ELEM_TAG)) {
-						immBegin(PRIM_TRIANGLE_FAN, efa->len);
+						immBegin(GWN_PRIM_TRI_FAN, efa->len);
 
 						BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 							luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
@@ -280,7 +280,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 						immUniformColor3fv(col);
 						
 						/* TODO: use editmesh tessface */
-						immBegin(PRIM_TRIANGLE_FAN, efa->len);
+						immBegin(GWN_PRIM_TRI_FAN, efa->len);
 
 						BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 							luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
@@ -307,16 +307,14 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 
 			col[3] = 0.5f; /* hard coded alpha, not that nice */
 
-			VertexFormat *format = immVertexFormat();
-			unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-			unsigned int color = VertexFormat_add_attrib(format, "color", COMP_F32, 3, KEEP_FLOAT);
+			Gwn_VertFormat *format = immVertexFormat();
+			unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+			unsigned int color = GWN_vertformat_attr_add(format, "color", GWN_COMP_F32, 3, GWN_FETCH_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
 
 			BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
-				tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
-				
-				if (uvedit_face_visible_test(scene, ima, efa, tf)) {
+				if (uvedit_face_visible_test(scene, ima, efa)) {
 					const int efa_len = efa->len;
 					float (*tf_uv)[2]     = (float (*)[2])BLI_buffer_reinit_data(&tf_uv_buf,     vec2f, efa_len);
 					float (*tf_uvorig)[2] = (float (*)[2])BLI_buffer_reinit_data(&tf_uvorig_buf, vec2f, efa_len);
@@ -354,7 +352,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 					}
 
 					/* TODO: use editmesh tessface */
-					immBegin(PRIM_TRIANGLE_FAN, efa->len);
+					immBegin(GWN_PRIM_TRI_FAN, efa->len);
 					BM_ITER_ELEM_INDEX (l, &liter, efa, BM_LOOPS_OF_FACE, i) {
 						luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
 						a = fabsf(uvang[i] - ang[i]) / (float)M_PI;
@@ -365,8 +363,8 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 					immEnd();
 				}
 				else {
-					if (tf == activetf)
-						activetf = NULL;
+					if (efa == efa_act)
+						efa_act = NULL;
 					BM_elem_flag_disable(efa, BM_ELEM_TAG);
 				}
 			}
@@ -392,7 +390,7 @@ static void draw_uvs_lineloop_bmface(BMFace *efa, const int cd_loop_uv_offset, c
 	BMLoop *l;
 	MLoopUV *luv;
 
-	immBegin(PRIM_LINE_LOOP, efa->len);
+	immBegin(GWN_PRIM_LINE_LOOP, efa->len);
 
 	BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 		luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
@@ -407,7 +405,7 @@ static void draw_uvs_lineloop_mpoly(Mesh *me, MPoly *mpoly, unsigned int pos)
 	MLoopUV *mloopuv;
 	int i;
 
-	immBegin(PRIM_LINE_LOOP, mpoly->totloop);
+	immBegin(GWN_PRIM_LINE_LOOP, mpoly->totloop);
 
 	mloopuv = &me->mloopuv[mpoly->loopstart];
 	for (i = mpoly->totloop; i != 0; i--, mloopuv++) {
@@ -421,24 +419,36 @@ static void draw_uvs_other_mesh_texface(Object *ob, const Image *curimage, const
 {
 	Mesh *me = ob->data;
 	MPoly *mpoly = me->mpoly;
-	MTexPoly *mtpoly = me->mtpoly;
 	int a;
 
 	if (me->mloopuv == NULL) {
 		return;
 	}
 
-	for (a = me->totpoly; a != 0; a--, mpoly++, mtpoly++) {
+	Image **image_array = NULL;
+
+	if (other_uv_filter == SI_FILTER_SAME_IMAGE) {
+		image_array = BKE_object_material_edit_image_get_array(ob);
+	}
+
+	for (a = me->totpoly; a != 0; a--, mpoly++) {
 		if (other_uv_filter == SI_FILTER_ALL) {
 			/* Nothing to compare, all UV faces are visible. */
 		}
 		else if (other_uv_filter == SI_FILTER_SAME_IMAGE) {
-			if (mtpoly->tpage != curimage) {
+			if (mpoly[a].mat_nr >= ob->totcol) {
+				continue;
+			}
+			if (image_array[mpoly[a].mat_nr] != curimage) {
 				continue;
 			}
 		}
 
 		draw_uvs_lineloop_mpoly(me, mpoly, pos);
+	}
+
+	if (image_array) {
+		MEM_freeN(image_array);
 	}
 }
 static void draw_uvs_other_mesh_new_shading(Object *ob, const Image *curimage, const int other_uv_filter, unsigned int pos)
@@ -510,7 +520,7 @@ static void draw_uvs_other_mesh(Object *ob, const Image *curimage, const bool ne
 static void draw_uvs_other(SceneLayer *sl, Object *obedit, const Image *curimage, const bool new_shading_nodes,
                            const int other_uv_filter)
 {
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -552,7 +562,7 @@ static void draw_uvs_texpaint(SpaceImage *sima, Scene *scene, SceneLayer *sl, Ob
 			mloopuv = me->mloopuv;
 		}
 
-		unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -564,7 +574,7 @@ static void draw_uvs_texpaint(SpaceImage *sima, Scene *scene, SceneLayer *sl, Ob
 			if ((scene->toolsettings->uv_flag & UV_SHOW_SAME_IMAGE) && mpoly->mat_nr != ob->actcol - 1)
 				continue;
 
-			immBegin(PRIM_LINE_LOOP, mpoly->totloop);
+			immBegin(GWN_PRIM_LINE_LOOP, mpoly->totloop);
 
 			mloopuv = mloopuv_base + mpoly->loopstart;
 			for (b = 0; b < mpoly->totloop; b++, mloopuv++) {
@@ -604,7 +614,6 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 	BMFace *efa, *efa_act;
 	BMLoop *l;
 	BMIter iter, liter;
-	MTexPoly *tf, *activetf = NULL;
 	MLoopUV *luv;
 	unsigned char col1[4], col2[4];
 	float pointsize;
@@ -612,11 +621,10 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 	Image *ima = sima->image;
 
 	const int cd_loop_uv_offset  = CustomData_get_offset(&bm->ldata, CD_MLOOPUV);
-	const int cd_poly_tex_offset = CustomData_get_offset(&bm->pdata, CD_MTEXPOLY);
 
 	unsigned int pos;
 
-	activetf = EDBM_mtexpoly_active_get(em, &efa_act, false, false); /* will be set to NULL if hidden */
+	efa_act = EDBM_uv_active_face_get(em, false, false); /* will be set to NULL if hidden */
 	ts = scene->toolsettings;
 
 	drawfaces = draw_uvs_face_check(scene);
@@ -638,7 +646,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 			}
 		}
 		else {
-			curimage = (activetf) ? activetf->tpage : ima;
+			curimage = (efa_act) ? BKE_object_material_edit_image_get(obedit, efa_act->mat_nr) : ima;
 		}
 
 		draw_uvs_other(sl, obedit, curimage, new_shading_nodes, sima->other_uv_filter);
@@ -647,7 +655,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 	/* 1. draw shadow mesh */
 	
 	if (sima->flag & SI_DRAWSHADOW) {
-		Object *ob_cage = DAG_get_object(depsgraph, obedit);
+		Object *ob_cage = DEG_get_object(depsgraph, obedit);
 		/* XXX TODO: Need to check if shadow mesh is different than original mesh. */
 		bool is_cage_like_final_meshes = (ob_cage == obedit);
 
@@ -661,7 +669,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 	/* 2. draw colored faces */
 	
 	if (sima->flag & SI_DRAW_STRETCH) {
-		draw_uvs_stretch(sima, scene, em, activetf);
+		draw_uvs_stretch(sima, scene, em, efa_act);
 	}
 	else if (!(sima->flag & SI_NO_DRAWFACES)) {
 		/* draw transparent faces */
@@ -670,18 +678,17 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glEnable(GL_BLEND);
 		
-		pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 		for (unsigned int i = 0; i < em->tottri; i++) {
 			efa = em->looptris[i][0]->f;
-			tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
-			if (uvedit_face_visible_test(scene, ima, efa, tf)) {
+			if (uvedit_face_visible_test(scene, ima, efa)) {
 				const bool is_select = uvedit_face_select_test(scene, efa, cd_loop_uv_offset);
 				BM_elem_flag_enable(efa, BM_ELEM_TAG);
 
-				if (tf == activetf) {
+				if (efa == efa_act) {
 					/* only once */
 					immUniformThemeColor(TH_EDITMESH_ACTIVE);
 				}
@@ -689,7 +696,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 					immUniformColor4ubv(is_select ? col2 : col1);
 				}
 
-				immBegin(PRIM_TRIANGLES, (em->looptris[i][0]->f->len - 2) * 3);
+				immBegin(GWN_PRIM_TRIS, (em->looptris[i][0]->f->len - 2) * 3);
 				draw_uvs_looptri(em, &i, cd_loop_uv_offset, pos);
 				immEnd();
 			}
@@ -706,14 +713,12 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		/* would be nice to do this within a draw loop but most below are optional, so it would involve too many checks */
 		
 		BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
-			tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
-
-			if (uvedit_face_visible_test(scene, ima, efa, tf)) {
+			if (uvedit_face_visible_test(scene, ima, efa)) {
 				BM_elem_flag_enable(efa, BM_ELEM_TAG);
 			}
 			else {
-				if (tf == activetf)
-					activetf = NULL;
+				if (efa == efa_act)
+					efa_act = NULL;
 				BM_elem_flag_disable(efa, BM_ELEM_TAG);
 			}
 		}
@@ -736,7 +741,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 	switch (sima->dt_uv) {
 		case SI_UVDT_DASH:
 		{
-			const uint shdr_pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			const uint shdr_pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_LINE_DASHED_COLOR);
 
@@ -751,11 +756,8 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 			BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 				if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 					continue;
-				tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
 
-				if (tf) {
-					draw_uvs_lineloop_bmface(efa, cd_loop_uv_offset, shdr_pos);
-				}
+				draw_uvs_lineloop_bmface(efa, cd_loop_uv_offset, shdr_pos);
 			}
 
 			immUnbindProgram();
@@ -764,7 +766,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		}
 		case SI_UVDT_BLACK: /* black/white */
 		case SI_UVDT_WHITE:
-			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -786,7 +788,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 
 			break;
 		case SI_UVDT_OUTLINE:
-			pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+			pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 			immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -809,9 +811,9 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 				int sel;
 				UI_GetThemeColor4ubv(TH_EDGE_SELECT, col1);
 
-				VertexFormat *format = immVertexFormat();
-				pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-				unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 4, NORMALIZE_INT_TO_FLOAT);
+				Gwn_VertFormat *format = immVertexFormat();
+				pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+				unsigned int color = GWN_vertformat_attr_add(format, "color", GWN_COMP_U8, 4, GWN_FETCH_INT_TO_FLOAT_UNIT);
 
 				if (interpedges) {
 					immBindBuiltinProgram(GPU_SHADER_2D_SMOOTH_COLOR);
@@ -820,7 +822,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 						if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 							continue;
 
-						immBegin(PRIM_LINE_LOOP, efa->len);
+						immBegin(GWN_PRIM_LINE_LOOP, efa->len);
 
 						BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 							sel = uvedit_uv_select_test(scene, l, cd_loop_uv_offset);
@@ -844,7 +846,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 						if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 							continue;
 
-						immBegin(PRIM_LINES, efa->len * 2);
+						immBegin(GWN_PRIM_LINES, efa->len * 2);
 
 						BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 							sel = uvedit_edge_select_test(scene, l, cd_loop_uv_offset);
@@ -866,7 +868,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 				}
 			}
 			else {
-				pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+				pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 				immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 				immUniformColor4ubv(col2);
@@ -896,16 +898,16 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		float cent[2];
 		bool col_set = false;
 
-		VertexFormat *format = immVertexFormat();
-		pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-		unsigned int color = VertexFormat_add_attrib(format, "color", COMP_U8, 3, NORMALIZE_INT_TO_FLOAT);
+		Gwn_VertFormat *format = immVertexFormat();
+		pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+		unsigned int color = GWN_vertformat_attr_add(format, "color", GWN_COMP_U8, 3, GWN_FETCH_INT_TO_FLOAT_UNIT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_FLAT_COLOR);
 
 		pointsize = UI_GetThemeValuef(TH_FACEDOT_SIZE);
 		glPointSize(pointsize);
 		
-		immBeginAtMost(PRIM_POINTS, bm->totface);
+		immBeginAtMost(GWN_PRIM_POINTS, bm->totface);
 
 		/* unselected faces */
 
@@ -957,7 +959,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 	/* 6. draw uv vertices */
 	
 	if (drawfaces != 2) { /* 2 means Mesh Face Mode */
-		pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+		pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 		immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -966,7 +968,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		pointsize = UI_GetThemeValuef(TH_VERTEX_SIZE);
 		glPointSize(pointsize);
 
-		immBeginAtMost(PRIM_POINTS, bm->totloop);
+		immBeginAtMost(GWN_PRIM_POINTS, bm->totloop);
 
 		BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 			if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
@@ -986,7 +988,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		glPointSize(pointsize * 2 + (((int)pointsize % 2) ? (-1) : 0));
 		imm_cpack(0xFF);
 	
-		immBeginAtMost(PRIM_POINTS, bm->totloop);
+		immBeginAtMost(GWN_PRIM_POINTS, bm->totloop);
 
 		BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 			if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
@@ -1006,7 +1008,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, SceneLayer *sl, Object *obe
 		immUniformThemeColor(TH_VERTEX_SELECT);
 		glPointSize(pointsize);
 	
-		immBeginAtMost(PRIM_POINTS, bm->totloop);
+		immBeginAtMost(GWN_PRIM_POINTS, bm->totloop);
 
 		BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 			if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
@@ -1037,7 +1039,7 @@ static void draw_uv_shadows_get(SpaceImage *sima, Object *ob, Object *obedit, bo
 	if ((sima->mode == SI_MODE_PAINT) && obedit && obedit->type == OB_MESH) {
 		struct BMEditMesh *em = BKE_editmesh_from_object(obedit);
 		
-		*show_shadow = EDBM_mtexpoly_check(em);
+		*show_shadow = EDBM_uv_check(em);
 	}
 	
 	*show_texpaint = (ob && ob->type == OB_MESH && ob->mode == OB_MODE_TEXTURE_PAINT);

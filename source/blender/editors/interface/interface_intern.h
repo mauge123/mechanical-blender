@@ -259,6 +259,7 @@ struct uiBut {
 	
 	uiButSearchCreateFunc search_create_func;
 	uiButSearchFunc search_func;
+	bool free_search_arg;
 	void *search_arg;
 
 	uiButHandleRenameFunc rename_func;
@@ -278,7 +279,7 @@ struct uiBut {
 	BIFIconID icon;
 	char dt; /* drawtype: UI_EMBOSS, UI_EMBOSS_NONE ... etc, copied from the block */
 	signed char pie_dir; /* direction in a pie menu, used for collision detection (RadialDirection) */
-	char changed; /* could be made into a single flag */
+	bool changed; /* could be made into a single flag */
 	unsigned char unit_type; /* so buttons can support unit systems which are not RNA */
 	short modifier_key;
 	short iconadd;
@@ -606,7 +607,7 @@ int ui_searchbox_autocomplete(struct bContext *C, struct ARegion *ar, uiBut *but
 void ui_searchbox_event(struct bContext *C, struct ARegion *ar, uiBut *but, const struct wmEvent *event);
 bool ui_searchbox_apply(uiBut *but, struct ARegion *ar);
 void ui_searchbox_free(struct bContext *C, struct ARegion *ar);
-void ui_but_search_refresh(uiBut *but, const bool is_template_ID);
+void ui_but_search_refresh(uiBut *but);
 
 uiBlock *ui_popup_block_refresh(
         struct bContext *C, uiPopupBlockHandle *handle,
@@ -747,5 +748,21 @@ void UI_OT_eyedropper_color(struct wmOperatorType *ot);
 void UI_OT_eyedropper_id(struct wmOperatorType *ot);
 void UI_OT_eyedropper_depth(struct wmOperatorType *ot);
 void UI_OT_eyedropper_driver(struct wmOperatorType *ot);
+
+/* interface_util.c */
+
+/**
+ * For use with #ui_rna_collection_search_cb.
+ */
+typedef struct uiRNACollectionSearch {
+	PointerRNA target_ptr;
+	PropertyRNA *target_prop;
+
+	PointerRNA search_ptr;
+	PropertyRNA *search_prop;
+
+	bool *but_changed; /* pointer to uiBut.changed */
+} uiRNACollectionSearch;
+void ui_rna_collection_search_cb(const struct bContext *C, void *arg, const char *str, uiSearchItems *items);
 
 #endif  /* __INTERFACE_INTERN_H__ */

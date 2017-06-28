@@ -42,7 +42,6 @@
 #include "BLT_lang.h"
 
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_idprop.h"
 #include "BKE_layer.h"
 #include "BKE_screen.h"
@@ -50,6 +49,8 @@
 #include "BKE_node.h"
 #include "BKE_text.h" /* for UI_OT_reports_to_text */
 #include "BKE_report.h"
+
+#include "DEG_depsgraph.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -353,11 +354,21 @@ static int use_property_button_exec(bContext *C, wmOperator *UNUSED(op))
 		return OPERATOR_CANCELLED;
 	}
 
+	int array_len = RNA_property_array_length(&scene_props_ptr, prop);
+	bool is_array = array_len != 0;
+
 	switch (RNA_property_type(prop)) {
 		case PROP_FLOAT:
 		{
-			float value = RNA_property_float_get(&scene_props_ptr, prop);
-			BKE_collection_engine_property_add_float(props, identifier, value);
+			if (is_array) {
+				float values[RNA_MAX_ARRAY_LENGTH];
+				RNA_property_float_get_array(&scene_props_ptr, prop, values);
+				BKE_collection_engine_property_add_float_array(props, identifier, values, array_len);
+			}
+			else {
+				float value = RNA_property_float_get(&scene_props_ptr, prop);
+				BKE_collection_engine_property_add_float(props, identifier, value);
+			}
 			break;
 		}
 		case PROP_ENUM:
@@ -386,7 +397,7 @@ static int use_property_button_exec(bContext *C, wmOperator *UNUSED(op))
 	}
 
 	/* TODO(sergey): Use proper flag for tagging here. */
-	DAG_id_tag_update((ID *)CTX_data_scene(C), 0);
+	DEG_id_tag_update((ID *)CTX_data_scene(C), 0);
 
 	return OPERATOR_FINISHED;
 }
@@ -421,7 +432,7 @@ static int unuse_property_button_exec(bContext *C, wmOperator *UNUSED(op))
 	IDP_FreeFromGroup(props, prop_to_remove);
 
 	/* TODO(sergey): Use proper flag for tagging here. */
-	DAG_id_tag_update((ID *)CTX_data_scene(C), 0);
+	DEG_id_tag_update((ID *)CTX_data_scene(C), 0);
 
 	return OPERATOR_FINISHED;
 }

@@ -44,10 +44,11 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+
+#include "DEG_depsgraph.h"
 
 #include "BLF_api.h"
 
@@ -132,10 +133,10 @@ void ED_node_tag_update_id(ID *id)
 	 * all the users of this tree will have update
 	 * flushed from the tree,
 	 */
-	DAG_id_tag_update(&ntree->id, 0);
+	DEG_id_tag_update(&ntree->id, 0);
 
 	if (ntree->type == NTREE_SHADER) {
-		DAG_id_tag_update(id, 0);
+		DEG_id_tag_update(id, 0);
 		
 		if (GS(id->name) == ID_MA)
 			WM_main_add_notifier(NC_MATERIAL | ND_SHADING, id);
@@ -148,12 +149,12 @@ void ED_node_tag_update_id(ID *id)
 		WM_main_add_notifier(NC_SCENE | ND_NODES, id);
 	}
 	else if (ntree->type == NTREE_TEXTURE) {
-		DAG_id_tag_update(id, 0);
+		DEG_id_tag_update(id, 0);
 		WM_main_add_notifier(NC_TEXTURE | ND_NODES, id);
 	}
 	else if (id == &ntree->id) {
 		/* node groups */
-		DAG_id_tag_update(id, 0);
+		DEG_id_tag_update(id, 0);
 	}
 }
 
@@ -639,8 +640,8 @@ static void node_draw_preview_background(float tile, rctf *rect)
 {
 	float x, y;
 	
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
@@ -712,7 +713,7 @@ static void node_draw_preview(bNodePreview *preview, rctf *prv)
 	
 	glDisable(GL_BLEND);
 
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 	immUniformThemeColorShadeAlpha(TH_BACK, -15, +100);
 	imm_draw_line_box(pos, draw_rect.xmin, draw_rect.ymin, draw_rect.xmax, draw_rect.ymax);
@@ -762,9 +763,9 @@ void node_draw_sockets(View2D *v2d, const bContext *C, bNodeTree *ntree, bNode *
 	float scale;
 	UI_view2d_scale_get(v2d, &scale, NULL);
 
-	VertexFormat *format = immVertexFormat();
-	unsigned int pos = VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-	unsigned int col = VertexFormat_add_attrib(format, "color", COMP_F32, 4, KEEP_FLOAT);
+	Gwn_VertFormat *format = immVertexFormat();
+	unsigned int pos = GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+	unsigned int col = GWN_vertformat_attr_add(format, "color", GWN_COMP_F32, 4, GWN_FETCH_FLOAT);
 
 	glEnable(GL_BLEND);
 	GPU_enable_program_point_size();
@@ -779,7 +780,7 @@ void node_draw_sockets(View2D *v2d, const bContext *C, bNodeTree *ntree, bNode *
 		immUniform1f("outlineWidth", 1.0f);
 		immUniform4f("outlineColor", 0.0f, 0.0f, 0.0f, 0.6f);
 
-		immBeginAtMost(PRIM_POINTS, total_input_ct + total_output_ct);
+		immBeginAtMost(GWN_PRIM_POINTS, total_input_ct + total_output_ct);
 	}
 
 	/* socket inputs */
@@ -823,7 +824,7 @@ void node_draw_sockets(View2D *v2d, const bContext *C, bNodeTree *ntree, bNode *
 		immUniform4f("outlineColor", c[0], c[1], c[2], 1.0f);
 		immUniform1f("outlineWidth", 1.5f);
 
-		immBegin(PRIM_POINTS, selected_input_ct + selected_output_ct);
+		immBegin(GWN_PRIM_POINTS, selected_input_ct + selected_output_ct);
 
 		if (selected_input_ct) {
 			/* socket inputs */
@@ -899,14 +900,6 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 			UI_GetThemeColor4fv(color_id, color);
 		}
 	}
-
-#ifdef WITH_COMPOSITOR
-	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
-		if (COM_isHighlightedbNode(node)) {
-			UI_GetThemeColorBlendShade4fv(color_id, TH_ACTIVE, 0.5f, 0, color);
-		}
-	}
-#endif
 
 	glLineWidth(1.0f);
 
@@ -1041,16 +1034,6 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		UI_GetThemeColorBlendShade4fv(color_id, TH_REDALERT, 0.5f, 0, color);
 	else
 		UI_GetThemeColor4fv(color_id, color);
-
-#ifdef WITH_COMPOSITOR
-	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
-		if (COM_isHighlightedbNode(node)) {
-			UI_GetThemeColorBlendShade4fv(color_id, TH_ACTIVE, 0.5f, 0, color);
-		}
-	}
-#else
-	(void)ntree;
-#endif
 	
 	UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
 	
@@ -1113,13 +1096,13 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	}
 
 	/* scale widget thing */
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 2, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
 	immUniformThemeColorShade(color_id, -10);
 	dx = 10.0f;
 
-	immBegin(PRIM_LINES, 4);
+	immBegin(GWN_PRIM_LINES, 4);
 	immVertex2f(pos, rct->xmax - dx, centy - 4.0f);
 	immVertex2f(pos, rct->xmax - dx, centy + 4.0f);
 
@@ -1130,7 +1113,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 	immUniformThemeColorShade(color_id, 30);
 	dx -= snode->aspect;
 
-	immBegin(PRIM_LINES, 4);
+	immBegin(GWN_PRIM_LINES, 4);
 	immVertex2f(pos, rct->xmax - dx, centy - 4.0f);
 	immVertex2f(pos, rct->xmax - dx, centy + 4.0f);
 
@@ -1302,15 +1285,9 @@ static void snode_setup_v2d(SpaceNode *snode, ARegion *ar, const float center[2]
 static void draw_nodetree(const bContext *C, ARegion *ar, bNodeTree *ntree, bNodeInstanceKey parent_key)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
-	
+
 	node_uiblocks_init(C, ntree);
-	
-#ifdef WITH_COMPOSITOR
-	if (ntree->type == NTREE_COMPOSIT) {
-		COM_startReadHighlights();
-	}
-#endif
-	
+
 	node_update_nodetree(C, ntree);
 	node_draw_nodetree(C, ar, snode, ntree, parent_key);
 }
@@ -1419,7 +1396,23 @@ void drawnodespace(const bContext *C, ARegion *ar)
 			
 			/* backdrop */
 			draw_nodespace_back_pix(C, ar, snode, path->parent_key);
-			
+
+			{
+				float original_proj[4][4];
+				gpuGetProjectionMatrix(original_proj);
+
+				gpuPushMatrix();
+				gpuLoadIdentity();
+
+				glaDefine2DArea(&ar->winrct);
+				wmOrtho2_pixelspace(ar->winx, ar->winy);
+
+				WM_manipulatormap_draw(ar->manipulator_map, C, WM_MANIPULATORMAP_DRAWSTEP_2D);
+
+				gpuPopMatrix();
+				gpuLoadProjectionMatrix(original_proj);
+			}
+
 			draw_nodetree(C, ar, ntree, path->parent_key);
 		}
 		

@@ -26,10 +26,12 @@
 #include "DRW_render.h"
 
 #include "GPU_shader.h"
+#include "GPU_texture.h"
 
 #include "UI_resources.h"
 
 #include "BKE_global.h"
+#include "BKE_texture.h"
 
 #include "draw_common.h"
 
@@ -44,6 +46,7 @@
 /* Colors & Constant */
 GlobalsUboStorage ts;
 struct GPUUniformBuffer *globals_ubo = NULL;
+struct GPUTexture *globals_ramp = NULL;
 
 void DRW_globals_update(void)
 {
@@ -110,6 +113,30 @@ void DRW_globals_update(void)
 	}
 
 	globals_ubo = DRW_uniformbuffer_create(sizeof(GlobalsUboStorage), &ts);
+
+	ColorBand ramp = {0};
+	float *colors;
+	int col_size;
+
+	ramp.tot = 3;
+	ramp.data[0].a = 1.0f;
+	ramp.data[0].b = 1.0f;
+	ramp.data[0].pos = 0.0f;
+	ramp.data[1].a = 1.0f;
+	ramp.data[1].g = 1.0f;
+	ramp.data[1].pos = 0.5f;
+	ramp.data[2].a = 1.0f;
+	ramp.data[2].r = 1.0f;
+	ramp.data[2].pos = 1.0f;
+
+	colorband_table_RGBA(&ramp, &colors, &col_size);
+
+	if (globals_ramp) {
+		GPU_texture_free(globals_ramp);
+	}
+	globals_ramp = GPU_texture_create_1D(col_size, colors, NULL);
+
+	MEM_freeN(colors);
 }
 
 /* ********************************* SHGROUP ************************************* */
@@ -157,7 +184,7 @@ DRWShadingGroup *shgroup_groundpoints_uniform_color(DRWPass *pass, float color[4
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance_screenspace(DRWPass *pass, struct Batch *geom, float *size)
+DRWShadingGroup *shgroup_instance_screenspace(DRWPass *pass, struct Gwn_Batch *geom, float *size)
 {
 	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_SCREENSPACE_VARIYING_COLOR);
 
@@ -172,7 +199,7 @@ DRWShadingGroup *shgroup_instance_screenspace(DRWPass *pass, struct Batch *geom,
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance_objspace_solid(DRWPass *pass, struct Batch *geom, float (*obmat)[4])
+DRWShadingGroup *shgroup_instance_objspace_solid(DRWPass *pass, struct Gwn_Batch *geom, float (*obmat)[4])
 {
 	static float light[3] = {0.0f, 0.0f, 1.0f};
 	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_OBJECTSPACE_SIMPLE_LIGHTING_VARIYING_COLOR);
@@ -186,7 +213,7 @@ DRWShadingGroup *shgroup_instance_objspace_solid(DRWPass *pass, struct Batch *ge
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance_objspace_wire(DRWPass *pass, struct Batch *geom, float (*obmat)[4])
+DRWShadingGroup *shgroup_instance_objspace_wire(DRWPass *pass, struct Gwn_Batch *geom, float (*obmat)[4])
 {
 	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_OBJECTSPACE_VARIYING_COLOR);
 
@@ -198,7 +225,7 @@ DRWShadingGroup *shgroup_instance_objspace_wire(DRWPass *pass, struct Batch *geo
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance_screen_aligned(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_instance_screen_aligned(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED);
 
@@ -211,7 +238,7 @@ DRWShadingGroup *shgroup_instance_screen_aligned(DRWPass *pass, struct Batch *ge
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance_axis_names(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_instance_axis_names(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_INSTANCE_SCREEN_ALIGNED_AXIS);
 
@@ -224,7 +251,7 @@ DRWShadingGroup *shgroup_instance_axis_names(DRWPass *pass, struct Batch *geom)
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance_scaled(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_instance_scaled(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh_inst = GPU_shader_get_builtin_shader(GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SCALE);
 
@@ -236,7 +263,7 @@ DRWShadingGroup *shgroup_instance_scaled(DRWPass *pass, struct Batch *geom)
 	return grp;
 }
 
-DRWShadingGroup *shgroup_instance(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_instance(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh_inst = GPU_shader_get_builtin_shader(GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE);
 
@@ -248,7 +275,7 @@ DRWShadingGroup *shgroup_instance(DRWPass *pass, struct Batch *geom)
 	return grp;
 }
 
-DRWShadingGroup *shgroup_camera_instance(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_camera_instance(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh_inst = GPU_shader_get_builtin_shader(GPU_SHADER_CAMERA);
 
@@ -262,7 +289,7 @@ DRWShadingGroup *shgroup_camera_instance(DRWPass *pass, struct Batch *geom)
 	return grp;
 }
 
-DRWShadingGroup *shgroup_distance_lines_instance(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_distance_lines_instance(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh_inst = GPU_shader_get_builtin_shader(GPU_SHADER_DISTANCE_LINES);
 	static float point_size = 4.0f;
@@ -277,7 +304,7 @@ DRWShadingGroup *shgroup_distance_lines_instance(DRWPass *pass, struct Batch *ge
 	return grp;
 }
 
-DRWShadingGroup *shgroup_spot_instance(DRWPass *pass, struct Batch *geom)
+DRWShadingGroup *shgroup_spot_instance(DRWPass *pass, struct Gwn_Batch *geom)
 {
 	GPUShader *sh_inst = GPU_shader_get_builtin_shader(GPU_SHADER_INSTANCE_EDGES_VARIYING_COLOR);
 	static bool True = true;
@@ -292,6 +319,38 @@ DRWShadingGroup *shgroup_spot_instance(DRWPass *pass, struct Batch *geom)
 
 	return grp;
 }
+
+DRWShadingGroup *shgroup_instance_bone_envelope_wire(DRWPass *pass, struct Gwn_Batch *geom, float (*obmat)[4])
+{
+	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_INSTANCE_BONE_ENVELOPE_WIRE);
+
+	DRWShadingGroup *grp = DRW_shgroup_instance_create(sh, pass, geom);
+	DRW_shgroup_attrib_float(grp, "InstanceModelMatrix", 16);
+	DRW_shgroup_attrib_float(grp, "color", 4);
+	DRW_shgroup_attrib_float(grp, "radius_head", 1);
+	DRW_shgroup_attrib_float(grp, "radius_tail", 1);
+	DRW_shgroup_attrib_float(grp, "distance", 1);
+	DRW_shgroup_uniform_mat4(grp, "ObjectModelMatrix", (float *)obmat);
+
+	return grp;
+}
+
+DRWShadingGroup *shgroup_instance_bone_envelope_solid(DRWPass *pass, struct Gwn_Batch *geom, float (*obmat)[4])
+{
+	static float light[3] = {0.0f, 0.0f, 1.0f};
+	GPUShader *sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_INSTANCE_BONE_ENVELOPE_SOLID);
+
+	DRWShadingGroup *grp = DRW_shgroup_instance_create(sh, pass, geom);
+	DRW_shgroup_attrib_float(grp, "InstanceModelMatrix", 16);
+	DRW_shgroup_attrib_float(grp, "color", 4);
+	DRW_shgroup_attrib_float(grp, "radius_head", 1);
+	DRW_shgroup_attrib_float(grp, "radius_tail", 1);
+	DRW_shgroup_uniform_mat4(grp, "ObjectModelMatrix", (float *)obmat);
+	DRW_shgroup_uniform_vec3(grp, "light", light, 1);
+
+	return grp;
+}
+
 
 /* ******************************************** COLOR UTILS *********************************************** */
 

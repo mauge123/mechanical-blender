@@ -1339,7 +1339,7 @@ static void ui_but_to_pixelrect(rcti *rect, const ARegion *ar, uiBlock *block, u
 	rctf rectf;
 
 	ui_block_to_window_rctf(ar, block, &rectf, (but) ? &but->rect : &block->rect);
-	BLI_rcti_rctf_copy(rect, &rectf);
+	BLI_rcti_rctf_copy_round(rect, &rectf);
 	BLI_rcti_translate(rect, -ar->winrct.xmin, -ar->winrct.ymin);
 }
 
@@ -2339,11 +2339,10 @@ bool ui_but_string_set_eval_num(bContext *C, uiBut *but, const char *str, double
 
 #else /* WITH_PYTHON */
 
-	*value = atof(str);
+	*r_value = atof(str);
 	ok = true;
 
-	(void)C;
-	(void)but;
+	UNUSED_VARS(C, but);
 
 #endif /* WITH_PYTHON */
 
@@ -2379,7 +2378,7 @@ static void ui_but_string_free_internal(uiBut *but)
 
 bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 {
-	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
+	if (but->rnaprop && but->rnapoin.data && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		if (RNA_property_editable(&but->rnapoin, but->rnaprop)) {
 			PropertyType type;
 
@@ -2426,8 +2425,15 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 	}
 	else if (but->type == UI_BTYPE_TEXT) {
 		/* string */
-		if (ui_but_is_utf8(but)) BLI_strncpy_utf8(but->poin, str, but->hardmax);
-		else BLI_strncpy(but->poin, str, but->hardmax);
+		if (!but->poin || (str[0] == '\0')) {
+			str = "";
+		}
+		else if (ui_but_is_utf8(but)) {
+			BLI_strncpy_utf8(but->poin, str, but->hardmax);
+		}
+		else {
+			BLI_strncpy(but->poin, str, but->hardmax);
+		}
 
 		return true;
 	}
@@ -2633,6 +2639,10 @@ static void ui_but_free(const bContext *C, uiBut *but)
 		MEM_freeN(but->tip_argN);
 	}
 
+	if (!but->editstr && but->free_search_arg) {
+		MEM_SAFE_FREE(but->search_arg);
+	}
+
 	if (but->active) {
 		/* XXX solve later, buttons should be free-able without context ideally,
 		 * however they may have open tooltips or popup windows, which need to
@@ -2785,11 +2795,13 @@ uiBlock *UI_block_begin(const bContext *C, ARegion *region, const char *name, sh
 		block->aspect = 2.0f / fabsf(getsizex * block->winmat[0][0]);
 	}
 	else {
+		const bScreen *screen = WM_window_get_active_screen(window);
+
 		/* no subwindow created yet, for menus for example, so we
 		 * use the main window instead, since buttons are created
 		 * there anyway */
-		wm_subwindow_matrix_get(window, window->screen->mainwin, block->winmat);
-		wm_subwindow_size_get(window, window->screen->mainwin, &getsizex, &getsizey);
+		wm_subwindow_matrix_get(window, screen->mainwin, block->winmat);
+		wm_subwindow_size_get(window, screen->mainwin, &getsizex, &getsizey);
 
 		block->aspect = 2.0f / fabsf(getsizex * block->winmat[0][0]);
 		block->auto_open = true;
@@ -3172,7 +3184,9 @@ static uiBut *ui_def_but(
 	}
 
 	if (block->flag & UI_BLOCK_RADIAL) {
-		but->drawflag |= (UI_BUT_TEXT_LEFT | UI_BUT_ICON_LEFT);
+		but->drawflag |= UI_BUT_TEXT_LEFT;
+		if (but->str && but->str[0])
+			but->drawflag |= UI_BUT_ICON_LEFT;
 	}
 	else if ((block->flag & UI_BLOCK_LOOP) ||
 	         ELEM(but->type,
@@ -3505,7 +3519,7 @@ static uiBut *ui_def_but_rna(
 	}
 
 	const char *info;
-	if (!RNA_property_editable_info(&but->rnapoin, prop, &info)) {
+	if (but->rnapoin.data && !RNA_property_editable_info(&but->rnapoin, prop, &info)) {
 		ui_def_but_rna__disable(but, info);
 	}
 
@@ -4376,7 +4390,7 @@ void UI_but_func_search_set(
 	if (0 == (but->block->flag & UI_BLOCK_LOOP)) {
 		/* skip empty buttons, not all buttons need input, we only show invalid */
 		if (but->drawstr[0])
-			ui_but_search_refresh(but, false);
+			ui_but_search_refresh(but);
 	}
 }
 
@@ -4528,7 +4542,7 @@ void UI_but_string_info_get(bContext *C, uiBut *but, ...)
 				tmp = BLI_strdup(RNA_property_identifier(but->rnaprop));
 		}
 		else if (type == BUT_GET_RNASTRUCT_IDENTIFIER) {
-			if (but->rnaprop)
+			if (but->rnaprop && but->rnapoin.data)
 				tmp = BLI_strdup(RNA_struct_identifier(but->rnapoin.type));
 			else if (but->optype)
 				tmp = BLI_strdup(but->optype->idname);
@@ -4623,7 +4637,10 @@ void UI_but_string_info_get(bContext *C, uiBut *but, ...)
 			if (ptr && prop) {
 				if (!item) {
 					int i;
-					
+
+					/* so the context is passed to itemf functions */
+					WM_operator_properties_sanitize(ptr, false);
+
 					RNA_property_enum_items_gettexted(C, ptr, prop, &items, &totitems, &free_items);
 					for (i = 0, item = items; i < totitems; i++, item++) {
 						if (item->identifier[0] && item->value == value)

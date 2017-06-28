@@ -38,7 +38,7 @@
 struct ARegion;
 struct ARegionType;
 struct BoundBox;
-struct Batch;
+struct Gwn_Batch;
 struct DerivedMesh;
 struct Object;
 struct SmokeDomainSettings;
@@ -345,9 +345,6 @@ void draw_smoke_velocity(struct SmokeDomainSettings *domain, float viewnormal[3]
 extern unsigned char view3d_camera_border_hack_col[3];
 extern bool view3d_camera_border_hack_test;
 #endif
-
-/* temporary test for blender 2.8 viewport */
-#define IS_VIEWPORT_LEGACY(v3d) ((v3d->tmp_compat_flag & V3D_NEW_VIEWPORT) == 0)
 
 /* temporary for legacy viewport to work */
 void VP_legacy_drawcursor(Scene *scene, struct SceneLayer *sl, ARegion *ar, View3D *v3d);

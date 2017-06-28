@@ -35,15 +35,15 @@
 // TODO(sergey): Use some sort of wrapper.
 #include <deque>
 
-extern "C" {
-#include "DNA_object_types.h"
-
 #include "BLI_utildefines.h"
 #include "BLI_task.h"
 #include "BLI_ghash.h"
 
-#include "DEG_depsgraph.h"
+extern "C" {
+#include "DNA_object_types.h"
 } /* extern "C" */
+
+#include "DEG_depsgraph.h"
 
 #include "intern/nodes/deg_node.h"
 #include "intern/nodes/deg_node_component.h"
@@ -120,10 +120,12 @@ void deg_graph_flush_updates(Main *bmain, Depsgraph *graph)
 	 * NOTE: Count how many nodes we need to handle - entry nodes may be
 	 *       component nodes which don't count for this purpose!
 	 */
-	GSET_FOREACH_BEGIN(OperationDepsNode *, node, graph->entry_tags)
+	GSET_FOREACH_BEGIN(OperationDepsNode *, op_node, graph->entry_tags)
 	{
-		queue.push_back(node);
-		node->scheduled = true;
+		if ((op_node->flag & DEPSOP_FLAG_SKIP_FLUSH) == 0) {
+			queue.push_back(op_node);
+			op_node->scheduled = true;
+		}
 	}
 	GSET_FOREACH_END();
 
@@ -138,19 +140,31 @@ void deg_graph_flush_updates(Main *bmain, Depsgraph *graph)
 			ComponentDepsNode *comp_node = node->owner;
 			IDDepsNode *id_node = comp_node->owner;
 
-			ID *id = id_node->id;
-			if(id_node->done == 0) {
+			/* TODO(sergey): Do we need to pass original or evaluated ID here? */
+			ID *id = id_node->id_orig;
+			if (id_node->done == 0) {
 				deg_editors_id_update(bmain, id);
 				lib_id_recalc_tag(bmain, id);
 				/* TODO(sergey): For until we've got proper data nodes in the graph. */
 				lib_id_recalc_data_tag(bmain, id);
+
+#ifdef WITH_COPY_ON_WRITE
+				/* Currently this is needed to get ob->mesh to be replaced with
+				 * original mesh (rather than being evaluated_mesh).
+				 *
+				 * TODO(sergey): This is something we need to avoid.
+				 */
+				ComponentDepsNode *cow_comp =
+				        id_node->find_component(DEG_NODE_TYPE_COPY_ON_WRITE);
+				cow_comp->tag_update(graph);
+#endif
 			}
 
-			if(comp_node->done == 0) {
+			if (comp_node->done == 0) {
 				Object *object = NULL;
 				if (GS(id->name) == ID_OB) {
 					object = (Object *)id;
-					if(id_node->done == 0) {
+					if (id_node->done == 0) {
 						++num_flushed_objects;
 					}
 				}
@@ -164,15 +178,36 @@ void deg_graph_flush_updates(Main *bmain, Depsgraph *graph)
 					 * Plus it ensures visibility changes and relations and
 					 * layers visibility update has proper flags to work with.
 					 */
-					if (comp_node->type == DEPSNODE_TYPE_ANIMATION) {
-						object->recalc |= OB_RECALC_TIME;
+					switch (comp_node->type) {
+						case DEG_NODE_TYPE_UNDEFINED:
+						case DEG_NODE_TYPE_OPERATION:
+						case DEG_NODE_TYPE_TIMESOURCE:
+						case DEG_NODE_TYPE_ID_REF:
+						case DEG_NODE_TYPE_PARAMETERS:
+						case DEG_NODE_TYPE_SEQUENCER:
+						case DEG_NODE_TYPE_LAYER_COLLECTIONS:
+						case DEG_NODE_TYPE_COPY_ON_WRITE:
+							/* Ignore, does not translate to object component. */
+							break;
+						case DEG_NODE_TYPE_ANIMATION:
+							object->recalc |= OB_RECALC_TIME;
+							break;
+						case DEG_NODE_TYPE_TRANSFORM:
+							object->recalc |= OB_RECALC_OB;
+							break;
+						case DEG_NODE_TYPE_GEOMETRY:
+						case DEG_NODE_TYPE_EVAL_POSE:
+						case DEG_NODE_TYPE_BONE:
+						case DEG_NODE_TYPE_EVAL_PARTICLES:
+						case DEG_NODE_TYPE_SHADING:
+						case DEG_NODE_TYPE_CACHE:
+						case DEG_NODE_TYPE_PROXY:
+							object->recalc |= OB_RECALC_DATA;
+							break;
 					}
-					else if (comp_node->type == DEPSNODE_TYPE_TRANSFORM) {
-						object->recalc |= OB_RECALC_OB;
-					}
-					else {
-						object->recalc |= OB_RECALC_DATA;
-					}
+
+					/* TODO : replace with more granular flags */
+					object->deg_update_flag |= DEG_RUNTIME_DATA_UPDATE;
 				}
 			}
 

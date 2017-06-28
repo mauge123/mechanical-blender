@@ -621,7 +621,7 @@ void BKE_pbvh_free(PBVH *bvh)
 
 		if (node->flag & PBVH_Leaf) {
 			if (node->draw_buffers)
-				GPU_free_pbvh_buffers(node->draw_buffers);
+				GPU_pbvh_buffers_free(node->draw_buffers);
 			if (node->vert_indices)
 				MEM_freeN((void *)node->vert_indices);
 			if (node->face_vert_indices)
@@ -636,7 +636,7 @@ void BKE_pbvh_free(PBVH *bvh)
 				BLI_gset_free(node->bm_other_verts, NULL);
 		}
 	}
-	GPU_free_pbvh_buffer_multires(&bvh->grid_common_gpu_buffer);
+	GPU_pbvh_multires_buffers_free(&bvh->grid_common_gpu_buffer);
 
 	if (bvh->deformed) {
 		if (bvh->verts) {
@@ -1091,11 +1091,11 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 		PBVHNode *node = nodes[n];
 
 		if (node->flag & PBVH_RebuildDrawBuffers) {
-			GPU_free_pbvh_buffers(node->draw_buffers);
+			GPU_pbvh_buffers_free(node->draw_buffers);
 			switch (bvh->type) {
 				case PBVH_GRIDS:
 					node->draw_buffers =
-						GPU_build_grid_pbvh_buffers(node->prim_indices,
+						GPU_pbvh_grid_buffers_build(node->prim_indices,
 					                           node->totprim,
 					                           bvh->grid_hidden,
 					                           bvh->gridkey.grid_size,
@@ -1103,7 +1103,7 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 					break;
 				case PBVH_FACES:
 					node->draw_buffers =
-						GPU_build_mesh_pbvh_buffers(node->face_vert_indices,
+						GPU_pbvh_mesh_buffers_build(node->face_vert_indices,
 					                           bvh->mpoly, bvh->mloop, bvh->looptri,
 					                           bvh->verts,
 					                           node->prim_indices,
@@ -1111,42 +1111,44 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 					break;
 				case PBVH_BMESH:
 					node->draw_buffers =
-						GPU_build_bmesh_pbvh_buffers(bvh->flags & PBVH_DYNTOPO_SMOOTH_SHADING);
+						GPU_pbvh_bmesh_buffers_build(bvh->flags & PBVH_DYNTOPO_SMOOTH_SHADING);
 					break;
 			}
- 
+
 			node->flag &= ~PBVH_RebuildDrawBuffers;
 		}
 
 		if (node->flag & PBVH_UpdateDrawBuffers) {
 			switch (bvh->type) {
 				case PBVH_GRIDS:
-					GPU_update_grid_pbvh_buffers(node->draw_buffers,
-					                        bvh->grids,
-					                        bvh->grid_flag_mats,
-					                        node->prim_indices,
-					                        node->totprim,
-					                        &bvh->gridkey,
-					                        bvh->show_diffuse_color);
+					GPU_pbvh_grid_buffers_update(
+					        node->draw_buffers,
+					        bvh->grids,
+					        bvh->grid_flag_mats,
+					        node->prim_indices,
+					        node->totprim,
+					        &bvh->gridkey,
+					        bvh->show_diffuse_color);
 					break;
 				case PBVH_FACES:
-					GPU_update_mesh_pbvh_buffers(node->draw_buffers,
-					                        bvh->verts,
-					                        node->vert_indices,
-					                        node->uniq_verts +
-					                        node->face_verts,
-					                        CustomData_get_layer(bvh->vdata,
-					                                             CD_PAINT_MASK),
-					                        node->face_vert_indices,
-					                        bvh->show_diffuse_color);
+					GPU_pbvh_mesh_buffers_update(
+					        node->draw_buffers,
+					        bvh->verts,
+					        node->vert_indices,
+					        node->uniq_verts +
+					        node->face_verts,
+					        CustomData_get_layer(bvh->vdata, CD_PAINT_MASK),
+					        node->face_vert_indices,
+					        bvh->show_diffuse_color);
 					break;
 				case PBVH_BMESH:
-					GPU_update_bmesh_pbvh_buffers(node->draw_buffers,
-					                         bvh->bm,
-					                         node->bm_faces,
-					                         node->bm_unique_verts,
-					                         node->bm_other_verts,
-					                         bvh->show_diffuse_color);
+					GPU_pbvh_bmesh_buffers_update(
+					        node->draw_buffers,
+					        bvh->bm,
+					        node->bm_faces,
+					        node->bm_unique_verts,
+					        node->bm_other_verts,
+					        bvh->show_diffuse_color);
 					break;
 			}
 
@@ -1157,13 +1159,13 @@ static void pbvh_update_draw_buffers(PBVH *bvh, PBVHNode **nodes, int totnode)
 
 static void pbvh_draw_BB(PBVH *bvh)
 {
-	unsigned int pos = VertexFormat_add_attrib(immVertexFormat(), "pos", COMP_F32, 3, KEEP_FLOAT);
+	unsigned int pos = GWN_vertformat_attr_add(immVertexFormat(), "pos", GWN_COMP_F32, 3, GWN_FETCH_FLOAT);
 	immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
 	for (int a = 0; a < bvh->totnode; a++) {
 		PBVHNode *node = &bvh->nodes[a];
 
-		GPU_draw_pbvh_BB(node->vb.bmin, node->vb.bmax, ((node->flag & PBVH_Leaf) != 0), pos);
+		GPU_pbvh_BB_draw(node->vb.bmin, node->vb.bmax, ((node->flag & PBVH_Leaf) != 0), pos);
 	}
 
 	immUnbindProgram();
@@ -1740,7 +1742,7 @@ void BKE_pbvh_node_draw(PBVHNode *node, void *data_v)
 	PBVHNodeDrawData *data = data_v;
 
 	if (!(node->flag & PBVH_FullyHidden)) {
-		GPU_draw_pbvh_buffers(node->draw_buffers,
+		GPU_pbvh_buffers_draw(node->draw_buffers,
 		                 data->setMaterial,
 		                 data->wireframe,
 		                 data->fast);
@@ -1843,6 +1845,67 @@ void BKE_pbvh_draw(PBVH *bvh, float (*planes)[4], float (*fnors)[3],
 
 	if (G.debug_value == 14)
 		pbvh_draw_BB(bvh);
+}
+
+struct PBVHNodeDrawCallbackData {
+
+	void (*draw_fn)(void *user_data, Gwn_Batch *batch);
+	void *user_data;
+	bool fast;
+};
+
+static void pbvh_node_draw_cb(PBVHNode *node, void *data_v)
+{
+	struct PBVHNodeDrawCallbackData *data = data_v;
+
+	if (!(node->flag & PBVH_FullyHidden)) {
+		Gwn_Batch *triangles = GPU_pbvh_buffers_batch_get(node->draw_buffers, data->fast);
+		if (triangles != NULL) {
+			data->draw_fn(data->user_data, triangles);
+		}
+	}
+}
+
+/**
+ * Version of #BKE_pbvh_draw that runs a callback.
+ */
+void BKE_pbvh_draw_cb(
+        PBVH *bvh, float (*planes)[4], float (*fnors)[3], bool fast,
+        void (*draw_fn)(void *user_data, Gwn_Batch *batch), void *user_data)
+{
+	struct PBVHNodeDrawCallbackData draw_data = {
+		.fast = fast,
+		.draw_fn = draw_fn,
+		.user_data = user_data,
+	};
+	PBVHNode **nodes;
+	int totnode;
+
+	for (int a = 0; a < bvh->totnode; a++)
+		pbvh_node_check_diffuse_changed(bvh, &bvh->nodes[a]);
+
+	BKE_pbvh_search_gather(bvh, update_search_cb, SET_INT_IN_POINTER(PBVH_UpdateNormals | PBVH_UpdateDrawBuffers),
+	                       &nodes, &totnode);
+
+	pbvh_update_normals(bvh, nodes, totnode, fnors);
+	pbvh_update_draw_buffers(bvh, nodes, totnode);
+
+	if (nodes) MEM_freeN(nodes);
+
+	if (planes) {
+		BKE_pbvh_search_callback(
+		        bvh, BKE_pbvh_node_planes_contain_AABB,
+		        planes, pbvh_node_draw_cb, &draw_data);
+	}
+	else {
+		BKE_pbvh_search_callback(
+		        bvh, NULL,
+		        NULL, pbvh_node_draw_cb, &draw_data);
+	}
+#if 0
+	if (G.debug_value == 14)
+		pbvh_draw_BB(bvh);
+#endif
 }
 
 void BKE_pbvh_grids_update(PBVH *bvh, CCGElem **grids, void **gridfaces,
@@ -2054,22 +2117,22 @@ void pbvh_vertex_iter_init(PBVH *bvh, PBVHNode *node,
 		vi->vmask = CustomData_get_layer(bvh->vdata, CD_PAINT_MASK);
 }
 
-void pbvh_show_diffuse_color_set(PBVH *bvh, bool show_diffuse_color)
+bool pbvh_has_mask(PBVH *bvh)
 {
-	bool has_mask = false;
-
 	switch (bvh->type) {
 		case PBVH_GRIDS:
-			has_mask = (bvh->gridkey.has_mask != 0);
-			break;
+			return (bvh->gridkey.has_mask != 0);
 		case PBVH_FACES:
-			has_mask = (bvh->vdata && CustomData_get_layer(bvh->vdata,
-			                                CD_PAINT_MASK));
-			break;
+			return (bvh->vdata && CustomData_get_layer(bvh->vdata,
+			                      CD_PAINT_MASK));
 		case PBVH_BMESH:
-			has_mask = (bvh->bm && (CustomData_get_offset(&bvh->bm->vdata, CD_PAINT_MASK) != -1));
-			break;
+			return (bvh->bm && (CustomData_get_offset(&bvh->bm->vdata, CD_PAINT_MASK) != -1));
 	}
 
-	bvh->show_diffuse_color = !has_mask || show_diffuse_color;
+	return false;
+}
+
+void pbvh_show_diffuse_color_set(PBVH *bvh, bool show_diffuse_color)
+{
+	bvh->show_diffuse_color = !pbvh_has_mask(bvh) || show_diffuse_color;
 }

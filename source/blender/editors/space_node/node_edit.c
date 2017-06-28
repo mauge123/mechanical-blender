@@ -41,7 +41,6 @@
 #include "BLI_blenlib.h"
 
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
 #include "BKE_library.h"
@@ -49,6 +48,8 @@
 #include "BKE_node.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+
+#include "DEG_depsgraph.h"
 
 #include "RE_engine.h"
 #include "RE_pipeline.h"
@@ -123,7 +124,7 @@ static int compo_get_recalc_flags(const bContext *C)
 	int recalc_flags = 0;
 
 	for (win = wm->windows.first; win; win = win->next) {
-		bScreen *sc = win->screen;
+		const bScreen *sc = WM_window_get_active_screen(win);
 		ScrArea *sa;
 
 		for (sa = sc->areabase.first; sa; sa = sa->next) {
@@ -328,11 +329,11 @@ void snode_dag_update(bContext *C, SpaceNode *snode)
 	if (snode->edittree != snode->nodetree) {
 		FOREACH_NODETREE(bmain, tntree, id) {
 			if (ntreeHasTree(tntree, snode->edittree))
-				DAG_id_tag_update(id, 0);
+				DEG_id_tag_update(id, 0);
 		} FOREACH_NODETREE_END
 	}
 
-	DAG_id_tag_update(snode->id, 0);
+	DEG_id_tag_update(snode->id, 0);
 }
 
 void snode_notify(bContext *C, SpaceNode *snode)
@@ -398,14 +399,10 @@ void ED_node_shader_default(const bContext *C, ID *id)
 			ma->nodetree = ntree;
 
 			if (BKE_scene_uses_blender_eevee(scene)) {
-				out = nodeAddStaticNode(C, ntree, SH_NODE_OUTPUT_METALLIC);
-				out->locx = 300.0f; out->locy = 300.0f;
-				nodeSetActive(ntree, out);
-				ntreeUpdateTree(CTX_data_main(C), ntree);
-				return;
+				output_type = SH_NODE_OUTPUT_EEVEE_MATERIAL;
+				shader_type = SH_NODE_EEVEE_METALLIC;
 			}
-
-			if (BKE_scene_use_new_shading_nodes(scene)) {
+			else if (BKE_scene_use_new_shading_nodes(scene)) {
 				output_type = SH_NODE_OUTPUT_MATERIAL;
 				shader_type = SH_NODE_BSDF_DIFFUSE;
 			}
@@ -588,7 +585,9 @@ void snode_set_context(const bContext *C)
 		}
 	}
 	
-	if (snode->nodetree != ntree || snode->id != id || snode->from != from || snode->treepath.last == NULL) {
+	if (snode->nodetree != ntree || snode->id != id || snode->from != from ||
+	    (snode->treepath.last == NULL && ntree))
+	{
 		ED_node_tree_start(snode, ntree, id, from);
 	}
 }
@@ -2092,7 +2091,7 @@ static int node_clipboard_paste_exec(bContext *C, wmOperator *op)
 	/* make sure all clipboard nodes would be valid in the target tree */
 	all_nodes_valid = true;
 	for (node = clipboard_nodes_lb->first; node; node = node->next) {
-		if (!node->typeinfo->poll_instance(node, ntree)) {
+		if (!node->typeinfo->poll_instance || !node->typeinfo->poll_instance(node, ntree)) {
 			all_nodes_valid = false;
 			BKE_reportf(op->reports, RPT_ERROR, "Cannot add node %s into node tree %s", node->name, ntree->id.name + 2);
 		}

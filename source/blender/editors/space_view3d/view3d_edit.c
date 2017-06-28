@@ -61,9 +61,10 @@
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_action.h"
-#include "BKE_depsgraph.h" /* for ED_view3d_camera_lock_sync */
 #include "BKE_unit.h"
 #include "BKE_editmesh.h"
+
+#include "DEG_depsgraph.h"
 
 #include "BIF_gl.h"
 
@@ -175,7 +176,7 @@ bool ED_view3d_camera_lock_sync(View3D *v3d, RegionView3D *rv3d)
 
 			ob_update = v3d->camera;
 			while (ob_update) {
-				DAG_id_tag_update(&ob_update->id, OB_RECALC_OB);
+				DEG_id_tag_update(&ob_update->id, OB_RECALC_OB);
 				WM_main_add_notifier(NC_OBJECT | ND_TRANSFORM, ob_update);
 				ob_update = ob_update->parent;
 			}
@@ -187,7 +188,7 @@ bool ED_view3d_camera_lock_sync(View3D *v3d, RegionView3D *rv3d)
 			ED_view3d_to_object(v3d->camera, rv3d->ofs, rv3d->viewquat, rv3d->dist);
 			BKE_object_tfm_protected_restore(v3d->camera, &obtfm, v3d->camera->protectflag | protect_scale_all);
 
-			DAG_id_tag_update(&v3d->camera->id, OB_RECALC_OB);
+			DEG_id_tag_update(&v3d->camera->id, OB_RECALC_OB);
 			WM_main_add_notifier(NC_OBJECT | ND_TRANSFORM, v3d->camera);
 		}
 
@@ -4973,7 +4974,7 @@ void ED_view3d_autodist_init(
 			break;
 		case 1:
 		{
-			Scene *scene = DAG_get_scene(graph);
+			Scene *scene = DEG_get_scene(graph);
 			ED_view3d_draw_depth_gpencil(scene, ar, v3d);
 			break;
 		}
@@ -5320,7 +5321,7 @@ static int dim_value_num_input_modal(bContext *C, wmOperator *op, const wmEvent 
 			// Apply value only once confirmed
 			edm = get_selected_dimension(bm);
 			edm->mdim->value = num->val[0];
-		    DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
+		    DEG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 		    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
 		}
 		ED_area_headerprint(sa, NULL);

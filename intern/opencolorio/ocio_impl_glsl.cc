@@ -95,7 +95,7 @@ typedef struct OCIO_GLSLDrawState {
 	GLuint ocio_shader;
 	GLuint vert_shader;
 	GLuint program;
-	ShaderInterface *shader_interface;
+	Gwn_ShaderInterface *shader_interface;
 
 	/* Previous OpenGL state. */
 	GLint last_texture, last_texture_unit;
@@ -397,7 +397,7 @@ bool OCIOImpl::setupGLSLDraw(OCIO_GLSLDrawState **state_r, OCIO_ConstProcessorRc
 		}
 
 		if (state->program) {
-			state->shader_interface = ShaderInterface_create(state->program);
+			state->shader_interface = GWN_shaderinterface_create(state->program);
 		}
 
 		state->curve_mapping_used = use_curve_mapping;
@@ -416,10 +416,17 @@ bool OCIOImpl::setupGLSLDraw(OCIO_GLSLDrawState **state_r, OCIO_ConstProcessorRc
 
 		glActiveTexture(GL_TEXTURE0);
 
-		/* IMM needs vertex format even if we don't draw with it */
-		VertexFormat *format = immVertexFormat();
-		VertexFormat_add_attrib(format, "pos", COMP_F32, 2, KEEP_FLOAT);
-		VertexFormat_add_attrib(format, "texCoord", COMP_F32, 2, KEEP_FLOAT);
+		/* IMM needs vertex format even if we don't draw with it.
+		 *
+		 * NOTE: The only reason why it's here is because of Cycles viewport.
+		 * All other areas are managing their own vertex formats.
+		 * Doing it here is probably harmless, but kind of stupid.
+		 *
+		 * TODO(sergey): Look into some nicer solution.
+		 */
+		Gwn_VertFormat *format = immVertexFormat();
+		GWN_vertformat_attr_add(format, "pos", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
+		GWN_vertformat_attr_add(format, "texCoord", GWN_COMP_F32, 2, GWN_FETCH_FLOAT);
 		immBindProgram(state->program, state->shader_interface);
 
 		immUniform1i("image_texture", 0);
@@ -490,7 +497,7 @@ void OCIOImpl::freeGLState(struct OCIO_GLSLDrawState *state)
 		glDeleteProgram(state->program);
 
 	if (state->shader_interface)
-		ShaderInterface_discard(state->shader_interface);		
+		GWN_shaderinterface_discard(state->shader_interface);		
 
 	if (state->ocio_shader)
 		glDeleteShader(state->ocio_shader);

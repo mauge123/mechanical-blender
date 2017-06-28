@@ -50,10 +50,8 @@ struct Scene;
 namespace DEG {
 
 struct DepsNode;
-struct RootDepsNode;
 struct TimeSourceDepsNode;
 struct IDDepsNode;
-struct SubgraphDepsNode;
 struct ComponentDepsNode;
 struct OperationDepsNode;
 
@@ -80,12 +78,10 @@ struct DepsRelation {
 	/* relationship attributes */
 	const char *name;             /* label for debugging */
 
-	eDepsRelation_Type type;      /* type */
 	int flag;                     /* (eDepsRelation_Flag) */
 
 	DepsRelation(DepsNode *from,
 	             DepsNode *to,
-	             eDepsRelation_Type type,
 	             const char *description);
 
 	~DepsRelation();
@@ -112,28 +108,20 @@ struct Depsgraph {
 	 */
 	DepsNode *find_node_from_pointer(const PointerRNA *ptr, const PropertyRNA *prop) const;
 
-	RootDepsNode *add_root_node();
-
-	TimeSourceDepsNode *find_time_source(const ID *id = NULL) const;
-
-	SubgraphDepsNode *add_subgraph_node(const ID *id);
-	void remove_subgraph_node(SubgraphDepsNode *subgraph_node);
-	void clear_subgraph_nodes();
+	TimeSourceDepsNode *add_time_source();
+	TimeSourceDepsNode *find_time_source() const;
 
 	IDDepsNode *find_id_node(const ID *id) const;
 	IDDepsNode *add_id_node(ID *id, const char *name = "");
-	void remove_id_node(const ID *id);
 	void clear_id_nodes();
 
 	/* Add new relationship between two nodes. */
 	DepsRelation *add_new_relation(OperationDepsNode *from,
 	                               OperationDepsNode *to,
-	                               eDepsRelation_Type type,
 	                               const char *description);
 
 	DepsRelation *add_new_relation(DepsNode *from,
 	                               DepsNode *to,
-	                               eDepsRelation_Type type,
 	                               const char *description);
 
 	/* Tag a specific node as needing updates. */
@@ -142,17 +130,19 @@ struct Depsgraph {
 	/* Clear storage used by all nodes. */
 	void clear_all_nodes();
 
+	/* Copy-on-Write Functionality ........ */
+
+	/* For given original ID get ID which is created by CoW system. */
+	ID *get_cow_id(const ID *id_orig) const;
+
 	/* Core Graph Functionality ........... */
 
 	/* <ID : IDDepsNode> mapping from ID blocks to nodes representing these blocks
 	 * (for quick lookups). */
 	GHash *id_hash;
 
-	/* "root" node - the one where all evaluation enters from. */
-	RootDepsNode *root_node;
-
-	/* Subgraphs referenced in tree. */
-	GSet *subgraphs;
+	/* Top-level time source node. */
+	TimeSourceDepsNode *time_source;
 
 	/* Indicates whether relations needs to be updated. */
 	bool need_update;

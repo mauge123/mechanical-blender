@@ -40,16 +40,6 @@
 extern "C" {
 #endif
 
-/* For now we support the legacy matrix stack in gpuGetMatrix functions.
- * Will remove this after switching to core profile, which can happen after
- * we convert all code to use the API in this file. */
-#ifdef WITH_GL_PROFILE_CORE
-#  define SUPPORT_LEGACY_MATRIX 0
-#else
-#  define SUPPORT_LEGACY_MATRIX 1
-#endif
-
-
 void gpuMatrixReset(void); /* to Identity transform & empty stack */
 
 /* ModelView Matrix (2D or 3D) */
@@ -121,7 +111,7 @@ const float (*gpuGetNormalMatrixInverse(float m[3][3]))[3];
 
 
 /* set uniform values for currently bound shader */
-void gpuBindMatrices(const ShaderInterface*);
+void gpuBindMatrices(const Gwn_ShaderInterface*);
 bool gpuMatricesDirty(void); /* since last bind */
 
 #ifdef __cplusplus

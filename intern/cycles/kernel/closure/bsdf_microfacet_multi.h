@@ -42,7 +42,7 @@ ccl_device_forceinline float D_ggx_aniso(const float3 wm, const float2 alpha)
 /* Sample slope distribution (based on page 14 of the supplemental implementation). */
 ccl_device_forceinline float2 mf_sampleP22_11(const float cosI, const float2 randU)
 {
-	if(cosI > 0.9999f || cosI < 1e-6f) {
+	if(cosI > 0.9999f || fabsf(cosI) < 1e-6f) {
 		const float r = sqrtf(randU.x / max(1.0f - randU.x, 1e-7f));
 		const float phi = M_2PI_F * randU.y;
 		return make_float2(r*cosf(phi), r*sinf(phi));
@@ -91,18 +91,15 @@ ccl_device_forceinline float3 mf_sample_vndf(const float3 wi, const float2 alpha
 	return normalize(make_float3(-slope_x, -slope_y, 1.0f));
 }
 
-/* === Phase functions: Glossy, Diffuse and Glass === */
+/* === Phase functions: Glossy and Glass === */
 
-/* Phase function for reflective materials, either without a fresnel term (for compatibility) or with the conductive fresnel term. */
-ccl_device_forceinline float3 mf_sample_phase_glossy(const float3 wi, float3 *n, float3 *k, float3 *weight, const float3 wm)
+/* Phase function for reflective materials. */
+ccl_device_forceinline float3 mf_sample_phase_glossy(const float3 wi, float3 *weight, const float3 wm)
 {
-	if(n && k)
-		*weight *= fresnel_conductor(dot(wi, wm), *n, *k);
-
 	return -wi + 2.0f * wm * dot(wi, wm);
 }
 
-ccl_device_forceinline float3 mf_eval_phase_glossy(const float3 w, const float lambda, const float3 wo, const float2 alpha, float3 *n, float3 *k)
+ccl_device_forceinline float3 mf_eval_phase_glossy(const float3 w, const float lambda, const float3 wo, const float2 alpha)
 {
 	if(w.z > 0.9999f)
 		return make_float3(0.0f, 0.0f, 0.0f);
@@ -123,28 +120,7 @@ ccl_device_forceinline float3 mf_eval_phase_glossy(const float3 w, const float l
 	else
 		phase *= D_ggx_aniso(wh, alpha);
 
-	if(n && k) {
-		/* Apply conductive fresnel term. */
-		return phase * fresnel_conductor(dotW_WH, *n, *k);
-	}
-
 	return make_float3(phase, phase, phase);
-}
-
-/* Phase function for rough lambertian diffuse surfaces. */
-ccl_device_forceinline float3 mf_sample_phase_diffuse(const float3 wm, const float randu, const float randv)
-{
-	float3 tm, bm;
-	make_orthonormals(wm, &tm, &bm);
-
-	float2 disk = concentric_sample_disk(randu, randv);
-	return disk.x*tm + disk.y*bm + safe_sqrtf(1.0f - disk.x*disk.x - disk.y*disk.y)*wm;
-}
-
-ccl_device_forceinline float3 mf_eval_phase_diffuse(const float3 w, const float3 wm)
-{
-	const float v = max(0.0f, dot(w, wm)) * M_1_PI_F;
-	return make_float3(v, v, v);
 }
 
 /* Phase function for dielectric transmissive materials, including both reflection and refraction according to the dielectric fresnel term. */
@@ -269,40 +245,69 @@ ccl_device_forceinline float mf_ggx_albedo(float r)
 	return saturate(albedo);
 }
 
+ccl_device_inline float mf_ggx_transmission_albedo(float a, float ior)
+{
+	if(ior < 1.0f) {
+		ior = 1.0f/ior;
+	}
+	a = saturate(a);
+	ior = clamp(ior, 1.0f, 3.0f);
+	float I_1 = 0.0476898f*expf(-0.978352f*(ior-0.65657f)*(ior-0.65657f)) - 0.033756f*ior + 0.993261f;
+	float R_1 = (((0.116991f*a - 0.270369f)*a + 0.0501366f)*a - 0.00411511f)*a + 1.00008f;
+	float I_2 = (((-2.08704f*ior + 26.3298f)*ior - 127.906f)*ior + 292.958f)*ior - 287.946f + 199.803f/(ior*ior) - 101.668f/(ior*ior*ior);
+	float R_2 = ((((5.3725f*a -24.9307f)*a + 22.7437f)*a - 3.40751f)*a + 0.0986325f)*a + 0.00493504f;
+
+	return saturate(1.0f + I_2*R_2*0.0019127f - (1.0f - I_1)*(1.0f - R_1)*9.3205f);
+}
+
 ccl_device_forceinline float mf_ggx_pdf(const float3 wi, const float3 wo, const float alpha)
 {
 	float D = D_ggx(normalize(wi+wo), alpha);
 	float lambda = mf_lambda(wi, make_float2(alpha, alpha));
+	float singlescatter = 0.25f * D / max((1.0f + lambda) * wi.z, 1e-7f);
+
+	float multiscatter = wo.z * M_1_PI_F;
+
 	float albedo = mf_ggx_albedo(alpha);
-	return 0.25f * D / max((1.0f + lambda) * wi.z, 1e-7f) + (1.0f - albedo) * wo.z;
+	return albedo*singlescatter + (1.0f - albedo)*multiscatter;
 }
 
 ccl_device_forceinline float mf_ggx_aniso_pdf(const float3 wi, const float3 wo, const float2 alpha)
 {
-	return 0.25f * D_ggx_aniso(normalize(wi+wo), alpha) / ((1.0f + mf_lambda(wi, alpha)) * wi.z) + (1.0f - mf_ggx_albedo(sqrtf(alpha.x*alpha.y))) * wo.z;
-}
+	float D = D_ggx_aniso(normalize(wi+wo), alpha);
+	float lambda = mf_lambda(wi, alpha);
+	float singlescatter = 0.25f * D / max((1.0f + lambda) * wi.z, 1e-7f);
 
-ccl_device_forceinline float mf_diffuse_pdf(const float3 wo)
-{
-	return M_1_PI_F * wo.z;
+	float multiscatter = wo.z * M_1_PI_F;
+
+	float albedo = mf_ggx_albedo(sqrtf(alpha.x*alpha.y));
+	return albedo*singlescatter + (1.0f - albedo)*multiscatter;
 }
 
 ccl_device_forceinline float mf_glass_pdf(const float3 wi, const float3 wo, const float alpha, const float eta)
 {
-	float3 wh;
-	float fresnel;
-	if(wi.z*wo.z > 0.0f) {
-		wh = normalize(wi + wo);
-		fresnel = fresnel_dielectric_cos(dot(wi, wh), eta);
-	}
-	else {
-		wh = normalize(wi + wo*eta);
-		fresnel = 1.0f - fresnel_dielectric_cos(dot(wi, wh), eta);
-	}
+	bool reflective = (wi.z*wo.z > 0.0f);
+
+	float wh_len;
+	float3 wh = normalize_len(wi + (reflective? wo : (wo*eta)), &wh_len);
 	if(wh.z < 0.0f)
 		wh = -wh;
 	float3 r_wi = (wi.z < 0.0f)? -wi: wi;
-	return fresnel * max(0.0f, dot(r_wi, wh)) * D_ggx(wh, alpha) / ((1.0f + mf_lambda(r_wi, make_float2(alpha, alpha))) * r_wi.z) + fabsf(wo.z);
+	float lambda = mf_lambda(r_wi, make_float2(alpha, alpha));
+	float D = D_ggx(wh, alpha);
+	float fresnel = fresnel_dielectric_cos(dot(r_wi, wh), eta);
+
+	float multiscatter = fabsf(wo.z * M_1_PI_F);
+	if(reflective) {
+		float singlescatter = 0.25f * D / max((1.0f + lambda) * r_wi.z, 1e-7f);
+		float albedo = mf_ggx_albedo(alpha);
+		return fresnel * (albedo*singlescatter + (1.0f - albedo)*multiscatter);
+	}
+	else {
+		float singlescatter = fabsf(dot(r_wi, wh)*dot(wo, wh) * D * eta*eta / max((1.0f + lambda) * r_wi.z * wh_len*wh_len, 1e-7f));
+		float albedo = mf_ggx_transmission_albedo(alpha, eta);
+		return (1.0f - fresnel) * (albedo*singlescatter + (1.0f - albedo)*multiscatter);
+	}
 }
 
 /* === Actual random walk implementations, one version of mf_eval and mf_sample per phase function. === */
@@ -314,13 +319,6 @@ ccl_device_forceinline float mf_glass_pdf(const float3 wi, const float3 wo, cons
 #define MF_PHASE_FUNCTION glass
 #define MF_MULTI_GLASS
 #include "kernel/closure/bsdf_microfacet_multi_impl.h"
-
-/* The diffuse phase function is not implemented as a node yet. */
-#if 0
-#define MF_PHASE_FUNCTION diffuse
-#define MF_MULTI_DIFFUSE
-#include "kernel/closure/bsdf_microfacet_multi_impl.h"
-#endif
 
 #define MF_PHASE_FUNCTION glossy
 #define MF_MULTI_GLOSSY
@@ -362,12 +360,16 @@ ccl_device int bsdf_microfacet_multi_ggx_aniso_setup(MicrofacetBsdf *bsdf)
 	return bsdf_microfacet_multi_ggx_common_setup(bsdf);
 }
 
-ccl_device int bsdf_microfacet_multi_ggx_aniso_fresnel_setup(MicrofacetBsdf *bsdf)
+ccl_device int bsdf_microfacet_multi_ggx_aniso_fresnel_setup(MicrofacetBsdf *bsdf, const ShaderData *sd)
 {
 	if(is_zero(bsdf->T))
 		bsdf->T = make_float3(1.0f, 0.0f, 0.0f);
 
 	bsdf->type = CLOSURE_BSDF_MICROFACET_MULTI_GGX_FRESNEL_ID;
+
+	float F0 = fresnel_dielectric_cos(1.0f, bsdf->ior);
+	float F = average(interpolate_fresnel_color(sd->I, bsdf->N, bsdf->ior, F0, bsdf->extra->cspec0));
+	bsdf->sample_weight *= F;
 
 	return bsdf_microfacet_multi_ggx_common_setup(bsdf);
 }
@@ -381,11 +383,15 @@ ccl_device int bsdf_microfacet_multi_ggx_setup(MicrofacetBsdf *bsdf)
 	return bsdf_microfacet_multi_ggx_common_setup(bsdf);
 }
 
-ccl_device int bsdf_microfacet_multi_ggx_fresnel_setup(MicrofacetBsdf *bsdf)
+ccl_device int bsdf_microfacet_multi_ggx_fresnel_setup(MicrofacetBsdf *bsdf, const ShaderData *sd)
 {
 	bsdf->alpha_y = bsdf->alpha_x;
 
 	bsdf->type = CLOSURE_BSDF_MICROFACET_MULTI_GGX_FRESNEL_ID;
+
+	float F0 = fresnel_dielectric_cos(1.0f, bsdf->ior);
+	float F = average(interpolate_fresnel_color(sd->I, bsdf->N, bsdf->ior, F0, bsdf->extra->cspec0));
+	bsdf->sample_weight *= F;
 
 	return bsdf_microfacet_multi_ggx_common_setup(bsdf);
 }
@@ -428,7 +434,7 @@ ccl_device float3 bsdf_microfacet_multi_ggx_eval_reflect(const ShaderClosure *sc
 		*pdf = mf_ggx_aniso_pdf(localI, localO, make_float2(bsdf->alpha_x, bsdf->alpha_y));
 	else
 		*pdf = mf_ggx_pdf(localI, localO, bsdf->alpha_x);
-	return mf_eval_glossy(localI, localO, true, bsdf->extra->color, bsdf->alpha_x, bsdf->alpha_y, lcg_state, NULL, NULL, bsdf->ior, use_fresnel, bsdf->extra->cspec0);
+	return mf_eval_glossy(localI, localO, true, bsdf->extra->color, bsdf->alpha_x, bsdf->alpha_y, lcg_state, bsdf->ior, use_fresnel, bsdf->extra->cspec0);
 }
 
 ccl_device int bsdf_microfacet_multi_ggx_sample(KernelGlobals *kg, const ShaderClosure *sc, float3 Ng, float3 I, float3 dIdx, float3 dIdy, float randu, float randv, float3 *eval, float3 *omega_in, float3 *domega_in_dx, float3 *domega_in_dy, float *pdf, ccl_addr_space uint *lcg_state)
@@ -442,6 +448,10 @@ ccl_device int bsdf_microfacet_multi_ggx_sample(KernelGlobals *kg, const ShaderC
 		*omega_in = 2*dot(Z, I)*Z - I;
 		*pdf = 1e6f;
 		*eval = make_float3(1e6f, 1e6f, 1e6f);
+#ifdef __RAY_DIFFERENTIALS__
+		*domega_in_dx = (2 * dot(Z, dIdx)) * Z - dIdx;
+		*domega_in_dy = (2 * dot(Z, dIdy)) * Z - dIdy;
+#endif
 		return LABEL_REFLECT|LABEL_SINGULAR;
 	}
 
@@ -456,7 +466,7 @@ ccl_device int bsdf_microfacet_multi_ggx_sample(KernelGlobals *kg, const ShaderC
 	float3 localI = make_float3(dot(I, X), dot(I, Y), dot(I, Z));
 	float3 localO;
 
-	*eval = mf_sample_glossy(localI, &localO, bsdf->extra->color, bsdf->alpha_x, bsdf->alpha_y, lcg_state, NULL, NULL, bsdf->ior, use_fresnel, bsdf->extra->cspec0);
+	*eval = mf_sample_glossy(localI, &localO, bsdf->extra->color, bsdf->alpha_x, bsdf->alpha_y, lcg_state, bsdf->ior, use_fresnel, bsdf->extra->cspec0);
 	if(is_aniso)
 		*pdf = mf_ggx_aniso_pdf(localI, localO, make_float2(bsdf->alpha_x, bsdf->alpha_y));
 	else
@@ -487,7 +497,7 @@ ccl_device int bsdf_microfacet_multi_ggx_glass_setup(MicrofacetBsdf *bsdf)
 	return SD_BSDF|SD_BSDF_HAS_EVAL|SD_BSDF_NEEDS_LCG;
 }
 
-ccl_device int bsdf_microfacet_multi_ggx_glass_fresnel_setup(MicrofacetBsdf *bsdf)
+ccl_device int bsdf_microfacet_multi_ggx_glass_fresnel_setup(MicrofacetBsdf *bsdf, const ShaderData *sd)
 {
 	bsdf->alpha_x = clamp(bsdf->alpha_x, 1e-4f, 1.0f);
 	bsdf->alpha_y = bsdf->alpha_x;
@@ -500,6 +510,10 @@ ccl_device int bsdf_microfacet_multi_ggx_glass_fresnel_setup(MicrofacetBsdf *bsd
 	bsdf->extra->cspec0.z = saturate(bsdf->extra->cspec0.z);
 
 	bsdf->type = CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_FRESNEL_ID;
+
+	float F0 = fresnel_dielectric_cos(1.0f, bsdf->ior);
+	float F = average(interpolate_fresnel_color(sd->I, bsdf->N, bsdf->ior, F0, bsdf->extra->cspec0));
+	bsdf->sample_weight *= F;
 
 	return SD_BSDF|SD_BSDF_HAS_EVAL|SD_BSDF_NEEDS_LCG;
 }

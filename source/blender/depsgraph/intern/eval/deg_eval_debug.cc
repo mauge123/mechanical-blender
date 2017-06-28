@@ -34,15 +34,15 @@
 
 #include <cstring>  /* required for STREQ later on. */
 
-extern "C" {
 #include "BLI_listbase.h"
 #include "BLI_ghash.h"
 
-#include "DEG_depsgraph_debug.h"
-
+extern "C" {
 #include "WM_api.h"
 #include "WM_types.h"
 }  /* extern "C" */
+
+#include "DEG_depsgraph_debug.h"
 
 #include "intern/nodes/deg_node.h"
 #include "intern/nodes/deg_node_component.h"
@@ -104,7 +104,7 @@ void DepsgraphDebug::task_started(Depsgraph *graph,
 		BLI_spin_lock(&graph->lock);
 
 		ComponentDepsNode *comp = node->owner;
-		ID *id = comp->owner->id;
+		ID *id = comp->owner->id_orig;
 
 		DepsgraphStatsID *id_stats = get_id_stats(id, true);
 		times_clear(id_stats->times);
@@ -133,7 +133,7 @@ void DepsgraphDebug::task_completed(Depsgraph *graph,
 		BLI_spin_lock(&graph->lock);
 
 		ComponentDepsNode *comp = node->owner;
-		ID *id = comp->owner->id;
+		ID *id = comp->owner->id_orig;
 
 		DepsgraphStatsID *id_stats = get_id_stats(id, true);
 		times_add(id_stats->times, time);

@@ -46,7 +46,6 @@
 #include "BKE_action.h"
 #include "BKE_camera.h"
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_object.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
@@ -458,7 +457,7 @@ void ED_view3d_smooth_view_force_finish(
 		/* force update of view matrix so tools that run immediately after
 		 * can use them without redrawing first */
 		Scene *scene = CTX_data_scene(C);
-		ED_view3d_update_viewmat(scene, v3d, ar, NULL, NULL);
+		ED_view3d_update_viewmat(scene, v3d, ar, NULL, NULL, NULL);
 	}
 }
 
@@ -500,7 +499,7 @@ static int view3d_camera_to_view_exec(bContext *C, wmOperator *UNUSED(op))
 
 	BKE_object_tfm_protected_restore(v3d->camera, &obtfm, v3d->camera->protectflag);
 
-	DAG_id_tag_update(&v3d->camera->id, OB_RECALC_OB);
+	DEG_id_tag_update(&v3d->camera->id, OB_RECALC_OB);
 	rv3d->persp = RV3D_CAMOB;
 	
 	WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, v3d->camera);
@@ -578,7 +577,7 @@ static int view3d_camera_to_view_selected_exec(bContext *C, wmOperator *op)
 		BKE_object_tfm_protected_restore(camera_ob, &obtfm, OB_LOCK_SCALE | OB_LOCK_ROT4D);
 
 		/* notifiers */
-		DAG_id_tag_update(&camera_ob->id, OB_RECALC_OB);
+		DEG_id_tag_update(&camera_ob->id, OB_RECALC_OB);
 		WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, camera_ob);
 		return OPERATOR_FINISHED;
 	}
@@ -1238,9 +1237,10 @@ int view3d_opengl_select(
 
 	G.f |= G_PICKSEL;
 
-	view3d_winmatrix_set(ar, v3d, &rect);
-	mul_m4_m4m4(vc->rv3d->persmat, vc->rv3d->winmat, vc->rv3d->viewmat);
-	
+	/* Important we use the 'viewmat' and don't re-calculate since
+	 * the object & bone view locking takes 'rect' into account, see: T51629. */
+	ED_view3d_draw_setup_view(vc->win, scene, ar, v3d, vc->rv3d->viewmat, NULL, &rect);
+
 	if (v3d->drawtype > OB_WIRE) {
 		v3d->zbuf = true;
 		glEnable(GL_DEPTH_TEST);
@@ -1265,7 +1265,7 @@ int view3d_opengl_select(
 	hits = GPU_select_end();
 	
 	/* second pass, to get the closest object to camera */
-	if (do_passes) {
+	if (do_passes && (hits > 0)) {
 		GPU_select_begin(buffer, bufsize, &rect, GPU_SELECT_NEAREST_SECOND_PASS, hits);
 
 #ifdef WITH_OPENGL_LEGACY
@@ -1283,8 +1283,7 @@ int view3d_opengl_select(
 	}
 
 	G.f &= ~G_PICKSEL;
-	view3d_winmatrix_set(ar, v3d, NULL);
-	mul_m4_m4m4(vc->rv3d->persmat, vc->rv3d->winmat, vc->rv3d->viewmat);
+	ED_view3d_draw_setup_view(vc->win, scene, ar, v3d, vc->rv3d->viewmat, NULL, NULL);
 	
 	if (v3d->drawtype > OB_WIRE) {
 		v3d->zbuf = 0;
@@ -1376,7 +1375,6 @@ static void RestoreState(bContext *C, wmWindow *win)
 		win->queue = queue_back;
 	
 	GPU_state_init();
-	GPU_set_tpage(NULL, 0, 0);
 
 	glPopAttrib();
 }
@@ -1419,10 +1417,6 @@ static void game_set_commmandline_options(GameData *gm)
 		SYS_WriteCommandLineInt(syshandle, "blender_material", test);
 		test = (gm->matmode == GAME_MAT_GLSL);
 		SYS_WriteCommandLineInt(syshandle, "blender_glsl_material", test);
-		test = (gm->flag & GAME_DISPLAY_LISTS);
-		SYS_WriteCommandLineInt(syshandle, "displaylists", test);
-
-
 	}
 }
 
@@ -1430,19 +1424,21 @@ static void game_set_commmandline_options(GameData *gm)
 
 static int game_engine_poll(bContext *C)
 {
-	bScreen *screen;
+	const wmWindow *win = CTX_wm_window(C);
+	const Scene *scene = WM_window_get_active_scene(win);
+
 	/* we need a context and area to launch BGE
 	 * it's a temporary solution to avoid crash at load time
 	 * if we try to auto run the BGE. Ideally we want the
 	 * context to be set as soon as we load the file. */
 
-	if (CTX_wm_window(C) == NULL) return 0;
-	if ((screen = CTX_wm_screen(C)) == NULL) return 0;
+	if (win == NULL) return 0;
+	if (CTX_wm_screen(C) == NULL) return 0;
 
 	if (CTX_data_mode_enum(C) != CTX_MODE_OBJECT)
 		return 0;
 
-	if (!BKE_scene_uses_blender_game(screen->scene))
+	if (!BKE_scene_uses_blender_game(scene))
 		return 0;
 
 	return 1;

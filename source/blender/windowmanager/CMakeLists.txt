@@ -72,16 +72,11 @@ set(SRC
 	intern/wm_window.c
 	intern/wm_stereo.c
 	manipulators/intern/wm_manipulator.c
-	manipulators/intern/wm_manipulatorgroup.c
-	manipulators/intern/wm_manipulatormap.c
-	manipulators/intern/manipulator_library/arrow_manipulator.c
-	manipulators/intern/manipulator_library/arrow2d_manipulator.c
-	manipulators/intern/manipulator_library/cage_manipulator.c
-	manipulators/intern/manipulator_library/dial_manipulator.c
-	manipulators/intern/manipulator_library/primitive_manipulator.c
-	manipulators/intern/manipulator_library/geom_arrow_manipulator.c
-	manipulators/intern/manipulator_library/geom_cube_manipulator.c
-	manipulators/intern/manipulator_library/manipulator_library_utils.c
+	manipulators/intern/wm_manipulator_group.c
+	manipulators/intern/wm_manipulator_group_type.c
+	manipulators/intern/wm_manipulator_map.c
+	manipulators/intern/wm_manipulator_target_props.c
+	manipulators/intern/wm_manipulator_type.c
 
 	WM_api.h
 	WM_keymap.h
@@ -96,11 +91,9 @@ set(SRC
 	wm_window.h
 	manipulators/WM_manipulator_api.h
 	manipulators/WM_manipulator_types.h
-	manipulators/WM_manipulator_library.h
+	manipulators/wm_manipulator_fn.h
 	manipulators/wm_manipulator_wmapi.h
 	manipulators/intern/wm_manipulator_intern.h
-	manipulators/intern/manipulator_library/manipulator_geometry.h
-	manipulators/intern/manipulator_library/manipulator_library_intern.h
 )
 
 if(WITH_AUDASPACE)

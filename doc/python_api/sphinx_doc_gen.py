@@ -332,6 +332,9 @@ except ImportError:
 # to avoid having to match Blender's source tree.
 EXTRA_SOURCE_FILES = (
     "../../../release/scripts/templates_py/bmesh_simple.py",
+    "../../../release/scripts/templates_py/manipulator_operator.py",
+    "../../../release/scripts/templates_py/manipulator_operator_target.py",
+    "../../../release/scripts/templates_py/manipulator_simple.py",
     "../../../release/scripts/templates_py/operator_simple.py",
     "../../../release/scripts/templates_py/ui_panel_simple.py",
     "../../../release/scripts/templates_py/ui_previews_custom_icon.py",
@@ -341,6 +344,8 @@ EXTRA_SOURCE_FILES = (
     "../examples/bge.texture.py",
     "../examples/bmesh.ops.1.py",
     "../examples/bpy.app.translations.py",
+    "../static/favicon.ico",
+    "../static/blender_logo.svg",
 )
 
 
@@ -362,8 +367,6 @@ INFO_DOCS = (
      "Blender/Python Quickstart: new to Blender/scripting and want to get your feet wet?"),
     ("info_overview.rst",
      "Blender/Python API Overview: a more complete explanation of Python integration"),
-    ("info_tutorial_addon.rst",
-     "Blender/Python Add-on Tutorial: a step by step guide on how to write an add-on from scratch"),
     ("info_api_reference.rst",
      "Blender/Python API Reference Usage: examples of how to use the API reference docs"),
     ("info_best_practice.rst",
@@ -1045,6 +1048,7 @@ context_type_map = {
     "image_paint_object": ("Object", False),
     "lamp": ("Lamp", False),
     "lattice": ("Lattice", False),
+    "lightprobe": ("LightProbe", False),
     "line_style": ("FreestyleLineStyle", False),
     "material": ("Material", False),
     "material_slot": ("MaterialSlot", False),
@@ -1615,10 +1619,8 @@ def pyrna2sphinx(basepath):
                     else:
                         url_base = API_BASEURL
 
-                    fw("   :file: `%s <%s/%s>`_:%d\n\n" % (location[0],
-                                                           url_base,
-                                                           location[0],
-                                                           location[1]))
+                    fw("   :file: `%s\\:%d <%s/%s$%d>`_\n\n" %
+                       (location[0], location[1], url_base, location[0], location[1]))
 
             file.close()
 
@@ -1648,14 +1650,14 @@ def write_sphinx_conf_py(basepath):
 
     if ARGS.sphinx_theme == "blender-org":
         fw("html_theme_path = ['../']\n")
-        # copied with the theme, exclude else we get an error [T28873]
-        fw("html_favicon = 'favicon.ico'\n")    # in <theme>/static/
 
     # not helpful since the source is generated, adds to upload size.
     fw("html_copy_source = False\n")
     fw("html_show_sphinx = False\n")
     fw("html_split_index = True\n")
-    fw("\n")
+    fw("html_extra_path = ['__/static/favicon.ico', '__/static/blender_logo.svg']\n")
+    fw("html_favicon = '__/static/favicon.ico'\n")
+    fw("html_logo = '__/static/blender_logo.svg'\n\n")
 
     # needed for latex, pdf gen
     fw("latex_elements = {\n")
@@ -1701,6 +1703,9 @@ def write_rst_contents(basepath):
         for info, info_desc in INFO_DOCS:
             fw("   %s <%s>\n\n" % (info_desc, info))
         fw("\n")
+        fw("- :ref:`Blender/Python Add-on Tutorial: a step by step guide on")
+        fw(" how to write an add-on from scratch <blender_manual:advanced_scripting_addon_tutorial>`\n")
+        fw("\n")
 
     fw(title_string("Application Modules", "=", double=True))
     fw(".. toctree::\n")
@@ -1717,8 +1722,6 @@ def write_rst_contents(basepath):
         "bpy.utils.previews",
         "bpy.path",
         "bpy.app",
-        "bpy.app.handlers",
-        "bpy.app.translations",
 
         # C modules
         "bpy.props",
@@ -1733,19 +1736,9 @@ def write_rst_contents(basepath):
     fw("   :maxdepth: 1\n\n")
 
     standalone_modules = (
-        # mathutils
-        "mathutils",
-        "mathutils.geometry",
-        "mathutils.bvhtree", "mathutils.kdtree",
-        "mathutils.interpolate",
-        "mathutils.noise",
-        # misc
-        "freestyle", "bgl", "blf",
-        "gpu", "gpu.offscreen",
-        "aud", "bpy_extras",
-        "idprop.types",
-        # bmesh, submodules are in own page
-        "bmesh",
+        # submodules are added in parent page
+        "mathutils", "freestyle", "bgl", "blf", "gpu",
+        "aud", "bpy_extras", "idprop.types", "bmesh",
     )
 
     for mod in standalone_modules:

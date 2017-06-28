@@ -32,19 +32,19 @@ shader node_principled_bsdf(
 	float Sheen = 0.0,
 	float SheenTint = 0.5,
 	float Clearcoat = 0.0,
-	float ClearcoatGloss = 1.0,
+	float ClearcoatRoughness = 0.03,
 	float IOR = 1.45,
-	float Transparency = 0.0,
-	float RefractionRoughness = 0.0,
+	float Transmission = 0.0,
+	float TransmissionRoughness = 0.0,
 	normal Normal = N,
 	normal ClearcoatNormal = N,
 	normal Tangent = normalize(dPdu),
 	output closure color BSDF = 0)
 {
 	float f = max(IOR, 1e-5);
-	float diffuse_weight = (1.0 - clamp(Metallic, 0.0, 1.0)) * (1.0 - clamp(Transparency, 0.0, 1.0));
-	float transp = clamp(Transparency, 0.0, 1.0) * (1.0 - clamp(Metallic, 0.0, 1.0));
-	float specular_weight = (1.0 - transp);
+	float diffuse_weight = (1.0 - clamp(Metallic, 0.0, 1.0)) * (1.0 - clamp(Transmission, 0.0, 1.0));
+	float final_transmission = clamp(Transmission, 0.0, 1.0) * (1.0 - clamp(Metallic, 0.0, 1.0));
+	float specular_weight = (1.0 - final_transmission);
 
 	vector T = Tangent;
 
@@ -57,8 +57,8 @@ shader node_principled_bsdf(
 
 	if (diffuse_weight > 1e-5) {
 		if (Subsurface > 1e-5) {
-			color Albedo = SubsurfaceColor * Subsurface + BaseColor * (1.0 - Subsurface);
-			BSDF = bssrdf_principled(Normal, Subsurface * SubsurfaceRadius, 0.0, Albedo, Roughness);
+			color mixed_ss_base_color = SubsurfaceColor * Subsurface + BaseColor * (1.0 - Subsurface);
+			BSDF = mixed_ss_base_color * bssrdf_principled(Normal, Subsurface * SubsurfaceRadius, 0.0, SubsurfaceColor, Roughness);
 		} else {
 			BSDF = BaseColor * principled_diffuse(Normal, Roughness);
 		}
@@ -90,7 +90,7 @@ shader node_principled_bsdf(
 		}
 	}
 
-	if (transp > 1e-5) {
+	if (final_transmission > 1e-5) {
 		color Cspec0 = BaseColor * SpecularTint + color(1.0, 1.0, 1.0) * (1.0 - SpecularTint);
 		float eta = backfacing() ? 1.0 / f : f;
 
@@ -98,23 +98,23 @@ shader node_principled_bsdf(
 			float cosNO = dot(Normal, I);
 			float Fr = fresnel_dielectric_cos(cosNO, eta);
 
-		float refl_roughness = Roughness;
-		if (Roughness <= 1e-2)
-			refl_roughness = 0.0;
+			float refl_roughness = Roughness;
+			if (Roughness <= 1e-2)
+				refl_roughness = 0.0;
 
-			float refraction_roughness = refl_roughness;
+			float transmission_roughness = refl_roughness;
 			if (distribution == "GGX")
-				refraction_roughness = 1.0 - (1.0 - refl_roughness) * (1.0 - RefractionRoughness);
+				transmission_roughness = 1.0 - (1.0 - refl_roughness) * (1.0 - TransmissionRoughness);
 
-			BSDF = BSDF + transp * (Fr * microfacet_ggx_fresnel(Normal, refl_roughness * refl_roughness, eta, BaseColor, Cspec0) +
-			       (1.0 - Fr) * BaseColor * microfacet_ggx_refraction(Normal, refraction_roughness * refraction_roughness, eta));
+			BSDF = BSDF + final_transmission * (Fr * microfacet_ggx_fresnel(Normal, refl_roughness * refl_roughness, eta, BaseColor, Cspec0) +
+			       (1.0 - Fr) * BaseColor * microfacet_ggx_refraction(Normal, transmission_roughness * transmission_roughness, eta));
 		} else {
-			BSDF = BSDF + transp * microfacet_multi_ggx_glass_fresnel(Normal, Roughness * Roughness, eta, BaseColor, Cspec0);
+			BSDF = BSDF + final_transmission * microfacet_multi_ggx_glass_fresnel(Normal, Roughness * Roughness, eta, BaseColor, Cspec0);
 		}
 	}
 
 	if (Clearcoat > 1e-5) {
-		BSDF = BSDF + principled_clearcoat(ClearcoatNormal, Clearcoat, ClearcoatGloss);
+		BSDF = BSDF + principled_clearcoat(ClearcoatNormal, Clearcoat, ClearcoatRoughness * ClearcoatRoughness);
 	}
 }
 

@@ -3154,11 +3154,11 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 			/* normalmaps, test if tangents needed, separated from shading */
 			if (ma->mode_l & MA_TANGENT_V) {
 				need_tangent= 1;
-				if (me->mtpoly==NULL)
+				if (me->mloopuv==NULL)
 					need_orco= 1;
 			}
 			if (ma->mode_l & MA_NORMAP_TANG) {
-				if (me->mtpoly==NULL) {
+				if (me->mloopuv==NULL) {
 					need_orco= 1;
 				}
 				need_tangent= 1;
@@ -3171,7 +3171,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 
 	if (re->flag & R_NEED_TANGENT) {
 		/* exception for tangent space baking */
-		if (me->mtpoly==NULL) {
+		if (me->mloopuv==NULL) {
 			need_orco= 1;
 		}
 		need_tangent= 1;
@@ -4702,6 +4702,12 @@ static void add_render_object(Render *re, Object *ob, Object *par, DupliObject *
 	if (ob->particlesystem.first) {
 		psysindex= 1;
 		for (psys=ob->particlesystem.first; psys; psys=psys->next, psysindex++) {
+			/* It seems that we may generate psys->renderdata recursively in some nasty intricated cases of
+			 * several levels of bupliobject (see T51524).
+			 * For now, basic rule is, do not restore psys if it was already in 'render state'.
+			 * Another, more robust solution could be to add some reference counting to that renderdata... */
+			const bool psys_has_renderdata = (psys->renderdata != NULL);
+
 			if (!psys_check_enabled(ob, psys, G.is_rendering))
 				continue;
 			
@@ -4713,8 +4719,9 @@ static void add_render_object(Render *re, Object *ob, Object *par, DupliObject *
 			if (dob)
 				psys->flag |= PSYS_USE_IMAT;
 			init_render_object_data(re, obr, timeoffset);
-			if (!(re->r.scemode & R_VIEWPORT_PREVIEW))
+			if (!(re->r.scemode & R_VIEWPORT_PREVIEW) && !psys_has_renderdata) {
 				psys_render_restore(ob, psys);
+			}
 			psys->flag &= ~PSYS_USE_IMAT;
 
 			/* only add instance for objects that have not been used for dupli */

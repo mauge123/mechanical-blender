@@ -42,9 +42,10 @@
 #include "BKE_context.h"
 #include "BKE_movieclip.h"
 #include "BKE_tracking.h"
-#include "BKE_depsgraph.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+
+#include "DEG_depsgraph.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -875,8 +876,7 @@ static int slide_marker_modal(bContext *C, wmOperator *op, const wmEvent *event)
 			if (ELEM(event->type, LEFTSHIFTKEY, RIGHTSHIFTKEY)) {
 				data->accurate = event->val == KM_PRESS;
 			}
-
-			/* fall-through */
+			ATTR_FALLTHROUGH;
 		case MOUSEMOVE:
 			mdelta[0] = event->mval[0] - data->mval[0];
 			mdelta[1] = event->mval[1] - data->mval[1];
@@ -906,7 +906,7 @@ static int slide_marker_modal(bContext *C, wmOperator *op, const wmEvent *event)
 				}
 
 				WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, NULL);
-				DAG_id_tag_update(&sc->clip->id, 0);
+				DEG_id_tag_update(&sc->clip->id, 0);
 			}
 			else if (data->area == TRACK_AREA_PAT) {
 				if (data->action == SLIDE_ACTION_SIZE) {
@@ -1201,7 +1201,7 @@ static int disable_markers_exec(bContext *C, wmOperator *op)
 		}
 	}
 
-	DAG_id_tag_update(&clip->id, 0);
+	DEG_id_tag_update(&clip->id, 0);
 
 	WM_event_add_notifier(C, NC_MOVIECLIP | NA_EVALUATED, clip);
 

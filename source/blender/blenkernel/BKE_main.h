@@ -108,6 +108,7 @@ typedef struct Main {
 	ListBase vfont;
 	ListBase text;
 	ListBase speaker;
+	ListBase lightprobe;
 	ListBase sound;
 	ListBase group;
 	ListBase armature;
@@ -123,6 +124,7 @@ typedef struct Main {
 	ListBase mask;
 	ListBase linestyle;
 	ListBase cachefiles;
+	ListBase workspaces;
 // WITH_MECHANICAL_DIMENSIONS
 	ListBase dimensions;
 // WITH_MECHANICAL_DRAWINGS

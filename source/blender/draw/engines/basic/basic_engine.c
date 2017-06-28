@@ -136,8 +136,8 @@ static void BASIC_engine_init(void *vedata)
 #ifdef USE_DEPTH
 	if (DRW_state_is_fbo()) {
 		const float *viewport_size = DRW_viewport_size_get();
-		DRWFboTexture tex = {&txl->depth_dup, DRW_BUF_DEPTH_24, 0};
-		DRW_framebuffer_init(&fbl->dupli_depth,
+		DRWFboTexture tex = {&txl->depth_dup, DRW_TEX_DEPTH_24, 0};
+		DRW_framebuffer_init(&fbl->dupli_depth, &draw_engine_basic_type,
 		                     (int)viewport_size[0], (int)viewport_size[1],
 		                     &tex, 1);
 	}
@@ -178,10 +178,10 @@ static void BASIC_cache_populate(void *vedata, Object *ob)
 {
 	BASIC_StorageList *stl = ((BASIC_Data *)vedata)->stl;
 
-	if (!DRW_is_object_renderable(ob))
+	if (!DRW_object_is_renderable(ob))
 		return;
 
-	struct Batch *geom = DRW_cache_object_surface_get(ob);
+	struct Gwn_Batch *geom = DRW_cache_object_surface_get(ob);
 	if (geom) {
 		bool do_cull = false;  /* TODO (we probably wan't to take this from the viewport?) */
 #ifdef USE_DEPTH
@@ -248,7 +248,7 @@ DrawEngineType draw_engine_basic_type = {
 RenderEngineType DRW_engine_viewport_basic_type = {
 	NULL, NULL,
 	BASIC_ENGINE, N_("Basic"), RE_INTERNAL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	&draw_engine_basic_type,
 	{NULL, NULL, NULL}
 };

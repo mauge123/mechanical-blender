@@ -52,6 +52,7 @@ extern char datatoc_gpu_shader_uniform_color_frag_glsl[];
 extern char datatoc_gpu_shader_checker_frag_glsl[];
 extern char datatoc_gpu_shader_diag_stripes_frag_glsl[];
 extern char datatoc_gpu_shader_simple_lighting_frag_glsl[];
+extern char datatoc_gpu_shader_simple_lighting_flat_color_frag_glsl[];
 extern char datatoc_gpu_shader_simple_lighting_smooth_color_frag_glsl[];
 extern char datatoc_gpu_shader_simple_lighting_smooth_color_alpha_frag_glsl[];
 extern char datatoc_gpu_shader_flat_color_frag_glsl[];
@@ -63,6 +64,7 @@ extern char datatoc_gpu_shader_2D_smooth_color_frag_glsl[];
 extern char datatoc_gpu_shader_2D_image_vert_glsl[];
 
 extern char datatoc_gpu_shader_3D_image_vert_glsl[];
+extern char datatoc_gpu_shader_image_linear_frag_glsl[];
 extern char datatoc_gpu_shader_image_color_frag_glsl[];
 extern char datatoc_gpu_shader_image_alpha_color_frag_glsl[];
 extern char datatoc_gpu_shader_image_shuffle_color_frag_glsl[];
@@ -75,6 +77,7 @@ extern char datatoc_gpu_shader_3D_vert_glsl[];
 extern char datatoc_gpu_shader_3D_normal_vert_glsl[];
 extern char datatoc_gpu_shader_3D_flat_color_vert_glsl[];
 extern char datatoc_gpu_shader_3D_smooth_color_vert_glsl[];
+extern char datatoc_gpu_shader_3D_normal_flat_color_vert_glsl[];
 extern char datatoc_gpu_shader_3D_normal_smooth_color_vert_glsl[];
 extern char datatoc_gpu_shader_3D_smooth_color_frag_glsl[];
 extern char datatoc_gpu_shader_3D_passthrough_vert_glsl[];
@@ -89,6 +92,8 @@ extern char datatoc_gpu_shader_instance_camera_vert_glsl[];
 extern char datatoc_gpu_shader_instance_distance_line_vert_glsl[];
 extern char datatoc_gpu_shader_instance_edges_variying_color_geom_glsl[];
 extern char datatoc_gpu_shader_instance_edges_variying_color_vert_glsl[];
+extern char datatoc_gpu_shader_instance_bone_envelope_solid_vert_glsl[];
+extern char datatoc_gpu_shader_instance_bone_envelope_wire_vert_glsl[];
 
 extern char datatoc_gpu_shader_3D_groundpoint_vert_glsl[];
 extern char datatoc_gpu_shader_3D_groundline_geom_glsl[];
@@ -108,7 +113,6 @@ extern char datatoc_gpu_shader_2D_point_uniform_size_aa_vert_glsl[];
 extern char datatoc_gpu_shader_2D_point_uniform_size_outline_aa_vert_glsl[];
 extern char datatoc_gpu_shader_2D_point_uniform_size_varying_color_outline_aa_vert_glsl[];
 
-extern char datatoc_gpu_shader_2D_line_dashed_legacy_vert_glsl[];
 extern char datatoc_gpu_shader_2D_line_dashed_vert_glsl[];
 extern char datatoc_gpu_shader_2D_line_dashed_frag_glsl[];
 extern char datatoc_gpu_shader_2D_line_dashed_geom_glsl[];
@@ -186,33 +190,7 @@ static void shader_print_errors(const char *task, const char *log, const char **
 
 static const char *gpu_shader_version(void)
 {
-#ifdef WITH_LEGACY_OPENGL
-	if (GLEW_VERSION_3_3) {
-		if (GPU_legacy_support()) {
-			return "#version 330 compatibility\n";
-			/* highest version that is widely supported
-			 * gives us native geometry shaders!
-			 * use compatibility profile so we can continue using builtin shader input/output names
-			 */
-		}
-		else {
-			return "#version 130\n";
-			/* latest version that is compatible with existing shaders */
-		}
-	}
-	else if (GLEW_VERSION_3_0) {
-		return "#version 130\n";
-		/* GLSL 1.3 has modern syntax/keywords/datatypes so use if available
-		 * older features are deprecated but still available without compatibility extension or profile
-		 */
-	}
-	else {
-		return "#version 120\n";
-		/* minimum supported */
-	}
-#else
 	return "#version 330\n";
-#endif
 }
 
 static void gpu_shader_standard_extensions(char defines[MAX_EXT_DEFINE_LENGTH])
@@ -222,25 +200,9 @@ static void gpu_shader_standard_extensions(char defines[MAX_EXT_DEFINE_LENGTH])
 	 */
 
 	if (GLEW_ARB_texture_query_lod) {
-		/* a #version 400 feature, but we use #version 150 maximum so use extension */
+		/* a #version 400 feature, but we use #version 330 maximum so use extension */
 		strcat(defines, "#extension GL_ARB_texture_query_lod: enable\n");
 	}
-
-#ifdef WITH_LEGACY_OPENGL
-	if (GLEW_VERSION_3_1 && !GLEW_VERSION_3_2 && GLEW_ARB_compatibility) {
-		strcat(defines, "#extension GL_ARB_compatibility: enable\n");
-	}
-
-	if (!GLEW_VERSION_3_1) {
-		if (GLEW_ARB_draw_instanced) {
-			strcat(defines, "#extension GL_ARB_draw_instanced: enable\n");
-		}
-
-		if (!GLEW_VERSION_3_0) {
-			strcat(defines, "#extension GL_EXT_gpu_shader4: require\n");
-		}
-	}
-#endif
 }
 
 static void gpu_shader_standard_defines(char defines[MAX_DEFINE_LENGTH],
@@ -262,10 +224,6 @@ static void gpu_shader_standard_defines(char defines[MAX_DEFINE_LENGTH],
 
 	if (GPU_bicubic_bump_support())
 		strcat(defines, "#define BUMP_BICUBIC\n");
-
-	if (GLEW_VERSION_3_0) {
-		strcat(defines, "#define BIT_OPERATIONS\n");
-	}
 
 #ifdef WITH_OPENSUBDIV
 	/* TODO(sergey): Check whether we actually compiling shader for
@@ -317,10 +275,6 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
                                 const int flags)
 {
 #ifdef WITH_OPENSUBDIV
-	/* TODO(sergey): used to add #version 150 to the geometry shader.
-	 * Could safely be renamed to "use_geometry_code" since it's very
-	 * likely any of geometry code will want to use GLSL 1.5.
-	 */
 	bool use_opensubdiv = (flags & GPU_SHADER_FLAGS_SPECIAL_OPENSUBDIV) != 0;
 #else
 	UNUSED_VARS(flags);
@@ -332,9 +286,6 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 	GPUShader *shader;
 	char standard_defines[MAX_DEFINE_LENGTH] = "";
 	char standard_extensions[MAX_EXT_DEFINE_LENGTH] = "";
-
-	if (geocode && !GPU_geometry_shader_support())
-		return NULL;
 
 	shader = MEM_callocN(sizeof(GPUShader), "GPUShader");
 
@@ -475,18 +426,26 @@ GPUShader *GPU_shader_create_ex(const char *vertexcode,
 		return NULL;
 	}
 
-	shader->interface = ShaderInterface_create(shader->program);
+	shader->interface = GWN_shaderinterface_create(shader->program);
 
 #ifdef WITH_OPENSUBDIV
 	/* TODO(sergey): Find a better place for this. */
-	if (use_opensubdiv && GLEW_VERSION_4_1) {
-		glProgramUniform1i(shader->program,
-		                   ShaderInterface_uniform(shader->interface, "FVarDataOffsetBuffer")->location,
-		                   30);  /* GL_TEXTURE30 */
+	if (use_opensubdiv) {
+		if (GLEW_VERSION_4_1) {
+			glProgramUniform1i(shader->program,
+			                   GWN_shaderinterface_uniform(shader->interface, "FVarDataOffsetBuffer")->location,
+			                   30);  /* GL_TEXTURE30 */
 
-		glProgramUniform1i(shader->program,
-		                   ShaderInterface_uniform(shader->interface, "FVarDataBuffer")->location,
-		                   31);  /* GL_TEXTURE31 */
+			glProgramUniform1i(shader->program,
+			                   GWN_shaderinterface_uniform(shader->interface, "FVarDataBuffer")->location,
+			                   31);  /* GL_TEXTURE31 */
+		}
+		else {
+			glUseProgram(shader->program);
+			glUniform1i(GWN_shaderinterface_uniform(shader->interface, "FVarDataOffsetBuffer")->location, 30);
+			glUniform1i(GWN_shaderinterface_uniform(shader->interface, "FVarDataBuffer")->location, 31);
+			glUseProgram(0);
+		}
 	}
 #endif
 
@@ -523,7 +482,7 @@ void GPU_shader_free(GPUShader *shader)
 		MEM_freeN(shader->uniform_interface);
 
 	if (shader->interface)
-		ShaderInterface_discard(shader->interface);
+		GWN_shaderinterface_discard(shader->interface);
 
 	MEM_freeN(shader);
 }
@@ -531,7 +490,7 @@ void GPU_shader_free(GPUShader *shader)
 int GPU_shader_get_uniform(GPUShader *shader, const char *name)
 {
 	BLI_assert(shader && shader->program);
-	const ShaderInput *uniform = ShaderInterface_uniform(shader->interface, name);
+	const Gwn_ShaderInput *uniform = GWN_shaderinterface_uniform(shader->interface, name);
 	return uniform ? uniform->location : -1;
 }
 
@@ -640,7 +599,7 @@ void GPU_shader_uniform_texture(GPUShader *UNUSED(shader), int location, GPUText
 int GPU_shader_get_attribute(GPUShader *shader, const char *name)
 {
 	BLI_assert(shader && shader->program);
-	const ShaderInput *attrib = ShaderInterface_attrib(shader->interface, name);
+	const Gwn_ShaderInput *attrib = GWN_shaderinterface_attr(shader->interface, name);
 	return attrib ? attrib->location : -1;
 }
 
@@ -670,6 +629,8 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 		                               datatoc_gpu_shader_edges_overlay_frag_glsl,
 		                               datatoc_gpu_shader_edges_overlay_geom_glsl },
 		[GPU_SHADER_SIMPLE_LIGHTING] = { datatoc_gpu_shader_3D_normal_vert_glsl, datatoc_gpu_shader_simple_lighting_frag_glsl },
+		/* Use 'USE_FLAT_NORMAL' to make flat shader from smooth  */
+		[GPU_SHADER_SIMPLE_LIGHTING_FLAT_COLOR] = { datatoc_gpu_shader_3D_normal_smooth_color_vert_glsl, datatoc_gpu_shader_simple_lighting_smooth_color_frag_glsl },
 		[GPU_SHADER_SIMPLE_LIGHTING_SMOOTH_COLOR] = { datatoc_gpu_shader_3D_normal_smooth_color_vert_glsl, datatoc_gpu_shader_simple_lighting_smooth_color_frag_glsl },
 		[GPU_SHADER_SIMPLE_LIGHTING_SMOOTH_COLOR_ALPHA] = { datatoc_gpu_shader_3D_normal_smooth_color_vert_glsl, datatoc_gpu_shader_simple_lighting_smooth_color_alpha_frag_glsl },
 
@@ -693,6 +654,8 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 		                               datatoc_gpu_shader_flat_color_frag_glsl },
 		[GPU_SHADER_2D_SMOOTH_COLOR] = { datatoc_gpu_shader_2D_smooth_color_vert_glsl,
 		                                 datatoc_gpu_shader_2D_smooth_color_frag_glsl },
+		[GPU_SHADER_2D_IMAGE_LINEAR_TO_SRGB] = { datatoc_gpu_shader_2D_image_vert_glsl,
+		                                         datatoc_gpu_shader_image_linear_frag_glsl },
 		[GPU_SHADER_2D_IMAGE_COLOR] = { datatoc_gpu_shader_2D_image_vert_glsl,
 		                                datatoc_gpu_shader_image_color_frag_glsl },
 		[GPU_SHADER_2D_IMAGE_ALPHA_COLOR] = { datatoc_gpu_shader_2D_image_vert_glsl,
@@ -779,6 +742,11 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 		[GPU_SHADER_INSTANCE_EDGES_VARIYING_COLOR] = { datatoc_gpu_shader_instance_edges_variying_color_vert_glsl,
 		                                               datatoc_gpu_shader_flat_color_frag_glsl,
 		                                               datatoc_gpu_shader_instance_edges_variying_color_geom_glsl},
+
+		[GPU_SHADER_3D_INSTANCE_BONE_ENVELOPE_SOLID] = { datatoc_gpu_shader_instance_bone_envelope_solid_vert_glsl,
+		                                           datatoc_gpu_shader_simple_lighting_frag_glsl },
+		[GPU_SHADER_3D_INSTANCE_BONE_ENVELOPE_WIRE] = { datatoc_gpu_shader_instance_bone_envelope_wire_vert_glsl,
+		                                                datatoc_gpu_shader_flat_color_frag_glsl },
 	};
 
 	if (builtin_shaders[shader] == NULL) {
@@ -795,10 +763,14 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 				defines = "#define AXIS_NAME;\n";
 				break;
 			case GPU_SHADER_3D_OBJECTSPACE_SIMPLE_LIGHTING_VARIYING_COLOR:
+			case GPU_SHADER_3D_INSTANCE_BONE_ENVELOPE_SOLID:
 				defines = "#define USE_INSTANCE_COLOR;\n";
 				break;
 			case GPU_SHADER_3D_FLAT_COLOR_U32:
 				defines = "#define USE_COLOR_U32;\n";
+				break;
+			case GPU_SHADER_SIMPLE_LIGHTING_FLAT_COLOR:
+				defines = "#define USE_FLAT_NORMAL;\n";
 				break;
 			default:
 				break;
@@ -812,14 +784,6 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 				{ datatoc_gpu_shader_edges_front_back_persp_legacy_vert_glsl,
 				  datatoc_gpu_shader_flat_color_alpha_test_0_frag_glsl };
 			stages = &legacy_fancy_edges;
-		}
-
-		if (shader == GPU_SHADER_2D_LINE_DASHED_COLOR && !GLEW_VERSION_3_2) {
-			/* Dashed need geometry shader, which are not supported by legacy OpenGL, fallback to solid lines. */
-			/* TODO: remove after switch to core profile (maybe) */
-			static const GPUShaderStages legacy_dashed_lines = { datatoc_gpu_shader_2D_line_dashed_legacy_vert_glsl,
-			                                                     datatoc_gpu_shader_2D_line_dashed_frag_glsl };
-			stages = &legacy_dashed_lines;
 		}
 
 		if (shader == GPU_SHADER_3D_LINE_DASHED_COLOR && !GLEW_VERSION_3_2) {

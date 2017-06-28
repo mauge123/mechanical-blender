@@ -125,10 +125,10 @@ static void EXTERNAL_cache_populate(void *vedata, Object *ob)
 {
 	EXTERNAL_StorageList *stl = ((EXTERNAL_Data *)vedata)->stl;
 
-	if (!DRW_is_object_renderable(ob))
+	if (!DRW_object_is_renderable(ob))
 		return;
 
-	struct Batch *geom = DRW_cache_object_surface_get(ob);
+	struct Gwn_Batch *geom = DRW_cache_object_surface_get(ob);
 	if (geom) {
 		/* Depth Prepass */
 		DRW_shgroup_call_add(stl->g_data->depth_shgrp, geom, ob->obmat);
@@ -177,7 +177,7 @@ static void external_draw_scene(void *vedata)
 
 	/* Set render info. */
 	EXTERNAL_Data *data = vedata;
-	if (rv3d->render_engine->text) {
+	if (rv3d->render_engine->text[0] != '\0') {
 		BLI_strncpy(data->info, rv3d->render_engine->text, sizeof(data->info));
 	}
 	else {
@@ -224,7 +224,7 @@ DrawEngineType draw_engine_external_type = {
 RenderEngineType DRW_engine_viewport_external_type = {
 	NULL, NULL,
 	EXTERNAL_ENGINE, N_("External"), RE_INTERNAL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	&draw_engine_external_type,
 	{NULL, NULL, NULL}
 };

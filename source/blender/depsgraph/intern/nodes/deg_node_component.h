@@ -99,11 +99,17 @@ struct ComponentDepsNode : public DepsNode {
 	 * \param op: The operation to perform
 	 * \param name: Identifier for operation - used to find/locate it again
 	 */
-	OperationDepsNode *add_operation(eDepsOperation_Type optype,
-	                                 DepsEvalOperationCb op,
+	OperationDepsNode *add_operation(const DepsEvalOperationCb& op,
 	                                 eDepsOperation_Code opcode,
 	                                 const char *name,
 	                                 int name_tag);
+
+	/* Entry/exit operations management.
+	 *
+	 * Use those instead of direct set since this will perform sanity checks.
+	 */
+	void set_entry_operation(OperationDepsNode *op_node);
+	void set_exit_operation(OperationDepsNode *op_node);
 
 	void clear_operations();
 
@@ -125,7 +131,7 @@ struct ComponentDepsNode : public DepsNode {
 	OperationDepsNode *get_entry_operation();
 	OperationDepsNode *get_exit_operation();
 
-	void finalize_build();
+	void finalize_build(Depsgraph *graph);
 
 	IDDepsNode *owner;
 
@@ -199,6 +205,10 @@ struct CacheComponentDepsNode : public ComponentDepsNode {
 };
 
 struct LayerCollectionsDepsNode : public ComponentDepsNode {
+	DEG_DEPSNODE_DECLARE;
+};
+
+struct CopyOnWriteDepsNode : public ComponentDepsNode {
 	DEG_DEPSNODE_DECLARE;
 };
 

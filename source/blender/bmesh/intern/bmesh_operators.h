@@ -77,13 +77,13 @@ enum {
 /* similar face selection slot values */
 enum {
 	SIMFACE_MATERIAL = 201,
-	SIMFACE_IMAGE,
 	SIMFACE_AREA,
 	SIMFACE_SIDES,
 	SIMFACE_PERIMETER,
 	SIMFACE_NORMAL,
 	SIMFACE_COPLANAR,
 	SIMFACE_SMOOTH,
+	SIMFACE_FACEMAP,
 #ifdef WITH_FREESTYLE
 	SIMFACE_FREESTYLE
 #endif
@@ -141,12 +141,19 @@ void BM_mesh_esubdivide(
         const short use_only_quads,
         const int seed);
 
-void BM_mesh_calc_uvs_grid(BMesh *bm, const unsigned int x_segments, const unsigned int y_segments, const short oflag);
-void BM_mesh_calc_uvs_sphere(BMesh *bm, const short oflag);
-void BM_mesh_calc_uvs_circle(BMesh *bm, float mat[4][4], const float radius, const short oflag);
+void BM_mesh_calc_uvs_grid(
+        BMesh *bm, const uint x_segments, const uint y_segments,
+        const short oflag, const int cd_loop_uv_offset);
+void BM_mesh_calc_uvs_sphere(
+        BMesh *bm,
+        const short oflag, const int cd_loop_uv_offset);
+void BM_mesh_calc_uvs_circle(
+        BMesh *bm, float mat[4][4], const float radius,
+        const short oflag, const int cd_loop_uv_offset);
 void BM_mesh_calc_uvs_cone(
         BMesh *bm, float mat[4][4],
-        const float radius_top, const float radius_bottom, const int segments, const bool cap_ends, const short oflag);
+        const float radius_top, const float radius_bottom, const int segments, const bool cap_ends,
+        const short oflag, const int cd_loop_uv_offset);
 void BM_mesh_calc_uvs_cube(BMesh *bm, const short oflag);
 
 #include "intern/bmesh_operator_api_inline.h"

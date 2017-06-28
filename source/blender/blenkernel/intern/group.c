@@ -78,6 +78,8 @@ Group *BKE_group_add(Main *bmain, const char *name)
 	Group *group;
 	
 	group = BKE_libblock_alloc(bmain, ID_GR, name);
+	id_us_min(&group->id);
+	id_us_ensure_real(&group->id);
 	group->layer = (1 << 20) - 1;
 
 	group->preview = NULL;
@@ -85,7 +87,7 @@ Group *BKE_group_add(Main *bmain, const char *name)
 	return group;
 }
 
-Group *BKE_group_copy(Main *bmain, Group *group)
+Group *BKE_group_copy(Main *bmain, const Group *group)
 {
 	Group *groupn;
 

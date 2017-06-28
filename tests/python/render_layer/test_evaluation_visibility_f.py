@@ -21,11 +21,12 @@ class UnitTesting(RenderLayerTesting):
         import bpy
 
         scene = bpy.context.scene
+        workspace = bpy.context.workspace
         cube = bpy.data.objects.new('guinea pig', bpy.data.meshes.new('mesh'))
 
         layer = scene.render_layers.new('Visibility Test')
         layer.collections.unlink(layer.collections[0])
-        scene.render_layers.active = layer
+        workspace.render_layer = layer
 
         scene_collection_mom = scene.master_collection.collections.new("Mom")
         scene_collection_kid = scene_collection_mom.collections.new("Kid")
@@ -49,10 +50,5 @@ class UnitTesting(RenderLayerTesting):
 # ############################################################
 
 if __name__ == '__main__':
-    import sys
-
-    extra_arguments = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    sys.argv = [__file__] + (sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else [])
-
-    UnitTesting._extra_arguments = extra_arguments
+    UnitTesting._extra_arguments = setup_extra_arguments(__file__)
     unittest.main()

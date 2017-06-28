@@ -165,7 +165,7 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, Panel):
             pin_id = None
 
         if not space.use_pin_id:
-            layout.prop(space, "texture_context", expand=True)
+            layout.row().prop(space, "texture_context", expand=True)
             pin_id = None
 
         if space.texture_context == 'OTHER':
@@ -318,9 +318,9 @@ class TEXTURE_PT_clouds(TextureTypePanel, Panel):
 
         tex = context.texture
 
-        layout.prop(tex, "cloud_type", expand=True)
+        layout.row().prop(tex, "cloud_type", expand=True)
         layout.label(text="Noise:")
-        layout.prop(tex, "noise_type", text="Type", expand=True)
+        layout.row().prop(tex, "noise_type", text="Type", expand=True)
         layout.prop(tex, "noise_basis", text="Basis")
 
         split = layout.split()
@@ -342,8 +342,8 @@ class TEXTURE_PT_wood(TextureTypePanel, Panel):
 
         tex = context.texture
 
-        layout.prop(tex, "noise_basis_2", expand=True)
-        layout.prop(tex, "wood_type", expand=True)
+        layout.row().prop(tex, "noise_basis_2", expand=True)
+        layout.row().prop(tex, "wood_type", expand=True)
 
         col = layout.column()
         col.active = tex.wood_type in {'RINGNOISE', 'BANDNOISE'}
@@ -371,10 +371,10 @@ class TEXTURE_PT_marble(TextureTypePanel, Panel):
 
         tex = context.texture
 
-        layout.prop(tex, "marble_type", expand=True)
-        layout.prop(tex, "noise_basis_2", expand=True)
+        layout.row().prop(tex, "marble_type", expand=True)
+        layout.row().prop(tex, "noise_basis_2", expand=True)
         layout.label(text="Noise:")
-        layout.prop(tex, "noise_type", text="Type", expand=True)
+        layout.row().prop(tex, "noise_type", text="Type", expand=True)
         layout.prop(tex, "noise_basis", text="Basis")
 
         split = layout.split()
@@ -431,9 +431,9 @@ class TEXTURE_PT_stucci(TextureTypePanel, Panel):
 
         tex = context.texture
 
-        layout.prop(tex, "stucci_type", expand=True)
+        layout.row().prop(tex, "stucci_type", expand=True)
         layout.label(text="Noise:")
-        layout.prop(tex, "noise_type", text="Type", expand=True)
+        layout.row().prop(tex, "noise_type", text="Type", expand=True)
         layout.prop(tex, "noise_basis", text="Basis")
 
         row = layout.row()
@@ -459,7 +459,7 @@ def texture_filter_common(tex, layout):
     layout.prop(tex, "filter_type", text="")
     if tex.use_mipmap and tex.filter_type in {'AREA', 'EWA', 'FELINE'}:
         if tex.filter_type == 'FELINE':
-            layout.prop(tex, "filter_probes", text="Probes")
+            layout.prop(tex, "filter_lightprobes", text="Light Probes")
         else:
             layout.prop(tex, "filter_eccentricity", text="Eccentricity")
 
@@ -808,7 +808,7 @@ class TEXTURE_PT_pointdensity(TextureButtonsPanel, Panel):
         tex = context.texture
         pd = tex.point_density
 
-        layout.prop(pd, "point_source", expand=True)
+        layout.row().prop(pd, "point_source", expand=True)
 
         split = layout.split()
 
@@ -963,7 +963,7 @@ class TEXTURE_PT_mapping(TextureSlotPanel, Panel):
                 split.label(text="Map:")
                 ob = context.object
                 if ob and ob.type == 'MESH':
-                    split.prop_search(tex, "uv_layer", ob.data, "uv_textures", text="")
+                    split.prop_search(tex, "uv_layer", ob.data, "uv_layers", text="")
                 else:
                     split.prop(tex, "uv_layer", text="")
 

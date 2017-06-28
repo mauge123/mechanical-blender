@@ -55,9 +55,9 @@ set(SRC_DNA_INC
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_lamp_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_lattice_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_layer_types.h
+	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_lightprobe_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_linestyle_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_listBase.h
-	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_manipulator_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_material_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_mesh_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_meshdata_types.h
@@ -90,6 +90,7 @@ set(SRC_DNA_INC
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_view2d_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_view3d_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_windowmanager_types.h
+	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_workspace_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_world_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_movieclip_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_tracking_types.h

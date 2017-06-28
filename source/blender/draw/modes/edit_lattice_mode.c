@@ -130,8 +130,8 @@ static void EDIT_LATTICE_engine_init(void *vedata)
 
 	/* Init Framebuffers like this: order is attachment order (for color texs) */
 	/*
-	 * DRWFboTexture tex[2] = {{&txl->depth, DRW_BUF_DEPTH_24, 0},
-	 *                         {&txl->color, DRW_BUF_RGBA_8, DRW_TEX_FILTER}};
+	 * DRWFboTexture tex[2] = {{&txl->depth, DRW_TEX_DEPTH_24, 0},
+	 *                         {&txl->color, DRW_TEX_RGBA_8, DRW_TEX_FILTER}};
 	 */
 
 	/* DRW_framebuffer_init takes care of checking if
@@ -144,7 +144,7 @@ static void EDIT_LATTICE_engine_init(void *vedata)
 	 */
 
 	if (!e_data.wire_sh) {
-		e_data.wire_sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_UNIFORM_COLOR);
+		e_data.wire_sh = GPU_shader_get_builtin_shader(GPU_SHADER_3D_SMOOTH_COLOR);
 	}
 
 	if (!e_data.overlay_vert_sh) {
@@ -177,6 +177,8 @@ static void EDIT_LATTICE_cache_init(void *vedata)
 		        "Lattice Verts",
 		        DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_POINT);
 		stl->g_data->vert_shgrp = DRW_shgroup_create(e_data.overlay_vert_sh, psl->vert_pass);
+
+		DRW_shgroup_uniform_block(stl->g_data->vert_shgrp, "globalsBlock", globals_ubo);
 	}
 }
 
@@ -194,9 +196,9 @@ static void EDIT_LATTICE_cache_populate(void *vedata, Object *ob)
 	if (ob->type == OB_LATTICE) {
 		if (ob == obedit) {
 			/* Get geometry cache */
-			struct Batch *geom;
+			struct Gwn_Batch *geom;
 
-			geom = DRW_cache_lattice_wire_get(ob);
+			geom = DRW_cache_lattice_wire_get(ob, true);
 			DRW_shgroup_call_add(stl->g_data->wire_shgrp, geom, ob->obmat);
 
 			geom = DRW_cache_lattice_vert_overlay_get(ob);

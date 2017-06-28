@@ -55,6 +55,7 @@ extern char datatoc_gpu_shader_uniform_color_frag_glsl[];
 
 /* *********** LISTS *********** */
 typedef struct EDIT_MESH_PassList {
+	struct DRWPass *vcolor_faces;
 	struct DRWPass *depth_hidden_wire;
 	struct DRWPass *edit_face_overlay;
 	struct DRWPass *edit_face_occluded;
@@ -67,11 +68,6 @@ typedef struct EDIT_MESH_FramebufferList {
 	struct GPUFrameBuffer *occlude_wire_fb;
 } EDIT_MESH_FramebufferList;
 
-typedef struct EDIT_MESH_TextureList {
-	struct GPUTexture *occlude_wire_depth_tx;
-	struct GPUTexture *occlude_wire_color_tx;
-} EDIT_MESH_TextureList;
-
 typedef struct EDIT_MESH_StorageList {
 	struct EDIT_MESH_PrivateData *g_data;
 } EDIT_MESH_StorageList;
@@ -79,7 +75,7 @@ typedef struct EDIT_MESH_StorageList {
 typedef struct EDIT_MESH_Data {
 	void *engine_type;
 	EDIT_MESH_FramebufferList *fbl;
-	EDIT_MESH_TextureList *txl;
+	DRWViewportEmptyList *txl;
 	EDIT_MESH_PassList *psl;
 	EDIT_MESH_StorageList *stl;
 } EDIT_MESH_Data;
@@ -87,6 +83,8 @@ typedef struct EDIT_MESH_Data {
 /* *********** STATIC *********** */
 
 static struct {
+	/* weight/vert-color */
+	GPUShader *vcolor_face_shader;
 	GPUShader *overlay_tri_sh;
 	GPUShader *overlay_tri_fast_sh;
 	GPUShader *overlay_tri_vcol_sh;
@@ -98,11 +96,17 @@ static struct {
 	GPUShader *overlay_mix_sh;
 	GPUShader *overlay_facefill_sh;
 	GPUShader *normals_face_sh;
+	GPUShader *normals_loop_sh;
 	GPUShader *normals_sh;
 	GPUShader *depth_sh;
+	/* temp buffer texture */
+	struct GPUTexture *occlude_wire_depth_tx;
+	struct GPUTexture *occlude_wire_color_tx;
 } e_data = {NULL}; /* Engine data */
 
 typedef struct EDIT_MESH_PrivateData {
+	/* weight/vert-color */
+	DRWShadingGroup *fvcolor_shgrp;
 	DRWShadingGroup *depth_shgrp_hidden_wire;
 
 	DRWShadingGroup *fnormals_shgrp;
@@ -126,19 +130,22 @@ typedef struct EDIT_MESH_PrivateData {
 
 static void EDIT_MESH_engine_init(void *vedata)
 {
-	EDIT_MESH_TextureList *txl = ((EDIT_MESH_Data *)vedata)->txl;
 	EDIT_MESH_FramebufferList *fbl = ((EDIT_MESH_Data *)vedata)->fbl;
 
 	const float *viewport_size = DRW_viewport_size_get();
 
 	DRWFboTexture tex[2] = {{
-	    &txl->occlude_wire_depth_tx, DRW_BUF_DEPTH_24, 0},
-	    {&txl->occlude_wire_color_tx, DRW_BUF_RGBA_8, DRW_TEX_FILTER}
+	    &e_data.occlude_wire_depth_tx, DRW_TEX_DEPTH_24, DRW_TEX_TEMP},
+	    {&e_data.occlude_wire_color_tx, DRW_TEX_RGBA_8, DRW_TEX_FILTER | DRW_TEX_TEMP}
 	};
 	DRW_framebuffer_init(
-	        &fbl->occlude_wire_fb,
+	        &fbl->occlude_wire_fb, &draw_engine_edit_mesh_type,
 	        (int)viewport_size[0], (int)viewport_size[1],
 	        tex, ARRAY_SIZE(tex));
+
+	if (!e_data.vcolor_face_shader) {
+		e_data.vcolor_face_shader = GPU_shader_get_builtin_shader(GPU_SHADER_SIMPLE_LIGHTING_SMOOTH_COLOR_ALPHA);
+	}
 
 	if (!e_data.overlay_tri_sh) {
 		e_data.overlay_tri_sh = DRW_shader_create_with_lib(
@@ -215,6 +222,13 @@ static void EDIT_MESH_engine_init(void *vedata)
 		        datatoc_gpu_shader_uniform_color_frag_glsl,
 		        "#define FACE_NORMALS\n");
 	}
+	if (!e_data.normals_loop_sh) {
+		e_data.normals_loop_sh = DRW_shader_create(
+		        datatoc_edit_normals_vert_glsl,
+		        datatoc_edit_normals_geom_glsl,
+		        datatoc_gpu_shader_uniform_color_frag_glsl,
+		        "#define LOOP_NORMALS\n");
+	}
 	if (!e_data.normals_sh) {
 		e_data.normals_sh = DRW_shader_create(
 		        datatoc_edit_normals_vert_glsl,
@@ -259,20 +273,23 @@ static DRWPass *edit_mesh_create_overlay_pass(
 	        DRW_STATE_WRITE_COLOR | DRW_STATE_POINT | statemod);
 
 	*r_face_shgrp = DRW_shgroup_create(tri_sh, pass);
-	DRW_shgroup_uniform_block(*r_face_shgrp, "globalsBlock", globals_ubo, 0);
+	DRW_shgroup_uniform_block(*r_face_shgrp, "globalsBlock", globals_ubo);
 	DRW_shgroup_uniform_vec2(*r_face_shgrp, "viewportSize", DRW_viewport_size_get(), 1);
 	DRW_shgroup_uniform_float(*r_face_shgrp, "faceAlphaMod", faceAlpha, 1);
 
 	*r_ledges_shgrp = DRW_shgroup_create(ledge_sh, pass);
+	DRW_shgroup_uniform_block(*r_ledges_shgrp, "globalsBlock", globals_ubo);
 	DRW_shgroup_uniform_vec2(*r_ledges_shgrp, "viewportSize", DRW_viewport_size_get(), 1);
 
 	if ((tsettings->selectmode & (SCE_SELECT_VERTEX)) != 0) {
 		*r_lverts_shgrp = DRW_shgroup_create(e_data.overlay_vert_sh, pass);
+		DRW_shgroup_uniform_block(*r_lverts_shgrp, "globalsBlock", globals_ubo);
 		DRW_shgroup_uniform_vec2(*r_lverts_shgrp, "viewportSize", DRW_viewport_size_get(), 1);
 	}
 
 	if ((tsettings->selectmode & (SCE_SELECT_FACE)) != 0) {
 		*r_facedot_shgrp = DRW_shgroup_create(e_data.overlay_facedot_sh, pass);
+		DRW_shgroup_uniform_block(*r_facedot_shgrp, "globalsBlock", globals_ubo);
 	}
 
 	return pass;
@@ -284,7 +301,6 @@ static float size_normal;
 
 static void EDIT_MESH_cache_init(void *vedata)
 {
-	EDIT_MESH_TextureList *txl = ((EDIT_MESH_Data *)vedata)->txl;
 	EDIT_MESH_PassList *psl = ((EDIT_MESH_Data *)vedata)->psl;
 	EDIT_MESH_StorageList *stl = ((EDIT_MESH_Data *)vedata)->stl;
 	DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
@@ -299,6 +315,21 @@ static void EDIT_MESH_cache_init(void *vedata)
 	if (!stl->g_data) {
 		/* Alloc transient pointers */
 		stl->g_data = MEM_mallocN(sizeof(*stl->g_data), __func__);
+	}
+
+	{
+		psl->vcolor_faces = DRW_pass_create(
+		        "Vert Color Pass",
+		        DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS);
+
+		stl->g_data->fvcolor_shgrp = DRW_shgroup_create(e_data.vcolor_face_shader, psl->vcolor_faces);
+
+		static float light[3] = {-0.3f, 0.5f, 1.0f};
+		static float alpha = 1.0f;
+		static float world_light = 1.0f;  /* XXX, see: paint_vertex_mode.c */
+		DRW_shgroup_uniform_vec3(stl->g_data->fvcolor_shgrp, "light", light, 1);
+		DRW_shgroup_uniform_float(stl->g_data->fvcolor_shgrp, "alpha", &alpha, 1);
+		DRW_shgroup_uniform_float(stl->g_data->fvcolor_shgrp, "global", &world_light, 1);
 	}
 
 	{
@@ -323,7 +354,7 @@ static void EDIT_MESH_cache_init(void *vedata)
 		DRW_shgroup_uniform_float(stl->g_data->vnormals_shgrp, "normalSize", &size_normal, 1);
 		DRW_shgroup_uniform_vec4(stl->g_data->vnormals_shgrp, "color", ts.colorVNormal, 1);
 
-		stl->g_data->lnormals_shgrp = DRW_shgroup_create(e_data.normals_sh, psl->normals);
+		stl->g_data->lnormals_shgrp = DRW_shgroup_create(e_data.normals_loop_sh, psl->normals);
 		DRW_shgroup_uniform_float(stl->g_data->lnormals_shgrp, "normalSize", &size_normal, 1);
 		DRW_shgroup_uniform_vec4(stl->g_data->lnormals_shgrp, "color", ts.colorLNormal, 1);
 	}
@@ -347,10 +378,10 @@ static void EDIT_MESH_cache_init(void *vedata)
 		        "Front Face Color",
 		        DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_LESS | DRW_STATE_BLEND);
 		stl->g_data->facefill_occluded_shgrp = DRW_shgroup_create(e_data.overlay_facefill_sh, psl->facefill_occlude);
-		DRW_shgroup_uniform_block(stl->g_data->facefill_occluded_shgrp, "globalsBlock", globals_ubo, 0);
+		DRW_shgroup_uniform_block(stl->g_data->facefill_occluded_shgrp, "globalsBlock", globals_ubo);
 
 		/* we need a full screen pass to combine the result */
-		struct Batch *quad = DRW_cache_fullscreen_quad_get();
+		struct Gwn_Batch *quad = DRW_cache_fullscreen_quad_get();
 
 		psl->mix_occlude = DRW_pass_create(
 		        "Mix Occluded Wires",
@@ -358,9 +389,9 @@ static void EDIT_MESH_cache_init(void *vedata)
 		DRWShadingGroup *mix_shgrp = DRW_shgroup_create(e_data.overlay_mix_sh, psl->mix_occlude);
 		DRW_shgroup_call_add(mix_shgrp, quad, NULL);
 		DRW_shgroup_uniform_float(mix_shgrp, "alpha", &backwire_opacity, 1);
-		DRW_shgroup_uniform_buffer(mix_shgrp, "wireColor", &txl->occlude_wire_color_tx, 0);
-		DRW_shgroup_uniform_buffer(mix_shgrp, "wireDepth", &txl->occlude_wire_depth_tx, 2);
-		DRW_shgroup_uniform_buffer(mix_shgrp, "sceneDepth", &dtxl->depth, 3);
+		DRW_shgroup_uniform_buffer(mix_shgrp, "wireColor", &e_data.occlude_wire_color_tx);
+		DRW_shgroup_uniform_buffer(mix_shgrp, "wireDepth", &e_data.occlude_wire_depth_tx);
+		DRW_shgroup_uniform_buffer(mix_shgrp, "sceneDepth", &dtxl->depth);
 	}
 }
 
@@ -368,7 +399,7 @@ static void edit_mesh_add_ob_to_pass(
         Scene *scene, Object *ob, DRWShadingGroup *face_shgrp, DRWShadingGroup *ledges_shgrp,
         DRWShadingGroup *lverts_shgrp, DRWShadingGroup *facedot_shgrp, DRWShadingGroup *facefill_shgrp)
 {
-	struct Batch *geo_ovl_tris, *geo_ovl_ledges, *geo_ovl_lverts, *geo_ovl_fcenter;
+	struct Gwn_Batch *geo_ovl_tris, *geo_ovl_ledges, *geo_ovl_lverts, *geo_ovl_fcenter;
 	ToolSettings *tsettings = scene->toolsettings;
 
 	DRW_cache_mesh_wire_overlay_get(ob, &geo_ovl_tris, &geo_ovl_ledges, &geo_ovl_lverts);
@@ -396,12 +427,14 @@ static void EDIT_MESH_cache_populate(void *vedata, Object *ob)
 	View3D *v3d = draw_ctx->v3d;
 	Scene *scene = draw_ctx->scene;
 	Object *obedit = scene->obedit;
-	struct Batch *geom;
+	struct Gwn_Batch *geom;
 
 	if (ob->type == OB_MESH) {
 		if (ob == obedit) {
-			IDProperty *ces_mode_ed = BKE_object_collection_engine_get(ob, COLLECTION_MODE_EDIT, "");
+			IDProperty *ces_mode_ed = BKE_layer_collection_engine_evaluated_get(ob, COLLECTION_MODE_EDIT, "");
 			bool do_occlude_wire = BKE_collection_engine_property_value_get_bool(ces_mode_ed, "show_occlude_wire");
+			bool do_show_weight = BKE_collection_engine_property_value_get_bool(ces_mode_ed, "show_weight");
+
 			/* Updating uniform */
 			backwire_opacity = BKE_collection_engine_property_value_get_float(ces_mode_ed, "backwire_opacity");
 
@@ -413,6 +446,11 @@ static void EDIT_MESH_cache_populate(void *vedata, Object *ob)
 
 			face_mod = (do_occlude_wire) ? 0.0f : 1.0f;
 
+			if (do_show_weight) {
+				geom = DRW_cache_mesh_surface_weights_get(ob);
+				DRW_shgroup_call_add(stl->g_data->fvcolor_shgrp, geom, ob->obmat);
+			}
+
 			if (do_occlude_wire) {
 				geom = DRW_cache_mesh_surface_get(ob);
 				DRW_shgroup_call_add(stl->g_data->depth_shgrp_hidden_wire, geom, ob->obmat);
@@ -423,14 +461,19 @@ static void EDIT_MESH_cache_populate(void *vedata, Object *ob)
 				DRW_shgroup_call_add(stl->g_data->fnormals_shgrp, geom, ob->obmat);
 			}
 
-			if (vnormals_do) {
-				geom = DRW_cache_mesh_verts_get(ob);
-				DRW_shgroup_call_add(stl->g_data->vnormals_shgrp, geom, ob->obmat);
-			}
+			if (vnormals_do || lnormals_do) {
+				struct Gwn_Batch *geo_ovl_tris, *geo_ovl_ledges, *geo_ovl_lverts;
+				DRW_cache_mesh_normals_overlay_get(ob, &geo_ovl_tris, &geo_ovl_ledges, &geo_ovl_lverts);
 
-			if (lnormals_do) {
-				geom = DRW_cache_mesh_surface_verts_get(ob);
-				DRW_shgroup_call_add(stl->g_data->lnormals_shgrp, geom, ob->obmat);
+				if (vnormals_do) {
+					DRW_shgroup_call_add(stl->g_data->vnormals_shgrp, geo_ovl_tris, ob->obmat);
+					DRW_shgroup_call_add(stl->g_data->vnormals_shgrp, geo_ovl_ledges, ob->obmat);
+					DRW_shgroup_call_add(stl->g_data->vnormals_shgrp, geo_ovl_lverts, ob->obmat);
+				}
+
+				if (lnormals_do) {
+					DRW_shgroup_call_add(stl->g_data->lnormals_shgrp, geo_ovl_tris, ob->obmat);
+				}
 			}
 
 			if ((v3d->flag & V3D_ZBUF_SELECT) == 0) {
@@ -455,12 +498,18 @@ static void EDIT_MESH_draw_scene(void *vedata)
 	DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 	DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
 
+	DRW_draw_pass(psl->vcolor_faces);
+
 	DRW_draw_pass(psl->depth_hidden_wire);
 
 	if (psl->edit_face_occluded) {
 		float clearcol[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 		/* render facefill */
 		DRW_draw_pass(psl->facefill_occlude);
+
+		/* attach temp textures */
+		DRW_framebuffer_texture_attach(fbl->occlude_wire_fb, e_data.occlude_wire_depth_tx, 0, 0);
+		DRW_framebuffer_texture_attach(fbl->occlude_wire_fb, e_data.occlude_wire_color_tx, 0, 0);
 		
 		/* Render wires on a separate framebuffer */
 		DRW_framebuffer_bind(fbl->occlude_wire_fb);
@@ -474,6 +523,10 @@ static void EDIT_MESH_draw_scene(void *vedata)
 		/* Combine with scene buffer */
 		DRW_framebuffer_bind(dfbl->default_fb);
 		DRW_draw_pass(psl->mix_occlude);
+
+		/* detach temp textures */
+		DRW_framebuffer_texture_detach(e_data.occlude_wire_depth_tx);
+		DRW_framebuffer_texture_detach(e_data.occlude_wire_color_tx);
 
 		/* reattach */
 		DRW_framebuffer_texture_attach(dfbl->default_fb, dtxl->depth, 0, 0);
@@ -490,6 +543,7 @@ void EDIT_MESH_collection_settings_create(IDProperty *properties)
 	           properties->type == IDP_GROUP &&
 	           properties->subtype == IDP_GROUP_SUB_MODE_EDIT);
 	BKE_collection_engine_property_add_int(properties, "show_occlude_wire", false);
+	BKE_collection_engine_property_add_int(properties, "show_weight", false);
 	BKE_collection_engine_property_add_int(properties, "face_normals_show", false);
 	BKE_collection_engine_property_add_int(properties, "vert_normals_show", false);
 	BKE_collection_engine_property_add_int(properties, "loop_normals_show", false);
@@ -509,6 +563,7 @@ static void EDIT_MESH_engine_free(void)
 	DRW_SHADER_FREE_SAFE(e_data.overlay_facedot_sh);
 	DRW_SHADER_FREE_SAFE(e_data.overlay_mix_sh);
 	DRW_SHADER_FREE_SAFE(e_data.overlay_facefill_sh);
+	DRW_SHADER_FREE_SAFE(e_data.normals_loop_sh);
 	DRW_SHADER_FREE_SAFE(e_data.normals_face_sh);
 	DRW_SHADER_FREE_SAFE(e_data.normals_sh);
 }

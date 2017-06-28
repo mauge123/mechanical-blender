@@ -557,8 +557,7 @@ void RNA_api_ui_layout(StructRNA *srna)
 	RNA_def_boolean(func, "emboss", true, "", "Draw the button itself, just the icon/text");
 	parm = RNA_def_property(func, "icon_value", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_ui_text(parm, "Icon Value", "Override automatic icon of the item");
-	parm = RNA_def_pointer(func, "properties", "OperatorProperties", "",
-	                       "Operator properties to fill in, return when 'properties' is set to true");
+	parm = RNA_def_pointer(func, "properties", "OperatorProperties", "", "Operator properties to fill in");
 	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED | PARM_RNAPTR);
 	RNA_def_function_return(func, parm);
 	RNA_def_function_ui_description(func, "Item. Places a button into the layout to call an Operator");
@@ -671,7 +670,31 @@ void RNA_api_ui_layout(StructRNA *srna)
 	                      "Identifier of property in data giving the type of the ID-blocks to use");
 	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 	api_ui_item_common_text(func);
-	
+
+	func = RNA_def_function(srna, "template_search", "uiTemplateSearch");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	api_ui_item_rna_common(func);
+	parm = RNA_def_pointer(func, "search_data", "AnyType", "", "Data from which to take collection to search in");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	parm = RNA_def_string(func, "search_property", NULL, 0, "", "Identifier of search collection property");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_string(func, "new", NULL, 0, "", "Operator identifier to create a new item for the collection");
+	RNA_def_string(func, "unlink", NULL, 0, "", "Operator identifier to unlink or delete the active "
+	               "item from the collection");
+
+	func = RNA_def_function(srna, "template_search_preview", "uiTemplateSearchPreview");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	api_ui_item_rna_common(func);
+	parm = RNA_def_pointer(func, "search_data", "AnyType", "", "Data from which to take collection to search in");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	parm = RNA_def_string(func, "search_property", NULL, 0, "", "Identifier of search collection property");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_string(func, "new", NULL, 0, "", "Operator identifier to create a new item for the collection");
+	RNA_def_string(func, "unlink", NULL, 0, "", "Operator identifier to unlink or delete the active "
+	               "item from the collection");
+	RNA_def_int(func, "rows", 0, 0, INT_MAX, "Number of thumbnail preview rows to display", "", 0, INT_MAX);
+	RNA_def_int(func, "cols", 0, 0, INT_MAX, "Number of thumbnail preview columns to display", "", 0, INT_MAX);
+
 	func = RNA_def_function(srna, "template_path_builder", "rna_uiTemplatePathBuilder");
 	parm = RNA_def_pointer(func, "data", "AnyType", "", "Data from which to take property");
 	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);

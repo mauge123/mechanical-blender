@@ -49,7 +49,6 @@
 
 #include "BLI_kdtree.h"
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 #include "BKE_deform.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_key.h"
@@ -61,6 +60,9 @@
 #include "BKE_report.h"
 #include "BKE_editmesh.h"
 #include "BKE_multires.h"
+
+#include "DEG_depsgraph.h"
+#include "DEG_depsgraph_build.h"
 
 #include "ED_mesh.h"
 #include "ED_object.h"
@@ -105,22 +107,26 @@ static void join_mesh_single(
 
 		/* vertex groups */
 		MDeformVert *dvert = CustomData_get(vdata, *vertofs, CD_MDEFORMVERT);
+		MDeformVert *dvert_src = CustomData_get(&me->vdata, 0, CD_MDEFORMVERT);
 
-		/* NB: vertex groups here are new version */
-		if (dvert) {
-			for (a = 0; a < me->totvert; a++) {
-				for (b = 0; b < dvert[a].totweight; b++) {
-					/*	Find the old vertex group */
-					bDeformGroup *dg, *odg = BLI_findlink(&base_src->object->defbase, dvert[a].dw[b].def_nr);
-					int index;
-					if (odg) {
-						/*	Search for a match in the new object, and set new index */
-						for (dg = ob_dst->defbase.first, index = 0; dg; dg = dg->next, index++) {
-							if (STREQ(dg->name, odg->name)) {
-								dvert[a].dw[b].def_nr = index;
-								break;
-							}
-						}
+		/* Remap to correct new vgroup indices, if needed. */
+		if (dvert_src) {
+			BLI_assert(dvert != NULL);
+
+			/* Build src to merged mapping of vgroup indices. */
+			bDeformGroup *dg_src;
+			int *vgroup_index_map = alloca(sizeof(*vgroup_index_map) * BLI_listbase_count(&base_src->object->defbase));
+			bool is_vgroup_remap_needed = false;
+
+			for (dg_src = base_src->object->defbase.first, b = 0; dg_src; dg_src = dg_src->next, b++) {
+				vgroup_index_map[b] = defgroup_name_index(ob_dst, dg_src->name);
+				is_vgroup_remap_needed = is_vgroup_remap_needed || (vgroup_index_map[b] != b);
+			}
+
+			if (is_vgroup_remap_needed) {
+				for (a = 0; a < me->totvert; a++) {
+					for (b = 0; b < dvert[a].totweight; b++) {
+						dvert[a].dw[b].def_nr = vgroup_index_map[dvert_src[a].dw[b].def_nr];
 					}
 				}
 			}
@@ -634,9 +640,9 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	/* Due to dependnecy cycle some other object might access old derived data. */
 	BKE_object_free_derived_caches(ob);
 
-	DAG_relations_tag_update(bmain);   /* removed objects, need to rebuild dag */
+	DEG_relations_tag_update(bmain);   /* removed objects, need to rebuild dag */
 
-	DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA);
+	DEG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
 

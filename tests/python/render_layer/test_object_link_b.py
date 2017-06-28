@@ -19,7 +19,7 @@ class UnitTesting(RenderLayerTesting):
         See if we can link objects via bpy.context.scene_collection
         """
         import bpy
-        bpy.context.scene.render_layers.active_index = len(bpy.context.scene.render_layers) - 1
+        bpy.context.workspace.render_layer = bpy.context.scene.render_layers['Viewport']
         master_collection = bpy.context.scene_collection
         self.do_object_link(master_collection)
 
@@ -29,10 +29,5 @@ class UnitTesting(RenderLayerTesting):
 # ############################################################
 
 if __name__ == '__main__':
-    import sys
-
-    extra_arguments = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    sys.argv = [__file__] + (sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else [])
-
-    UnitTesting._extra_arguments = extra_arguments
+    UnitTesting._extra_arguments = setup_extra_arguments(__file__)
     unittest.main()

@@ -47,9 +47,13 @@ struct wmOperator;
 /* -------------------------------------------------------------------- */
 /* wmManipulator */
 
-typedef void (*wmManipulatorSelectFunc)(struct bContext *, struct wmManipulator *, const int);
+/* wm_manipulator_type.c, for init/exit */
+void wm_manipulatortype_free(void);
+void wm_manipulatortype_init(void);
 
-struct wmManipulatorGroup *wm_manipulator_get_parent_group(const struct wmManipulator *manipulator);
+/* wm_manipulatorgroup_type.c, for init/exit */
+void wm_manipulatorgrouptype_free(void);
+void wm_manipulatorgrouptype_init(void);
 
 /* -------------------------------------------------------------------- */
 /* wmManipulatorGroup */
@@ -57,34 +61,33 @@ struct wmManipulatorGroup *wm_manipulator_get_parent_group(const struct wmManipu
 void MANIPULATORGROUP_OT_manipulator_select(struct wmOperatorType *ot);
 void MANIPULATORGROUP_OT_manipulator_tweak(struct wmOperatorType *ot);
 
-void  wm_manipulatorgroup_attach_to_modal_handler(
-        struct bContext *C, struct wmEventHandler *handler,
-        struct wmManipulatorGroupType *mgrouptype, struct wmOperator *op);
-
 /* -------------------------------------------------------------------- */
 /* wmManipulatorMap */
 
-void wm_manipulatormap_delete(struct wmManipulatorMap *mmap);
-void wm_manipulatormaptypes_free(void);
+void wm_manipulatormap_remove(struct wmManipulatorMap *mmap);
 
 void wm_manipulators_keymap(struct wmKeyConfig *keyconf);
 
 void wm_manipulatormaps_handled_modal_update(
-        bContext *C, struct wmEvent *event, struct wmEventHandler *handler,
-        const struct wmOperatorType *ot);
+        bContext *C, struct wmEvent *event, struct wmEventHandler *handler);
 void wm_manipulatormap_handler_context(bContext *C, struct wmEventHandler *handler);
 
-struct wmManipulator *wm_manipulatormap_find_highlighted_manipulator(
-        struct wmManipulatorMap *mmap, bContext *C,
-        const struct wmEvent *event, unsigned char *part);
-void wm_manipulatormap_set_highlighted_manipulator(
+struct wmManipulator *wm_manipulatormap_highlight_find(
+        struct wmManipulatorMap *mmap, bContext *C, const struct wmEvent *event,
+        int *r_part);
+void wm_manipulatormap_highlight_set(
         struct wmManipulatorMap *mmap, const bContext *C,
-        struct wmManipulator *manipulator, unsigned char part);
-struct wmManipulator *wm_manipulatormap_get_highlighted_manipulator(struct wmManipulatorMap *mmap);
-void wm_manipulatormap_set_active_manipulator(
+        struct wmManipulator *mpr, int part);
+struct wmManipulator *wm_manipulatormap_highlight_get(struct wmManipulatorMap *mmap);
+void wm_manipulatormap_active_set(
         struct wmManipulatorMap *mmap, bContext *C,
-        const struct wmEvent *event, struct wmManipulator *manipulator);
-struct wmManipulator *wm_manipulatormap_get_active_manipulator(struct wmManipulatorMap *mmap);
+        const struct wmEvent *event, struct wmManipulator *mpr);
+struct wmManipulator *wm_manipulatormap_active_get(struct wmManipulatorMap *mmap);
+
+/* -------------------------------------------------------------------- */
+/* wmManipulatorMapType */
+
+void wm_manipulatormaptypes_free(void);
 
 #endif  /* __WM_MANIPULATOR_WMAPI_H__ */
 

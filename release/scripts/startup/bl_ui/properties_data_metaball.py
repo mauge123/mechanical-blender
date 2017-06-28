@@ -70,13 +70,13 @@ class DATA_PT_metaball(DataButtonsPanel, Panel):
         col.prop(mball, "threshold", text="Threshold")
 
         layout.label(text="Update:")
-        layout.prop(mball, "update_method", expand=True)
+        layout.row().prop(mball, "update_method", expand=True)
 
 
 class DATA_PT_mball_texture_space(DataButtonsPanel, Panel):
     bl_label = "Texture Space"
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME', 'BLENDER_CLAY', 'BLENDER_EEVEE'}
 
     def draw(self, context):
         layout = self.layout
@@ -131,7 +131,7 @@ class DATA_PT_metaball_element(DataButtonsPanel, Panel):
 
 
 class DATA_PT_custom_props_metaball(DataButtonsPanel, PropertyPanel, Panel):
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME', 'BLENDER_CLAY', 'BLENDER_EEVEE'}
     _context_path = "object.data"
     _property_type = bpy.types.MetaBall
 

@@ -107,6 +107,7 @@ set(SRC
 	GPU_immediate.h
 	GPU_immediate_util.h
 	GPU_init_exit.h
+	GPU_lamp.h
 	GPU_legacy_stubs.h
 	GPU_material.h
 	GPU_matrix.h
@@ -134,13 +135,13 @@ data_to_c_simple(shaders/gpu_shader_flat_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_flat_color_alpha_test_0_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_flat_color_vert.glsl SRC)
-data_to_c_simple(shaders/gpu_shader_2D_line_dashed_legacy_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_line_dashed_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_line_dashed_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_line_dashed_geom.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_smooth_color_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_smooth_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_2D_image_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_image_linear_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_shuffle_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_mask_uniform_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_modulate_alpha_frag.glsl SRC)
@@ -170,6 +171,8 @@ data_to_c_simple(shaders/gpu_shader_instance_camera_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_distance_line_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_edges_variying_color_geom.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_instance_edges_variying_color_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_instance_bone_envelope_solid_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_instance_bone_envelope_wire_vert.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_3D_groundline_geom.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_3D_groundpoint_vert.glsl SRC)
