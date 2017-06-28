@@ -3942,9 +3942,9 @@ static void rna_def_dimension(BlenderRNA *brna)
 	};
 
 	static EnumPropertyItem rna_enum_transform_oritentation_items[] = {
-		{DIM_TS_PLANE_X, "plane yz", 0, "PLANE_X", "use plane yz of trasnform orientation"},
-		{DIM_TS_PLANE_Y, "plane xz", 0, "PLANE_Y", "use plane xz of trasnform orientation"},
-		{DIM_TS_PLANE_Z, "plane xy", 0, "PLANE_Z", "use plane xy of trasnform orientation"},
+		{DIM_TS_PLANE_X, "plane_yz", 0, "PLANE_X", "use plane yz of trasnform orientation"},
+		{DIM_TS_PLANE_Y, "plane_xz", 0, "PLANE_Y", "use plane xz of trasnform orientation"},
+		{DIM_TS_PLANE_Z, "plane_xy", 0, "PLANE_Z", "use plane xy of trasnform orientation"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
