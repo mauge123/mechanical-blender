@@ -107,7 +107,11 @@ bool ui_block_is_pie_menu(const uiBlock *block)
 
 static bool ui_but_is_unit_radians_ex(UnitSettings *unit, const int unit_type)
 {
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+	return (bUnit_GetUnitSystemRotation(unit) == USER_UNIT_ROT_RADIANS && unit_type == PROP_UNIT_ROTATION);
+#else
 	return (unit->system_rotation == USER_UNIT_ROT_RADIANS && unit_type == PROP_UNIT_ROTATION);
+#endif
 }
 
 static bool ui_but_is_unit_radians(const uiBut *but)
@@ -2107,8 +2111,17 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 	}
 
 #ifdef WITH_MECHANICAL_UNIT_FORCE
-	bUnit_AsString_force(str, bUnit_GetScaleLength(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)), len_max, ui_get_but_scale_unit(but, value), precision,
-	               unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type), do_split, pad);
+	bUnit_AsString_force(
+					str,
+					bUnit_GetObjectFact(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)),
+					bUnit_GetScaleLength(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)),
+					len_max,
+					ui_get_but_scale_unit(but, value),
+					precision,
+					bUnit_GetUnitSystem(unit),
+					RNA_SUBTYPE_UNIT_VALUE(unit_type),
+					do_split,
+					pad);
 #else
 	bUnit_AsString(str, len_max, ui_get_but_scale_unit(but, value), precision,
 	               unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type), do_split, pad);

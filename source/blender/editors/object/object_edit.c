@@ -437,6 +437,10 @@ void ED_object_editmode_exit(bContext *C, int flag)
 		/* for example; displist make is different in editmode */
 		scene->obedit = NULL; // XXX for context
 
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+		scene->unit.obedit = NULL;
+#endif
+
 		/* flag object caches as outdated */
 		BKE_ptcache_ids_from_object(&pidlist, obedit, scene, 0);
 		for (pid = pidlist.first; pid; pid = pid->next) {
@@ -515,6 +519,10 @@ void ED_object_editmode_enter(bContext *C, int flag)
 		BMEditMesh *em;
 		ok = 1;
 		scene->obedit = ob;  /* context sees this */
+
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+		scene->unit.obedit = ob;
+#endif
 
 		const bool use_key_index = mesh_needs_keyindex(ob->data);
 

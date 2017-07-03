@@ -118,7 +118,6 @@ class SCENE_PT_dimension(SceneButtonsPanel, Panel):
         col.label(text="Default Constraints:")
         col.prop(context.tool_settings, "dimension_constraint_plane")
         col.prop(context.tool_settings, "dimension_constraint_axis")
-        col.prop(context.tool_settings, "dimension_constraint_concentric")
         col.prop(context.tool_settings, "dimension_constraint_allow_slide")
                 
 class SCENE_PT_unit(SceneButtonsPanel, Panel):
@@ -153,6 +152,7 @@ class SCENE_PT_unit(SceneButtonsPanel, Panel):
         split.row()
         split.prop(unit, "use_separate")
         split = col.split(percentage=0.35)
+# Mechanical
         split.row()
         split.prop(unit, "force_scale")
 

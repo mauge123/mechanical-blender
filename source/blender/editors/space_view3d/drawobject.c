@@ -3912,8 +3912,16 @@ static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMe
 
 					if (unit->system) {
 #ifdef WITH_MECHANICAL_UNIT_FORCE
-						numstr_len = bUnit_AsString_force(numstr, bUnit_GetScaleLength(unit, B_UNIT_LENGTH), sizeof(numstr), len_v3v3(v1, v2) * unit->scale_length, 3,
-														unit->system, B_UNIT_LENGTH, do_split, false);
+						numstr_len = bUnit_AsString_force(numstr,
+						                                  bUnit_GetObjectFact(unit, B_UNIT_LENGTH),
+						                                  bUnit_GetScaleLength(unit, B_UNIT_LENGTH),
+						                                  sizeof(numstr),
+						                                  len_v3v3(v1, v2) * unit->scale_length,
+						                                  3,
+						                                  bUnit_GetUnitSystem(unit),
+						                                  B_UNIT_LENGTH,
+						                                  do_split,
+						                                  false);
 #else
 						numstr_len = bUnit_AsString(numstr, sizeof(numstr), len_v3v3(v1, v2) * unit->scale_length, 3,
 													unit->system, B_UNIT_LENGTH, do_split, false);
@@ -3930,7 +3938,7 @@ static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMe
 	}
 
 	if (me->drawflag & ME_DRAWEXTRA_EDGEANG) {
-		const bool is_rad = (unit->system_rotation == USER_UNIT_ROT_RADIANS);
+		const bool is_rad =  (bUnit_GetUnitSystemRotation(unit) == USER_UNIT_ROT_RADIANS);
 		BMEdge *eed;
 
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_EDGEANG, col);
@@ -4074,7 +4082,7 @@ static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMe
 
 	if (me->drawflag & ME_DRAWEXTRA_FACEANG) {
 		BMFace *efa;
-		const bool is_rad = (unit->system_rotation == USER_UNIT_ROT_RADIANS);
+		const bool is_rad = (bUnit_GetUnitSystemRotation(unit) == USER_UNIT_ROT_RADIANS);
 
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_FACEANG, col);
 

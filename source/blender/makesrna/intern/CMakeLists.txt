@@ -320,6 +320,7 @@ if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_GEOMETRY)
 	add_definitions(-DWITH_MECHANICAL_UCS)
 	add_definitions(-DWITH_MECHANICAL_DRAWINGS)
+	add_definitions(-DWITH_MECHANICAL_OBJECT_UNITS)
 
 	list(APPEND INC
 		../../mechanical/

@@ -37,7 +37,13 @@ extern "C" {
 size_t  bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad);
 #ifdef WITH_MECHANICAL_UNIT_FORCE
 float * bUnit_GetScaleLength (UnitSettings *unit, int unit_type);
-size_t  bUnit_AsString_force(char *str, float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad);
+size_t  bUnit_AsString_force(char *str, float fact, float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad);
+#endif
+
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+float bUnit_GetObjectFact (UnitSettings *unit, int unit_type);
+int bUnit_GetUnitSystem (UnitSettings *unit);
+int bUnit_GetUnitSystemRotation(UnitSettings *unit);
 #endif
 
 /* replace units with values, used before python button evaluation */

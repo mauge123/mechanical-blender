@@ -21,6 +21,13 @@ import bpy
 from bpy.types import Panel, Menu
 from rna_prop_ui import PropertyPanel
 
+class OBJECT_MT_units_length_presets(Menu):
+    """Unit of measure for properties that use length values"""
+    bl_label = "Unit Presets"
+    preset_subdir = "object_units"
+    preset_operator = "script.execute_preset"
+    draw = Menu.draw_preset
+
 
 class ObjectButtonsPanel:
     bl_space_type = 'PROPERTIES'
@@ -382,6 +389,44 @@ class OBJECT_PT_custom_props(ObjectButtonsPanel, PropertyPanel, Panel):
     _property_type = bpy.types.Object
 
 
+'''
+MECHANICAL_OBECT_UNITS
+'''
+
+class OBJECT_PT_unit(ObjectButtonsPanel, Panel):
+    bl_label = "Units"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+    
+    def draw_header(self, context):
+        unit = context.object.unit_settings
+        self.layout.prop(unit, "enabled", text="")
+
+    def draw(self, context):
+        layout = self.layout
+
+        unit = context.object.unit_settings
+        
+        row = layout.row(align=True)
+        row.menu("OBJECT_MT_units_length_presets", text=OBJECT_MT_units_length_presets.bl_label)
+
+       
+        split = layout.split(percentage=0.35)
+        split.label("Length:")
+        split.prop(unit, "system", text="")
+        split = layout.split(percentage=0.35)
+        split.label("Angle:")
+        split.prop(unit, "system_rotation", text="")
+
+        col = layout.column()
+        col.enabled = unit.system != 'NONE'
+        split = col.split(percentage=0.35)
+        split.label("Unit Scale:")
+        split.prop(unit, "scale_length", text="")
+        split = col.split(percentage=0.35)
+        
+
+
+
 classes = (
     OBJECT_PT_context_object,
     OBJECT_PT_transform,
@@ -395,7 +440,11 @@ classes = (
     OBJECT_PT_duplication,
     OBJECT_PT_motion_paths,
     OBJECT_PT_custom_props,
+    #WITH_MECHANICAL_GEOMETRY
     OBJECT_PT_geometry,
+    #WITH_MECHANICAL_OBJECT_UNITS
+    OBJECT_PT_unit,
+    OBJECT_MT_units_length_presets,
 )
 
 if __name__ == "__main__":  # only for live edit.

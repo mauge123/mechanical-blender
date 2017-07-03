@@ -2844,8 +2844,62 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Enable Geometry", "Enable Geometry Calcs On Object");
 	RNA_def_property_boolean_sdna(prop, NULL, "geom_enabled", 1);
 
+// WITH_MECHANICAL_OBJECT_UNITS
+	/* Unit Settings */
+	prop = RNA_def_property(srna, "unit_settings", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "unit");
+	RNA_def_property_struct_type(prop, "ObjectUnitSettings");
+	RNA_def_property_ui_text(prop, "Object Unit Settings", "Unit settings for the object");
+
+
 	RNA_api_object(srna);
 }
+
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+static void rna_def_object_unit_settings(BlenderRNA  *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static EnumPropertyItem unit_systems[] = {
+		{USER_UNIT_NONE, "NONE", 0, "None", ""},
+		{USER_UNIT_METRIC, "METRIC", 0, "Metric", ""},
+		{USER_UNIT_IMPERIAL, "IMPERIAL", 0, "Imperial", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem rotation_units[] = {
+		{0, "DEGREES", 0, "Degrees", "Use degrees for measuring angles and rotations"},
+		{USER_UNIT_ROT_RADIANS, "RADIANS", 0, "Radians", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "ObjectUnitSettings", NULL);
+	RNA_def_struct_ui_text(srna, "Object Unit Settings", "");
+
+	/* Units */
+	prop = RNA_def_property(srna, "system", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, unit_systems);
+	RNA_def_property_ui_text(prop, "Unit System", "The unit system to use for button display");
+	RNA_def_property_update(prop, NC_WINDOW, NULL);
+
+	prop = RNA_def_property(srna, "system_rotation", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, rotation_units);
+	RNA_def_property_ui_text(prop, "Rotation Units", "Unit to use for displaying/editing rotation values");
+	RNA_def_property_update(prop, NC_WINDOW, NULL);
+
+	prop = RNA_def_property(srna, "scale_length", PROP_FLOAT, PROP_UNSIGNED);
+	RNA_def_property_ui_text(prop, "Unit Scale", "Scale to use when converting between blender units and dimensions");
+	RNA_def_property_range(prop, 0.00001, 100000.0);
+	RNA_def_property_ui_range(prop, 0.001, 100.0, 0.1, 6);
+	RNA_def_property_update(prop, NC_WINDOW, NULL);
+
+	prop = RNA_def_property(srna, "enabled", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Enabled", "use object units");
+	RNA_def_property_update(prop, NC_WINDOW, NULL);
+}
+#endif
 
 static void rna_def_dupli_object(BlenderRNA *brna)
 {
@@ -2953,6 +3007,9 @@ void RNA_def_object(BlenderRNA *brna)
 	rna_def_dupli_object(brna);
 	RNA_define_animate_sdna(true);
 	rna_def_object_lodlevel(brna);
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+	rna_def_object_unit_settings(brna);
+#endif
 }
 
 #endif

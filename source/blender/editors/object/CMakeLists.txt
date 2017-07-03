@@ -60,7 +60,8 @@ set(SRC
 	object_transform.c
 	object_warp.c
 	object_vgroup.c
-
+#WITH_MECHANICAL_OBJECT_UNITS
+	object_units.c
 	object_intern.h
 )
 
@@ -80,6 +81,7 @@ endif()
 
 if(WITH_MECHANICAL)
 	add_definitions(-DWITH_MECHANICAL_CREATE_OBJECT_W_CUSTOM_ORIENTATION)
+	add_definitions(-DWITH_MECHANICAL_OBJECT_UNITS)
 endif()
 
 blender_add_lib(bf_editor_object "${SRC}" "${INC}" "${INC_SYS}")

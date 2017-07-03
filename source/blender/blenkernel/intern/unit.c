@@ -354,12 +354,16 @@ static void unit_dual_convert(
 	*r_unit_b = unit_best_fit(*r_value_b, usys, *r_unit_a, 1);
 }
 
-static size_t unit_as_string(char *str, int len_max, double value, int prec, const bUnitCollection *usys,
+static size_t unit_as_string(char *str, int len_max, double value, double fact, int prec, const bUnitCollection *usys,
                              /* non exposed options */
                              const bUnitDef *unit, char pad)
 {
 	double value_conv;
 	size_t len, i;
+
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+	value = value / fact;
+#endif
 
 	if (unit) {
 		/* use unit without finding the best one */
@@ -373,6 +377,12 @@ static size_t unit_as_string(char *str, int len_max, double value, int prec, con
 	}
 
 	value_conv = value / unit->scalar;
+
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+	value_conv = value_conv * fact;
+#endif
+
+
 
 	/* Convert to a string */
 	len = BLI_snprintf_rlen(str, len_max, "%.*f", prec, value_conv);
@@ -430,16 +440,59 @@ static size_t unit_as_string(char *str, int len_max, double value, int prec, con
 float* bUnit_GetScaleLength(UnitSettings *unit, int unit_type){
 	float *scale_length = NULL;
 	if (unit->flag & USER_UNIT_OPT_FORCE_SCALE && (unit_type == B_UNIT_LENGTH)) {
-		scale_length = &unit->scale_length;
+		//WITH_MECHANICAL_OBJECT_UNITS
+		if (unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
+			scale_length = &unit->obedit->unit.scale_length;
+		}else {
+			scale_length = &unit->scale_length;
+		}
 	}
 	return scale_length;
 }
+#endif
 
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+float bUnit_GetObjectFact(UnitSettings *unit, int unit_type){
+	if (unit->obedit != NULL && unit->obedit->unit.enabled) {
+			if (unit_type == B_UNIT_LENGTH && unit->obedit->unit.system)  {
+				return unit->scale_length / unit->obedit->unit.scale_length;
+			}
+	}
+	return 1;
+}
+
+int bUnit_GetUnitSystem(UnitSettings *unit) {
+	if (unit->obedit != NULL && unit->obedit->unit.enabled){
+		return unit->obedit->unit.system;
+	}else{
+		return unit->system;
+	}
+}
+
+int bUnit_GetUnitSystemRotation(UnitSettings *unit){
+	if (unit->obedit != NULL){
+		return unit->obedit->unit.system_rotation;
+	}else{
+		return unit->system_rotation;
+	}
+}
+
+#endif
+
+
+/* Used for drawing number buttons, try keep fast.
+ * Return the length of the generated string.
+ */
+#ifdef WITH_MECHANICAL_UNIT_FORCE
 size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad)
 {
-	return bUnit_AsString_force(str, NULL, len_max, value, prec, system, type, split, pad);
+	return bUnit_AsString_force(str, 1.0f, NULL, len_max, value, prec, system, type, split, pad);
 }
-size_t bUnit_AsString_force(char *str,float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad)
+/*
+ * @scale_length is a float pointer used to match the unit in order to force the unit, if null is not used
+ * @fact is a factor to dimension, introduced by the object
+ */
+size_t bUnit_AsString_force(char *str,float fact, float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad)
 #else
 size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system, int type, bool split, bool pad)
 #endif
@@ -463,27 +516,29 @@ size_t bUnit_AsString(char *str, int len_max, double value, int prec, int system
 		/* check the 2 is a smaller unit */
 		if (unit_b > unit_a) {
 			size_t i;
-			i = unit_as_string(str, len_max, value_a, prec, usys, unit_a, '\0');
+			i = unit_as_string(str, len_max, value_a, fact, prec, usys, unit_a, '\0');
 
 			/* is there enough space for at least 1 char of the next unit? */
 			if (i + 2 < len_max) {
 				str[i++] = ' ';
 
 				/* use low precision since this is a smaller unit */
-				i += unit_as_string(str + i, len_max - i, value_b, prec ? 1 : 0, usys, unit_b, '\0');
+				i += unit_as_string(str + i, len_max - i, value_b, fact, prec ? 1 : 0, usys, unit_b, '\0');
 			}
 			return i;
 		}
 	}
+
 #ifdef WITH_MECHANICAL_UNIT_FORCE
 	if (scale_length != NULL) {
 		for (int i =0;i<usys->length;i++){
 			if (usys->units[i].scalar == *scale_length) {
 				unit = &usys->units[i];
+				break;
 			}
 		}
 	}
-	return unit_as_string(str, len_max, value, prec, usys, unit, pad ? ' ' : '\0');
+	return unit_as_string(str, len_max, value, fact, prec, usys, unit, pad ? ' ' : '\0');
 #else
 	return unit_as_string(str, len_max, value, prec, usys, NULL, pad ? ' ' : '\0');
 #endif

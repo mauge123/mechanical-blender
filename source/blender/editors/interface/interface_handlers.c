@@ -4125,7 +4125,7 @@ static float ui_numedit_apply_snapf(
 		if (softrange >= 21.0f) {
 			UnitSettings *unit = but->block->unit;
 			int unit_type = UI_but_unit_type_get(but);
-			if ((unit_type == PROP_UNIT_ROTATION) && (unit->system_rotation != USER_UNIT_ROT_RADIANS)) {
+			if ((unit_type == PROP_UNIT_ROTATION) && (bUnit_GetUnitSystemRotation(unit) != USER_UNIT_ROT_RADIANS)) {
 				/* pass (degrees)*/
 			}
 			else {

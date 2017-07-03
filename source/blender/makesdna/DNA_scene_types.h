@@ -49,6 +49,8 @@ extern "C" {
 #include "DNA_gpu_types.h"
 #include "DNA_userdef_types.h"
 
+#include "DNA_object_types.h"
+
 struct CurveMapping;
 struct Object;
 struct Brush;
@@ -1630,12 +1632,18 @@ typedef struct bStats {
 /* Unit Settings */
 
 typedef struct UnitSettings {
+    //WITH_MECHANICAL_OBJECT_UNITS
+	struct Object *obedit;  //to get object units
+
+
 	/* Display/Editing unit options for each scene */
 	float scale_length; /* maybe have other unit conversions? */
 	char system; /* imperial, metric etc */
 	char system_rotation; /* not implemented as a proper unit system yet */
 	short flag;
+
 } UnitSettings;
+
 
 /* ------------------------------------------- */
 /* Global/Common Physics Settings */
@@ -1727,9 +1735,6 @@ typedef struct Scene {
 	struct GameFraming framing  DNA_DEPRECATED; // XXX  deprecated since 2.5
 	struct GameData gm;
 
-	/* Units */
-	struct UnitSettings unit;
-	
 	/* Grease Pencil */
 	struct bGPdata *gpd;
 
@@ -1739,8 +1744,13 @@ typedef struct Scene {
 	/* Movie Tracking */
 	struct MovieClip *clip;			/* active movie clip */
 
+
 	uint64_t customdata_mask;	/* XXX. runtime flag for drawing, actually belongs in the window, only used by BKE_object_handle_update() */
 	uint64_t customdata_mask_modal; /* XXX. same as above but for temp operator use (gl renders) */
+
+	/* Units */
+	struct UnitSettings unit;
+
 
 	/* Color Management */
 	ColorManagedViewSettings view_settings;

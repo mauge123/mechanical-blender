@@ -58,6 +58,18 @@ struct bGPdata;
 struct RigidBodyOb;
 
 
+//WITH_MECHANICAL_OBJECT_UNITS
+typedef struct ObjectUnitSettings {
+	/* Display/Editing unit options for each scene */
+	float scale_length; /* maybe have other unit conversions? */
+	char system; /* imperial, metric etc */
+	char system_rotation; /* not implemented as a proper unit system yet */
+	short enabled;
+} ObjectUnitSettings;
+
+
+
+
 /* Vertex Groups - Name Info */
 typedef struct bDeformGroup {
 	struct bDeformGroup *next, *prev;
@@ -299,6 +311,9 @@ typedef struct Object {
 	LodLevel *currentlod;
 
 	struct PreviewImage *preview;
+
+// WITH_MECHANICAL_OBJECT_UNITS
+	struct ObjectUnitSettings unit;
 
 // WITH_MECHANICAL_GEOMETRY
 	int geom_enabled;
