@@ -41,18 +41,19 @@ float bUnit_GetScaleLength (UnitSettings *unit);
 size_t  bUnit_AsString_force(char *str, float fact, float* scale_length, int len_max, double value, int prec, int system, int type, bool split, bool pad);
 #endif
 
-#ifdef WITH_MECHANICAL_OBJECT_UNITS
+//#ifdef WITH_MECHANICAL_OBJECT_UNITS
 float bUnit_GetObjectFact (UnitSettings *unit, int unit_type);
 int bUnit_GetUnitSystem (UnitSettings *unit);
 int bUnit_GetUnitSystemRotation(UnitSettings *unit);
-#endif
+//#endif
 
 /* replace units with values, used before python button evaluation */
-#ifdef WITH_MECHANICAL_OBJECT_UNITS
+//#ifdef WITH_MECHANICAL_OBJECT_UNITS
 bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double scale_pref, int system, int type, double fact);
-#else
-bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double scale_pref, int system, int type);
-#endif
+//#else
+//bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double scale_pref, int system, int type);
+//#endif
+
 /* make string keyboard-friendly: 10µm --> 10um */
 void bUnit_ToUnitAltName(char *str, int len_max, const char *orig_str, int system, int type);
 

@@ -33,6 +33,8 @@
 #include <Python.h>
 #include <structmember.h>
 
+#include "DNA_scene_types.h"
+
 #include "BLI_utildefines.h"
 #include "BLI_string.h"
 
@@ -199,11 +201,11 @@ static PyObject *bpyunits_to_value(PyObject *UNUSED(self), PyObject *args, PyObj
 	str = PyMem_MALLOC(sizeof(*str) * (size_t)str_len);
 	BLI_strncpy(str, inpt, (size_t)str_len);
 
-#ifdef WITH_MECHANICAL_OBJECT_UNITS
+//#ifdef WITH_MECHANICAL_OBJECT_UNITS
 	bUnit_ReplaceString(str, (int)str_len, uref, scale, usys, ucat, 1.0);
-#else
-	bUnit_ReplaceString(str, (int)str_len, uref, scale, usys, ucat);
-#endif
+//#else
+//	bUnit_ReplaceString(str, (int)str_len, uref, scale, usys, ucat);
+//#endif
 
 	if (!PyC_RunString_AsNumber(str, "<bpy_units_api>", &result)) {
 		if (PyErr_Occurred()) {

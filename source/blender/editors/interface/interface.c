@@ -2313,12 +2313,6 @@ static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char 
 	const int unit_type = UI_but_unit_type_get(but);
 #ifdef WITH_MECHANICAL_OBJECT_UNITS
 	UnitSettings *unit = but->block->unit;
-	float fact;
-	if (unit->obedit && unit->obedit->unit.enabled) {
-		fact = unit->obedit->unit.scale_length /  unit->scale_length;
-	} else {
-		fact = 1.0f;
-	}
 #endif
 	BLI_strncpy(str_unit_convert, str, sizeof(str_unit_convert));
 
@@ -2331,7 +2325,7 @@ static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char 
 	                    ui_get_but_scale_unit(but, 1.0),
 	                    bUnit_GetUnitSystem(unit),
 	                    RNA_SUBTYPE_UNIT_VALUE(unit_type),
-	                    fact);
+	                    1/bUnit_GetObjectFact(unit,RNA_SUBTYPE_UNIT_VALUE(unit_type)));
 #else
 	bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), but->drawstr,
 	                    ui_get_but_scale_unit(but, 1.0), but->block->unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));

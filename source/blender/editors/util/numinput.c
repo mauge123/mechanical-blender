@@ -26,6 +26,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_scene_types.h"
+
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
@@ -493,13 +495,20 @@ bool handleNumInput(bContext *C, NumInput *n, const wmEvent *event)
 
 		BLI_strncpy(str_unit_convert, n->str, sizeof(str_unit_convert));
 
-#ifdef WITH_MECHANICAL_OBJECT_UNITS
-		bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), default_unit, fac,
-		                    n->unit_sys, n->unit_type[idx],1.0);
-#else
+//WITH_MECHANICAL_OBJECT_UNITS
+		bUnit_ReplaceString(str_unit_convert,
+		                    sizeof(str_unit_convert),
+		                    default_unit,
+		                    fac,
+		                    n->unit_sys,
+		                    n->unit_type[idx],
+		                    1/bUnit_GetObjectFact(&sce->unit,n->unit_type[idx]));
+//else
+/*
 		bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), default_unit, fac,
 		                    n->unit_sys, n->unit_type[idx]);
-#endif
+*/
+
 
 		/* Note: with angles, we always get values as radians here... */
 		if (BPY_execute_string_as_number(C, str_unit_convert, false, &val)) {

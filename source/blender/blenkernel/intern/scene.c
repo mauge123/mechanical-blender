@@ -2314,7 +2314,7 @@ int BKE_scene_num_threads(const Scene *scene)
 double BKE_scene_unit_scale(const UnitSettings *unit, const int unit_type, double value)
 {	
 	double scale_length = 0;
-	if (unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
+	if (unit->obedit && unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
 		scale_length = unit->obedit->unit.scale_length;
 	}else {
 		scale_length = unit->scale_length;

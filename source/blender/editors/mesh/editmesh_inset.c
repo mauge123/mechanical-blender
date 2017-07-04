@@ -27,6 +27,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_string.h"
 #include "BLI_math.h"

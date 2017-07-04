@@ -209,13 +209,14 @@ static void apply_dimension_linear_value(BMesh *bm, BMDim *edm, float value, int
 	// Untag dimensions vertex
 	untag_dimension_necessary_verts(edm);
 
-		sub_v3_v3v3(n, edm->mdim->end, edm->mdim->start);
-		normalize_v3(n);
-
 	// Update Dimension Verts
 	if(edm->mdim->dir == DIM_DIR_RIGHT){
+		sub_v3_v3v3(n, edm->mdim->end, edm->mdim->start);
+		normalize_v3(n);
 		apply_dimension_linear_value_exec(edm->v[1]->co,edm->v[0]->co, value, v, n);
 	}else if(edm->mdim->dir== DIM_DIR_LEFT){
+		sub_v3_v3v3(n, edm->mdim->start, edm->mdim->end);
+		normalize_v3(n);
 		apply_dimension_linear_value_exec(edm->v[0]->co,edm->v[1]->co, value, v, n);
 	}
 
