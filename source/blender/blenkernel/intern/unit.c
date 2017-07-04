@@ -361,10 +361,6 @@ static size_t unit_as_string(char *str, int len_max, double value, double fact, 
 	double value_conv;
 	size_t len, i;
 
-#ifdef WITH_MECHANICAL_OBJECT_UNITS
-	value = value / fact;
-#endif
-
 	if (unit) {
 		/* use unit without finding the best one */
 	}
@@ -725,7 +721,7 @@ static const bUnitDef *unit_detect_from_str(const bUnitCollection *usys, const c
  *
  * return true of a change was made.
  */
-bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double scale_pref, int system, int type)
+bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double scale_pref, int system, int type, double fact)
 {
 	const bUnitCollection *usys = unit_get_system(system, type);
 
@@ -748,7 +744,7 @@ bool bUnit_ReplaceString(char *str, int len_max, const char *str_prev, double sc
 	scale_pref_base *= default_unit->scalar;
 
 	/* Apply the default unit on the whole expression, this allows to handle nasty cases like '2+2in'. */
-	if (BLI_snprintf(str_tmp, sizeof(str_tmp), "(%s)*%.9g", str, default_unit->scalar) < sizeof(str_tmp)) {
+	if (BLI_snprintf(str_tmp, sizeof(str_tmp), "(%s)*%.9g", str, default_unit->scalar * fact) < sizeof(str_tmp)) {
 		strncpy(str, str_tmp, len_max);
 	}
 	else {

@@ -60,8 +60,6 @@ set(SRC
 	object_transform.c
 	object_warp.c
 	object_vgroup.c
-#WITH_MECHANICAL_OBJECT_UNITS
-	object_units.c
 	object_intern.h
 )
 

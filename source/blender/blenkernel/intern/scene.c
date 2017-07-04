@@ -2312,7 +2312,14 @@ int BKE_scene_num_threads(const Scene *scene)
  * and unit->scale_length.
  */
 double BKE_scene_unit_scale(const UnitSettings *unit, const int unit_type, double value)
-{
+{	
+	double scale_length = 0;
+	if (unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
+		scale_length = unit->obedit->unit.scale_length;
+	}else {
+		scale_length = unit->scale_length;
+	}
+
 	if (unit->system == USER_UNIT_NONE) {
 		/* Never apply scale_length when not using a unit setting! */
 		return value;
@@ -2320,13 +2327,13 @@ double BKE_scene_unit_scale(const UnitSettings *unit, const int unit_type, doubl
 
 	switch (unit_type) {
 		case B_UNIT_LENGTH:
-			return value * (double)unit->scale_length;
+			return value * scale_length;
 		case B_UNIT_AREA:
-			return value * pow(unit->scale_length, 2);
+			return value * pow(scale_length, 2);
 		case B_UNIT_VOLUME:
-			return value * pow(unit->scale_length, 3);
+			return value * pow(scale_length, 3);
 		case B_UNIT_MASS:
-			return value * pow(unit->scale_length, 3);
+			return value * pow(scale_length, 3);
 		case B_UNIT_CAMERA:  /* *Do not* use scene's unit scale for camera focal lens! See T42026. */
 		default:
 			return value;

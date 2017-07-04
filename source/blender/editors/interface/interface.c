@@ -2311,13 +2311,31 @@ static bool ui_set_but_string_eval_num_unit(bContext *C, uiBut *but, const char 
 {
 	char str_unit_convert[256];
 	const int unit_type = UI_but_unit_type_get(but);
-
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+	UnitSettings *unit = but->block->unit;
+	float fact;
+	if (unit->obedit && unit->obedit->unit.enabled) {
+		fact = unit->obedit->unit.scale_length /  unit->scale_length;
+	} else {
+		fact = 1.0f;
+	}
+#endif
 	BLI_strncpy(str_unit_convert, str, sizeof(str_unit_convert));
 
 	/* ugly, use the draw string to get the value,
 	 * this could cause problems if it includes some text which resolves to a unit */
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+	bUnit_ReplaceString(str_unit_convert,
+	                    sizeof(str_unit_convert),
+	                    but->drawstr,
+	                    ui_get_but_scale_unit(but, 1.0),
+	                    bUnit_GetUnitSystem(unit),
+	                    RNA_SUBTYPE_UNIT_VALUE(unit_type),
+	                    fact);
+#else
 	bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), but->drawstr,
 	                    ui_get_but_scale_unit(but, 1.0), but->block->unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));
+#endif
 
 	return BPY_execute_string_as_number(C, str_unit_convert, true, r_value);
 }
