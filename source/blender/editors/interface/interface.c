@@ -2114,7 +2114,7 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 	bUnit_AsString_force(
 					str,
 					bUnit_GetObjectFact(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)),
-					bUnit_GetScaleLength(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)),
+					bUnit_GetScaleLength_ptr(unit, RNA_SUBTYPE_UNIT_VALUE(unit_type)),
 					len_max,
 					ui_get_but_scale_unit(but, value),
 					precision,

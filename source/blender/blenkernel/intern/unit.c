@@ -433,17 +433,27 @@ static size_t unit_as_string(char *str, int len_max, double value, double fact, 
  * Return the length of the generated string.
  */
 #ifdef WITH_MECHANICAL_UNIT_FORCE
-float* bUnit_GetScaleLength(UnitSettings *unit, int unit_type){
+float* bUnit_GetScaleLength_ptr(UnitSettings *unit, int unit_type){
 	float *scale_length = NULL;
 	if (unit->flag & USER_UNIT_OPT_FORCE_SCALE && (unit_type == B_UNIT_LENGTH)) {
 		//WITH_MECHANICAL_OBJECT_UNITS
-		if (unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
+		if (unit->obedit && unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
 			scale_length = &unit->obedit->unit.scale_length;
 		}else {
 			scale_length = &unit->scale_length;
 		}
 	}
 	return scale_length;
+}
+#endif
+
+#ifdef WITH_MECHANICAL_OBJECT_UNITS
+float bUnit_GetScaleLength(UnitSettings *unit){
+	if (unit->obedit && unit->obedit->unit.enabled && unit->obedit->unit.system != USER_UNIT_NONE) {
+		return unit->obedit->unit.scale_length;
+	}else {
+		return unit->scale_length;
+	}
 }
 #endif
 

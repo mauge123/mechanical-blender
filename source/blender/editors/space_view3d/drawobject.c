@@ -2694,7 +2694,8 @@ static void get_dimension_theme_values (int selected, unsigned char *r_lines, un
 static void draw_linear_dimension (
         float* p1_co, float *p2_co,
         float *start, float *end, float *txt_pos, int selected,
-        float *normal)
+        float *normal,
+        UnitSettings *unit)
 {
 
 	float w,h;
@@ -2740,7 +2741,22 @@ static void draw_linear_dimension (
 	glEnd();
 
 	//draw dimension length
-	BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
+	if (unit) {
+		bUnit_AsString_force(numstr,
+						  bUnit_GetObjectFact(unit, B_UNIT_LENGTH),
+						  bUnit_GetScaleLength_ptr(unit, B_UNIT_LENGTH),
+						  sizeof(numstr),
+						  len_v3v3(start,end) * bUnit_GetScaleLength(unit),
+						  3,
+						  bUnit_GetUnitSystem(unit),
+						  B_UNIT_LENGTH,
+						  (unit->flag & USER_UNIT_OPT_SPLIT) != 0,
+						  false);
+	}else{
+		BLI_snprintf_rlen(numstr, sizeof(numstr), "%.6g", len_v3v3(start,end));
+	}
+
+
 	BLF_width_and_height(UIFONT_DEFAULT,numstr,sizeof(numstr),&w,&h);
 	view3d_cached_text_draw_add(txt_pos, numstr, strlen(numstr), (0-w/2), V3D_CACHE_TEXT_LOCALCLIP | V3D_CACHE_TEXT_ASCII,tcol);
 }
@@ -2879,7 +2895,7 @@ static void draw_om_dim(MDim *mdm,DerivedMesh *dm)
 								   mdm->end,
 								   mdm->dpos,
 								   false,
-									NULL);
+									NULL, NULL);
 			break;
 		case DIM_TYPE_DIAMETER:
 			draw_diameter_dimension(mdm->start, mdm->end, mdm->dpos, false);
@@ -2965,7 +2981,8 @@ static void draw_em_dim(BMEditMesh *em, BMDim *edm, RegionView3D *rv3d, Object *
 				    edm->mdim->end,
 				    edm->mdim->dpos,
 				    BM_elem_flag_test(edm, BM_ELEM_SELECT),
-				    edm->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED ? normal : NULL);
+				    edm->mdim->dimension_flag & DIMENSION_FLAG_TS_ALIGNED ? normal : NULL,
+				    &scene->unit);
 				draw_dimension_direction_points(edm);
 
 			break;
@@ -3914,9 +3931,9 @@ static void draw_em_measure_stats(ARegion *ar, View3D *v3d, Object *ob, BMEditMe
 #ifdef WITH_MECHANICAL_UNIT_FORCE
 						numstr_len = bUnit_AsString_force(numstr,
 						                                  bUnit_GetObjectFact(unit, B_UNIT_LENGTH),
-						                                  bUnit_GetScaleLength(unit, B_UNIT_LENGTH),
+						                                  bUnit_GetScaleLength_ptr(unit, B_UNIT_LENGTH),
 						                                  sizeof(numstr),
-						                                  len_v3v3(v1, v2) * unit->scale_length,
+						                                  len_v3v3(v1, v2) * bUnit_GetScaleLength(unit),
 						                                  3,
 						                                  bUnit_GetUnitSystem(unit),
 						                                  B_UNIT_LENGTH,
