@@ -164,7 +164,7 @@ static void rna_Scene_ray_cast(
 
 	bool ret = ED_transform_snap_object_project_ray_ex(
 	        sctx,
-	        SCE_SNAP_MODE_FACE,
+	        SCE_SNAP_MODE_FACE, //WITH_MECHANICAL
 	        &(const struct SnapObjectParams){
 	            .snap_select = SNAP_ALL,
 	        },

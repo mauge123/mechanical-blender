@@ -2099,9 +2099,11 @@ static void ui_update_color_picker_buts_rgb(uiBlock *block, ColorPicker *cpicker
 			continue;
 
 		if (bt->rnaprop) {
-			
 			ui_but_v3_set(bt, rgb);
 			
+			/* original button that created the color picker already does undo
+			 * push, so disable it on RNA buttons in the color picker block */
+			UI_but_flag_disable(bt, UI_BUT_UNDO);
 		}
 		else if (STREQ(bt->str, "Hex: ")) {
 			float rgb_gamma[3];
@@ -2950,8 +2952,8 @@ uiPieMenu *UI_pie_menu_begin(struct bContext *C, const char *title, int icon, co
 	pie->block_radial->puphash = ui_popup_menu_hash(title);
 	pie->block_radial->flag |= UI_BLOCK_RADIAL;
 
-	/* if pie is spawned by a left click, it is always assumed to be click style */
-	if (event->type == LEFTMOUSE) {
+	/* if pie is spawned by a left click, release or click event, it is always assumed to be click style */
+	if (event->type == LEFTMOUSE || ELEM(event->val, KM_RELEASE, KM_CLICK)) {
 		pie->block_radial->pie_data.flags |= UI_PIE_CLICK_STYLE;
 		pie->block_radial->pie_data.event = EVENT_NONE;
 		win->lock_pie_event = EVENT_NONE;

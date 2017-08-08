@@ -292,8 +292,6 @@ class CyclesRender_PT_light_paths(CyclesButtonsPanel, Panel):
         sub = col.column(align=True)
         sub.label("Transparency:")
         sub.prop(cscene, "transparent_max_bounces", text="Max")
-        sub.prop(cscene, "transparent_min_bounces", text="Min")
-        sub.prop(cscene, "use_transparent_shadows", text="Shadows")
 
         col.separator()
 
@@ -306,7 +304,6 @@ class CyclesRender_PT_light_paths(CyclesButtonsPanel, Panel):
         sub = col.column(align=True)
         sub.label(text="Bounces:")
         sub.prop(cscene, "max_bounces", text="Max")
-        sub.prop(cscene, "min_bounces", text="Min")
 
         sub = col.column(align=True)
         sub.prop(cscene, "diffuse_bounces", text="Diffuse")
@@ -1608,6 +1605,7 @@ class CyclesRender_PT_debug(CyclesButtonsPanel, Panel):
         col.prop(cscene, "debug_opencl_device_type", text="Device")
         col.prop(cscene, "debug_opencl_kernel_single_program", text="Single Program")
         col.prop(cscene, "debug_use_opencl_debug", text="Debug")
+        col.prop(cscene, "debug_opencl_mem_limit")
 
 
 class CyclesParticle_PT_CurveSettings(CyclesButtonsPanel, Panel):

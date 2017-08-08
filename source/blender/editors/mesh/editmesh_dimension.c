@@ -164,7 +164,7 @@ static int mechanical_add_dimension_exec(bContext *C, wmOperator *op)
 
 	if (em->bm->totvertsel >= get_necessary_dimension_verts(dim_type)) {
 
-		MDim *mdm = BKE_libblock_alloc(bmain, ID_DM, "Dimension");
+		MDim *mdm = BKE_libblock_alloc(bmain, ID_DM, "Dimension", 0);
 		mdm->ob = obedit;
 
 		if (!mechanical_add_dimension_from_vertexs(dim_type, mdm, em, op)) {

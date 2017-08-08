@@ -316,7 +316,7 @@ static void wm_window_match_do(bContext *C, ListBase *oldwmlist)
 }
 
 /* in case UserDef was read, we re-initialize all, and do versioning */
-static void wm_init_userdef(bContext *C, const bool use_factory_settings)
+static void wm_init_userdef(bContext *C, const bool read_userdef_from_memory)
 {
 	Main *bmain = CTX_data_main(C);
 
@@ -336,14 +336,12 @@ static void wm_init_userdef(bContext *C, const bool use_factory_settings)
 	}
 
 	/* avoid re-saving for every small change to our prefs, allow overrides */
-	if (use_factory_settings) {
+	if (read_userdef_from_memory) {
 		BLO_update_defaults_userpref_blend();
 	}
 
 	/* update tempdir from user preferences */
 	BKE_tempdir_init(U.tempdir);
-
-	BKE_blender_userdef_refresh();
 }
 
 
@@ -667,7 +665,7 @@ int wm_homefile_read(
 	 *
 	 * And in this case versioning code is to be run.
 	 */
-	bool read_userdef_from_memory = true;
+	bool read_userdef_from_memory = false;
 	eBLOReadSkip skip_flags = 0;
 
 	/* options exclude eachother */
@@ -713,7 +711,6 @@ int wm_homefile_read(
 			BKE_blender_userdef_set_data(userdef);
 			MEM_freeN(userdef);
 
-			read_userdef_from_memory = false;
 			skip_flags |= BLO_READ_SKIP_USERDEF;
 			printf("Read prefs: %s\n", filepath_userdef);
 		}
@@ -724,20 +721,20 @@ int wm_homefile_read(
 	if (filepath_startup_override != NULL) {
 		/* pass */
 	}
-	else if (app_template_override && app_template_override[0]) {
+	else if (app_template_override) {
+		/* This may be clearing the current template by setting to an empty string. */
 		app_template = app_template_override;
 	}
 	else if (!use_factory_settings && U.app_template[0]) {
 		app_template = U.app_template;
 	}
 
-	if (app_template != NULL) {
+	if ((app_template != NULL) && (app_template[0] != '\0')) {
 		BKE_appdir_app_template_id_search(app_template, app_template_system, sizeof(app_template_system));
 		BLI_path_join(app_template_config, sizeof(app_template_config), cfgdir, app_template, NULL);
-	}
 
-	/* insert template name into startup file */
-	if (app_template != NULL) {
+		/* Insert template name into startup file. */
+
 		/* note that the path is being set even when 'use_factory_settings == true'
 		 * this is done so we can load a templates factory-settings */
 		if (!use_factory_settings) {
@@ -775,6 +772,9 @@ int wm_homefile_read(
 		success = BKE_blendfile_read_from_memory(
 		        C, datatoc_startup_blend, datatoc_startup_blend_size,
 		        NULL, skip_flags, true);
+		if (success && !(skip_flags & BLO_READ_SKIP_USERDEF)) {
+			read_userdef_from_memory = true;
+		}
 		if (BLI_listbase_is_empty(&wmbase)) {
 			wm_clear_default_size(C);
 		}
@@ -810,6 +810,7 @@ int wm_homefile_read(
 			/* we need to have preferences load to overwrite preferences from previous template */
 			userdef_template = BKE_blendfile_userdef_read_from_memory(
 			        datatoc_startup_blend, datatoc_startup_blend_size, NULL);
+			read_userdef_from_memory = true;
 		}
 		if (userdef_template) {
 			BKE_blender_userdef_set_app_template(userdef_template);

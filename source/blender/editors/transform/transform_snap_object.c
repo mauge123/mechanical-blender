@@ -1789,14 +1789,17 @@ void ED_transform_snap_object_context_set_editmesh_callbacks(
 	sctx->callbacks.edit_mesh.user_data = user_data;
 }
 
+
 bool ED_transform_snap_object_project_ray_ex(
-        SnapObjectContext *sctx,
-        const unsigned short snap_to,
+        struct SnapObjectContext *sctx,
+        const unsigned short snap_to, //WITH_MECHANICAL
         const struct SnapObjectParams *params,
         const float ray_start[3], const float ray_normal[3], float *ray_depth,
+        /* return args */
         float r_loc[3], float r_no[3], int *r_index,
-        Object **r_ob, float r_obmat[4][4])
+        struct Object **r_ob, float r_obmat[4][4])
 {
+
 #ifdef WITH_MECHANICAL_GEOMETRY
 	return snapObjectsRay(
 			sctx,

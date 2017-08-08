@@ -202,6 +202,7 @@ set(SRC_GEOM_HEADERS
 	geom/geom.h
 	geom/geom_attribute.h
 	geom/geom_curve.h
+	geom/geom_curve_intersect.h
 	geom/geom_motion_curve.h
 	geom/geom_motion_triangle.h
 	geom/geom_motion_triangle_intersect.h
@@ -233,6 +234,7 @@ set(SRC_FILTER_HEADERS
 set(SRC_UTIL_HEADERS
 	../util/util_atomic.h
 	../util/util_color.h
+	../util/util_defines.h
 	../util/util_half.h
 	../util/util_hash.h
 	../util/util_math.h

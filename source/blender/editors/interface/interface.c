@@ -689,7 +689,7 @@ static bool ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBu
 
 	if (oldbut->active) {
 		/* flags from the buttons we want to refresh, may want to add more here... */
-		const int flag_copy = UI_BUT_REDALERT;
+		const int flag_copy = UI_BUT_REDALERT | UI_HAS_ICON;
 
 		found_active = true;
 
@@ -1170,6 +1170,8 @@ static void ui_menu_block_set_keymaps(const bContext *C, uiBlock *block)
 	uiBut *but;
 	char buf[128];
 
+	BLI_assert(block->flag & UI_BLOCK_LOOP);
+
 	/* only do it before bounding */
 	if (block->rect.xmin != block->rect.xmax)
 		return;
@@ -1184,6 +1186,9 @@ static void ui_menu_block_set_keymaps(const bContext *C, uiBlock *block)
 	}
 	else {
 		for (but = block->buttons.first; but; but = but->next) {
+			if (but->dt != UI_EMBOSS_PULLDOWN) {
+				continue;
+			}
 
 			if (ui_but_event_operator_string(C, but, buf, sizeof(buf))) {
 				ui_but_add_shortcut(but, buf, false);
@@ -2165,9 +2170,14 @@ static float ui_get_but_step_unit(uiBut *but, float step_default)
 
 /**
  * \param float_precision  For number buttons the precision to use or -1 to fallback to the button default.
+ * \param use_exp_float  Use exponent representation of floats when out of reasonable range (outside of 1e3/1e-3).
  */
-void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int float_precision)
+void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int float_precision, const bool use_exp_float, bool *r_use_exp_float)
 {
+	if (r_use_exp_float) {
+		*r_use_exp_float = false;
+	}
+
 	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		PropertyType type;
 		const char *buf = NULL;
@@ -2235,17 +2245,38 @@ void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int 
 				ui_get_but_string_unit(but, str, maxlen, value, false, float_precision);
 			}
 			else {
-				const int prec = (float_precision == -1) ? ui_but_calc_float_precision(but, value) : float_precision;
-				BLI_snprintf(str, maxlen, "%.*f", prec, value);
+				int prec = (float_precision == -1) ? ui_but_calc_float_precision(but, value) : float_precision;
+				if (use_exp_float) {
+					const int int_digits_num = integer_digits_f(value);
+					if (int_digits_num < -6 || int_digits_num > 12) {
+						BLI_snprintf(str, maxlen, "%.*g", prec, value);
+						if (r_use_exp_float) {
+							*r_use_exp_float = true;
+						}
+					}
+					else {
+						prec -= int_digits_num;
+						CLAMP(prec, 0, UI_PRECISION_FLOAT_MAX);
+						BLI_snprintf(str, maxlen, "%.*f", prec, value);
+					}
+				}
+				else {
+#if 0				/* TODO, but will likely break some stuff, so better after 2.79 release. */
+					prec -= int_digits_num;
+					CLAMP(prec, 0, UI_PRECISION_FLOAT_MAX);
+#endif
+					BLI_snprintf(str, maxlen, "%.*f", prec, value);
+				}
 			}
 		}
-		else
+		else {
 			BLI_snprintf(str, maxlen, "%d", (int)value);
+		}
 	}
 }
 void ui_but_string_get(uiBut *but, char *str, const size_t maxlen)
 {
-	ui_but_string_get_ex(but, str, maxlen, -1);
+	ui_but_string_get_ex(but, str, maxlen, -1, false, NULL);
 }
 
 /**

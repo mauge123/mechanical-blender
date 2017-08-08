@@ -105,7 +105,8 @@ public:
 	                                            device_memory& use_queues_flag,
 	                                            device_memory& work_pool_wgs);
 
-	virtual SplitKernelFunction* get_split_kernel_function(string kernel_name, const DeviceRequestedFeatures&);
+	virtual SplitKernelFunction* get_split_kernel_function(const string& kernel_name,
+	                                                       const DeviceRequestedFeatures&);
 	virtual int2 split_kernel_local_size();
 	virtual int2 split_kernel_global_size(device_memory& kg, device_memory& data, DeviceTask *task);
 };
@@ -1897,17 +1898,13 @@ public:
 		int threads_per_block;
 		cuda_assert(cuFuncGetAttribute(&threads_per_block, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, func));
 
-		int xthreads = (int)sqrt(threads_per_block);
-		int ythreads = (int)sqrt(threads_per_block);
-
-		int xblocks = (dim.global_size[0] + xthreads - 1)/xthreads;
-		int yblocks = (dim.global_size[1] + ythreads - 1)/ythreads;
+		int xblocks = (dim.global_size[0]*dim.global_size[1] + threads_per_block - 1)/threads_per_block;
 
 		cuda_assert(cuFuncSetCacheConfig(func, CU_FUNC_CACHE_PREFER_L1));
 
 		cuda_assert(cuLaunchKernel(func,
-		                           xblocks , yblocks, 1, /* blocks */
-		                           xthreads, ythreads, 1, /* threads */
+		                           xblocks, 1, 1, /* blocks */
+		                           threads_per_block, 1, 1, /* threads */
 		                           0, 0, args, 0));
 
 		device->cuda_pop_context();
@@ -2037,7 +2034,8 @@ bool CUDASplitKernel::enqueue_split_kernel_data_init(const KernelDimensions& dim
 	return !device->have_error();
 }
 
-SplitKernelFunction* CUDASplitKernel::get_split_kernel_function(string kernel_name, const DeviceRequestedFeatures&)
+SplitKernelFunction* CUDASplitKernel::get_split_kernel_function(const string& kernel_name,
+                                                                const DeviceRequestedFeatures&)
 {
 	CUfunction func;
 
@@ -2166,7 +2164,6 @@ void device_cuda_info(vector<DeviceInfo>& devices)
 
 		info.advanced_shading = (major >= 2);
 		info.has_bindless_textures = (major >= 3);
-		info.pack_images = false;
 
 		int pci_location[3] = {0, 0, 0};
 		cuDeviceGetAttribute(&pci_location[0], CU_DEVICE_ATTRIBUTE_PCI_DOMAIN_ID, num);

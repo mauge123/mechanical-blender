@@ -61,7 +61,7 @@ Drawing *BKE_drawing_add(Main *bmain, const char *name)
 {
 	Drawing *dwg;
 
-	dwg = BKE_libblock_alloc(bmain, ID_DW, name);
+	dwg = BKE_libblock_alloc(bmain, ID_DW, name, 0);
 
 	//BKE_text_init(ta);
 

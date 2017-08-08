@@ -100,6 +100,8 @@ ccl_device_noinline void kernel_path_ao(KernelGlobals *kg,
 
 #ifndef __SPLIT_KERNEL__
 
+#if defined(__BRANCHED_PATH__) || defined(__BAKING__)
+
 ccl_device void kernel_path_indirect(KernelGlobals *kg,
                                      ShaderData *sd,
                                      ShaderData *emission_sd,
@@ -428,6 +430,7 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 	}
 }
 
+#endif /* defined(__BRANCHED_PATH__) || defined(__BAKING__) */
 
 ccl_device_inline float kernel_path_integrate(KernelGlobals *kg,
                                               RNG *rng,
@@ -643,11 +646,15 @@ ccl_device_inline float kernel_path_integrate(KernelGlobals *kg,
 #ifdef __SHADOW_TRICKS__
 		if((sd.object_flag & SD_OBJECT_SHADOW_CATCHER)) {
 			if(state.flag & PATH_RAY_CAMERA) {
-				state.flag |= (PATH_RAY_SHADOW_CATCHER | PATH_RAY_SHADOW_CATCHER_ONLY | PATH_RAY_STORE_SHADOW_INFO);
-				state.catcher_object = sd.object;
+				state.flag |= (PATH_RAY_SHADOW_CATCHER |
+				               PATH_RAY_SHADOW_CATCHER_ONLY |
+				               PATH_RAY_STORE_SHADOW_INFO);
 				if(!kernel_data.background.transparent) {
-					L->shadow_color = indirect_background(kg, &emission_sd, &state, &ray);
+					L->shadow_background_color =
+					        indirect_background(kg, &emission_sd, &state, &ray);
 				}
+				L->shadow_radiance_sum = path_radiance_clamp_and_sum(kg, L);
+				L->shadow_throughput = average(throughput);
 			}
 		}
 		else {
@@ -775,7 +782,7 @@ ccl_device_inline float kernel_path_integrate(KernelGlobals *kg,
 #endif  /* __SUBSURFACE__ */
 
 #ifdef __SHADOW_TRICKS__
-	*is_shadow_catcher = (state.flag & PATH_RAY_SHADOW_CATCHER);
+	*is_shadow_catcher = (state.flag & PATH_RAY_SHADOW_CATCHER) != 0;
 #endif  /* __SHADOW_TRICKS__ */
 
 #ifdef __KERNEL_DEBUG__

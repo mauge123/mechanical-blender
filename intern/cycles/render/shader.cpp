@@ -190,6 +190,7 @@ Shader::Shader()
 	has_volume_spatial_varying = false;
 	has_object_dependency = false;
 	has_integrator_dependency = false;
+	has_volume_connected = false;
 
 	displacement_method = DISPLACE_BUMP;
 
@@ -502,9 +503,7 @@ void ShaderManager::device_update_common(Device *device,
 	KernelIntegrator *kintegrator = &dscene->data.integrator;
 	kintegrator->use_volumes = has_volumes;
 	/* TODO(sergey): De-duplicate with flags set in integrator.cpp. */
-	if(scene->integrator->transparent_shadows) {
-		kintegrator->transparent_shadows = has_transparent_shadow;
-	}
+	kintegrator->transparent_shadows = has_transparent_shadow;
 }
 
 void ShaderManager::device_free_common(Device *device, DeviceScene *dscene, Scene *scene)

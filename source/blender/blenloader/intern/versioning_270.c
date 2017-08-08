@@ -1236,12 +1236,19 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 
 			SEQ_BEGIN (scene->ed, seq)
 			{
-				if (seq->type == SEQ_TYPE_TEXT) {
-					TextVars *data = seq->effectdata;
-					if (data->color[3] == 0.0f) {
-						copy_v4_fl(data->color, 1.0f);
-						data->shadow_color[3] = 1.0f;
-					}
+				if (seq->type != SEQ_TYPE_TEXT) {
+					continue;
+				}
+
+				if (seq->effectdata == NULL) {
+					struct SeqEffectHandle effect_handle = BKE_sequence_get_effect(seq);
+					effect_handle.init(seq);
+				}
+
+				TextVars *data = seq->effectdata;
+				if (data->color[3] == 0.0f) {
+					copy_v4_fl(data->color, 1.0f);
+					data->shadow_color[3] = 1.0f;
 				}
 			}
 			SEQ_END
@@ -1652,7 +1659,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 		} FOREACH_NODETREE_END
 	}
 
-	{
+	if (!MAIN_VERSION_ATLEAST(main, 279, 0)) {
 		for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
 			if (scene->r.im_format.exr_codec == R_IMF_EXR_CODEC_DWAB) {
 				scene->r.im_format.exr_codec = R_IMF_EXR_CODEC_DWAA;
@@ -1669,7 +1676,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 void do_versions_after_linking_270(Main *main)
 {
 	/* To be added to next subversion bump! */
-	{
+	if (!MAIN_VERSION_ATLEAST(main, 279, 0)) {
 		FOREACH_NODETREE(main, ntree, id) {
 			if (ntree->type == NTREE_COMPOSIT) {
 				ntreeSetTypes(NULL, ntree);

@@ -311,14 +311,6 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
                 default=0.0,
                 )
 
-        cls.min_bounces = IntProperty(
-                name="Min Bounces",
-                description="Minimum number of bounces, setting this lower "
-                            "than the maximum enables probabilistic path "
-                            "termination (faster but noisier)",
-                min=0, max=1024,
-                default=3,
-                )
         cls.max_bounces = IntProperty(
                 name="Max Bounces",
                 description="Total maximum number of bounces",
@@ -351,25 +343,11 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
                 default=0,
                 )
 
-        cls.transparent_min_bounces = IntProperty(
-                name="Transparent Min Bounces",
-                description="Minimum number of transparent bounces, setting "
-                            "this lower than the maximum enables "
-                            "probabilistic path termination (faster but "
-                            "noisier)",
-                min=0, max=1024,
-                default=8,
-                )
         cls.transparent_max_bounces = IntProperty(
                 name="Transparent Max Bounces",
                 description="Maximum number of transparent bounces",
                 min=0, max=1024,
                 default=8,
-                )
-        cls.use_transparent_shadows = BoolProperty(
-                name="Transparent Shadows",
-                description="Use transparency of surfaces for rendering shadows",
-                default=True,
                 )
 
         cls.volume_step_size = FloatProperty(
@@ -702,6 +680,9 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
             )
 
         cls.debug_use_opencl_debug = BoolProperty(name="Debug OpenCL", default=False)
+
+        cls.debug_opencl_mem_limit = IntProperty(name="Memory limit", default=0,
+            description="Artificial limit on OpenCL memory usage in MB (0 to disable limit)")
 
     @classmethod
     def unregister(cls):

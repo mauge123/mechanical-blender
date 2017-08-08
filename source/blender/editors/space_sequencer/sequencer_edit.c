@@ -2162,7 +2162,7 @@ static int sequencer_add_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 	if (ed == NULL)
 		return OPERATOR_CANCELLED;
 
-	BKE_sequence_base_dupli_recursive(scene, NULL, &nseqbase, ed->seqbasep, SEQ_DUPE_CONTEXT);
+	BKE_sequence_base_dupli_recursive(scene, NULL, &nseqbase, ed->seqbasep, SEQ_DUPE_CONTEXT, 0);
 
 	if (nseqbase.first) {
 		Sequence *seq = nseqbase.first;
@@ -3200,7 +3200,7 @@ static int sequencer_copy_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	BKE_sequence_base_dupli_recursive(scene, NULL, &nseqbase, ed->seqbasep, SEQ_DUPE_UNIQUE_NAME);
+	BKE_sequence_base_dupli_recursive(scene, NULL, &nseqbase, ed->seqbasep, SEQ_DUPE_UNIQUE_NAME, 0);
 
 	/* To make sure the copied strips have unique names between each other add
 	 * them temporarily to the end of the original seqbase. (bug 25932)
@@ -3267,7 +3267,7 @@ static int sequencer_paste_exec(bContext *C, wmOperator *UNUSED(op))
 	ED_sequencer_deselect_all(scene);
 	ofs = scene->r.cfra - seqbase_clipboard_frame;
 
-	BKE_sequence_base_dupli_recursive(scene, NULL, &nseqbase, &seqbase_clipboard, SEQ_DUPE_UNIQUE_NAME);
+	BKE_sequence_base_dupli_recursive(scene, NULL, &nseqbase, &seqbase_clipboard, SEQ_DUPE_UNIQUE_NAME, 0);
 
 	/* transform pasted strips before adding */
 	if (ofs) {
@@ -3512,7 +3512,7 @@ static int sequencer_enable_proxies_exec(bContext *C, wmOperator *op)
 	bool proxy_50 = RNA_boolean_get(op->ptr, "proxy_50");
 	bool proxy_75 = RNA_boolean_get(op->ptr, "proxy_75");
 	bool proxy_100 = RNA_boolean_get(op->ptr, "proxy_100");
-	bool override = RNA_boolean_get(op->ptr, "override");
+	bool overwrite = RNA_boolean_get(op->ptr, "overwrite");
 	bool turnon = true;
 
 	if (ed == NULL || !(proxy_25 || proxy_50 || proxy_75 || proxy_100)) {
@@ -3548,7 +3548,7 @@ static int sequencer_enable_proxies_exec(bContext *C, wmOperator *op)
 				else 
 					seq->strip->proxy->build_size_flags &= ~SEQ_PROXY_IMAGE_SIZE_100;
 				
-				if (!override)
+				if (!overwrite)
 					seq->strip->proxy->build_flags |= SEQ_PROXY_SKIP_EXISTING;
 				else 
 					seq->strip->proxy->build_flags &= ~SEQ_PROXY_SKIP_EXISTING;
@@ -3580,7 +3580,7 @@ void SEQUENCER_OT_enable_proxies(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "proxy_50", false, "50%", "");
 	RNA_def_boolean(ot->srna, "proxy_75", false, "75%", "");
 	RNA_def_boolean(ot->srna, "proxy_100", false, "100%", "");
-	RNA_def_boolean(ot->srna, "override", false, "Override", "");
+	RNA_def_boolean(ot->srna, "overwrite", false, "Overwrite", "");
 }
 
 /* change ops */

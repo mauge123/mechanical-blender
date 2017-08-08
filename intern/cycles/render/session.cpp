@@ -721,7 +721,6 @@ DeviceRequestedFeatures Session::get_requested_device_features()
 	BakeManager *bake_manager = scene->bake_manager;
 	requested_features.use_baking = bake_manager->get_baking();
 	requested_features.use_integrator_branched = (scene->integrator->method == Integrator::BRANCHED_PATH);
-	requested_features.use_transparent &= scene->integrator->transparent_shadows;
 	requested_features.use_denoising = params.use_denoising;
 
 	return requested_features;
@@ -961,6 +960,7 @@ void Session::update_status_time(bool show_pause, bool show_done)
 	}
 	else if(show_done) {
 		status = "Done";
+		progress.set_end_time(); /* Save end time so that further calls to get_time are accurate. */
 	}
 	else {
 		status = substatus;

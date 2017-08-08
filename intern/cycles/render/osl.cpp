@@ -156,6 +156,7 @@ void OSLShaderManager::device_free(Device *device, DeviceScene *dscene, Scene *s
 	og->surface_state.clear();
 	og->volume_state.clear();
 	og->displacement_state.clear();
+	og->bump_state.clear();
 	og->background_state.reset();
 }
 
@@ -232,8 +233,10 @@ void OSLShaderManager::shading_system_init()
 			"glossy",			/* PATH_RAY_GLOSSY */
 			"singular",			/* PATH_RAY_SINGULAR */
 			"transparent",		/* PATH_RAY_TRANSPARENT */
-			"shadow",			/* PATH_RAY_SHADOW_OPAQUE */
-			"shadow",			/* PATH_RAY_SHADOW_TRANSPARENT */
+			"shadow",			/* PATH_RAY_SHADOW_OPAQUE_NON_CATCHER */
+			"shadow",			/* PATH_RAY_SHADOW_OPAQUE_CATCHER */
+			"shadow",			/* PATH_RAY_SHADOW_TRANSPARENT_NON_CATCHER */
+			"shadow",			/* PATH_RAY_SHADOW_TRANSPARENT_CATCHER */
 
 			"__unused__",
 			"__unused__",

@@ -615,6 +615,16 @@ bool WM_event_is_absolute(const wmEvent *event)
 	return (event->tablet_data != NULL);
 }
 
+bool WM_event_is_last_mousemove(const wmEvent *event)
+{
+	while ((event = event->next)) {
+		if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 #ifdef WITH_INPUT_NDOF
 void WM_ndof_deadzone_set(float deadzone)
 {
@@ -1079,6 +1089,9 @@ bool WM_operator_last_properties_store(wmOperator *UNUSED(op))
 
 #endif
 
+/**
+ * Also used for exec when 'event' is NULL.
+ */
 #ifdef WITH_MECHANICAL
 static int wm_operator_invoke(
         bContext *C, wmOperatorType *ot, wmEvent *event,
@@ -1099,6 +1112,11 @@ static int wm_operator_invoke(
 		wmWindowManager *wm = CTX_wm_manager(C);
 		const bool is_nested_call = (wm->op_undo_depth != 0);
 		wmOperator *op = wm_operator_create(wm, ot, properties, reports); /* if reports == NULL, they'll be initialized */
+
+		if (event != NULL) {
+			op->flag |= OP_IS_INVOKE;
+		}
+
 #ifdef WITH_MECHANICAL
 		wmOperator *opm, *opm_prev;
 
@@ -2922,7 +2940,7 @@ void WM_event_add_mousemove(bContext *C)
 
 
 /* for modal callbacks, check configuration for how to interpret exit with tweaks  */
-bool WM_modal_tweak_exit(const wmEvent *event, int tweak_event)
+bool WM_event_is_modal_tweak_exit(const wmEvent *event, int tweak_event)
 {
 	/* if the release-confirm userpref setting is enabled, 
 	 * tweak events can be canceled when mouse is released
