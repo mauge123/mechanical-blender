@@ -1,3 +1,9 @@
+**THIS REPO IS DEAD AND WILL NOT UPDATED ANYNORE**
+
+Development is moved [here](https://projects.blender.org/JaumeBellet/mblender)  
+
+Check [Mechanical's Blender website](https://mechanicalblender.org) for more info.
+
 # Mechanical-blender
 Mechanical Blender project is fork of blender BF-Project
 
